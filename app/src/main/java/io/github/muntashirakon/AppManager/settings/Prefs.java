@@ -676,6 +676,14 @@ public final class Prefs {
         public static void setFilteredProfileName(@Nullable String profileName) {
             AppPref.set(AppPref.PrefKey.PREF_MAIN_WINDOW_FILTER_PROFILE_STR, profileName == null ? "" : profileName);
         }
+
+        public static boolean getFilteredProfileNegate() {
+            return AppPref.getBoolean(AppPref.PrefKey.PREF_MAIN_WINDOW_FILTER_PROFILE_NEGATE_BOOL);
+        }
+
+        public static void setFilteredProfileNegate(boolean negate) {
+            AppPref.set(AppPref.PrefKey.PREF_MAIN_WINDOW_FILTER_PROFILE_NEGATE_BOOL, negate);
+        }
     }
 
     public static final class Misc {

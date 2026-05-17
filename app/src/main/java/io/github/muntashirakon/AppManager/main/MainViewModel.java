@@ -89,6 +89,7 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
     private int mFilterFlags;
     @Nullable
     private String mFilterProfileName;
+    private boolean mFilterProfileNegate;
     @Nullable
     private int[] mSelectedUsers;
     private String mSearchQuery;
@@ -107,6 +108,7 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
         mReverseSort = Prefs.MainPage.isReverseSort();
         mFilterFlags = Prefs.MainPage.getFilters();
         mFilterProfileName = Prefs.MainPage.getFilteredProfileName();
+        mFilterProfileNegate = Prefs.MainPage.getFilteredProfileNegate();
         mSelectedUsers = null; // TODO: 5/6/23 Load from prefs?
         if ("".equals(mFilterProfileName)) mFilterProfileName = null;
     }
@@ -291,6 +293,18 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
     @Nullable
     public String getFilterProfileName() {
         return mFilterProfileName;
+    }
+
+    public void setFilterProfileNegate(boolean negate) {
+        if (mFilterProfileNegate == negate) return;
+        mFilterProfileNegate = negate;
+        Prefs.MainPage.setFilteredProfileNegate(negate);
+        cancelIfRunning();
+        mFilterResult = executor.submit(this::filterItemsByFlags);
+    }
+
+    public boolean getFilterProfileNegate() {
+        return mFilterProfileNegate;
     }
 
     public void setSelectedUsers(@Nullable int[] selectedUsers) {
@@ -500,8 +514,19 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
                 }
                 List<ApplicationItem> result = filterItem.getFilteredAppInfoList(candidateApplicationItems);
                 if (profileFilterItem != null) {
-                    // Filter profile
-                    result = profileFilterItem.getFilteredAppInfoList(result);
+                    // Fork: profile filter — negate shows apps NOT in the profile; else only those in it
+                    List<ApplicationItem> profileMatched = profileFilterItem.getFilteredAppInfoList(result);
+                    if (mFilterProfileNegate) {
+                        HashSet<String> matchedPackages = new HashSet<>();
+                        for (ApplicationItem m : profileMatched) matchedPackages.add(m.packageName);
+                        List<ApplicationItem> negated = new ArrayList<>();
+                        for (ApplicationItem item : result) {
+                            if (!matchedPackages.contains(item.packageName)) negated.add(item);
+                        }
+                        result = negated;
+                    } else {
+                        result = profileMatched;
+                    }
                 }
                 for (ApplicationItem item : result) {
                     if ((mFilterFlags & MainListOptions.FILTER_APPS_WITH_SPLITS) != 0 && !item.hasSplits) {
