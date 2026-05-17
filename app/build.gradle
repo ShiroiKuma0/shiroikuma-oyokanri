@@ -11,7 +11,7 @@ android {
     buildToolsVersion = build_tools
 
     defaultConfig {
-        applicationId 'io.github.muntashirakon.AppManager'
+        applicationId 'shiroikuma.appmanager'
         minSdk min_sdk
         targetSdk target_sdk
         versionCode 451
@@ -46,7 +46,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            resValue "string", "app_name", "App Manager"
+            resValue "string", "app_name", "App Manager Custom"
         }
         debug {
             applicationIdSuffix '.debug'
@@ -75,8 +75,8 @@ android {
     splits {
         abi {
             reset()
-            include 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
-            universalApk true
+            include 'arm64-v8a'
+            universalApk false
         }
     }
     aaptOptions {

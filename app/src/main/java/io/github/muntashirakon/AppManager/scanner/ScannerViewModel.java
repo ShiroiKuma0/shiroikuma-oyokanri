@@ -424,10 +424,9 @@ public class ScannerViewModel extends AndroidViewModel {
         mLibraryClassesLiveData.postValue(libraryInfoList);
         mLibraryInfoList = libraryInfoList;
 
-        if (BuildConfig.DEBUG) {
-            mMissingClasses = missingLibs;
-            mMissingClassesLiveData.postValue(missingLibs);
-        }
+        // Fork: missing-classes display unconditional (upstream gates this behind BuildConfig.DEBUG)
+        mMissingClasses = missingLibs;
+        mMissingClassesLiveData.postValue(missingLibs);
     }
 
     @WorkerThread
