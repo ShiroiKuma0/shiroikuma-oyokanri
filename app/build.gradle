@@ -214,9 +214,19 @@ android.applicationVariants.configureEach { variant ->
 }
 
 def buildTime() {
-    var commitTime = "git show --no-patch --format=%ct000".execute([], project.rootDir).text.trim()
-    if (isDigitsOnly(commitTime)) {
-        return Long.parseLong(commitTime)
+    // Configuration-cache-compatible external process: providers.exec is tracked as a CC fingerprint input,
+    // unlike Groovy's String.execute() which is forbidden at configuration time.
+    try {
+        var execOutput = providers.exec {
+            commandLine 'git', 'show', '--no-patch', '--format=%ct000'
+            workingDir = rootProject.projectDir
+        }
+        var commitTime = execOutput.standardOutput.asText.get().trim()
+        if (isDigitsOnly(commitTime)) {
+            return Long.parseLong(commitTime)
+        }
+    } catch (Exception e) {
+        // fall through to system time
     }
     println("Using system time as the build time.")
     return System.currentTimeMillis()

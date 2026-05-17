@@ -29,11 +29,15 @@ interface InjectedExecOps {
 
 tasks.register('buildDocs') {
     def injected = project.objects.newInstance(InjectedExecOps)
+    // Capture project/rootProject references at configuration time (configuration-cache requirement
+    // — Task.project access at execution time is forbidden).
+    String capturedRootProjectDir = rootProject.projectDir.absolutePath
+    File capturedRootDirFile = project.rootDir
     doLast {
         println("=== docs: start ===")
-        String buildExec = "${rootProject.projectDir.absolutePath}/scripts/make_docs.sh"
+        String buildExec = "${capturedRootProjectDir}/scripts/make_docs.sh"
         injected.execOps.exec {
-            workingDir = project.rootDir
+            workingDir = capturedRootDirFile
             executable = buildExec
         }
         println("=== docs: finish ===")
@@ -41,8 +45,9 @@ tasks.register('buildDocs') {
 }
 
 tasks.register('cleanupDocs') {
+    String capturedRootProjectDir = rootProject.projectDir.absolutePath
     doLast {
-        File file = new File("${rootProject.projectDir.absolutePath}/docs/src/main/res")
+        File file = new File("${capturedRootProjectDir}/docs/src/main/res")
         if (file.exists()) {
             deleteDir(file)
         }

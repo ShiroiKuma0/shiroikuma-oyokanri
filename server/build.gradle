@@ -47,11 +47,24 @@ android.libraryVariants.configureEach { variant ->
     def compileTask = variant.javaCompileProvider
     def libServerCompileTask = project(':libserver').tasks.named("compile${buildTypeCap}JavaWithJavac")
     def injected = project.objects.newInstance(InjectedExecOps)
+    // Fork: capture project/android references at configuration time (configuration-cache
+    // requirement — Task.project / android.* / project-property access at execution time is
+    // forbidden). Upstream's rewrite reads android.sdkDirectory / target_sdk / min_sdk and the
+    // compile-task output dirs inside doLast; we resolve them here into plain values / providers
+    // so the doLast closure holds only serializable state.
+    String serverPkg = "io/github/muntashirakon/AppManager/server"
+    def capturedMinSdk = min_sdk
+    int capturedTargetSdk = target_sdk
+    String capturedSdkDirPath = android.sdkDirectory.path
+    String capturedBuildToolsVersion = android.buildToolsVersion
+    String androidJar = "${capturedSdkDirPath}/platforms/android-${capturedTargetSdk}/android.jar"
+    String d8Path = "${capturedSdkDirPath}/build-tools/${capturedBuildToolsVersion}/d8"
+    def serverClassesDirProvider = compileTask.map { it.destinationDirectory.get().asFile.absolutePath }
+    def libserverClassesDirProvider = libServerCompileTask.map { it.destinationDirectory.get().asFile.absolutePath }
     tasks.register("create${buildTypeCap}ServerJars") {
         inputs.dir(compileTask.map { it.destinationDirectory.get() })
         inputs.dir(libServerCompileTask.map { it.destinationDirectory.get() })
 
-        String serverPkg = "io/github/muntashirakon/AppManager/server"
         String srcDir = buildType == "release" ? "main" : buildType
         File assetsDir = file("${project.rootDir}/app/src/${srcDir}/assets")
         File amJar = new File(assetsDir, "am.jar")
@@ -64,12 +77,14 @@ android.libraryVariants.configureEach { variant ->
             println("Building Server JARs for type: ${buildType}")
             assetsDir.mkdirs()
 
-            String serverClassDir = compileTask.get().destinationDirectory.get().asFile.absolutePath
-            String libserverClassDir = libServerCompileTask.get().destinationDirectory.get().asFile.absolutePath + "/${serverPkg}/common"
+            // Fork: config-cache safe — the class dirs come from providers captured at
+            // configuration time, never from compileTask.get() inside doLast.
+            String serverClassDir = serverClassesDirProvider.get()
+            String libserverClassDir = libserverClassesDirProvider.get() + "/${serverPkg}/common"
 
-            String androidJar = "${android.sdkDirectory.path}/platforms/android-${target_sdk}/android.jar"
-            String d8Path = "${android.sdkDirectory.path}/build-tools/${android.buildToolsVersion}/d8"
-            // Make sure the build script and d8 use the same version of java.
+            // Upstream: make sure the build script and d8 use the same version of java.
+            // NOTE: androidJar/d8Path are already hoisted to configuration time above —
+            // re-declaring them here (as upstream does) would shadow them and fail to compile.
             String gradleJavaHome = System.getProperty("java.home")
             File gradleJava = new File(gradleJavaHome, "bin/java")
             if (!gradleJava.isFile()) {
@@ -87,7 +102,7 @@ android.libraryVariants.configureEach { variant ->
             }
 
             println("Creating am.jar...")
-            def amArgs = ['--release', '--min-api', min_sdk, '--output', amJar.absolutePath, '--lib', androidJar]
+            def amArgs = ['--release', '--min-api', capturedMinSdk, '--output', amJar.absolutePath, '--lib', androidJar]
             amArgs.addAll(Files.list(Paths.get(libserverClassDir)).filter {
                 !it.fileName.toString().startsWith("IRootServiceManager")
             }.map { it.toString() }.sorted().collect(Collectors.toList()))
@@ -98,7 +113,7 @@ android.libraryVariants.configureEach { variant ->
             println("Created ${amJar}")
 
             println("Creating main.jar...")
-            def mainArgs = ['--release', '--min-api', min_sdk, '--output', mainJar.absolutePath, '--lib', androidJar]
+            def mainArgs = ['--release', '--min-api', capturedMinSdk, '--output', mainJar.absolutePath, '--lib', androidJar]
             mainArgs.addAll(Files.list(Paths.get(libserverClassDir)).filter {
                 it.fileName.toString().startsWith("IRootServiceManager") || it.fileName.toString().startsWith("ServerUtils")
             }.map { it.toString() }.sorted().collect(Collectors.toList()))
@@ -113,13 +128,14 @@ android.libraryVariants.configureEach { variant ->
     compileTask.configure { finalizedBy("create${buildTypeCap}ServerJars") }
 }
 
+// Fork: capture rootProject.projectDir at config time for the cleanup task (configuration-cache).
+String capturedRootProjectDir = rootProject.projectDir.absolutePath
 tasks.register('cleanupServerJars') {
     doLast {
-        String rootDir = rootProject.projectDir.absolutePath
-        file("${rootDir}/app/src/main/assets/am.jar").delete()
-        file("${rootDir}/app/src/main/assets/main.jar").delete()
-        file("${rootDir}/app/src/debug/assets/am.jar").delete()
-        file("${rootDir}/app/src/debug/assets/main.jar").delete()
+        new File("${capturedRootProjectDir}/app/src/main/assets/am.jar").delete()
+        new File("${capturedRootProjectDir}/app/src/main/assets/main.jar").delete()
+        new File("${capturedRootProjectDir}/app/src/debug/assets/am.jar").delete()
+        new File("${capturedRootProjectDir}/app/src/debug/assets/main.jar").delete()
     }
 }
 
