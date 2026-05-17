@@ -5,6 +5,10 @@ plugins {
     id('dev.rikka.tools.refine') version "${refine_version}"
 }
 
+def customBuildNumber = (project.findProperty('customBuildNumber') ?: '0') as Integer
+def customBaseVersionName = project.findProperty('customBaseVersionName') ?: '4.0.5'
+def customBaseVersionCode = (project.findProperty('customBaseVersionCode') ?: '0') as Integer
+
 android {
     namespace 'io.github.muntashirakon.AppManager'
     compileSdk compile_sdk
@@ -14,8 +18,8 @@ android {
         applicationId 'shiroikuma.appmanager'
         minSdk min_sdk
         targetSdk target_sdk
-        versionCode 451
-        versionName "4.1.1"
+        versionCode customBaseVersionCode * 10000 + customBuildNumber
+        versionName "${customBaseVersionName}+${customBuildNumber}"
         javaCompileOptions {
             annotationProcessorOptions {
                 arguments += [

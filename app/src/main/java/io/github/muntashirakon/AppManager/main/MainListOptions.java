@@ -223,6 +223,12 @@ public class MainListOptions extends ListOptions {
                 activity.viewModel.setFilterProfileName(mAdapter.getItem(position));
             }
         });
+        profileNegateCheckbox.setChecked(activity.viewModel != null && activity.viewModel.getFilterProfileNegate());
+        profileNegateCheckbox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (activity.viewModel != null) {
+                activity.viewModel.setFilterProfileNegate(isChecked);
+            }
+        });
         mProfileSuggestionsResult = ThreadUtils.postOnBackgroundThread(() -> {
             mProfileNames.clear();
             mProfileNames.add(getString(R.string.no_profiles));
@@ -244,6 +250,7 @@ public class MainListOptions extends ListOptions {
                         }
                         profileNameSpinner.setSelection(i);
                     }
+                    profileNegateCheckbox.setChecked(activity.viewModel.getFilterProfileNegate());
                 }
             });
         });
