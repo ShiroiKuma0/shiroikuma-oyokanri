@@ -77,21 +77,8 @@ public final class BuildExpiryChecker {
 
     @Nullable
     public static Boolean buildExpired() {
-        int buildType = getBuildType();
-        long timeSpan = getCurrentTime() - getBuildTime();
-        long realTimeSpan = TIME_SPAN_MILLIS[buildType];
-        if (timeSpan <= realTimeSpan) {
-            // Build hasn't yet expired
-            return false;
-        }
-        // Build has expired
-        long warningPeriod = WARNING_PERIOD_MILLIS[buildType];
-        if (timeSpan <= realTimeSpan + warningPeriod) {
-            // Build has expired but in warning period
-            return null;
-        }
-        // Build has completely expired and should stop working
-        return true;
+        // Customized: never expire
+        return false;
     }
 
     private static long getCurrentTime() {
