@@ -22,6 +22,7 @@
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             app:navigationIcon="@null"
+            app:popupTheme="@style/ThemeOverlay.AppManager.PopupMenu"
             tools:menu="@menu/activity_main_actions" />
 
         <com.google.android.material.progressindicator.LinearProgressIndicator

@@ -12,7 +12,10 @@ import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.SpannableString;
+import android.text.Spanned;
 import android.text.TextUtils;
+import android.text.style.ForegroundColorSpan;
 import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -332,7 +335,11 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         MenuItem finderMenu = menu.findItem(R.id.action_finder);
         finderMenu.setVisible(true);
         // --- Custom theme: tint every action icon (including the overflow menu)
-        // yellow, to match the main-screen palette.
+        // yellow, to match the main-screen palette. Also wrap each title in a
+        // SpannableString with a yellow ForegroundColorSpan because the
+        // app:popupTheme overlay's text-color attributes do not propagate to
+        // M3 overflow menu item TextViews — only the popup background and
+        // icon-tint attributes do.
         final int themeYellow = ContextCompat.getColor(this, R.color.theme_bright_yellow);
         for (int i = 0; i < menu.size(); i++) {
             MenuItem item = menu.getItem(i);
@@ -341,6 +348,13 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                 icon = icon.mutate();
                 icon.setColorFilter(themeYellow, PorterDuff.Mode.SRC_IN);
                 item.setIcon(icon);
+            }
+            CharSequence title = item.getTitle();
+            if (title != null) {
+                SpannableString span = new SpannableString(title);
+                span.setSpan(new ForegroundColorSpan(themeYellow), 0, span.length(),
+                        Spanned.SPAN_INCLUSIVE_INCLUSIVE);
+                item.setTitle(span);
             }
         }
         androidx.appcompat.widget.Toolbar toolbar = findViewById(R.id.toolbar);
