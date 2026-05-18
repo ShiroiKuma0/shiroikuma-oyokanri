@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!--
+    One row in the bottom-toolbar customisation list. Checkbox at
+    the left marks the action as visible (true) or hidden (false,
+    routed to the auto-overflow "More…" menu). The drag handle on
+    the right is the touch target for drag-to-reorder; pressing it
+    starts an ItemTouchHelper drag, which lets the user move this
+    row through the list.
+
+    There is no separator between "visible" and "hidden" sections -
+    the same row layout serves both. The fragment maintains the
+    invariant that all checked rows come first (the user dragging a
+    checked row below an unchecked row, or vice-versa, just changes
+    its visibility classification on save, in addition to its order).
+-->
+<androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:minHeight="56dp"
+    android:paddingHorizontal="16dp"
+    android:paddingVertical="4dp"
+    android:background="?attr/selectableItemBackground">
+
+    <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/visible_checkbox"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:focusable="false"
+        android:clickable="false" />
+
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/action_icon"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="16dp"
+        android:contentDescription="@null"
+        tools:src="@drawable/ic_trash_can" />
+
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/action_label"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:ellipsize="end"
+        android:maxLines="1"
+        tools:text="Uninstall" />
+
+    <androidx.appcompat.widget.AppCompatImageView
+        android:id="@+id/drag_handle"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:padding="4dp"
+        android:src="@drawable/ic_drag"
+        android:contentDescription="@null"
+        android:focusable="true"
+        android:clickable="true" />
+
+</androidx.appcompat.widget.LinearLayoutCompat>

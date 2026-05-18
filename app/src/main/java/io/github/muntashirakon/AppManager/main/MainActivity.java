@@ -291,6 +291,10 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         mMultiSelectionView.updateCounter(true);
         mBatchOpsHandler = new MainBatchOpsHandler(mMultiSelectionView, viewModel);
         mMultiSelectionView.setOnSelectionChangeListener(mBatchOpsHandler);
+        // Override the XML-inflated selection toolbar with the user's
+        // customised order from MainToolbarPrefs, and wire each visible
+        // toolbar button to open the same prefs screen on long-press.
+        rebuildSelectionToolbarFromPrefs();
 
         if (SHOW_DISCLAIMER && AppPref.getBoolean(AppPref.PrefKey.PREF_SHOW_DISCLAIMER_BOOL)) {
             // Disclaimer will only be shown the first time it is loaded.
@@ -622,8 +626,79 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                 }
             });
         }
+        // Re-apply selection-toolbar prefs in case they were changed in
+        // the settings screen while we were paused. Idempotent on no
+        // change (the clear+rebuild path always runs but produces an
+        // identical menu, which the widget renders without flicker).
+        rebuildSelectionToolbarFromPrefs();
         ContextCompat.registerReceiver(this, mBatchOpsBroadCastReceiver,
                 new IntentFilter(BatchOpsService.ACTION_BATCH_OPS_COMPLETED), ContextCompat.RECEIVER_NOT_EXPORTED);
+    }
+
+    /**
+     * Replace the XML-inflated selection-action menu with one rebuilt
+     * from {@link MainToolbarPrefs}. Items are emitted in user-chosen
+     * order: visible first, then hidden, so the widget shows the
+     * visible block in the bar and dumps the hidden block into the
+     * auto-overflow ("More…") menu at the right edge.
+     *
+     * After the rebuild, posts a runnable to attach a long-press
+     * listener on each child action button so a long-press on any of
+     * them opens the customisation screen. The post is needed because
+     * the widget's presenter rebuilds child Views asynchronously when
+     * the menu changes; long-press attached now would land on the
+     * pre-rebuild Views.
+     */
+    private void rebuildSelectionToolbarFromPrefs() {
+        if (mMultiSelectionView == null) return;
+        android.view.Menu menu = mMultiSelectionView.getMenu();
+        menu.clear();
+        java.util.List<String> visible = MainToolbarPrefs.loadVisibleOrder(this);
+        java.util.List<String> hidden = MainToolbarPrefs.loadHiddenOrder(this);
+        int order = 0;
+        for (String key : visible) addToolbarItem(menu, key, order++);
+        for (String key : hidden) addToolbarItem(menu, key, order++);
+        // Rebind any constraint state (enabled/disabled per current
+        // selection) and rewire long-press once the widget has had a
+        // chance to recreate child views from the new menu.
+        if (mBatchOpsHandler != null && mAdapter != null && mAdapter.isInSelectionMode()) {
+            mBatchOpsHandler.updateConstraints();
+        }
+        mMultiSelectionView.post(this::attachToolbarLongPress);
+    }
+
+    private void addToolbarItem(@NonNull android.view.Menu menu,
+                                @NonNull String key, int order) {
+        int id = MainToolbarPrefs.idForKey(key);
+        int titleRes = MainToolbarPrefs.titleForKey(key);
+        int iconRes = MainToolbarPrefs.iconForKey(key);
+        if (id == 0 || titleRes == 0) return;
+        android.view.MenuItem item = menu.add(android.view.Menu.NONE, id, order,
+                titleRes);
+        if (iconRes != 0) item.setIcon(iconRes);
+    }
+
+    /**
+     * Find the inner LinearLayoutCompat that hosts the toolbar buttons
+     * and put the same long-press listener on every child. Long-press
+     * on any button opens the customisation screen. The listener is
+     * re-attached after every {@link #rebuildSelectionToolbarFromPrefs}
+     * call because the widget recreates child views on menu change.
+     */
+    private void attachToolbarLongPress() {
+        if (mMultiSelectionView == null) return;
+        android.view.View actionsView = mMultiSelectionView
+                .findViewById(io.github.muntashirakon.ui.R.id.selection_actions);
+        if (!(actionsView instanceof android.view.ViewGroup)) return;
+        android.view.ViewGroup vg = (android.view.ViewGroup) actionsView;
+        android.view.View.OnLongClickListener openEditor = v -> {
+            Intent intent = SettingsActivity.getSettingsIntent(this, "main_toolbar_prefs");
+            startActivity(intent);
+            return true;
+        };
+        for (int i = 0; i < vg.getChildCount(); i++) {
+            vg.getChildAt(i).setOnLongClickListener(openEditor);
+        }
     }
 
     @Override
