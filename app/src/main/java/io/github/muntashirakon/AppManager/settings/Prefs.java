@@ -361,6 +361,14 @@ public final class Prefs {
         public static void setDefaultFreezingMethod(@FreezeUtils.FreezeMethod int freezeType) {
             AppPref.set(AppPref.PrefKey.PREF_FREEZE_TYPE_INT, freezeType);
         }
+
+        public static boolean getSkipFreezeMethodDialog() {
+            return AppPref.getBoolean(AppPref.PrefKey.PREF_SKIP_FREEZE_METHOD_DIALOG_BOOL);
+        }
+
+        public static void setSkipFreezeMethodDialog(boolean skip) {
+            AppPref.set(AppPref.PrefKey.PREF_SKIP_FREEZE_METHOD_DIALOG_BOOL, skip);
+        }
     }
 
     public static final class Encryption {

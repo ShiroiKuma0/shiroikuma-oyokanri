@@ -1258,6 +1258,8 @@
     <string name="profile_freeze_msg">Freezes or unfreezes apps based on state</string>
     <string name="pref_default_freezing_method">Default freezing method</string>
     <string name="pref_default_freezing_method_description">Method to be used by default in places where there is no option to select a freezing method.</string>
+    <string name="pref_skip_freeze_method_dialog">Skip freeze method dialog</string>
+    <string name="pref_skip_freeze_method_dialog_description">When freezing a single app from its App info screen, use the default freezing method directly without showing the picker. Bulk freeze dialogs are unaffected.</string>
     <string name="suspend_app">Suspend</string>
     <string name="hide_app">Hide</string>
     <plurals name="alert_failed_to_freeze">
