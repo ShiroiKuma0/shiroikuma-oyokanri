@@ -36,6 +36,9 @@ import java.util.Locale;
 
 import io.github.muntashirakon.AppManager.PerProcessActivity;
 import io.github.muntashirakon.AppManager.R;
+import io.github.muntashirakon.AppManager.details.AppDetailsActivity;
+import io.github.muntashirakon.AppManager.profiles.AppsBaseProfileActivity;
+import io.github.muntashirakon.AppManager.profiles.ProfilesActivity;
 import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.settings.SettingsActivity;
 import io.github.muntashirakon.AppManager.utils.LangUtils;
@@ -130,13 +133,13 @@ public final class AppearanceUtils {
         public void onActivityPreCreated(@NonNull Activity activity, @Nullable Bundle savedInstanceState) {
             if (activity instanceof PerProcessActivity) {
                 int theme;
-                if (activity instanceof SettingsActivity) {
-                    // SettingsActivity uses a fork-specific yellow palette so
-                    // the entire settings screen reads as yellow on black.
-                    // Setting it from the manifest does not work because this
-                    // lifecycle callback would override it with the generic
-                    // app theme below — so we dispatch it here.
-                    theme = R.style.AppTheme_Settings;
+                if (isYellowOnBlackActivity(activity)) {
+                    // Fork-specific yellow palette on a pure-black background.
+                    // Dispatched here because this callback fires before the
+                    // activity's onCreate, and setting android:theme in the
+                    // manifest would otherwise be wiped by the generic
+                    // getAppTheme() call in the else branch.
+                    theme = R.style.AppTheme_YellowOnBlack;
                 } else {
                     boolean transparentBackground = ((PerProcessActivity) activity).getTransparentBackground();
                     theme = transparentBackground
@@ -147,6 +150,18 @@ public final class AppearanceUtils {
             }
             // Theme must be set first because the method below will add dynamic attributes to the theme
             DynamicColors.applyToActivityIfAvailable(activity);
+        }
+
+        /**
+         * Activities whose contents should render as yellow text and icons on
+         * a pure-black background. Add new entries here (single instanceof
+         * line per activity) as more screens are converted.
+         */
+        private static boolean isYellowOnBlackActivity(@NonNull Activity activity) {
+            return activity instanceof SettingsActivity
+                    || activity instanceof ProfilesActivity
+                    || activity instanceof AppsBaseProfileActivity
+                    || activity instanceof AppDetailsActivity;
         }
 
         @Override
