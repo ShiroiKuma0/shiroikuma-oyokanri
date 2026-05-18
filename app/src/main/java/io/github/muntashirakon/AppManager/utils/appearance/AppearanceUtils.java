@@ -37,6 +37,7 @@ import java.util.Locale;
 import io.github.muntashirakon.AppManager.PerProcessActivity;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.details.AppDetailsActivity;
+import io.github.muntashirakon.AppManager.main.MainActivity;
 import io.github.muntashirakon.AppManager.profiles.AppsBaseProfileActivity;
 import io.github.muntashirakon.AppManager.profiles.ProfilesActivity;
 import io.github.muntashirakon.AppManager.settings.Prefs;
@@ -161,7 +162,8 @@ public final class AppearanceUtils {
             return activity instanceof SettingsActivity
                     || activity instanceof ProfilesActivity
                     || activity instanceof AppsBaseProfileActivity
-                    || activity instanceof AppDetailsActivity;
+                    || activity instanceof AppDetailsActivity
+                    || activity instanceof MainActivity;
         }
 
         @Override

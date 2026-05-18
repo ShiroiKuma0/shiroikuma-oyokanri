@@ -277,6 +277,14 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         recyclerView.setLayoutManager(UIUtils.getGridLayoutAt450Dp(this));
         recyclerView.setAdapter(mAdapter);
         mMultiSelectionView = findViewById(R.id.selection_view);
+        // The MultiSelectionView constructor hardcodes setCardElevation(8dp)
+        // after any XML attributes are read, so app:cardElevation="0dp" in
+        // activity_main.xml is overridden during inflation. Doing it here,
+        // post-construction, sticks: M3 composites its tonal elevation
+        // overlay with an alpha derived from elevation Z, so at Z=0 the
+        // overlay contributes nothing and the outer card surface stays
+        // pure black instead of olive (colorPrimary yellow over black).
+        mMultiSelectionView.setCardElevation(0f);
         mMultiSelectionView.setOnItemSelectedListener(this);
         mMultiSelectionView.setOnSelectionModeChangeListener(this);
         mMultiSelectionView.setAdapter(mAdapter);
@@ -639,41 +647,10 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
     }
 
     private void displayChangelogIfRequired() {
-        if (!AppPref.getBoolean(AppPref.PrefKey.PREF_DISPLAY_CHANGELOG_BOOL)) {
-            return;
-        }
-        if (FundingCampaignChecker.campaignRunning()) {
-            new ScrollableDialogBuilder(this)
-                    .setMessage(R.string.funding_campaign_dialog_message)
-                    .enableAnchors()
-                    .show();
-        }
-        Snackbar.make(findViewById(android.R.id.content), R.string.view_changelog, 3 * 60 * 1000)
-                .setAction(R.string.ok, v -> {
-                    long lastVersion = AppPref.getLong(AppPref.PrefKey.PREF_DISPLAY_CHANGELOG_LAST_VERSION_LONG);
-                    AppPref.set(AppPref.PrefKey.PREF_DISPLAY_CHANGELOG_BOOL, false);
-                    AppPref.set(AppPref.PrefKey.PREF_DISPLAY_CHANGELOG_LAST_VERSION_LONG, (long) BuildConfig.VERSION_CODE);
-                    viewModel.executor.submit(() -> {
-                        Changelog changelog;
-                        try {
-                            changelog = new ChangelogParser(getApplication(), R.raw.changelog, lastVersion).parse();
-                        } catch (IOException | XmlPullParserException e) {
-                            return;
-                        }
-                        runOnUiThread(() -> {
-                            View view = View.inflate(this, R.layout.dialog_whats_new, null);
-                            RecyclerView recyclerView = view.findViewById(android.R.id.list);
-                            recyclerView.setLayoutManager(new LinearLayoutManager(recyclerView.getContext()));
-                            ChangelogRecyclerAdapter adapter = new ChangelogRecyclerAdapter();
-                            recyclerView.setAdapter(adapter);
-                            adapter.submitList(changelog.getChangelogItems());
-                            new AlertDialogBuilder(this, true)
-                                    .setTitle(R.string.changelog)
-                                    .setView(recyclerView)
-                                    .show();
-                        });
-                    });
-                }).show();
+        // Disabled in this fork. Each rebuild bumped customBuildNumber and
+        // re-tripped the upstream first-run snackbar, which is noise in
+        // rapid-iteration cycles. The changelog dialog itself is still
+        // available from the About preferences screen if wanted.
     }
 
     private void showFreezeUnfreezeDialog(int freezeType) {
