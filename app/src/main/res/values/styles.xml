@@ -91,6 +91,54 @@
         <item name="colorSurfaceContainerHigh">@android:color/black</item>
         <item name="colorSurfaceContainerHighest">@android:color/black</item>
         <item name="popupMenuBackground">@drawable/popup_menu_background_black</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.AppTheme.MaterialAlertDialog.YellowOnBlack</item>
+        <!--
+        Disable M3's tonal elevation overlay system wholesale on this theme.
+        Material 3 dialogs and other elevated surfaces construct their
+        background as a MaterialShapeDrawable programmatically and call
+        initializeElevationOverlay(context) on it. That provider reads:
+          - elevationOverlayEnabled (defaults true on Material3 dark themes)
+          - elevationOverlayColor (defaults ?attr/colorOnSurface — which we
+            override to yellow above; this is the olive source)
+        With overlay enabled and colorOnSurface = yellow, every elevated
+        MaterialShapeDrawable composites yellow-onto-black at an
+        elevation-derived alpha, producing the persistent olive cast that
+        survived four previous attempts (drawable shadowing, windowBackground
+        override, alertDialogStyle.background override, plain colour pins).
+        Setting elevationOverlayEnabled = false short-circuits the
+        compositeOverlayIfNeeded path entirely. elevationOverlayColor=black is
+        a defensive backup in case some code reads the colour without
+        consulting the gate.
+
+        These are Material-library attrs (not framework), no android: prefix
+        needed. Separate from colorSurfaceTint which is framework in API 31+
+        and would need android:colorSurfaceTint with the prefix - that name
+        without prefix is what caused the build failures in v3/v4.
+        -->
+        <item name="elevationOverlayEnabled">false</item>
+        <item name="elevationOverlayColor">@android:color/black</item>
+    </style>
+
+    <!-- Dialog theme overlay for MaterialAlertDialogs under
+         AppTheme.YellowOnBlack. The default M3 dialog window background is a
+         MaterialShapeDrawable with a tonal elevation overlay, which on a
+         yellow primary produces an olive tint over the (supposedly) black
+         surface. Two layers need overriding because M3 dialogs use them
+         both: android:windowBackground (the Window's drawable) AND
+         alertDialogStyle.background (the dialog component's visible
+         surface, defined on MaterialAlertDialog.MaterialComponents in the
+         M3 library as @drawable/mtrl_alert_dialog_background, which is the
+         MaterialShapeDrawable that produces the olive). Pointing both at our
+         plain <shape> GradientDrawable bypasses MaterialShapeDrawable on
+         both layers - the dialog now renders as pure black with a yellow
+         hairline stroke. -->
+    <style name="ThemeOverlay.AppTheme.MaterialAlertDialog.YellowOnBlack" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="android:windowBackground">@drawable/alert_dialog_bg_yellow_on_black</item>
+        <item name="alertDialogStyle">@style/MaterialAlertDialog.AppTheme.YellowOnBlack</item>
+    </style>
+
+    <style name="MaterialAlertDialog.AppTheme.YellowOnBlack" parent="MaterialAlertDialog.Material3">
+        <item name="background">@drawable/alert_dialog_bg_yellow_on_black</item>
     </style>
 
     <!-- Shadows libcore's Widget.AppTheme.MultiSelectionActionsView. The

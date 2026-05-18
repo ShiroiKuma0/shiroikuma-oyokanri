@@ -42,7 +42,9 @@ import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.io.File;
+import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -59,6 +61,7 @@ import io.github.muntashirakon.AppManager.compat.ApplicationInfoCompat;
 import io.github.muntashirakon.AppManager.compat.PackageManagerCompat;
 import io.github.muntashirakon.AppManager.details.AppDetailsActivity;
 import io.github.muntashirakon.AppManager.logs.Log;
+import io.github.muntashirakon.AppManager.profiles.AddToProfileDialogFragment;
 import io.github.muntashirakon.AppManager.profiles.ProfileManager;
 import io.github.muntashirakon.AppManager.profiles.struct.AppsProfile;
 import io.github.muntashirakon.AppManager.profiles.struct.BaseProfile;
@@ -77,6 +80,7 @@ import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 import io.github.muntashirakon.AppManager.utils.appearance.ColorCodes;
 import io.github.muntashirakon.dialog.SearchableItemsDialogBuilder;
+import io.github.muntashirakon.io.Path;
 import io.github.muntashirakon.io.Paths;
 import io.github.muntashirakon.util.AccessibilityUtils;
 import io.github.muntashirakon.util.AdapterUtils;
@@ -163,6 +167,48 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         }
         mPackageToProfileNames = map;
         ThreadUtils.postOnMainThread(this::notifyDataSetChanged);
+    }
+
+    /**
+     * Removes a single package from a named AppsProfile, persists the
+     * modified profile JSON to disk, then reloads the in-memory
+     * package-to-profiles map so the corresponding row's pills update.
+     * Used by the long-press handler on a profile pill (see the bind block).
+     * Runs entirely on a background thread; surfaces success/failure as a
+     * short toast on the main thread.
+     */
+    private void removePackageFromProfile(@NonNull String packageName, @NonNull String profileName) {
+        ThreadUtils.postOnBackgroundThread(() -> {
+            boolean success = false;
+            try {
+                String profileId = ProfileManager.getProfileIdCompat(profileName);
+                Path profilePath = ProfileManager.findProfilePathById(profileId);
+                if (profilePath != null) {
+                    BaseProfile baseProfile = BaseProfile.fromPath(profilePath);
+                    if (baseProfile instanceof AppsProfile) {
+                        AppsProfile profile = (AppsProfile) baseProfile;
+                        List<String> remaining = new ArrayList<>(Arrays.asList(profile.packages));
+                        if (remaining.remove(packageName)) {
+                            profile.packages = remaining.toArray(new String[0]);
+                            try (OutputStream os = profilePath.openOutputStream()) {
+                                profile.write(os);
+                                success = true;
+                            }
+                        }
+                    }
+                }
+            } catch (Throwable e) {
+                Log.e(TAG, "Failed to remove " + packageName + " from profile " + profileName, e);
+            }
+            final boolean ok = success;
+            if (ok) {
+                // Already on a background thread; loadProfileMembership posts
+                // its notifyDataSetChanged back to the main thread itself.
+                loadProfileMembership();
+            }
+            ThreadUtils.postOnMainThread(() ->
+                    displayShortToast(ok ? R.string.done : R.string.failed));
+        });
     }
 
     @UiThread
@@ -397,12 +443,28 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         // and backup info text used to live). Each pill is a Chip styled as
         // yellow text inside a yellow hairline-stroked transparent oval —
         // same visual language as the search bar and the installer
-        // master-toggle banner. Pills are non-interactive (display only).
+        // master-toggle banner.
+        //
+        // Interaction model on this row (per fork spec):
+        //   - tap a profile pill        -> filter the main list to apps in that profile
+        //   - long-press a profile pill -> remove this app from that profile (saves on disk)
+        //   - tap the "+" pill          -> open the add-to-profile dialog for this app
+        //   - long-press the "+" pill   -> clear an active profile filter, if any
+        // The "+" pill is a separate Chip declared in item_main.xml, sitting
+        // outside the ChipGroup so it can be right-justified by the wrapping
+        // LinearLayout (ChipGroup has weight=1, "+" sits at the right edge).
+        // It guarantees a tappable surface for the add affordance even when
+        // an app has no profile memberships. The ChipGroup's own empty-space
+        // click/long-click handlers below are kept as a defensive backup —
+        // they fire only when the user lands between or beyond pills, since
+        // each Chip consumes its own touch area.
         holder.profilePills.removeAllViews();
+        ColorStateList yellowList = ColorStateList.valueOf(mColorYellow);
+        ColorStateList transparentList = ColorStateList.valueOf(Color.TRANSPARENT);
+        final String pkgForRow = item.packageName;
+        // Profile-membership pills.
         List<String> profileNames = mPackageToProfileNames.get(item.packageName);
         if (profileNames != null) {
-            ColorStateList yellowList = ColorStateList.valueOf(mColorYellow);
-            ColorStateList transparentList = ColorStateList.valueOf(Color.TRANSPARENT);
             for (String name : profileNames) {
                 Chip chip = new Chip(context);
                 chip.setText(name);
@@ -413,11 +475,64 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                 chip.setChipIconVisible(false);
                 chip.setCloseIconVisible(false);
                 chip.setCheckable(false);
-                chip.setClickable(false);
-                chip.setFocusable(false);
+                chip.setClickable(true);
+                chip.setFocusable(true);
+                final String profileName = name;
+                chip.setOnClickListener(v -> {
+                    if (mActivity.viewModel == null) return;
+                    mActivity.viewModel.setFilterProfileNegate(false);
+                    mActivity.viewModel.setFilterProfileName(profileName);
+                });
+                chip.setOnLongClickListener(v -> {
+                    removePackageFromProfile(pkgForRow, profileName);
+                    return true;
+                });
                 holder.profilePills.addView(chip);
             }
         }
+        // The XML-declared "+" pill — always shown, right-justified by the
+        // parent LinearLayout's weight distribution. Style applied here
+        // because the chip is the same shape across all rows.
+        holder.addPill.setText("+");
+        holder.addPill.setTextColor(mColorYellow);
+        holder.addPill.setChipBackgroundColor(transparentList);
+        holder.addPill.setChipStrokeColor(yellowList);
+        holder.addPill.setChipStrokeWidth(2f);
+        holder.addPill.setChipIconVisible(false);
+        holder.addPill.setCloseIconVisible(false);
+        holder.addPill.setCheckable(false);
+        holder.addPill.setClickable(true);
+        holder.addPill.setFocusable(true);
+        holder.addPill.setOnClickListener(v -> {
+            AddToProfileDialogFragment dialog = AddToProfileDialogFragment.getInstance(
+                    new String[]{pkgForRow});
+            dialog.show(mActivity.getSupportFragmentManager(), AddToProfileDialogFragment.TAG);
+        });
+        holder.addPill.setOnLongClickListener(v -> {
+            if (mActivity.viewModel == null) return false;
+            if (mActivity.viewModel.getFilterProfileName() != null) {
+                mActivity.viewModel.setFilterProfileName(null);
+                return true;
+            }
+            return false;
+        });
+        // Empty-space handlers on the pill row itself. Defensive backup
+        // for taps that land between or beyond profile pills.
+        holder.profilePills.setClickable(true);
+        holder.profilePills.setLongClickable(true);
+        holder.profilePills.setOnClickListener(v -> {
+            AddToProfileDialogFragment dialog = AddToProfileDialogFragment.getInstance(
+                    new String[]{pkgForRow});
+            dialog.show(mActivity.getSupportFragmentManager(), AddToProfileDialogFragment.TAG);
+        });
+        holder.profilePills.setOnLongClickListener(v -> {
+            if (mActivity.viewModel == null) return false;
+            if (mActivity.viewModel.getFilterProfileName() != null) {
+                mActivity.viewModel.setFilterProfileName(null);
+                return true;
+            }
+            return false;
+        });
         // Set version (along with HW accelerated, debug and test only flags)
         holder.version.setText(item.versionTag);
         // Set version color to dark cyan if the app is inactive
@@ -676,6 +791,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         TextView backupIndicator;
         TextView backupInfoExt;
         ChipGroup profilePills;
+        Chip addPill;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -695,6 +811,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             backupIndicator = itemView.findViewById(R.id.backup_indicator);
             backupInfoExt = itemView.findViewById(R.id.backup_info_ext);
             profilePills = itemView.findViewById(R.id.profile_pills);
+            addPill = itemView.findViewById(R.id.profile_add_pill);
         }
     }
 }
