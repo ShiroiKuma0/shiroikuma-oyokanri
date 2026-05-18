@@ -12,6 +12,7 @@ import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.RemoteException;
 import android.os.UserHandleHidden;
@@ -274,6 +275,15 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         // Load app icon
         holder.icon.setTag(item.packageName);
         ImageLoader.getInstance().displayImage(item.packageName, item, holder.icon);
+        // Frozen apps: dim the icon, show a snowflake under it, italicize the label.
+        // item.isFrozen covers PM-disabled, suspended, and hidden mechanisms. It is
+        // populated from a live PackageManager query at list-load (see PackageUtils
+        // .getInstalledOrBackedUpApplicationsFromDb) so DB-cache staleness doesn't
+        // produce false negatives. ViewHolder is recycled, so every state below MUST
+        // be set in both branches.
+        holder.icon.setAlpha(item.isFrozen ? 0.5f : 1.0f);
+        holder.freezeIndicator.setVisibility(item.isFrozen ? View.VISIBLE : View.GONE);
+        holder.label.setTypeface(null, item.isFrozen ? Typeface.ITALIC : Typeface.NORMAL);
         // Set app label
         if (!TextUtils.isEmpty(mSearchQuery) && item.label.toLowerCase(Locale.ROOT).contains(mSearchQuery)) {
             // Highlight searched query
@@ -518,6 +528,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         MaterialCardView itemView;
         AppCompatImageView icon;
         AppCompatImageView debugIcon;
+        AppCompatImageView freezeIndicator;
         TextView label;
         TextView packageName;
         TextView version;
@@ -536,6 +547,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             this.itemView = (MaterialCardView) itemView;
             icon = itemView.findViewById(R.id.icon);
             debugIcon = itemView.findViewById(R.id.favorite_icon);
+            freezeIndicator = itemView.findViewById(R.id.freeze_indicator);
             label = itemView.findViewById(R.id.label);
             packageName = itemView.findViewById(R.id.packageName);
             version = itemView.findViewById(R.id.version);

@@ -151,6 +151,7 @@ import io.github.muntashirakon.AppManager.users.UserInfo;
 import io.github.muntashirakon.AppManager.users.Users;
 import io.github.muntashirakon.AppManager.utils.ArrayUtils;
 import io.github.muntashirakon.AppManager.utils.BetterActivityResult;
+import io.github.muntashirakon.AppManager.utils.BroadcastUtils;
 import io.github.muntashirakon.AppManager.utils.ClipboardUtils;
 import io.github.muntashirakon.AppManager.utils.ContextUtils;
 import io.github.muntashirakon.AppManager.utils.DateUtils;
@@ -2034,6 +2035,11 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
                 FreezeUtils.deleteFreezeMethod(mPackageName);
             }
             FreezeUtils.freeze(mPackageName, mUserId, freezeType);
+            // Notify the main list to refresh. Android's PACKAGE_CHANGED broadcast
+            // is unreliable across freeze methods (especially suspend / hide) and on
+            // some OEMs doesn't fire at all, so the main list otherwise wouldn't
+            // pick up the change until the user manually swipes-to-refresh.
+            BroadcastUtils.sendPackageAltered(requireContext(), new String[]{mPackageName});
         } catch (Throwable th) {
             Log.e(TAG, th);
             ThreadUtils.postOnMainThread(() -> displayLongToast(R.string.failed_to_freeze, mAppLabel));
@@ -2044,6 +2050,8 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
     private void doUnfreeze() {
         try {
             FreezeUtils.unfreeze(mPackageName, mUserId);
+            // See note in doFreeze() above.
+            BroadcastUtils.sendPackageAltered(requireContext(), new String[]{mPackageName});
         } catch (Throwable th) {
             Log.e(TAG, th);
             ThreadUtils.postOnMainThread(() -> displayLongToast(R.string.failed_to_unfreeze, mAppLabel));

@@ -1,5 +1,6 @@
 <!-- SPDX-License-Identifier: Apache-2.0 AND GPL-3.0-or-later -->
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     style="@style/Widget.AppTheme.CardView.ListItem.Outlined"
     android:layout_width="match_parent"
@@ -32,6 +33,17 @@
                 android:layout_gravity="center"
                 tools:srcCompat="@mipmap/ic_launcher_round"
                 android:contentDescription="@string/str_logo" />
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/freeze_indicator"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_snowflake_24dp"
+                android:visibility="gone"
+                app:tint="?attr/colorPrimary"
+                tools:ignore="ContentDescription"
+                tools:visibility="visible" />
 
             <androidx.appcompat.widget.AppCompatTextView
                 android:id="@+id/backup_indicator"
