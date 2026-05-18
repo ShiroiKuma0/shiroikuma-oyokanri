@@ -157,6 +157,13 @@ public class ApplicationItem extends PackageItemInfo implements IFilterableAppIn
      */
     public boolean isDisabled;
     /**
+     * Whether the app is frozen by any mechanism (PM-disabled, suspended, or hidden).
+     * Populated from a live PackageManager query at list-load time (see
+     * PackageUtils#getInstalledOrBackedUpApplicationsFromDb), so it reflects current
+     * system state even when the DB cache is stale.
+     */
+    public boolean isFrozen;
+    /**
      * Whether the app is installed
      */
     public boolean isInstalled = true;

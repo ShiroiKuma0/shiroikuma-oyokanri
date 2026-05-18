@@ -151,6 +151,22 @@ public final class PackageUtils {
                 CpuUtils.releaseWakeLock(wakeLock);
             }
         }
+        // Bulk-fetch live ApplicationInfo for every installed package in a single
+        // PackageManager binder call, so the frozen / disabled flags reflect the
+        // CURRENT system state — not the DB cache, which can lag (e.g. when apps
+        // were frozen/unfrozen while AppManager wasn't running to catch the
+        // PACKAGE_CHANGED broadcast, or when the freeze mechanism doesn't fire one).
+        // Failures fall back to the cached values; better stale than missing.
+        Map<String, ApplicationInfo> liveAppInfos = new HashMap<>();
+        try {
+            PackageManager pm = context.getPackageManager();
+            for (ApplicationInfo ai : pm.getInstalledApplications(
+                    PackageManager.MATCH_DISABLED_COMPONENTS | PackageManager.MATCH_UNINSTALLED_PACKAGES)) {
+                liveAppInfos.put(ai.packageName, ai);
+            }
+        } catch (Throwable e) {
+            Log.w(TAG, "Live ApplicationInfo fetch for freeze indicator failed; falling back to DB cache.", e);
+        }
         Map<String, Backup> backups = appDb.getBackups(false);
         int thisUser = UserHandleHidden.myUserId();
         // Get application items from apps
@@ -207,7 +223,16 @@ public final class PackageUtils {
             item.uid = app.uid;
             item.debuggable = app.isDebuggable();
             item.isUser = !app.isSystemApp();
-            item.isDisabled = !app.isEnabled;
+            // Frozen / disabled state: prefer live PackageManager data (built above)
+            // over the DB cache, which can lag behind the actual system state.
+            ApplicationInfo liveAi = liveAppInfos.get(app.packageName);
+            if (liveAi != null) {
+                item.isDisabled = !liveAi.enabled;
+                item.isFrozen = FreezeUtils.isFrozen(liveAi);
+            } else {
+                item.isDisabled = !app.isEnabled;
+                item.isFrozen = !app.isEnabled;
+            }
             item.label = app.packageLabel;
             item.targetSdk = app.sdk;
             item.versionName = app.versionName;

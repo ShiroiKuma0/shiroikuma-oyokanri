@@ -73,6 +73,7 @@ import io.github.muntashirakon.AppManager.usage.UsageUtils;
 import io.github.muntashirakon.AppManager.users.Users;
 import io.github.muntashirakon.AppManager.utils.ArrayUtils;
 import io.github.muntashirakon.AppManager.utils.ExUtils;
+import io.github.muntashirakon.AppManager.utils.FreezeUtils;
 import io.github.muntashirakon.AppManager.utils.MultithreadedExecutor;
 import io.github.muntashirakon.AppManager.utils.PackageUtils;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
@@ -786,6 +787,22 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
             item.debuggable = app.isDebuggable();
             item.isUser = !app.isSystemApp();
             item.isDisabled = !app.isEnabled;
+            // Frozen / disabled state: prefer live PackageManager data over the DB
+            // cache. The cache CAN be stale even after updateApplications() ran
+            // (the freeze action may not have fully propagated when the broadcast
+            // handler queried PM; or this branch may have been entered through
+            // ACTION_DB_PACKAGE_ALTERED which skips updateApplications entirely).
+            // Without this enrichment, a delayed broadcast can overwrite a correct
+            // list state — see the project skill's freeze-indicator notes.
+            try {
+                ApplicationInfo liveAi = getApplication().getPackageManager().getApplicationInfo(packageName,
+                        PackageManager.MATCH_DISABLED_COMPONENTS | PackageManager.MATCH_UNINSTALLED_PACKAGES);
+                item.isDisabled = !liveAi.enabled;
+                item.isFrozen = FreezeUtils.isFrozen(liveAi);
+            } catch (Throwable e) {
+                // Not installed / not accessible — fall back to cached values
+                item.isFrozen = !app.isEnabled;
+            }
             item.label = app.packageLabel;
             item.targetSdk = app.sdk;
             item.versionName = app.versionName;
