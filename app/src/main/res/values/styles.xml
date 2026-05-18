@@ -72,9 +72,11 @@
         <item name="actionMenuTextColor">@color/theme_bright_yellow</item>
     </style>
 
-    <style name="AppTheme.Settings" parent="AppTheme">
+    <style name="AppTheme.YellowOnBlack" parent="AppTheme">
         <item name="colorPrimary">@color/theme_bright_yellow</item>
         <item name="colorOnPrimary">@android:color/black</item>
+        <item name="colorPrimaryContainer">@color/theme_bright_yellow</item>
+        <item name="colorOnPrimaryContainer">@android:color/black</item>
         <item name="colorOnSurface">@color/theme_bright_yellow</item>
         <item name="colorOnSurfaceVariant">@color/theme_bright_yellow</item>
         <item name="colorControlNormal">@color/theme_bright_yellow</item>
@@ -88,5 +90,6 @@
         <item name="colorSurfaceContainerLowest">@android:color/black</item>
         <item name="colorSurfaceContainerHigh">@android:color/black</item>
         <item name="colorSurfaceContainerHighest">@android:color/black</item>
+        <item name="popupMenuBackground">@drawable/popup_menu_background_black</item>
     </style>
 </resources>
