@@ -988,6 +988,9 @@
     <string name="pref_buffer_title">Log buffer(s)</string>
     <string name="pref_cat_advanced">Advanced</string>
     <string name="pref_cat_appearance">Appearance</string>
+    <string name="pref_main_toolbar">Main selection toolbar</string>
+    <string name="pref_main_toolbar_description">Reorder or hide actions in the bottom toolbar when selecting apps.</string>
+    <string name="pref_main_toolbar_summary">Drag the handle on the right to reorder. Tap a row, or tick / untick its checkbox, to show or hide the action. Hidden actions stay reachable through the auto-overflow More… menu at the right edge of the toolbar.</string>
     <string name="pref_cat_configuration">Configuration</string>
     <string name="pref_default_log_level_summary">Log level at startup, when opening files, and when recording.</string>
     <string name="pref_default_log_level_title">Default log level</string>

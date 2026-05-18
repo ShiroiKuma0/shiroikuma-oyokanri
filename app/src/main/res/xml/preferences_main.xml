@@ -37,6 +37,13 @@
             app:title="@string/pref_cat_appearance" />
 
         <Preference
+            android:fragment="io.github.muntashirakon.AppManager.main.MainToolbarPreferences"
+            app:icon="@drawable/ic_view_list"
+            app:key="main_toolbar_prefs"
+            app:summary="@string/pref_main_toolbar_description"
+            app:title="@string/pref_main_toolbar" />
+
+        <Preference
             android:fragment="io.github.muntashirakon.AppManager.settings.PrivacyPreferences"
             app:icon="@drawable/ic_security"
             app:key="privacy_prefs"

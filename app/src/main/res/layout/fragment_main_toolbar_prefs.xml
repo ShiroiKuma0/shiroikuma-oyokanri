@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!--
+    Fragment hosting the bottom-toolbar customisation UI. A short
+    explanatory header sits above a vertical RecyclerView that holds
+    one row per action. Drag-to-reorder is handled by an
+    ItemTouchHelper attached in the fragment's onViewCreated.
+-->
+<androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="16dp"
+        android:paddingBottom="8dp"
+        android:textAppearance="?attr/textAppearanceBodySmall"
+        android:text="@string/pref_main_toolbar_summary" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/main_toolbar_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingBottom="8dp" />
+
+</androidx.appcompat.widget.LinearLayoutCompat>
