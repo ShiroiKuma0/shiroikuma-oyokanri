@@ -313,6 +313,18 @@ public class AdvancedSearchView extends SearchView {
         mQueryHint = hint;
     }
 
+    /**
+     * Tints the search-type selection icon (the filter-style icon on the left
+     * of the search bar) using a SRC_IN color filter. Pass a fully-opaque ARGB
+     * int. Custom-fork addition; used by MainActivity to match the main-screen
+     * theme palette.
+     */
+    public void setSearchTypeButtonTint(@androidx.annotation.ColorInt int color) {
+        if (mSearchTypeSelectionButton != null) {
+            mSearchTypeSelectionButton.setColorFilter(color, android.graphics.PorterDuff.Mode.SRC_IN);
+        }
+    }
+
     public void setEnabledTypes(@SearchType int enabledTypes) {
         this.mEnabledTypes = enabledTypes;
         if (this.mEnabledTypes == 0) {

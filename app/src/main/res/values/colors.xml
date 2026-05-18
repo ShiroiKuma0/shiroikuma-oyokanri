@@ -14,4 +14,13 @@
 
     <color name="widget_screen_time_app3_bg">#d4e3ff</color>
     <color name="widget_screen_time_app3_fg">#1b1b1b</color>
+
+    <!-- Main-screen theme palette (custom fork). Subjective values for
+         shades 'muted yellow' / grey / 'greyish orange' / screen-bg grey
+         live here so they can be tweaked in one place. -->
+    <color name="theme_bright_yellow">#FFFF00</color>
+    <color name="theme_muted_yellow">#B8B800</color>
+    <color name="theme_label_frozen_user">#888888</color>
+    <color name="theme_label_frozen_system">#A07A5A</color>
+    <color name="theme_screen_bg">#1F1F1F</color>
 </resources>

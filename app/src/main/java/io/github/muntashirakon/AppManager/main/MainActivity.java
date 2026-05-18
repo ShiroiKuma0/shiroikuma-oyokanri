@@ -8,6 +8,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.graphics.PorterDuff;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -16,6 +18,8 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.TextView;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
@@ -215,6 +219,30 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             layoutParams.gravity = Gravity.CENTER;
             actionBar.setCustomView(mSearchView, layoutParams);
             mSearchView.setIconifiedByDefault(false);
+            // --- Custom theme: yellow-pill search bar with muted-yellow internals.
+            // See app/src/main/res/values/colors.xml for the palette.
+            final int themeYellow = ContextCompat.getColor(this, R.color.theme_bright_yellow);
+            final int themeMutedYellow = ContextCompat.getColor(this, R.color.theme_muted_yellow);
+            mSearchView.setBackground(ContextCompat.getDrawable(this, R.drawable.main_search_bar_bg));
+            // Magnifier icon inside the search bar
+            ImageView magIcon = mSearchView.findViewById(androidx.appcompat.R.id.search_mag_icon);
+            if (magIcon != null) {
+                magIcon.setColorFilter(themeMutedYellow, PorterDuff.Mode.SRC_IN);
+            }
+            // Close (X) button
+            ImageView closeBtn = mSearchView.findViewById(androidx.appcompat.R.id.search_close_btn);
+            if (closeBtn != null) {
+                closeBtn.setColorFilter(themeYellow, PorterDuff.Mode.SRC_IN);
+            }
+            // Hint text + typed text
+            TextView searchText = mSearchView.findViewById(androidx.appcompat.R.id.search_src_text);
+            if (searchText != null) {
+                searchText.setHintTextColor(themeMutedYellow);
+                searchText.setTextColor(themeYellow);
+            }
+            // The search-type selection button (filter-style icon at the left)
+            mSearchView.setSearchTypeButtonTint(themeYellow);
+            // --- end custom theme
             mSearchDebouncer = new SearchViewDebouncer(SearchViewDebouncer.DELAY_STANDARD);
             mSearchDebouncer.bindAdvanced(mSearchView, (query, type) -> {
                 if (viewModel != null) viewModel.setSearchQuery(query, type);
@@ -298,6 +326,25 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         }
         MenuItem finderMenu = menu.findItem(R.id.action_finder);
         finderMenu.setVisible(true);
+        // --- Custom theme: tint every action icon (including the overflow menu)
+        // yellow, to match the main-screen palette.
+        final int themeYellow = ContextCompat.getColor(this, R.color.theme_bright_yellow);
+        for (int i = 0; i < menu.size(); i++) {
+            MenuItem item = menu.getItem(i);
+            Drawable icon = item.getIcon();
+            if (icon != null) {
+                icon = icon.mutate();
+                icon.setColorFilter(themeYellow, PorterDuff.Mode.SRC_IN);
+                item.setIcon(icon);
+            }
+        }
+        androidx.appcompat.widget.Toolbar toolbar = findViewById(R.id.toolbar);
+        if (toolbar != null && toolbar.getOverflowIcon() != null) {
+            Drawable overflow = toolbar.getOverflowIcon().mutate();
+            overflow.setColorFilter(themeYellow, PorterDuff.Mode.SRC_IN);
+            toolbar.setOverflowIcon(overflow);
+        }
+        // --- end custom theme
         return super.onCreateOptionsMenu(menu);
     }
 

@@ -8,6 +8,7 @@
     android:clickable="true"
     android:focusable="true"
     android:checkable="true"
+    app:cardBackgroundColor="@android:color/black"
     android:layout_marginHorizontal="?attr/listItemMarginHorizontal"
     android:layout_marginVertical="?attr/listItemMarginVertical">
 
