@@ -238,13 +238,6 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             }
             return true;
         });
-        holder.icon.setOnClickListener(v -> {
-            int currentPos = holder.getBindingAdapterPosition();
-            if (currentPos != RecyclerView.NO_POSITION) {
-                toggleSelection(currentPos);
-                AccessibilityUtils.requestAccessibilityFocus(holder.itemView);
-            }
-        });
         // Box-stroke colors (custom theme): uninstalled > disabled > running > stopped(none)
         if (!item.isInstalled) {
             cardView.setStrokeColor(ColorCodes.getAppUninstalledIndicatorColor(context));
@@ -316,20 +309,23 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                 : R.drawable.ic_snowflake_outline_24dp);
         holder.freezeIndicator.setImageTintList(ColorStateList.valueOf(
                 item.isFrozen ? mColorIceBlue : mColorYellow));
-        // Make the indicator a tap target to toggle freeze, but ONLY for eligible
-        // apps: user apps that aren't AppManager itself. System apps and our own
-        // package keep the indicator non-clickable so taps fall through to the
-        // parent card's selection handler. We can't reliably distinguish
-        // "critical" system apps from "regular" system apps from PackageManager
-        // metadata alone, so the conservative rule is to never toggle any system
-        // app via this shortcut. (ViewHolder recycling demands both branches set
-        // both properties.)
+        // Make the whole left icon column a tap target to toggle freeze, but
+        // ONLY for eligible apps: user apps that are not AppManager itself.
+        // System apps and our own package keep the column non-clickable so
+        // taps fall through to the parent card's click handler (which opens
+        // app details or toggles selection). Long-clicks on the column always
+        // bubble up to the card's long-click handler, so selection-via-long-
+        // press on the icon area continues to work in both branches. We
+        // cannot reliably distinguish "critical" system apps from "regular"
+        // ones via PackageManager metadata alone, so the conservative rule
+        // is to never toggle any system app via this shortcut. (ViewHolder
+        // recycling demands both branches set both properties.)
         if (item.isUser && !BuildConfig.APPLICATION_ID.equals(item.packageName)) {
-            holder.freezeIndicator.setClickable(true);
-            holder.freezeIndicator.setOnClickListener(v -> toggleFreeze(item));
+            holder.iconColumn.setClickable(true);
+            holder.iconColumn.setOnClickListener(v -> toggleFreeze(item));
         } else {
-            holder.freezeIndicator.setOnClickListener(null);
-            holder.freezeIndicator.setClickable(false);
+            holder.iconColumn.setOnClickListener(null);
+            holder.iconColumn.setClickable(false);
         }
         holder.label.setTypeface(null, item.isFrozen ? Typeface.ITALIC : Typeface.NORMAL);
         // Set app label
@@ -614,6 +610,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
 
     public static class ViewHolder extends MultiSelectionView.ViewHolder {
         MaterialCardView itemView;
+        View iconColumn;
         AppCompatImageView icon;
         AppCompatImageView debugIcon;
         AppCompatImageView freezeIndicator;
@@ -633,6 +630,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
             this.itemView = (MaterialCardView) itemView;
+            iconColumn = itemView.findViewById(R.id.icon_column);
             icon = itemView.findViewById(R.id.icon);
             debugIcon = itemView.findViewById(R.id.favorite_icon);
             freezeIndicator = itemView.findViewById(R.id.freeze_indicator);
