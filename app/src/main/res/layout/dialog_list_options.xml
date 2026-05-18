@@ -118,26 +118,36 @@
             android:orientation="vertical" />
 
         <androidx.appcompat.widget.LinearLayoutCompat
+            android:id="@+id/profile_filter_row"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
+            <!-- Kept invisible so the parent ListOptions.onViewCreated does
+                 not NPE on findViewById(R.id.spinner). The visible UI for
+                 profile filtering is the button below. -->
             <io.github.muntashirakon.widget.MaterialSpinner
                 style="@style/Widget.AppTheme.MaterialSpinner.Small"
                 android:id="@+id/spinner"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_height="0dp"
+                android:visibility="gone"
                 android:hint="@string/input_profile_name" />
 
             <com.google.android.material.checkbox.MaterialCheckBox
                 android:id="@+id/profile_negate"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_weight="0"
-                android:layout_marginStart="8dp"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone"
                 android:text="@string/filter_profile_negate" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/profile_filter_picker"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/input_profile_name" />
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 

@@ -205,53 +205,28 @@ public class MainListOptions extends ListOptions {
     private final List<String> mProfileNames = new ArrayList<>();
     private Future<?> mProfileSuggestionsResult;
     @Nullable
-    private SelectedArrayAdapter<String> mAdapter;
+    private com.google.android.material.button.MaterialButton mProfileFilterPicker;
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         MainActivity activity = (MainActivity) requireActivity();
+        // Upstream: reactive refresh of the options sheet on privilege-state change.
         LocalServices.state().observe(getViewLifecycleOwner(), ignored -> refreshOptions());
-        profileNameSpinner.setOnItemClickListener((parent, view1, position, id) -> {
-            if (mAdapter == null || activity.viewModel == null) {
-                return;
-            }
-            if (position == 0) {
-                // No profiles
-                activity.viewModel.setFilterProfileName(null);
-            } else {
-                activity.viewModel.setFilterProfileName(mAdapter.getItem(position));
-            }
-        });
-        profileNegateCheckbox.setChecked(activity.viewModel != null && activity.viewModel.getFilterProfileNegate());
-        profileNegateCheckbox.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if (activity.viewModel != null) {
-                activity.viewModel.setFilterProfileNegate(isChecked);
-            }
-        });
+        mProfileFilterPicker = view.findViewById(R.id.profile_filter_picker);
+        refreshProfileFilterButtonText(activity);
+        mProfileFilterPicker.setOnClickListener(v -> openProfileFilterPicker(activity));
+        // The legacy single-profile spinner + negate checkbox in this layout
+        // are now invisible (kept only so the parent ListOptions findViewById
+        // does not return null). Nothing to bind on them.
         mProfileSuggestionsResult = ThreadUtils.postOnBackgroundThread(() -> {
-            mProfileNames.clear();
-            mProfileNames.add(getString(R.string.no_profiles));
-            mProfileNames.addAll(ProfileManager.getProfileNames());
-            mAdapter = new SelectedArrayAdapter<>(activity,
-                    io.github.muntashirakon.ui.R.layout.auto_complete_dropdown_item_small,
-                    mProfileNames);
+            List<String> names = new ArrayList<>(ProfileManager.getProfileNames());
+            java.util.Collections.sort(names);
             if (isDetached() || ThreadUtils.isInterrupted()) return;
             activity.runOnUiThread(() -> {
-                profileNameSpinner.setAdapter(mAdapter);
-                if (activity.viewModel != null) {
-                    String selectedProfile = activity.viewModel.getFilterProfileName();
-                    if (TextUtils.isEmpty(selectedProfile)) {
-                        profileNameSpinner.setSelection(0);
-                    } else {
-                        int i = mProfileNames.indexOf(selectedProfile);
-                        if (i < 0) {
-                           i = 0;
-                        }
-                        profileNameSpinner.setSelection(i);
-                    }
-                    profileNegateCheckbox.setChecked(activity.viewModel.getFilterProfileNegate());
-                }
+                mProfileNames.clear();
+                mProfileNames.addAll(names);
+                refreshProfileFilterButtonText(activity);
             });
         });
         selectUserView.setVisibility(Users.getUsersIds().length <= 1 ? View.GONE : View.VISIBLE);
@@ -375,5 +350,100 @@ public class MainListOptions extends ListOptions {
     @Override
     public boolean enableSelectUser() {
         return true;
+    }
+
+    /**
+     * Refresh the profile-filter button's label to summarise the current
+     * filter (e.g., "In: A, B   Not in: C") or fall back to a neutral prompt
+     * when no filter is active.
+     */
+    private void refreshProfileFilterButtonText(@NonNull MainActivity activity) {
+        if (mProfileFilterPicker == null || activity.viewModel == null) return;
+        java.util.Set<String> include = activity.viewModel.getProfileFiltersInclude();
+        java.util.Set<String> exclude = activity.viewModel.getProfileFiltersExclude();
+        if (include.isEmpty() && exclude.isEmpty()) {
+            mProfileFilterPicker.setText(R.string.profile_filter_button_none);
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        if (!include.isEmpty()) {
+            sb.append("∈ ").append(TextUtils.join(", ", include));
+        }
+        if (!exclude.isEmpty()) {
+            if (sb.length() > 0) sb.append("   ");
+            sb.append("∉ ").append(TextUtils.join(", ", exclude));
+        }
+        mProfileFilterPicker.setText(getString(R.string.profile_filter_button_summary, sb.toString()));
+    }
+
+    /**
+     * Build and show the multi-profile filter picker dialog. Each known
+     * profile gets a row with two mutually-exclusive checkable chips: "In"
+     * (include) and "Not in" (exclude). Both unchecked means the profile is
+     * absent from the filter. The current selection is preloaded; pressing
+     * OK commits the new filter via viewModel.setProfileFilters and the
+     * outer button's label refreshes to summarise it.
+     */
+    private void openProfileFilterPicker(@NonNull MainActivity activity) {
+        if (activity.viewModel == null) return;
+        if (mProfileNames.isEmpty()) {
+            // No profiles known yet (either none defined or background load
+            // not finished). Nothing meaningful to show.
+            return;
+        }
+        // Working copies of the current filter; mutated as the user toggles
+        // chips, then committed on OK.
+        java.util.LinkedHashSet<String> include =
+                new java.util.LinkedHashSet<>(activity.viewModel.getProfileFiltersInclude());
+        java.util.LinkedHashSet<String> exclude =
+                new java.util.LinkedHashSet<>(activity.viewModel.getProfileFiltersExclude());
+        android.widget.LinearLayout content = new android.widget.LinearLayout(activity);
+        content.setOrientation(android.widget.LinearLayout.VERTICAL);
+        android.view.LayoutInflater inflater = android.view.LayoutInflater.from(activity);
+        for (String name : mProfileNames) {
+            android.view.View row = inflater.inflate(
+                    R.layout.dialog_profile_filter_picker_row, content, false);
+            ((android.widget.TextView) row.findViewById(R.id.profile_name)).setText(name);
+            com.google.android.material.chip.Chip inChip = row.findViewById(R.id.chip_include);
+            com.google.android.material.chip.Chip outChip = row.findViewById(R.id.chip_exclude);
+            inChip.setChecked(include.contains(name));
+            outChip.setChecked(exclude.contains(name));
+            final String profileName = name;
+            inChip.setOnCheckedChangeListener((btn, checked) -> {
+                if (checked) {
+                    include.add(profileName);
+                    if (outChip.isChecked()) outChip.setChecked(false);
+                } else {
+                    include.remove(profileName);
+                }
+            });
+            outChip.setOnCheckedChangeListener((btn, checked) -> {
+                if (checked) {
+                    exclude.add(profileName);
+                    if (inChip.isChecked()) inChip.setChecked(false);
+                } else {
+                    exclude.remove(profileName);
+                }
+            });
+            content.addView(row);
+        }
+        // Wrap in a ScrollView in case the profile count is large.
+        android.widget.ScrollView scroll = new android.widget.ScrollView(activity);
+        scroll.addView(content);
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
+                .setTitle(R.string.profile_filter_title)
+                .setView(scroll)
+                .setPositiveButton(R.string.ok, (d, w) -> {
+                    activity.viewModel.setProfileFilters(include, exclude);
+                    refreshProfileFilterButtonText(activity);
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .setNeutralButton(R.string.profile_filter_clear, (d, w) -> {
+                    activity.viewModel.setProfileFilters(
+                            java.util.Collections.emptySet(),
+                            java.util.Collections.emptySet());
+                    refreshProfileFilterButtonText(activity);
+                })
+                .show();
     }
 }
