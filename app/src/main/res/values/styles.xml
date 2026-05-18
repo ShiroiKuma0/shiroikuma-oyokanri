@@ -74,9 +74,11 @@
 
     <style name="AppTheme.Settings" parent="AppTheme">
         <item name="colorPrimary">@color/theme_bright_yellow</item>
+        <item name="colorOnPrimary">@android:color/black</item>
         <item name="colorOnSurface">@color/theme_bright_yellow</item>
         <item name="colorOnSurfaceVariant">@color/theme_bright_yellow</item>
         <item name="colorControlNormal">@color/theme_bright_yellow</item>
+        <item name="colorOutline">@color/theme_bright_yellow</item>
         <item name="android:textColorPrimary">@color/theme_bright_yellow</item>
         <item name="android:textColorSecondary">@color/theme_bright_yellow</item>
         <item name="android:colorBackground">@android:color/black</item>
