@@ -113,6 +113,21 @@ android {
     }
 }
 
+// Ensure :server:create<Variant>ServerJars writes am.jar + main.jar into
+// app/src/main/assets/ BEFORE mergeAssets snapshots that directory. Upstream wires
+// the JAR-creation task only as `javaCompileProvider.get().finalizedBy(jarTask)` in
+// server/build.gradle, which is too loose under configuration-cache + parallel
+// scheduling: mergeAssets can run before the finalizer completes, producing an APK
+// that's missing am.jar / main.jar. The runtime symptom is
+// ServerConfig.init() throwing `FileNotFoundException: am.jar`, leaving the
+// "Mode of operation -> Custom command" UI with empty command boxes.
+android.applicationVariants.configureEach { variant ->
+    String variantName = variant.buildType.name.capitalize()
+    variant.mergeAssetsProvider.configure {
+        dependsOn ":server:create${variantName}ServerJars"
+    }
+}
+
 dependencies {
     compileOnly project(path: ':hiddenapi')
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:${desugar_jdk_version}"
