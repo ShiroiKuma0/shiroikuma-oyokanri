@@ -30,19 +30,24 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
+import androidx.annotation.WorkerThread;
 import androidx.appcompat.widget.AppCompatImageView;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 
 import io.github.muntashirakon.AppManager.BuildConfig;
@@ -52,9 +57,11 @@ import io.github.muntashirakon.AppManager.apk.installer.PackageInstallerCompat;
 import io.github.muntashirakon.AppManager.backup.dialog.BackupRestoreDialogFragment;
 import io.github.muntashirakon.AppManager.compat.ApplicationInfoCompat;
 import io.github.muntashirakon.AppManager.compat.PackageManagerCompat;
-import io.github.muntashirakon.AppManager.db.entity.Backup;
 import io.github.muntashirakon.AppManager.details.AppDetailsActivity;
 import io.github.muntashirakon.AppManager.logs.Log;
+import io.github.muntashirakon.AppManager.profiles.ProfileManager;
+import io.github.muntashirakon.AppManager.profiles.struct.AppsProfile;
+import io.github.muntashirakon.AppManager.profiles.struct.BaseProfile;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
 import io.github.muntashirakon.AppManager.self.imagecache.ImageLoader;
 import io.github.muntashirakon.AppManager.settings.FeatureController;
@@ -111,6 +118,14 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         }
     };
 
+    // package name -> profile names containing it. Loaded asynchronously on
+    // adapter creation; until the load finishes the map is empty and bind
+    // just renders zero pills for every row, which is the same as an app
+    // that is in no profile. Replaced wholesale on each load to keep
+    // reads lock-free.
+    @NonNull
+    private volatile Map<String, List<String>> mPackageToProfileNames = Collections.emptyMap();
+
     MainRecyclerAdapter(@NonNull MainActivity activity) {
         super(DIFF_CALLBACK);
         mActivity = activity;
@@ -123,6 +138,31 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         mColorIceBlue = ContextCompat.getColor(activity, R.color.theme_ice_blue);
         mLabelFrozenUser = ContextCompat.getColor(activity, R.color.theme_label_frozen_user);
         mLabelFrozenSystem = ContextCompat.getColor(activity, R.color.theme_label_frozen_system);
+        ThreadUtils.postOnBackgroundThread(this::loadProfileMembership);
+    }
+
+    /**
+     * Reads every profile JSON from disk, builds a package-name to
+     * profile-names map, then swaps it in and re-renders the list. Called
+     * once on adapter construction; the list is small (handful of profiles)
+     * so we do not bother with incremental updates.
+     */
+    @WorkerThread
+    private void loadProfileMembership() {
+        Map<String, List<String>> map = new HashMap<>();
+        try {
+            for (BaseProfile profile : ProfileManager.getProfiles()) {
+                if (profile instanceof AppsProfile) {
+                    for (String pkg : ((AppsProfile) profile).packages) {
+                        map.computeIfAbsent(pkg, k -> new ArrayList<>()).add(profile.name);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to load profile membership", e);
+        }
+        mPackageToProfileNames = map;
+        ThreadUtils.postOnMainThread(this::notifyDataSetChanged);
     }
 
     @UiThread
@@ -278,14 +318,10 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         }
 
         if (item.sha != null) {
-            // Set issuer
-            holder.issuer.setVisibility(View.VISIBLE);
-            holder.issuer.setText(item.issuerShortName);
-            // Set signature type
+            // Set signature type (right column)
             holder.sha.setVisibility(View.VISIBLE);
             holder.sha.setText(item.sha.second);
         } else {
-            holder.issuer.setVisibility(View.GONE);
             holder.sha.setVisibility(View.GONE);
         }
         // Load app icon
@@ -356,8 +392,31 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         // Set package name color to orange if the app has known tracker components
         if (item.trackerCount > 0) {
             holder.packageName.setTextColor(ColorCodes.getComponentTrackerIndicatorColor(context));
-        } else {
-            holder.packageName.setTextColor(mColorSecondary);
+        } else holder.packageName.setTextColor(mColorSecondary);
+        // Populate profile-membership pills (these sit where the cert issuer
+        // and backup info text used to live). Each pill is a Chip styled as
+        // yellow text inside a yellow hairline-stroked transparent oval —
+        // same visual language as the search bar and the installer
+        // master-toggle banner. Pills are non-interactive (display only).
+        holder.profilePills.removeAllViews();
+        List<String> profileNames = mPackageToProfileNames.get(item.packageName);
+        if (profileNames != null) {
+            ColorStateList yellowList = ColorStateList.valueOf(mColorYellow);
+            ColorStateList transparentList = ColorStateList.valueOf(Color.TRANSPARENT);
+            for (String name : profileNames) {
+                Chip chip = new Chip(context);
+                chip.setText(name);
+                chip.setTextColor(mColorYellow);
+                chip.setChipBackgroundColor(transparentList);
+                chip.setChipStrokeColor(yellowList);
+                chip.setChipStrokeWidth(2f);
+                chip.setChipIconVisible(false);
+                chip.setCloseIconVisible(false);
+                chip.setCheckable(false);
+                chip.setClickable(false);
+                chip.setFocusable(false);
+                holder.profilePills.addView(chip);
+            }
         }
         // Set version (along with HW accelerated, debug and test only flags)
         holder.version.setText(item.versionTag);
@@ -384,7 +443,6 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         // Check for backup
         if (item.backup != null) {
             holder.backupIndicator.setVisibility(View.VISIBLE);
-            holder.backupInfo.setVisibility(View.VISIBLE);
             holder.backupInfoExt.setVisibility(View.VISIBLE);
             holder.backupIndicator.setText(R.string.backup);
             int indicatorColor;
@@ -401,16 +459,9 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                 indicatorColor = ColorCodes.getBackupUninstalledIndicatorColor(context);
             }
             holder.backupIndicator.setTextColor(indicatorColor);
-            Backup backup = item.backup;
-            long days = item.lastBackupDays;
-            holder.backupInfo.setText(String.format("%s: %s, %s %s",
-                    context.getString(R.string.latest_backup), context.getResources()
-                            .getQuantityString(R.plurals.usage_days, (int) days, days),
-                    context.getString(R.string.version), backup.versionName));
             holder.backupInfoExt.setText(item.backupFlagsStr);
         } else {
             holder.backupIndicator.setVisibility(View.GONE);
-            holder.backupInfo.setVisibility(View.GONE);
             holder.backupInfoExt.setVisibility(View.GONE);
         }
         super.onBindViewHolder(holder, position);
@@ -621,11 +672,10 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         TextView date;
         TextView size;
         TextView userId;
-        TextView issuer;
         TextView sha;
         TextView backupIndicator;
-        TextView backupInfo;
         TextView backupInfoExt;
+        ChipGroup profilePills;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -641,11 +691,10 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             date = itemView.findViewById(R.id.date);
             size = itemView.findViewById(R.id.size);
             userId = itemView.findViewById(R.id.shareid);
-            issuer = itemView.findViewById(R.id.issuer);
             sha = itemView.findViewById(R.id.sha);
             backupIndicator = itemView.findViewById(R.id.backup_indicator);
-            backupInfo = itemView.findViewById(R.id.backup_info);
             backupInfoExt = itemView.findViewById(R.id.backup_info_ext);
+            profilePills = itemView.findViewById(R.id.profile_pills);
         }
     }
 }
