@@ -81,6 +81,12 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
     private final int mColorPrimary;
     private final int mColorSecondary;
     private final int mQueryStringHighlight;
+    // Custom-theme palette for the main list. mColorOrange is reused for non-frozen
+    // system-app labels (same orange as the existing "SDK 35"/cleartext-traffic
+    // highlight), so no new field is needed for that.
+    private final int mColorYellow;
+    private final int mLabelFrozenUser;
+    private final int mLabelFrozenSystem;
 
     private static final DiffUtil.ItemCallback<ApplicationItem> DIFF_CALLBACK = new DiffUtil.ItemCallback<ApplicationItem>() {
         @Override
@@ -102,6 +108,9 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         mColorPrimary = ContextCompat.getColor(activity, io.github.muntashirakon.ui.R.color.textColorPrimary);
         mColorSecondary = ContextCompat.getColor(activity, io.github.muntashirakon.ui.R.color.textColorSecondary);
         mQueryStringHighlight = ColorCodes.getQueryStringHighlightColor(activity);
+        mColorYellow = ContextCompat.getColor(activity, R.color.theme_bright_yellow);
+        mLabelFrozenUser = ContextCompat.getColor(activity, R.color.theme_label_frozen_user);
+        mLabelFrozenSystem = ContextCompat.getColor(activity, R.color.theme_label_frozen_system);
     }
 
     @UiThread
@@ -224,15 +233,17 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                 AccessibilityUtils.requestAccessibilityFocus(holder.itemView);
             }
         });
-        // Box-stroke colors: uninstalled > disabled > force-stopped > regular
+        // Box-stroke colors (custom theme): uninstalled > disabled > running > stopped(none)
         if (!item.isInstalled) {
             cardView.setStrokeColor(ColorCodes.getAppUninstalledIndicatorColor(context));
         } else if (item.isDisabled) {
             cardView.setStrokeColor(ColorCodes.getAppDisabledIndicatorColor(context));
         } else if (item.isStopped) {
-            cardView.setStrokeColor(ColorCodes.getAppForceStoppedIndicatorColor(context));
-        } else {
+            // Force-stopped apps lose their distinctive border in this fork
             cardView.setStrokeColor(Color.TRANSPARENT);
+        } else {
+            // Running apps (installed, not disabled, not stopped) get the yellow oval
+            cardView.setStrokeColor(mColorYellow);
         }
         // Display yellow star if the app is in debug mode
         holder.debugIcon.setVisibility(item.debuggable ? View.VISIBLE : View.INVISIBLE);
@@ -288,15 +299,19 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         if (!TextUtils.isEmpty(mSearchQuery) && item.label.toLowerCase(Locale.ROOT).contains(mSearchQuery)) {
             // Highlight searched query
             holder.label.setText(UIUtils.getHighlightedText(item.label, mSearchQuery, mQueryStringHighlight));
+        } else holder.label.setText(item.label);
+        // Set app label color (custom theme — 4-state: isFrozen × isUser).
+        // - non-frozen + user        : bright yellow
+        // - non-frozen + system app  : orange (same as cleartext-traffic SDK highlight)
+        // - frozen + user            : grey
+        // - frozen + system app      : greyish-orange
+        int labelColor;
+        if (item.isFrozen) {
+            labelColor = item.isUser ? mLabelFrozenUser : mLabelFrozenSystem;
         } else {
-            holder.label.setText(item.label);
+            labelColor = item.isUser ? mColorYellow : mColorOrange;
         }
-        // Set app label color to red if clearing user data not allowed
-        if (item.isInstalled && !item.allowClearingUserData) {
-            holder.label.setTextColor(Color.RED);
-        } else {
-            holder.label.setTextColor(mColorPrimary);
-        }
+        holder.label.setTextColor(labelColor);
         // Set package name
         if (!TextUtils.isEmpty(mSearchQuery) && item.packageName.toLowerCase(Locale.ROOT).contains(mSearchQuery)) {
             // Highlight searched query
