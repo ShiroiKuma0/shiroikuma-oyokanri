@@ -153,29 +153,108 @@
             android:orientation="vertical"
             android:layout_marginStart="@dimen/padding_small">
 
-            <androidx.appcompat.widget.AppCompatTextView
-                android:id="@+id/version"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:singleLine="true"
-                android:textAppearance="?attr/textAppearanceBodySmall"
-                tools:text="v3.0.0" />
+            <!-- Right column: stacked vertical rows. Each of the first three
+                 rows is a horizontal pair - existing field on the left half,
+                 corresponding backup field on the right half (yellow, gone
+                 when no backup). Both children carry layout_weight=1 so each
+                 pair splits the column 50/50; both halves are left-aligned
+                 inside their own half so the existing fields and the backup
+                 fields form two clean columns ("existing" column and
+                 "backup" column). The pairings per spec:
+                   row 1: version          / backed-up versionName
+                   row 2: user-or-system   / backup date (YYYY-MM-DD)
+                   row 3: SDK              / backup time (HH:MM:SS)
+                 The 4th row (signature SHA) stays standalone, full-width.
+                 The "apk+data" backup-flags line that used to sit at the
+                 bottom was dropped at the user's request - the above three
+                 rows replace it. -->
 
-            <androidx.appcompat.widget.AppCompatTextView
-                android:id="@+id/isSystem"
+            <androidx.appcompat.widget.LinearLayoutCompat
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:singleLine="true"
-                android:textAppearance="?attr/textAppearanceBodyMedium"
-                tools:text="User" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
-            <androidx.appcompat.widget.AppCompatTextView
-                android:id="@+id/size"
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:id="@+id/version"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:singleLine="true"
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    tools:text="v3.0.0" />
+
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:id="@+id/backup_version"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:singleLine="true"
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    android:textSize="11sp"
+                    android:visibility="gone"
+                    tools:text="3.1.9"
+                    tools:visibility="visible" />
+
+            </androidx.appcompat.widget.LinearLayoutCompat>
+
+            <androidx.appcompat.widget.LinearLayoutCompat
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:singleLine="true"
-                android:textAppearance="?attr/textAppearanceBodyMedium"
-                tools:text="SDK 30" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:id="@+id/isSystem"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:singleLine="true"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    tools:text="User" />
+
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:id="@+id/backup_date"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:singleLine="true"
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    android:textSize="11sp"
+                    android:visibility="gone"
+                    tools:text="2026-05-18"
+                    tools:visibility="visible" />
+
+            </androidx.appcompat.widget.LinearLayoutCompat>
+
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:id="@+id/size"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:singleLine="true"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    tools:text="SDK 30" />
+
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:id="@+id/backup_time"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:singleLine="true"
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    android:textSize="11sp"
+                    android:visibility="gone"
+                    tools:text="21:01:06"
+                    tools:visibility="visible" />
+
+            </androidx.appcompat.widget.LinearLayoutCompat>
 
             <androidx.appcompat.widget.AppCompatTextView
                 android:id="@+id/sha"
@@ -185,16 +264,6 @@
                 android:textAppearance="?attr/textAppearanceBodyMedium"
                 android:textSize="11sp"
                 tools:text="SHA256withRSA" />
-
-            <androidx.appcompat.widget.AppCompatTextView
-                android:id="@+id/backup_info_ext"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:singleLine="true"
-                android:textAppearance="?attr/textAppearanceBodySmall"
-                android:textSize="10sp"
-                tools:text="APK+Data"
-                tools:ignore="SmallSp" />
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 

@@ -561,29 +561,75 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         }
         // Set SDK color to orange if the app is using cleartext (e.g. HTTP) traffic
         holder.size.setTextColor(item.usesCleartextTraffic ? mColorOrange : mColorSecondary);
-        // Check for backup
+        // Backup indicator on the LEFT (under the icon) is suppressed in
+        // this fork - we surface backup presence and details on the right
+        // column instead (version + date + time, in yellow, three lines
+        // each paired horizontally with the existing right-column row).
+        holder.backupIndicator.setVisibility(View.GONE);
         if (item.backup != null) {
-            holder.backupIndicator.setVisibility(View.VISIBLE);
-            holder.backupInfoExt.setVisibility(View.VISIBLE);
-            holder.backupIndicator.setText(R.string.backup);
-            int indicatorColor;
-            if (item.isInstalled) {
-                if (item.backup.versionCode >= item.versionCode) {
-                    // Up-to-date backup
-                    indicatorColor = ColorCodes.getBackupLatestIndicatorColor(context);
-                } else {
-                    // Outdated backup
-                    indicatorColor = ColorCodes.getBackupOutdatedIndicatorColor(context);
-                }
-            } else {
-                // App not installed
-                indicatorColor = ColorCodes.getBackupUninstalledIndicatorColor(context);
-            }
-            holder.backupIndicator.setTextColor(indicatorColor);
-            holder.backupInfoExt.setText(item.backupFlagsStr);
+            // Three-line backup summary on the right, in yellow. Date and
+            // time use Locale.ROOT so the format is fixed yyyy-MM-dd /
+            // 24-hour HH:mm:ss regardless of the device locale - per spec.
+            java.text.SimpleDateFormat dateFmt =
+                    new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT);
+            java.text.SimpleDateFormat timeFmt =
+                    new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.ROOT);
+            java.util.Date when = new java.util.Date(item.backup.backupTime);
+            holder.backupVersion.setVisibility(View.VISIBLE);
+            holder.backupVersion.setText(item.backup.versionName);
+            holder.backupVersion.setTextColor(mColorYellow);
+            holder.backupDate.setVisibility(View.VISIBLE);
+            holder.backupDate.setText(dateFmt.format(when));
+            holder.backupDate.setTextColor(mColorYellow);
+            holder.backupTime.setVisibility(View.VISIBLE);
+            holder.backupTime.setText(timeFmt.format(when));
+            holder.backupTime.setTextColor(mColorYellow);
+            // Tapping any of the three backup lines opens the
+            // backup/restore dialog for this single app, from which the
+            // user can start a fresh backup, restore, or delete the
+            // existing one. Listener captures `item` by reference, which
+            // is fine because we re-bind per onBindViewHolder call.
+            View.OnClickListener backupTap =
+                    v -> showBackupRestoreDialogOrAppNotInstalled(item);
+            holder.backupVersion.setOnClickListener(backupTap);
+            holder.backupDate.setOnClickListener(backupTap);
+            holder.backupTime.setOnClickListener(backupTap);
+            // Long-press on any of the three backup lines opens the same
+            // dialog restricted to RESTORE + DELETE modes, so it lands
+            // directly on the existing-backup management view (the
+            // "Restore..." dialog with Delete / Restore buttons) instead
+            // of the new-backup mode the short tap defaults to.
+            View.OnLongClickListener backupLongTap = v -> {
+                if (item.backup == null) return false;
+                BackupRestoreDialogFragment frag = BackupRestoreDialogFragment.getInstance(
+                        Collections.singletonList(new UserPackagePair(
+                                item.packageName, UserHandleHidden.myUserId())),
+                        BackupRestoreDialogFragment.MODE_RESTORE
+                                | BackupRestoreDialogFragment.MODE_DELETE);
+                frag.setOnActionBeginListener(mode -> mActivity.showProgressIndicator(true));
+                frag.setOnActionCompleteListener(
+                        (mode, failedPackages) -> mActivity.showProgressIndicator(false));
+                frag.show(mActivity.getSupportFragmentManager(),
+                        BackupRestoreDialogFragment.TAG);
+                return true;
+            };
+            holder.backupVersion.setOnLongClickListener(backupLongTap);
+            holder.backupDate.setOnLongClickListener(backupLongTap);
+            holder.backupTime.setOnLongClickListener(backupLongTap);
         } else {
-            holder.backupIndicator.setVisibility(View.GONE);
-            holder.backupInfoExt.setVisibility(View.GONE);
+            holder.backupVersion.setVisibility(View.GONE);
+            holder.backupDate.setVisibility(View.GONE);
+            holder.backupTime.setVisibility(View.GONE);
+            // Clear listeners so a recycled ViewHolder doesn't keep a
+            // reference to a stale ApplicationItem captured by a previous
+            // bind. (The GONE views can't be tapped anyway, but the
+            // captured reference would still keep the old item alive.)
+            holder.backupVersion.setOnClickListener(null);
+            holder.backupDate.setOnClickListener(null);
+            holder.backupTime.setOnClickListener(null);
+            holder.backupVersion.setOnLongClickListener(null);
+            holder.backupDate.setOnLongClickListener(null);
+            holder.backupTime.setOnLongClickListener(null);
         }
         super.onBindViewHolder(holder, position);
     }
@@ -795,7 +841,9 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         TextView userId;
         TextView sha;
         TextView backupIndicator;
-        TextView backupInfoExt;
+        TextView backupVersion;
+        TextView backupDate;
+        TextView backupTime;
         ChipGroup profilePills;
         Chip addPill;
 
@@ -815,7 +863,9 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             userId = itemView.findViewById(R.id.shareid);
             sha = itemView.findViewById(R.id.sha);
             backupIndicator = itemView.findViewById(R.id.backup_indicator);
-            backupInfoExt = itemView.findViewById(R.id.backup_info_ext);
+            backupVersion = itemView.findViewById(R.id.backup_version);
+            backupDate = itemView.findViewById(R.id.backup_date);
+            backupTime = itemView.findViewById(R.id.backup_time);
             profilePills = itemView.findViewById(R.id.profile_pills);
             addPill = itemView.findViewById(R.id.profile_add_pill);
         }
