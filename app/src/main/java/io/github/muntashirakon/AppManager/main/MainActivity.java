@@ -224,6 +224,11 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             final int themeYellow = ContextCompat.getColor(this, R.color.theme_bright_yellow);
             final int themeMutedYellow = ContextCompat.getColor(this, R.color.theme_muted_yellow);
             mSearchView.setBackground(ContextCompat.getDrawable(this, R.drawable.main_search_bar_bg));
+            // The parent Widget.AppTheme.SearchView style applies a
+            // ?attr/colorSurfaceVariant backgroundTint, which would otherwise
+            // tint our black-filled drawable to dark grey. Clear it so the
+            // search bar interior renders pure black, matching the cards.
+            mSearchView.setBackgroundTintList(null);
             // Magnifier icon inside the search bar
             ImageView magIcon = mSearchView.findViewById(androidx.appcompat.R.id.search_mag_icon);
             if (magIcon != null) {

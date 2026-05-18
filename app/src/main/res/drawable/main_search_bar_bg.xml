@@ -1,12 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<!-- Main-screen search-bar (the "cutout"): yellow oval border, black fill.
+<!-- Main-screen search-bar (the "cutout"): black pill, no border.
      Used by MainActivity.java when wiring up the AdvancedSearchView. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
        android:shape="rectangle">
     <corners android:radius="28dp" />
     <solid android:color="@android:color/black" />
-    <stroke
-        android:width="2dp"
-        android:color="@color/theme_bright_yellow" />
 </shape>
