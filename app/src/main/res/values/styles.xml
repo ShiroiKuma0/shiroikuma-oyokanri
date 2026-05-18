@@ -92,4 +92,26 @@
         <item name="colorSurfaceContainerHighest">@android:color/black</item>
         <item name="popupMenuBackground">@drawable/popup_menu_background_black</item>
     </style>
+
+    <!-- Shadows libcore's Widget.AppTheme.MultiSelectionActionsView. The
+         libcore version's android:background and item tints reference fixed
+         M3 colour resources (m3_comp_nav_bar_container_color and
+         m3_textfield_indicator_text_color) which do not follow theme
+         attributes, so the bottom selection toolbar stays grey even when the
+         activity uses AppTheme.YellowOnBlack. Pinning the background to
+         black and the item tints to bright yellow here forces it to match. -->
+    <style name="Widget.AppTheme.MultiSelectionActionsView" parent="android:Widget">
+        <item name="android:background">@drawable/multi_selection_actions_bg_black</item>
+        <item name="backgroundTint">@null</item>
+        <item name="elevation">@dimen/m3_sys_elevation_level2</item>
+        <item name="itemTextAppearanceInactive">?attr/textAppearanceBodyMedium</item>
+        <item name="itemTextAppearanceActive">?attr/textAppearanceBodyMedium</item>
+        <item name="itemIconSize">24dp</item>
+        <item name="itemIconTint">@color/theme_bright_yellow</item>
+        <item name="itemTextColor">@color/theme_bright_yellow</item>
+        <item name="enforceTextAppearance">true</item>
+        <item name="enforceMaterialTheme">true</item>
+        <item name="itemBackground">@null</item>
+        <item name="itemHorizontalTranslationEnabled">false</item>
+    </style>
 </resources>

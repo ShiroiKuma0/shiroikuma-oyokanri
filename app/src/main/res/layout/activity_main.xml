@@ -60,6 +60,8 @@
         android:layout_height="wrap_content"
         android:fitsSystemWindows="true"
         android:focusable="false"
+        app:cardBackgroundColor="@android:color/black"
+        app:cardElevation="0dp"
         app:menu="@menu/activity_main_selection_actions" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

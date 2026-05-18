@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!--
+    Solid-black background for the bottom multi-selection action bar.
+
+    This file exists only to defeat a libcore code path in
+    io.github.muntashirakon.multiselection.MultiSelectionActionsView, where if
+    the view's background is null or a ColorDrawable the view replaces it with
+    a freshly built MaterialShapeDrawable and calls initializeElevationOverlay
+    on it. That re-enables M3 tonal elevation overlay tinting on the inner
+    LinearLayoutCompat, which on the AppTheme.YellowOnBlack theme produces an
+    olive cast (colorPrimary = yellow composited onto the black surface) no
+    matter what theme attributes are pinned. A <shape> resolves at runtime to
+    GradientDrawable, which is NOT a ColorDrawable, so the instanceof check
+    in MultiSelectionActionsView's constructor evaluates false and the
+    background is left alone.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@android:color/black" />
+</shape>
