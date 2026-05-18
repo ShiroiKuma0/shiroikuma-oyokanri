@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!--
+    Window background drawable for MaterialAlertDialogs shown under
+    AppTheme.YellowOnBlack.
+
+    Material 3's default dialog window background is a MaterialShapeDrawable
+    that applies a tonal elevation overlay using ?attr/colorOnSurface or
+    ?attr/elevationOverlayColor (composited over ?attr/colorSurface). With
+    colorPrimary = bright yellow and colorOnSurface = bright yellow in this
+    theme, that overlay turns a supposedly black surface olive.
+
+    Setting android:windowBackground to a plain <shape> drawable on the
+    dialog theme overlay bypasses MaterialShapeDrawable entirely - the
+    dialog window now draws this GradientDrawable directly, with no M3
+    overlay logic in between. The yellow hairline stroke and 28dp corner
+    radius match the M3 default dialog silhouette so the visual is
+    "yellow-on-black dialog" rather than "raw black rectangle".
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@android:color/black" />
+    <stroke
+        android:width="1dp"
+        android:color="@color/theme_bright_yellow" />
+    <corners android:radius="28dp" />
+</shape>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<resources>
+    <!--
+        Override M3's library-provided dialog background drawables. Both
+        names cover historical and current Material library conventions
+        (mtrl_ is the older Material 2 style, m3_ is the Material 3 style).
+        AAPT's resource merger gives app-namespace resources precedence over
+        library ones with matching names, so both M3 dialog code paths end
+        up rendering our pure-black <shape> with a yellow hairline stroke
+        instead of MaterialShapeDrawable (which applies a tonal elevation
+        overlay and produces an olive tint over our black surface under
+        AppTheme.YellowOnBlack).
+
+        This is a broad-stroke override - it affects every dialog in the
+        app regardless of which theme the calling activity uses. That is
+        consistent with the fork's overall yellow-on-black visual identity.
+    -->
+    <item name="mtrl_alert_dialog_background" type="drawable">@drawable/alert_dialog_bg_yellow_on_black</item>
+    <item name="m3_alert_dialog_background" type="drawable">@drawable/alert_dialog_bg_yellow_on_black</item>
+</resources>
