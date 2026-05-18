@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!--
+    Per-profile row in the multi-profile filter picker dialog.
+
+    Layout: profile name (weight=1, left) + In chip + Not-in chip (right).
+    The two chips are checkable and mutually exclusive - tapping one
+    clears the other in the picker code. Both unchecked = profile is not
+    part of the active filter.
+-->
+<androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingHorizontal="8dp"
+    android:paddingVertical="4dp">
+
+    <TextView
+        android:id="@+id/profile_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:ellipsize="end"
+        android:maxLines="1"
+        tools:text="Profile name"
+        xmlns:tools="http://schemas.android.com/tools" />
+
+    <com.google.android.material.chip.Chip
+        android:id="@+id/chip_include"
+        style="@style/Widget.Material3.Chip.Filter"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:text="@string/profile_filter_chip_in"
+        android:checkable="true"
+        app:checkedIconVisible="false"
+        app:closeIconVisible="false"
+        app:chipIconVisible="false" />
+
+    <com.google.android.material.chip.Chip
+        android:id="@+id/chip_exclude"
+        style="@style/Widget.Material3.Chip.Filter"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:text="@string/profile_filter_chip_not_in"
+        android:checkable="true"
+        app:checkedIconVisible="false"
+        app:closeIconVisible="false"
+        app:chipIconVisible="false" />
+
+</androidx.appcompat.widget.LinearLayoutCompat>

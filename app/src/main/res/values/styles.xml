@@ -77,6 +77,19 @@
         <item name="colorOnPrimary">@android:color/black</item>
         <item name="colorPrimaryContainer">@color/theme_bright_yellow</item>
         <item name="colorOnPrimaryContainer">@android:color/black</item>
+        <!-- Material 3 Chip's checked-state background and text read from
+             colorSecondaryContainer / colorOnSecondaryContainer (see the
+             m3_chip_background_color and m3_chip_text_color selectors in
+             the M3 library). With those left at their M3 defaults, every
+             selected sort/filter chip and our new In/Not-in chips render
+             with a purple-tinted grey fill and dark text - jarring against
+             the rest of the yellow-on-black palette. Pin both to our
+             yellow/black pair so the checked state matches the unchecked
+             outline. Side effect: FABs and tonal buttons that source from
+             these attrs also gain the yellow look, which is consistent
+             with the fork. -->
+        <item name="colorSecondaryContainer">@color/theme_bright_yellow</item>
+        <item name="colorOnSecondaryContainer">@android:color/black</item>
         <item name="colorOnSurface">@color/theme_bright_yellow</item>
         <item name="colorOnSurfaceVariant">@color/theme_bright_yellow</item>
         <item name="colorControlNormal">@color/theme_bright_yellow</item>
