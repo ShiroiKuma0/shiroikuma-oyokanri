@@ -310,7 +310,15 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
         mMainModel.getFreezeTypeLiveData().observe(getViewLifecycleOwner(), freezeType -> {
             int freezeTypeN = Optional.ofNullable(freezeType)
                     .orElse(Prefs.Blocking.getDefaultFreezingMethod());
-            showFreezeDialog(freezeTypeN, freezeType != null);
+            if (Prefs.Blocking.getSkipFreezeMethodDialog()) {
+                // User opted to skip the picker for single-app freezes (Settings -> Rules
+                // -> "Skip freeze method dialog"). Apply the freeze directly using the
+                // resolved freeze type — which is the per-app stored method if one was
+                // remembered, otherwise the global default.
+                ThreadUtils.postOnBackgroundThread(() -> doFreeze(freezeTypeN, freezeType != null));
+            } else {
+                showFreezeDialog(freezeTypeN, freezeType != null);
+            }
         });
         mIconView.setOnClickListener(v -> {
             ThreadUtils.postOnBackgroundThread(() -> {
