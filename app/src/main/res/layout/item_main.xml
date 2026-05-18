@@ -20,6 +20,7 @@
         android:paddingVertical="?attr/listItemPaddingVertical">
 
         <androidx.appcompat.widget.LinearLayoutCompat
+            android:id="@+id/icon_column"
             android:layout_width="@dimen/icon_size"
             android:layout_height="match_parent"
             android:gravity="center"
@@ -37,8 +38,8 @@
 
             <androidx.appcompat.widget.AppCompatImageView
                 android:id="@+id/freeze_indicator"
-                android:layout_width="16dp"
-                android:layout_height="16dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:layout_gravity="center"
                 android:src="@drawable/ic_snowflake_outline_24dp"
                 android:visibility="visible"
