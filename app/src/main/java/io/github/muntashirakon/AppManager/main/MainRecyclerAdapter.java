@@ -11,6 +11,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.net.Uri;
@@ -44,6 +45,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
+import io.github.muntashirakon.AppManager.BuildConfig;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.apk.installer.PackageInstallerActivity;
 import io.github.muntashirakon.AppManager.apk.installer.PackageInstallerCompat;
@@ -52,14 +54,18 @@ import io.github.muntashirakon.AppManager.compat.ApplicationInfoCompat;
 import io.github.muntashirakon.AppManager.compat.PackageManagerCompat;
 import io.github.muntashirakon.AppManager.db.entity.Backup;
 import io.github.muntashirakon.AppManager.details.AppDetailsActivity;
+import io.github.muntashirakon.AppManager.logs.Log;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
 import io.github.muntashirakon.AppManager.self.imagecache.ImageLoader;
 import io.github.muntashirakon.AppManager.settings.FeatureController;
+import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.types.UserPackagePair;
 import io.github.muntashirakon.AppManager.users.UserInfo;
 import io.github.muntashirakon.AppManager.users.Users;
 import io.github.muntashirakon.AppManager.utils.ArrayUtils;
+import io.github.muntashirakon.AppManager.utils.BroadcastUtils;
 import io.github.muntashirakon.AppManager.utils.DateUtils;
+import io.github.muntashirakon.AppManager.utils.FreezeUtils;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 import io.github.muntashirakon.AppManager.utils.appearance.ColorCodes;
@@ -71,6 +77,7 @@ import io.github.muntashirakon.widget.MultiSelectionView;
 
 public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationItem, MainRecyclerAdapter.ViewHolder>
         implements SectionIndexer {
+    private static final String TAG = MainRecyclerAdapter.class.getSimpleName();
     private static final String sSections = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
     private final MainActivity mActivity;
@@ -83,8 +90,12 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
     private final int mQueryStringHighlight;
     // Custom-theme palette for the main list. mColorOrange is reused for non-frozen
     // system-app labels (same orange as the existing "SDK 35"/cleartext-traffic
-    // highlight), so no new field is needed for that.
+    // highlight), so no new field is needed for that. mColorIceBlue is the unified
+    // "frozen" indicator colour for both the snowflake icon and the label text;
+    // it replaces the previous grey/greyish-orange split for frozen apps because
+    // the outline-vs-filled drawable swap alone was too subtle to read.
     private final int mColorYellow;
+    private final int mColorIceBlue;
     private final int mLabelFrozenUser;
     private final int mLabelFrozenSystem;
 
@@ -109,6 +120,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         mColorSecondary = ContextCompat.getColor(activity, io.github.muntashirakon.ui.R.color.textColorSecondary);
         mQueryStringHighlight = ColorCodes.getQueryStringHighlightColor(activity);
         mColorYellow = ContextCompat.getColor(activity, R.color.theme_bright_yellow);
+        mColorIceBlue = ContextCompat.getColor(activity, R.color.theme_ice_blue);
         mLabelFrozenUser = ContextCompat.getColor(activity, R.color.theme_label_frozen_user);
         mLabelFrozenSystem = ContextCompat.getColor(activity, R.color.theme_label_frozen_system);
     }
@@ -293,21 +305,47 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         // produce false negatives. ViewHolder is recycled, so every state below MUST
         // be set in both branches.
         holder.icon.setAlpha(item.isFrozen ? 0.5f : 1.0f);
-        holder.freezeIndicator.setVisibility(item.isFrozen ? View.VISIBLE : View.GONE);
+        // Freeze indicator: always visible. Swap drawable between outline (not
+        // frozen) and filled (frozen) AND swap the tint between yellow (not
+        // frozen) and ice blue (frozen) so the state reads at a glance. The
+        // drawable swap alone was too subtle on its own — Material Symbols
+        // ac_unit looks similar in filled and outlined form — so the colour
+        // change carries most of the signal.
+        holder.freezeIndicator.setImageResource(item.isFrozen
+                ? R.drawable.ic_snowflake_24dp
+                : R.drawable.ic_snowflake_outline_24dp);
+        holder.freezeIndicator.setImageTintList(ColorStateList.valueOf(
+                item.isFrozen ? mColorIceBlue : mColorYellow));
+        // Make the indicator a tap target to toggle freeze, but ONLY for eligible
+        // apps: user apps that aren't AppManager itself. System apps and our own
+        // package keep the indicator non-clickable so taps fall through to the
+        // parent card's selection handler. We can't reliably distinguish
+        // "critical" system apps from "regular" system apps from PackageManager
+        // metadata alone, so the conservative rule is to never toggle any system
+        // app via this shortcut. (ViewHolder recycling demands both branches set
+        // both properties.)
+        if (item.isUser && !BuildConfig.APPLICATION_ID.equals(item.packageName)) {
+            holder.freezeIndicator.setClickable(true);
+            holder.freezeIndicator.setOnClickListener(v -> toggleFreeze(item));
+        } else {
+            holder.freezeIndicator.setOnClickListener(null);
+            holder.freezeIndicator.setClickable(false);
+        }
         holder.label.setTypeface(null, item.isFrozen ? Typeface.ITALIC : Typeface.NORMAL);
         // Set app label
         if (!TextUtils.isEmpty(mSearchQuery) && item.label.toLowerCase(Locale.ROOT).contains(mSearchQuery)) {
             // Highlight searched query
             holder.label.setText(UIUtils.getHighlightedText(item.label, mSearchQuery, mQueryStringHighlight));
         } else holder.label.setText(item.label);
-        // Set app label color (custom theme — 4-state: isFrozen × isUser).
-        // - non-frozen + user        : bright yellow
-        // - non-frozen + system app  : orange (same as cleartext-traffic SDK highlight)
-        // - frozen + user            : grey
-        // - frozen + system app      : greyish-orange
+        // Set app label color (custom theme — 3-state):
+        // - frozen (user OR system)   : ice blue (same hue as the snowflake)
+        // - non-frozen + user         : bright yellow
+        // - non-frozen + system app   : orange (same as cleartext-traffic SDK highlight)
+        // The mLabelFrozenUser / mLabelFrozenSystem fields are kept around in case
+        // the user/system distinction is wanted back later, but neither is used here.
         int labelColor;
         if (item.isFrozen) {
-            labelColor = item.isUser ? mLabelFrozenUser : mLabelFrozenSystem;
+            labelColor = mColorIceBlue;
         } else {
             labelColor = item.isUser ? mColorYellow : mColorOrange;
         }
@@ -537,6 +575,41 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         fragment.setOnActionBeginListener(mode -> mActivity.showProgressIndicator(true));
         fragment.setOnActionCompleteListener((mode, failedPackages) -> mActivity.showProgressIndicator(false));
         fragment.show(mActivity.getSupportFragmentManager(), BackupRestoreDialogFragment.TAG);
+    }
+
+    /**
+     * Toggle the freeze state of {@code item} via the freeze-indicator click.
+     * Uses {@link Prefs.Blocking#getDefaultFreezingMethod()} when freezing, and
+     * the same internal unfreeze path the rest of the app uses when thawing.
+     * The PM call runs on a background thread and is followed by a
+     * {@code sendPackageAltered} broadcast so the main list re-binds the item
+     * with the new state automatically.
+     * <p>
+     * Caller is responsible for the eligibility gate — this method does not
+     * re-check whether the app is a system app or AppManager itself.
+     */
+    private void toggleFreeze(@NonNull ApplicationItem item) {
+        final Context ctx = mActivity.getApplicationContext();
+        final int userId = (item.userIds != null && item.userIds.length > 0)
+                ? item.userIds[0]
+                : UserHandleHidden.myUserId();
+        final boolean wasFrozen = item.isFrozen;
+        ThreadUtils.postOnBackgroundThread(() -> {
+            try {
+                if (wasFrozen) {
+                    FreezeUtils.unfreeze(item.packageName, userId);
+                } else {
+                    FreezeUtils.freeze(item.packageName, userId,
+                            Prefs.Blocking.getDefaultFreezingMethod());
+                }
+                BroadcastUtils.sendPackageAltered(ctx, new String[]{item.packageName});
+            } catch (Throwable th) {
+                Log.e(TAG, "Freeze toggle failed for " + item.packageName, th);
+                ThreadUtils.postOnMainThread(() -> displayLongToast(
+                        wasFrozen ? R.string.failed_to_unfreeze : R.string.failed_to_freeze,
+                        item.label));
+            }
+        });
     }
 
     public static class ViewHolder extends MultiSelectionView.ViewHolder {

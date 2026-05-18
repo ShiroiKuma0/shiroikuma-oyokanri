@@ -1,0 +1,19 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Main-list "freeze indicator" — empty/outline state (app is NOT frozen).
+     Three intersecting diameter lines through center forming a 6-pointed
+     snowflake. Stroked lines only, no fill, so the icon reads as "hollow"
+     when contrasted with the filled ic_snowflake_24dp.xml used for frozen
+     apps. The actual colour is set programmatically in MainRecyclerAdapter
+     (yellow when not frozen, ice blue when frozen). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:strokeColor="@android:color/white"
+        android:strokeWidth="1.8"
+        android:fillColor="@android:color/transparent"
+        android:strokeLineCap="round"
+        android:pathData="M12,3 L12,21 M4.21,7.5 L19.79,16.5 M4.21,16.5 L19.79,7.5" />
+</vector>
