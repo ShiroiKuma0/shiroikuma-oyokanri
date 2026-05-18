@@ -333,8 +333,15 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             // Force-stopped apps lose their distinctive border in this fork
             cardView.setStrokeColor(Color.TRANSPARENT);
         } else {
-            // Running apps (installed, not disabled, not stopped) get the yellow oval
-            cardView.setStrokeColor(mColorYellow);
+            // Running apps (installed, not disabled, not stopped) get a
+            // box-stroke that matches the row's label colour:
+            //   user app   -> yellow (same as the user-app label)
+            //   system app -> orange (same as the system-app label)
+            // Frozen-and-running cases keep the orange/yellow stroke even
+            // though the label flips to ice blue - the stroke conveys the
+            // running/active state, not the frozen state, which the
+            // snowflake icon and italic label already do.
+            cardView.setStrokeColor(item.isUser ? mColorYellow : mColorOrange);
         }
         // Display yellow star if the app is in debug mode
         holder.debugIcon.setVisibility(item.debuggable ? View.VISIBLE : View.INVISIBLE);
@@ -392,17 +399,16 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         holder.freezeIndicator.setImageTintList(ColorStateList.valueOf(
                 item.isFrozen ? mColorIceBlue : mColorYellow));
         // Make the whole left icon column a tap target to toggle freeze, but
-        // ONLY for eligible apps: user apps that are not AppManager itself.
-        // System apps and our own package keep the column non-clickable so
-        // taps fall through to the parent card's click handler (which opens
-        // app details or toggles selection). Long-clicks on the column always
-        // bubble up to the card's long-click handler, so selection-via-long-
-        // press on the icon area continues to work in both branches. We
-        // cannot reliably distinguish "critical" system apps from "regular"
-        // ones via PackageManager metadata alone, so the conservative rule
-        // is to never toggle any system app via this shortcut. (ViewHolder
+        // ONLY for eligible apps: anything that is not AppManager itself.
+        // Our own package keeps the column non-clickable so taps fall
+        // through to the parent card's click handler (which opens app
+        // details or toggles selection). System apps ARE allowed - the
+        // earlier conservative rule that excluded them was relaxed at the
+        // user's request. Long-clicks on the column always bubble up to the
+        // card's long-click handler, so selection-via-long-press on the
+        // icon area continues to work in both branches. (ViewHolder
         // recycling demands both branches set both properties.)
-        if (item.isUser && !BuildConfig.APPLICATION_ID.equals(item.packageName)) {
+        if (!BuildConfig.APPLICATION_ID.equals(item.packageName)) {
             holder.iconColumn.setClickable(true);
             holder.iconColumn.setOnClickListener(v -> toggleFreeze(item));
         } else {
