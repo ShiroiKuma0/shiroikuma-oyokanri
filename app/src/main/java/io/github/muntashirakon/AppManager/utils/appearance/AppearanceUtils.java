@@ -35,7 +35,9 @@ import java.util.LinkedHashSet;
 import java.util.Locale;
 
 import io.github.muntashirakon.AppManager.PerProcessActivity;
+import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.settings.Prefs;
+import io.github.muntashirakon.AppManager.settings.SettingsActivity;
 import io.github.muntashirakon.AppManager.utils.LangUtils;
 
 public final class AppearanceUtils {
@@ -127,10 +129,21 @@ public final class AppearanceUtils {
         @Override
         public void onActivityPreCreated(@NonNull Activity activity, @Nullable Bundle savedInstanceState) {
             if (activity instanceof PerProcessActivity) {
-                boolean transparentBackground = ((PerProcessActivity) activity).getTransparentBackground();
-                activity.setTheme(transparentBackground
-                        ? Prefs.Appearance.getTransparentAppTheme()
-                        : Prefs.Appearance.getAppTheme());
+                int theme;
+                if (activity instanceof SettingsActivity) {
+                    // SettingsActivity uses a fork-specific yellow palette so
+                    // the entire settings screen reads as yellow on black.
+                    // Setting it from the manifest does not work because this
+                    // lifecycle callback would override it with the generic
+                    // app theme below — so we dispatch it here.
+                    theme = R.style.AppTheme_Settings;
+                } else {
+                    boolean transparentBackground = ((PerProcessActivity) activity).getTransparentBackground();
+                    theme = transparentBackground
+                            ? Prefs.Appearance.getTransparentAppTheme()
+                            : Prefs.Appearance.getAppTheme();
+                }
+                activity.setTheme(theme);
             }
             // Theme must be set first because the method below will add dynamic attributes to the theme
             DynamicColors.applyToActivityIfAvailable(activity);
