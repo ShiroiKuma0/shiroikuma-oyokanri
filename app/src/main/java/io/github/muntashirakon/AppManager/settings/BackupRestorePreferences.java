@@ -2,6 +2,9 @@
 
 package io.github.muntashirakon.AppManager.settings;
 
+import io.github.muntashirakon.AppManager.utils.ThreadUtils;
+import android.widget.Toast;
+import android.content.Context;
 import java.util.Arrays;
 import java.util.ArrayList;
 import io.github.muntashirakon.io.Path;
@@ -237,6 +240,29 @@ public class BackupRestorePreferences extends PreferenceFragment {
             Prefs.Storage.setSkipBackupMethodDialog((Boolean) newValue);
             return true;
         });
+        // Settings export/import (fork). Directory picker + export + import.
+        Preference settingsExportDirPref = findPreference("settings_export_directory");
+        if (settingsExportDirPref != null) {
+            updateSettingsExportDirSummary(settingsExportDirPref);
+            settingsExportDirPref.setOnPreferenceClickListener(preference -> {
+                showSettingsExportDirectoryChooser(preference);
+                return true;
+            });
+        }
+        Preference settingsExportPref = findPreference("settings_export");
+        if (settingsExportPref != null) {
+            settingsExportPref.setOnPreferenceClickListener(preference -> {
+                exportSettings();
+                return true;
+            });
+        }
+        Preference settingsImportPref = findPreference("settings_import");
+        if (settingsImportPref != null) {
+            settingsImportPref.setOnPreferenceClickListener(preference -> {
+                chooseSettingsImportFile();
+                return true;
+            });
+        }
         ((Preference) Objects.requireNonNull(findPreference("backup_volume")))
                 .setOnPreferenceClickListener(preference -> {
                     mModel.loadStorageVolumes();
@@ -307,16 +333,20 @@ public class BackupRestorePreferences extends PreferenceFragment {
         pref.setSummary(dir.isEmpty() ? getString(R.string.backup_directory_not_set) : dir);
     }
 
+    private interface DirChooserCallback {
+        void onChosen(@NonNull String absolutePath);
+
+        void onCleared();
+    }
+
     /**
      * Fork: a minimal built-in filesystem directory browser (no SAF). Navigate
-     * into subdirectories or up via "..", then "Use this directory" saves the
-     * absolute path as the backup directory; "Use backup volume" clears it.
+     * into subdirectories or up via "..", then the positive button reports the
+     * current directory and the neutral button (if a label is given) clears.
      */
-    private void showBackupDirectoryChooser(@NonNull Preference pref) {
-        String start = Prefs.Storage.hasBackupDirectory()
-                ? Prefs.Storage.getBackupDirectory()
-                : Environment.getExternalStorageDirectory().getAbsolutePath();
-        Path startPath = Paths.get(start);
+    private void showDirectoryChooser(@NonNull String startDir, int chooseLabelRes, int clearLabelRes,
+                                      @NonNull DirChooserCallback cb) {
+        Path startPath = Paths.get(startDir);
         if (!startPath.exists()) {
             startPath = Paths.get(Environment.getExternalStorageDirectory().getAbsolutePath());
         }
@@ -325,18 +355,14 @@ public class BackupRestorePreferences extends PreferenceFragment {
         ListView listView = new ListView(mActivity);
         ArrayAdapter<String> adapter = new ArrayAdapter<>(mActivity, android.R.layout.simple_list_item_1);
         listView.setAdapter(adapter);
-        AlertDialog dialog = new MaterialAlertDialogBuilder(mActivity)
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(mActivity)
                 .setView(listView)
-                .setPositiveButton(R.string.backup_directory_choose, (d, w) -> {
-                    Prefs.Storage.setBackupDirectory(current[0].getFilePath());
-                    updateBackupDirectorySummary(pref);
-                })
-                .setNeutralButton(R.string.backup_directory_use_volume, (d, w) -> {
-                    Prefs.Storage.setBackupDirectory("");
-                    updateBackupDirectorySummary(pref);
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .create();
+                .setPositiveButton(chooseLabelRes, (d, w) -> cb.onChosen(current[0].getFilePath()))
+                .setNegativeButton(R.string.cancel, null);
+        if (clearLabelRes != 0) {
+            builder.setNeutralButton(clearLabelRes, (d, w) -> cb.onCleared());
+        }
+        AlertDialog dialog = builder.create();
         final Runnable refresh = () -> {
             dialog.setTitle(current[0].getFilePath());
             rows.clear();
@@ -365,6 +391,149 @@ public class BackupRestorePreferences extends PreferenceFragment {
         });
         refresh.run();
         dialog.show();
+    }
+
+    private void showBackupDirectoryChooser(@NonNull Preference pref) {
+        String start = Prefs.Storage.hasBackupDirectory()
+                ? Prefs.Storage.getBackupDirectory()
+                : Environment.getExternalStorageDirectory().getAbsolutePath();
+        showDirectoryChooser(start, R.string.backup_directory_choose, R.string.backup_directory_use_volume,
+                new DirChooserCallback() {
+                    @Override
+                    public void onChosen(@NonNull String absolutePath) {
+                        Prefs.Storage.setBackupDirectory(absolutePath);
+                        updateBackupDirectorySummary(pref);
+                    }
+
+                    @Override
+                    public void onCleared() {
+                        Prefs.Storage.setBackupDirectory("");
+                        updateBackupDirectorySummary(pref);
+                    }
+                });
+    }
+
+    private void updateSettingsExportDirSummary(@NonNull Preference pref) {
+        String dir = Prefs.Storage.getSettingsExportDirectory();
+        pref.setSummary(dir.isEmpty() ? getString(R.string.settings_export_dir_not_set) : dir);
+    }
+
+    private void showSettingsExportDirectoryChooser(@NonNull Preference pref) {
+        String start = Prefs.Storage.hasSettingsExportDirectory()
+                ? Prefs.Storage.getSettingsExportDirectory()
+                : Environment.getExternalStorageDirectory().getAbsolutePath();
+        showDirectoryChooser(start, R.string.backup_directory_choose, R.string.settings_export_dir_clear,
+                new DirChooserCallback() {
+                    @Override
+                    public void onChosen(@NonNull String absolutePath) {
+                        Prefs.Storage.setSettingsExportDirectory(absolutePath);
+                        updateSettingsExportDirSummary(pref);
+                    }
+
+                    @Override
+                    public void onCleared() {
+                        Prefs.Storage.setSettingsExportDirectory("");
+                        updateSettingsExportDirSummary(pref);
+                    }
+                });
+    }
+
+    private void exportSettings() {
+        if (!Prefs.Storage.hasSettingsExportDirectory()) {
+            Toast.makeText(mActivity, R.string.settings_export_dir_not_set, Toast.LENGTH_LONG).show();
+            return;
+        }
+        Context appContext = mActivity.getApplicationContext();
+        String dir = Prefs.Storage.getSettingsExportDirectory();
+        Toast.makeText(mActivity, R.string.settings_exporting, Toast.LENGTH_SHORT).show();
+        ThreadUtils.postOnBackgroundThread(() -> {
+            try {
+                Path destDir = Paths.get(dir);
+                if (!destDir.exists()) destDir.mkdirs();
+                String name = SettingsBackupManager.export(appContext, destDir);
+                ThreadUtils.postOnMainThread(() -> Toast.makeText(mActivity,
+                        getString(R.string.settings_exported_to, name), Toast.LENGTH_LONG).show());
+            } catch (Exception e) {
+                ThreadUtils.postOnMainThread(() -> Toast.makeText(mActivity,
+                        getString(R.string.settings_export_failed, e.getMessage()), Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    private void chooseSettingsImportFile() {
+        if (!Prefs.Storage.hasSettingsExportDirectory()) {
+            Toast.makeText(mActivity, R.string.settings_export_dir_not_set, Toast.LENGTH_LONG).show();
+            return;
+        }
+        Path dir = Paths.get(Prefs.Storage.getSettingsExportDirectory());
+        Path[] all = dir.exists() ? dir.listFiles() : null;
+        final List<Path> zips = new ArrayList<>();
+        if (all != null) {
+            // Newest first: export names are timestamped, so reverse-name sort works.
+            Arrays.sort(all, (a, b) -> b.getName().compareToIgnoreCase(a.getName()));
+            for (Path p : all) {
+                if (!p.isDirectory() && p.getName().endsWith(SettingsBackupManager.EXPORT_EXT)) {
+                    zips.add(p);
+                }
+            }
+        }
+        if (zips.isEmpty()) {
+            Toast.makeText(mActivity, R.string.settings_no_exports_found, Toast.LENGTH_LONG).show();
+            return;
+        }
+        CharSequence[] names = new CharSequence[zips.size()];
+        for (int i = 0; i < zips.size(); i++) {
+            names[i] = zips.get(i).getName();
+        }
+        new MaterialAlertDialogBuilder(mActivity)
+                .setTitle(R.string.settings_import)
+                .setItems(names, (d, which) -> confirmAndImportSettings(zips.get(which)))
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private void confirmAndImportSettings(@NonNull Path zip) {
+        new MaterialAlertDialogBuilder(mActivity)
+                .setTitle(R.string.settings_import)
+                .setMessage(R.string.settings_import_confirm)
+                .setPositiveButton(R.string.yes, (d, w) -> importSettings(zip))
+                .setNegativeButton(R.string.no, null)
+                .show();
+    }
+
+    private void importSettings(@NonNull Path zip) {
+        Context appContext = mActivity.getApplicationContext();
+        Toast.makeText(mActivity, R.string.settings_importing, Toast.LENGTH_SHORT).show();
+        ThreadUtils.postOnBackgroundThread(() -> {
+            try {
+                int n = SettingsBackupManager.importFrom(appContext, zip);
+                ThreadUtils.postOnMainThread(() -> {
+                    if (n <= 0) {
+                        Toast.makeText(mActivity, R.string.settings_import_empty, Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    new MaterialAlertDialogBuilder(mActivity)
+                            .setTitle(R.string.settings_import)
+                            .setMessage(R.string.settings_imported_restart)
+                            .setCancelable(false)
+                            .setPositiveButton(R.string.restart, (d, w) -> restartProcess())
+                            .show();
+                });
+            } catch (Exception e) {
+                ThreadUtils.postOnMainThread(() -> Toast.makeText(mActivity,
+                        getString(R.string.settings_import_failed, e.getMessage()), Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    /** Hard-restart so SharedPreferences are re-read from the imported files. */
+    private void restartProcess() {
+        Intent intent = mActivity.getPackageManager().getLaunchIntentForPackage(mActivity.getPackageName());
+        if (intent != null) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            mActivity.startActivity(intent);
+        }
+        Runtime.getRuntime().exit(0);
     }
 
     @UiThread

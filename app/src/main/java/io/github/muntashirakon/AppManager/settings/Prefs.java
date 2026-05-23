@@ -841,6 +841,29 @@ public final class Prefs {
                     .edit().putBoolean(KEY_SKIP_BACKUP_DIALOG, skip).apply();
         }
 
+        // Fork: directory where App Manager's own settings (not app backups)
+        // are exported to / imported from. Stored in the same dedicated prefs
+        // file. Empty string = unset.
+        private static final String KEY_SETTINGS_EXPORT_DIR = "settings_export_dir";
+
+        @NonNull
+        public static String getSettingsExportDirectory() {
+            return ContextUtils.getContext()
+                    .getSharedPreferences(PREFS_BACKUP_OPTS, Context.MODE_PRIVATE)
+                    .getString(KEY_SETTINGS_EXPORT_DIR, "");
+        }
+
+        public static boolean hasSettingsExportDirectory() {
+            return !getSettingsExportDirectory().isEmpty();
+        }
+
+        /** Set the settings export/import directory (absolute path); "" clears. */
+        public static void setSettingsExportDirectory(@NonNull String path) {
+            ContextUtils.getContext()
+                    .getSharedPreferences(PREFS_BACKUP_OPTS, Context.MODE_PRIVATE)
+                    .edit().putString(KEY_SETTINGS_EXPORT_DIR, path).apply();
+        }
+
         @NonNull
         public static Path getAppManagerDirectory() {
             // Fork: a configured backup directory takes precedence over the

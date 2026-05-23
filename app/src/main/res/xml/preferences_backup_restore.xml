@@ -57,4 +57,29 @@
             app:title="@string/pref_import_backups" />
     </PreferenceCategory>
 
+    <PreferenceCategory
+        app:key="settings_io_category"
+        app:title="@string/settings_io_category"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            app:key="settings_export_directory"
+            app:title="@string/settings_export_directory"
+            app:summary="@string/pref_settings_export_directory_msg"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            app:key="settings_export"
+            app:title="@string/settings_export"
+            app:summary="@string/pref_settings_export_msg"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            app:key="settings_import"
+            app:title="@string/settings_import"
+            app:summary="@string/pref_settings_import_msg"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
 </PreferenceScreen>
