@@ -2,12 +2,16 @@
 
 package io.github.muntashirakon.AppManager.fonts;
 
+import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.text.Editable;
 import android.text.InputType;
+import android.text.TextWatcher;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -16,6 +20,7 @@ import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -24,6 +29,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.widget.AppCompatSeekBar;
 import androidx.appcompat.widget.AppCompatTextView;
 import androidx.appcompat.widget.LinearLayoutCompat;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -51,12 +57,28 @@ public class FontsPreferences extends Fragment {
 
     public static final String TAG = FontsPreferences.class.getSimpleName();
 
+    private static final class ColorSpec {
+        final String key;
+        final int labelRes;
+        ColorSpec(String key, int labelRes) {
+            this.key = key;
+            this.labelRes = labelRes;
+        }
+    }
+
+    private static final ColorSpec[] NO_COLORS = new ColorSpec[0];
+
     private static final class Cat {
         final String key;
         final int labelRes;
-        Cat(String key, int labelRes) {
+        final ColorSpec[] colors;
+        Cat(String key, int labelRes, ColorSpec[] colors) {
             this.key = key;
             this.labelRes = labelRes;
+            this.colors = colors;
+        }
+        Cat(String key, int labelRes) {
+            this(key, labelRes, NO_COLORS);
         }
     }
 
@@ -77,15 +99,41 @@ public class FontsPreferences extends Fragment {
                     new Cat(FontPrefs.DEFAULT, R.string.pref_font_cat_default),
             }),
             new Group(R.string.pref_font_group_main_list, new Cat[]{
-                    new Cat(FontPrefs.LABEL, R.string.pref_font_cat_label),
-                    new Cat(FontPrefs.PACKAGE, R.string.pref_font_cat_package),
-                    new Cat(FontPrefs.VERSION, R.string.pref_font_cat_version),
-                    new Cat(FontPrefs.APP_TYPE, R.string.pref_font_cat_app_type),
-                    new Cat(FontPrefs.INSTALL_DATE, R.string.pref_font_cat_install_date),
-                    new Cat(FontPrefs.UID, R.string.pref_font_cat_uid),
-                    new Cat(FontPrefs.SDK, R.string.pref_font_cat_sdk),
-                    new Cat(FontPrefs.SIGNATURE, R.string.pref_font_cat_signature),
-                    new Cat(FontPrefs.BACKUP_INFO, R.string.pref_font_cat_backup_info),
+                    new Cat(FontPrefs.LABEL, R.string.pref_font_cat_label, new ColorSpec[]{
+                            new ColorSpec(ColorPrefs.LABEL_USER, R.string.pref_color_label_user),
+                            new ColorSpec(ColorPrefs.LABEL_SYSTEM, R.string.pref_color_label_system),
+                            new ColorSpec(ColorPrefs.LABEL_FROZEN, R.string.pref_color_label_frozen),
+                    }),
+                    new Cat(FontPrefs.PACKAGE, R.string.pref_font_cat_package, new ColorSpec[]{
+                            new ColorSpec(ColorPrefs.PACKAGE_NORMAL, R.string.pref_color_package_normal),
+                            new ColorSpec(ColorPrefs.PACKAGE_TRACKERS, R.string.pref_color_package_trackers),
+                    }),
+                    new Cat(FontPrefs.VERSION, R.string.pref_font_cat_version, new ColorSpec[]{
+                            new ColorSpec(ColorPrefs.VERSION_NORMAL, R.string.pref_color_version_normal),
+                            new ColorSpec(ColorPrefs.VERSION_INACTIVE, R.string.pref_color_version_inactive),
+                    }),
+                    new Cat(FontPrefs.APP_TYPE, R.string.pref_font_cat_app_type, new ColorSpec[]{
+                            new ColorSpec(ColorPrefs.APPTYPE_NORMAL, R.string.pref_color_apptype_normal),
+                            new ColorSpec(ColorPrefs.APPTYPE_PERSISTENT, R.string.pref_color_apptype_persistent),
+                    }),
+                    new Cat(FontPrefs.INSTALL_DATE, R.string.pref_font_cat_install_date, new ColorSpec[]{
+                            new ColorSpec(ColorPrefs.DATE_NORMAL, R.string.pref_color_date_normal),
+                            new ColorSpec(ColorPrefs.DATE_READABLE, R.string.pref_color_date_readable),
+                    }),
+                    new Cat(FontPrefs.UID, R.string.pref_font_cat_uid, new ColorSpec[]{
+                            new ColorSpec(ColorPrefs.UID_NORMAL, R.string.pref_color_uid_normal),
+                            new ColorSpec(ColorPrefs.UID_SHARED, R.string.pref_color_uid_shared),
+                    }),
+                    new Cat(FontPrefs.SDK, R.string.pref_font_cat_sdk, new ColorSpec[]{
+                            new ColorSpec(ColorPrefs.SDK_NORMAL, R.string.pref_color_sdk_normal),
+                            new ColorSpec(ColorPrefs.SDK_CLEARTEXT, R.string.pref_color_sdk_cleartext),
+                    }),
+                    new Cat(FontPrefs.SIGNATURE, R.string.pref_font_cat_signature, new ColorSpec[]{
+                            new ColorSpec(ColorPrefs.SIGNATURE, R.string.pref_color_signature),
+                    }),
+                    new Cat(FontPrefs.BACKUP_INFO, R.string.pref_font_cat_backup_info, new ColorSpec[]{
+                            new ColorSpec(ColorPrefs.BACKUP, R.string.pref_color_backup),
+                    }),
             }),
             new Group(R.string.pref_font_group_app_details, new Cat[]{
                     new Cat(FontPrefs.DETAIL_LABEL, R.string.pref_font_cat_label),
@@ -251,6 +299,134 @@ public class FontsPreferences extends Fragment {
                     .setNegativeButton(R.string.cancel, null)
                     .show();
         });
+
+        // --- Per-element colours (fork) ---
+        // The font preview reflects the element's primary (first) colour role.
+        final LinearLayoutCompat colorRows = element.findViewById(R.id.color_rows);
+        final Runnable previewColor = () -> {
+            if (cat.colors.length > 0) {
+                preview.setTextColor(ColorPrefs.getColor(requireContext(), cat.colors[0].key));
+            }
+        };
+        previewColor.run();
+        for (ColorSpec spec : cat.colors) {
+            addColorRow(colorRows, spec, previewColor);
+        }
+    }
+
+    /** Add one tappable colour role row (swatch + label + value) to a container. */
+    private void addColorRow(@NonNull LinearLayoutCompat container, @NonNull ColorSpec spec,
+                             @NonNull Runnable previewRefresh) {
+        View row = LayoutInflater.from(requireContext()).inflate(R.layout.view_color_row, container, false);
+        AppCompatTextView label = row.findViewById(R.id.cr_label);
+        AppCompatTextView value = row.findViewById(R.id.cr_value);
+        View swatch = row.findViewById(R.id.cr_swatch);
+        label.setText(spec.labelRes);
+        final Runnable refresh = () -> {
+            int color = ColorPrefs.getColor(requireContext(), spec.key);
+            swatch.setBackground(swatchDrawable(color));
+            value.setText(ColorPrefs.isSet(requireContext(), spec.key)
+                    ? hex(color) : getString(R.string.pref_color_default));
+        };
+        refresh.run();
+        row.setOnClickListener(v -> openColorPicker(spec, () -> {
+            refresh.run();
+            previewRefresh.run();
+        }));
+        container.addView(row);
+    }
+
+    /** Colour picker dialog: hex input + live preview + preset palette swatches. */
+    private void openColorPicker(@NonNull ColorSpec spec, @NonNull Runnable onChanged) {
+        View body = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_color_picker, null);
+        final View preview = body.findViewById(R.id.cp_preview);
+        final EditText hexInput = body.findViewById(R.id.cp_hex);
+        final LinearLayoutCompat presets = body.findViewById(R.id.cp_presets);
+        int current = ColorPrefs.getColor(requireContext(), spec.key);
+        hexInput.setText(hex(current));
+        preview.setBackground(swatchDrawable(current));
+        hexInput.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void afterTextChanged(Editable e) {
+                Integer col = parseColor(e.toString());
+                if (col != null) preview.setBackground(swatchDrawable(col));
+            }
+        });
+        int[] palette = {
+                ContextCompat.getColor(requireContext(), R.color.theme_bright_orange),
+                ContextCompat.getColor(requireContext(), R.color.theme_bright_yellow),
+                ContextCompat.getColor(requireContext(), R.color.theme_ice_blue),
+                ContextCompat.getColor(requireContext(), io.github.muntashirakon.ui.R.color.stopped),
+                Color.MAGENTA,
+                ContextCompat.getColor(requireContext(), io.github.muntashirakon.ui.R.color.textColorSecondary),
+                Color.WHITE,
+                Color.BLACK,
+        };
+        int sz = (int) dp(32);
+        int m = (int) dp(3);
+        for (int p : palette) {
+            View sw = new View(requireContext());
+            LinearLayoutCompat.LayoutParams lp = new LinearLayoutCompat.LayoutParams(sz, sz);
+            lp.setMargins(m, 0, m, 0);
+            sw.setLayoutParams(lp);
+            sw.setBackground(swatchDrawable(p));
+            sw.setOnClickListener(v -> {
+                hexInput.setText(hex(p));
+                preview.setBackground(swatchDrawable(p));
+            });
+            presets.addView(sw);
+        }
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle(spec.labelRes)
+                .setView(body)
+                .setPositiveButton(R.string.ok, (d, w) -> {
+                    Integer col = parseColor(hexInput.getText().toString());
+                    if (col != null) {
+                        ColorPrefs.setColor(requireContext(), spec.key, col);
+                        onChanged.run();
+                    } else {
+                        Toast.makeText(requireContext(), R.string.pref_color_invalid, Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNeutralButton(R.string.pref_color_reset, (d, w) -> {
+                    ColorPrefs.reset(requireContext(), spec.key);
+                    onChanged.run();
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    @NonNull
+    private GradientDrawable swatchDrawable(int color) {
+        GradientDrawable d = new GradientDrawable();
+        d.setShape(GradientDrawable.RECTANGLE);
+        d.setCornerRadius(dp(4));
+        d.setColor(color);
+        d.setStroke((int) dp(1), 0xFF666666);
+        return d;
+    }
+
+    @NonNull
+    private static String hex(int c) {
+        if (Color.alpha(c) == 255) return String.format("#%06X", 0xFFFFFF & c);
+        return String.format("#%08X", c);
+    }
+
+    @Nullable
+    private static Integer parseColor(@NonNull String s) {
+        s = s.trim();
+        if (s.isEmpty()) return null;
+        if (!s.startsWith("#")) s = "#" + s;
+        try {
+            return Color.parseColor(s);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private float dp(float v) {
+        return v * getResources().getDisplayMetrics().density;
     }
 
     /**
