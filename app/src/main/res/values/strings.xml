@@ -1675,6 +1675,8 @@
     <string name="pref_font_group_main_list">Main app list</string>
     <string name="pref_font_group_app_details">App details</string>
     <string name="copy_displayed_app_ids">Copy displayed app IDs</string>
+    <string name="clear_all_filters">Clear all filters</string>
+    <string name="filters_cleared">Filters cleared</string>
     <string name="no_apps_displayed_to_copy">No apps are currently displayed</string>
     <plurals name="copied_n_app_ids">
         <item quantity="one"><xliff:g id="count" example="1">%1$d</xliff:g> app ID copied to clipboard</item>

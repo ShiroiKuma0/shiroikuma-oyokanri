@@ -10,6 +10,8 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.SpannableString;
@@ -325,6 +327,8 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                 mAdapter.setDefaultList(applicationItems);
             }
             showProgressIndicator(false);
+            // Keep the list-options icon's active state in sync with filters.
+            invalidateOptionsMenu();
         });
         viewModel.getOperationStatus().observe(this, status -> {
             mProgressIndicator.hide();
@@ -387,7 +391,44 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
     public boolean onPrepareOptionsMenu(@NonNull Menu menu) {
         super.onPrepareOptionsMenu(menu);
         mAppUsageMenu.setVisible(FeatureController.isUsageAccessEnabled());
+        updateFilterIcon(menu);
         return true;
+    }
+
+    /**
+     * Custom theme: the list-options icon doubles as the "filter" affordance,
+     * so reflect whether any filter is active. Inactive = the normal yellow
+     * icon; active = an orange tint plus a small dot badge in the top-right
+     * corner (option B). Rebuilt from a fresh drawable each call so repeated
+     * invalidateOptionsMenu() calls do not stack badges.
+     */
+    private void updateFilterIcon(@NonNull Menu menu) {
+        MenuItem item = menu.findItem(R.id.action_list_options);
+        if (item == null) return;
+        Drawable base = ContextCompat.getDrawable(this, R.drawable.ic_list_status);
+        if (base == null) return;
+        base = base.mutate();
+        boolean active = viewModel != null && viewModel.isFilterActive();
+        if (!active) {
+            base.setColorFilter(ContextCompat.getColor(this, R.color.theme_bright_yellow),
+                    PorterDuff.Mode.SRC_IN);
+            item.setIcon(base);
+            return;
+        }
+        int accent = ContextCompat.getColor(this, R.color.theme_bright_orange);
+        base.setColorFilter(accent, PorterDuff.Mode.SRC_IN);
+        float d = getResources().getDisplayMetrics().density;
+        int box = Math.round(24 * d);
+        int dot = Math.round(9 * d);
+        GradientDrawable badge = new GradientDrawable();
+        badge.setShape(GradientDrawable.OVAL);
+        badge.setColor(accent);
+        badge.setSize(dot, dot);
+        LayerDrawable layer = new LayerDrawable(new Drawable[]{base, badge});
+        // setLayerInset is API 1-safe (setLayerGravity would need API 23).
+        layer.setLayerInset(0, 0, 0, 0, 0);
+        layer.setLayerInset(1, box - dot, 0, 0, box - dot);
+        item.setIcon(layer);
     }
 
     @SuppressLint("InflateParams")
@@ -404,6 +445,16 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             listOptions.show(getSupportFragmentManager(), MainListOptions.TAG);
         } else if (id == R.id.action_export_displayed_ids) {
             copyDisplayedAppIds();
+        } else if (id == R.id.action_clear_filters) {
+            if (viewModel != null) {
+                viewModel.clearAllFilters();
+                // Sync the search box UI to the now-cleared query.
+                if (mSearchView != null && !mSearchView.isIconified()) {
+                    mSearchView.setQuery("", false);
+                }
+                invalidateOptionsMenu();
+                UIUtils.displayShortToast(R.string.filters_cleared);
+            }
         } else if (id == R.id.action_refresh) {
             if (viewModel != null) {
                 showProgressIndicator(true);

@@ -324,6 +324,39 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
     }
 
     /**
+     * True if anything is narrowing the displayed list: a flag filter, a
+     * profile filter (include or exclude), or a search query. Drives the
+     * "filter active" state of the list-options toolbar icon.
+     */
+    public boolean isFilterActive() {
+        return mFilterFlags != 0
+                || !mProfileFiltersInclude.isEmpty()
+                || !mProfileFiltersExclude.isEmpty()
+                || !TextUtils.isEmpty(mSearchQuery);
+    }
+
+    /**
+     * Reset every filter to its unfiltered default in one shot: clears the flag
+     * filters, both profile-filter sets (persisting the empty state), and the
+     * search query, then re-runs the filter once. Sort order is intentionally
+     * left untouched (it is not a filter).
+     */
+    public void clearAllFilters() {
+        mFilterFlags = 0;
+        Prefs.MainPage.setFilters(0);
+        mProfileFiltersInclude.clear();
+        mProfileFiltersExclude.clear();
+        getApplication().getSharedPreferences(PREFS_PROFILE_FILTER, android.content.Context.MODE_PRIVATE)
+                .edit()
+                .putStringSet(PREF_KEY_INCLUDE, new HashSet<>())
+                .putStringSet(PREF_KEY_EXCLUDE, new HashSet<>())
+                .apply();
+        mSearchQuery = null;
+        cancelIfRunning();
+        mFilterResult = executor.submit(this::filterItemsByFlags);
+    }
+
+    /**
      * Replace the entire profile filter with the given include and exclude
      * sets. The filter pipeline ANDs all include profiles (intersection) and
      * subtracts the union of all exclude profiles' packages from the result.
