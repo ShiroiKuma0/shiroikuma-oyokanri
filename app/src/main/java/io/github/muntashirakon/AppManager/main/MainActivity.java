@@ -669,18 +669,11 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         if (mAppUsageMenu != null) {
             mAppUsageMenu.setVisible(FeatureController.isUsageAccessEnabled());
         }
-        // Check for backup volume
-        if (!Prefs.BackupRestore.backupDirectoryExists()) {
-            new MaterialAlertDialogBuilder(this)
-                    .setTitle(R.string.backup_volume)
-                    .setMessage(R.string.backup_volume_unavailable_warning)
-                    .setPositiveButton(R.string.close, null)
-                    .setNeutralButton(R.string.change_backup_volume, (dialog, which) -> {
-                        Intent intent = SettingsActivity.getSettingsIntent(this, "backup_restore_prefs", "backup_volume");
-                        startActivity(intent);
-                    })
-                    .show();
-        }
+        // Fork: the startup backup-volume availability check was removed. It ran
+        // on the main thread in onStart() and, with a custom backup directory
+        // set, the path lookup could block before the file-system op-mode was
+        // ready and hang the app on "Initializing...". The warning is not needed
+        // at startup; missing-volume situations surface at backup/restore time.
     }
 
     private boolean mImsVisibleBeforeLeave = false;

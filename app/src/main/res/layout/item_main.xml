@@ -194,8 +194,9 @@
                 <androidx.appcompat.widget.AppCompatTextView
                     android:id="@+id/backup_version"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="match_parent"
                     android:layout_weight="1"
+                    android:gravity="center_vertical"
                     android:singleLine="true"
                     android:textAppearance="?attr/textAppearanceBodySmall"
                     android:textSize="11sp"
@@ -223,8 +224,9 @@
                 <androidx.appcompat.widget.AppCompatTextView
                     android:id="@+id/backup_date"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="match_parent"
                     android:layout_weight="1"
+                    android:gravity="center_vertical"
                     android:singleLine="true"
                     android:textAppearance="?attr/textAppearanceBodySmall"
                     android:textSize="11sp"
@@ -252,8 +254,9 @@
                 <androidx.appcompat.widget.AppCompatTextView
                     android:id="@+id/backup_time"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="match_parent"
                     android:layout_weight="1"
+                    android:gravity="center_vertical"
                     android:singleLine="true"
                     android:textAppearance="?attr/textAppearanceBodySmall"
                     android:textSize="11sp"
