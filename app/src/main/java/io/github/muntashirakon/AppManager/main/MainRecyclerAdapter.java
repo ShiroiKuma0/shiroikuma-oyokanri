@@ -718,12 +718,19 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             holder.backupVersion.setText(R.string.backup_tap_hint);
             holder.backupVersion.setTextColor(mcBackup);
             FontUtil.apply(holder.backupVersion, FontPrefs.BACKUP_INFO);
-            holder.backupDate.setVisibility(View.GONE);
-            holder.backupTime.setVisibility(View.GONE);
+            // Keep the date/time cells visible-but-empty so the tap target
+            // spans the whole right-hand backup column (all three rows),
+            // not just the one-line "Back up" text - much easier to hit.
+            // Empty text renders nothing but the cells still occupy their
+            // row height and receive clicks.
+            holder.backupDate.setVisibility(View.VISIBLE);
+            holder.backupDate.setText("");
+            holder.backupTime.setVisibility(View.VISIBLE);
+            holder.backupTime.setText("");
             View.OnClickListener startBackupTap = v -> openBackupModeDialog(item);
             holder.backupVersion.setOnClickListener(startBackupTap);
-            holder.backupDate.setOnClickListener(null);
-            holder.backupTime.setOnClickListener(null);
+            holder.backupDate.setOnClickListener(startBackupTap);
+            holder.backupTime.setOnClickListener(startBackupTap);
             holder.backupVersion.setOnLongClickListener(null);
             holder.backupDate.setOnLongClickListener(null);
             holder.backupTime.setOnLongClickListener(null);
