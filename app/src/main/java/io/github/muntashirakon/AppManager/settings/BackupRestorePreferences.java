@@ -2,6 +2,12 @@
 
 package io.github.muntashirakon.AppManager.settings;
 
+import java.util.Arrays;
+import java.util.ArrayList;
+import io.github.muntashirakon.io.Path;
+import android.widget.ListView;
+import android.widget.ArrayAdapter;
+import android.os.Environment;
 import static io.github.muntashirakon.AppManager.utils.UIUtils.getSecondaryText;
 import static io.github.muntashirakon.AppManager.utils.UIUtils.getSmallerText;
 
@@ -210,6 +216,16 @@ public class BackupRestorePreferences extends PreferenceFragment {
                     .show();
             return true;
         });
+        // Backup directory (fork): a regular filesystem directory that
+        // overrides the SAF volume when set.
+        Preference backupDirPref = findPreference("backup_directory");
+        if (backupDirPref != null) {
+            updateBackupDirectorySummary(backupDirPref);
+            backupDirPref.setOnPreferenceClickListener(preference -> {
+                showBackupDirectoryChooser(preference);
+                return true;
+            });
+        }
         // Backup volume
         mBackupVolume = Prefs.Storage.getVolumePath();
         ((Preference) Objects.requireNonNull(findPreference("backup_volume")))
@@ -275,6 +291,71 @@ public class BackupRestorePreferences extends PreferenceFragment {
     @Override
     public int getTitle() {
         return R.string.backup_restore;
+    }
+
+    private void updateBackupDirectorySummary(@NonNull Preference pref) {
+        String dir = Prefs.Storage.getBackupDirectory();
+        pref.setSummary(dir.isEmpty() ? getString(R.string.backup_directory_not_set) : dir);
+    }
+
+    /**
+     * Fork: a minimal built-in filesystem directory browser (no SAF). Navigate
+     * into subdirectories or up via "..", then "Use this directory" saves the
+     * absolute path as the backup directory; "Use backup volume" clears it.
+     */
+    private void showBackupDirectoryChooser(@NonNull Preference pref) {
+        String start = Prefs.Storage.hasBackupDirectory()
+                ? Prefs.Storage.getBackupDirectory()
+                : Environment.getExternalStorageDirectory().getAbsolutePath();
+        Path startPath = Paths.get(start);
+        if (!startPath.exists()) {
+            startPath = Paths.get(Environment.getExternalStorageDirectory().getAbsolutePath());
+        }
+        final Path[] current = {startPath};
+        final List<Path> rows = new ArrayList<>();
+        ListView listView = new ListView(mActivity);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(mActivity, android.R.layout.simple_list_item_1);
+        listView.setAdapter(adapter);
+        AlertDialog dialog = new MaterialAlertDialogBuilder(mActivity)
+                .setView(listView)
+                .setPositiveButton(R.string.backup_directory_choose, (d, w) -> {
+                    Prefs.Storage.setBackupDirectory(current[0].getFilePath());
+                    updateBackupDirectorySummary(pref);
+                })
+                .setNeutralButton(R.string.backup_directory_use_volume, (d, w) -> {
+                    Prefs.Storage.setBackupDirectory("");
+                    updateBackupDirectorySummary(pref);
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .create();
+        final Runnable refresh = () -> {
+            dialog.setTitle(current[0].getFilePath());
+            rows.clear();
+            adapter.setNotifyOnChange(false);
+            adapter.clear();
+            Path parent = current[0].getParent();
+            if (parent != null) {
+                rows.add(parent);
+                adapter.add("..");
+            }
+            Path[] children = current[0].listFiles();
+            if (children != null) {
+                Arrays.sort(children, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+                for (Path c : children) {
+                    if (c.isDirectory()) {
+                        rows.add(c);
+                        adapter.add(c.getName() + "/");
+                    }
+                }
+            }
+            adapter.notifyDataSetChanged();
+        };
+        listView.setOnItemClickListener((p, v, position, id) -> {
+            current[0] = rows.get(position);
+            refresh.run();
+        });
+        refresh.run();
+        dialog.show();
     }
 
     @UiThread

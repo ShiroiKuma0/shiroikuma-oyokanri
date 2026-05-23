@@ -830,6 +830,11 @@
     <string name="pref_backup_restore_msg">Customise backup/restore.</string>
     <string name="backup_volume">Backup volume</string>
     <string name="pref_backup_volume_msg">Select the volume or disk where the backups will be stored.</string>
+    <string name="backup_directory">Backup directory</string>
+    <string name="pref_backup_directory_msg">Use a regular filesystem directory for backup and restore (much faster than a SAF volume). When set, this overrides the backup volume below.</string>
+    <string name="backup_directory_not_set">Not set — using the backup volume</string>
+    <string name="backup_directory_choose">Use this directory</string>
+    <string name="backup_directory_use_volume">Use backup volume</string>
     <string name="no_volumes_found">Could not find any volumes with write permission.</string>
     <string name="unencrypted">Unencrypted</string>
     <string name="encrypted">Encrypted</string>
