@@ -795,8 +795,43 @@ public final class Prefs {
     }
 
     public static final class Storage {
+        // Fork: an optional regular filesystem directory used for backup and
+        // restore. When set, it fully overrides the SAF "backup volume" below
+        // (SAF is slow; with all-files access a direct path is far faster).
+        // Stored in a dedicated SharedPreferences so it does not touch the
+        // AppPref PrefKey enum. Empty string = unset (fall back to volume).
+        private static final String PREFS_BACKUP_DIR = "am_backup_directory";
+        private static final String KEY_BACKUP_DIR = "path";
+
+        @NonNull
+        public static String getBackupDirectory() {
+            return ContextUtils.getContext()
+                    .getSharedPreferences(PREFS_BACKUP_DIR, Context.MODE_PRIVATE)
+                    .getString(KEY_BACKUP_DIR, "");
+        }
+
+        public static boolean hasBackupDirectory() {
+            return !getBackupDirectory().isEmpty();
+        }
+
+        /** Set the override directory (absolute filesystem path); pass "" to clear. */
+        public static void setBackupDirectory(@NonNull String path) {
+            ContextUtils.getContext()
+                    .getSharedPreferences(PREFS_BACKUP_DIR, Context.MODE_PRIVATE)
+                    .edit().putString(KEY_BACKUP_DIR, path).apply();
+        }
+
         @NonNull
         public static Path getAppManagerDirectory() {
+            // Fork: a configured backup directory takes precedence over the
+            // SAF volume and is used as the base directory directly (AppManager
+            // creates its "backups"/"apks"/.nomedia structure inside it).
+            String dir = getBackupDirectory();
+            if (!dir.isEmpty()) {
+                Path dirPath = Paths.get(dir);
+                if (!dirPath.exists()) dirPath.mkdirs();
+                return dirPath;
+            }
             Uri uri = getVolumePath();
             Path path;
             if (Objects.equals(uri.getScheme(), ContentResolver.SCHEME_FILE)) {

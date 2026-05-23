@@ -30,6 +30,12 @@
 
         <Preference
             app:iconSpaceReserved="false"
+            app:key="backup_directory"
+            app:summary="@string/pref_backup_directory_msg"
+            app:title="@string/backup_directory" />
+
+        <Preference
+            app:iconSpaceReserved="false"
             app:key="backup_volume"
             app:summary="@string/pref_backup_volume_msg"
             app:title="@string/backup_volume" />
