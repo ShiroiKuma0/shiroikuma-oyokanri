@@ -21,7 +21,7 @@
 
         <androidx.appcompat.widget.LinearLayoutCompat
             android:id="@+id/icon_column"
-            android:layout_width="@dimen/icon_size"
+            android:layout_width="@dimen/main_list_icon_size"
             android:layout_height="match_parent"
             android:gravity="center"
             android:layout_marginEnd="@dimen/padding_small"
@@ -29,28 +29,35 @@
 
             <androidx.appcompat.widget.AppCompatImageView
                 android:id="@+id/icon"
-                android:layout_width="@dimen/icon_size"
-                android:layout_height="@dimen/icon_size"
-                android:layout_weight="1"
-                android:layout_gravity="center"
+                android:layout_width="@dimen/main_list_icon_size"
+                android:layout_height="@dimen/main_list_icon_size"
+                android:layout_gravity="center_horizontal"
                 tools:srcCompat="@mipmap/ic_launcher_round"
                 android:contentDescription="@string/str_logo" />
 
-            <androidx.appcompat.widget.AppCompatImageView
-                android:id="@+id/freeze_indicator"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:layout_gravity="center"
-                android:src="@drawable/ic_snowflake_outline_24dp"
-                android:visibility="visible"
-                tools:ignore="ContentDescription"
-                tools:tint="@color/theme_bright_yellow" />
+            <!-- Freeze (snowflake) indicator centered horizontally and
+                 vertically in the whitespace under the icon. -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:id="@+id/freeze_indicator"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_snowflake_outline_24dp"
+                    android:visibility="visible"
+                    tools:ignore="ContentDescription"
+                    tools:tint="@color/theme_bright_yellow" />
+
+            </FrameLayout>
 
             <androidx.appcompat.widget.AppCompatTextView
                 android:id="@+id/backup_indicator"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:textAppearance="?attr/textAppearanceLabelSmall"
                 android:text="@string/backup"
                 tools:ignore="SmallSp" />
