@@ -140,6 +140,10 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
     private int mcBackup;
     private int mcSignature;
     private boolean mcSignatureSet;
+    // Non-text indicators (Stage 2): card outline, freeze snowflake, chips, + pill.
+    private int mcStrokeUser, mcStrokeSystem;
+    private int mcFreezeFrozen, mcFreezeThawed;
+    private int mcChip, mcAddPill;
 
     // package name -> profile names containing it. Loaded asynchronously on
     // adapter creation; until the load finishes the map is empty and bind
@@ -271,6 +275,12 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         mcBackup = ColorPrefs.getColor(mActivity, ColorPrefs.BACKUP, mColorYellow);
         mcSignatureSet = ColorPrefs.isSet(mActivity, ColorPrefs.SIGNATURE);
         mcSignature = ColorPrefs.getColor(mActivity, ColorPrefs.SIGNATURE, mColorSecondary);
+        mcStrokeUser = ColorPrefs.getColor(mActivity, ColorPrefs.STROKE_USER, mColorYellow);
+        mcStrokeSystem = ColorPrefs.getColor(mActivity, ColorPrefs.STROKE_SYSTEM, mColorOrange);
+        mcFreezeFrozen = ColorPrefs.getColor(mActivity, ColorPrefs.FREEZE_FROZEN, mColorIceBlue);
+        mcFreezeThawed = ColorPrefs.getColor(mActivity, ColorPrefs.FREEZE_THAWED, mColorYellow);
+        mcChip = ColorPrefs.getColor(mActivity, ColorPrefs.CHIP, mColorYellow);
+        mcAddPill = ColorPrefs.getColor(mActivity, ColorPrefs.ADDPILL, mColorYellow);
     }
 
     /**
@@ -404,7 +414,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             // though the label flips to ice blue - the stroke conveys the
             // running/active state, not the frozen state, which the
             // snowflake icon and italic label already do.
-            cardView.setStrokeColor(item.isUser ? mColorYellow : mColorOrange);
+            cardView.setStrokeColor(item.isUser ? mcStrokeUser : mcStrokeSystem);
         }
         // Display yellow star if the app is in debug mode
         holder.debugIcon.setVisibility(item.debuggable ? View.VISIBLE : View.INVISIBLE);
@@ -462,7 +472,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                 ? R.drawable.ic_snowflake_24dp
                 : R.drawable.ic_snowflake_outline_24dp);
         holder.freezeIndicator.setImageTintList(ColorStateList.valueOf(
-                item.isFrozen ? mColorIceBlue : mColorYellow));
+                item.isFrozen ? mcFreezeFrozen : mcFreezeThawed));
         // Make the whole left icon column a tap target to toggle freeze, but
         // ONLY for eligible apps: anything that is not AppManager itself.
         // Our own package keeps the column non-clickable so taps fall
@@ -538,7 +548,8 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         // they fire only when the user lands between or beyond pills, since
         // each Chip consumes its own touch area.
         holder.profilePills.removeAllViews();
-        ColorStateList yellowList = ColorStateList.valueOf(mColorYellow);
+        ColorStateList chipStrokeList = ColorStateList.valueOf(mcChip);
+        ColorStateList addPillStrokeList = ColorStateList.valueOf(mcAddPill);
         ColorStateList transparentList = ColorStateList.valueOf(Color.TRANSPARENT);
         final String pkgForRow = item.packageName;
         // Profile-membership pills.
@@ -547,9 +558,9 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             for (String name : profileNames) {
                 Chip chip = new Chip(context);
                 chip.setText(name);
-                chip.setTextColor(mColorYellow);
+                chip.setTextColor(mcChip);
                 chip.setChipBackgroundColor(transparentList);
-                chip.setChipStrokeColor(yellowList);
+                chip.setChipStrokeColor(chipStrokeList);
                 chip.setChipStrokeWidth(2f);
                 chip.setChipIconVisible(false);
                 chip.setCloseIconVisible(false);
@@ -573,9 +584,9 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         // parent LinearLayout's weight distribution. Style applied here
         // because the chip is the same shape across all rows.
         holder.addPill.setText("+");
-        holder.addPill.setTextColor(mColorYellow);
+        holder.addPill.setTextColor(mcAddPill);
         holder.addPill.setChipBackgroundColor(transparentList);
-        holder.addPill.setChipStrokeColor(yellowList);
+        holder.addPill.setChipStrokeColor(addPillStrokeList);
         holder.addPill.setChipStrokeWidth(2f);
         holder.addPill.setChipIconVisible(false);
         holder.addPill.setCloseIconVisible(false);

@@ -1701,6 +1701,21 @@
     <string name="pref_color_default">Default</string>
     <string name="pref_color_reset">Reset to default</string>
     <string name="pref_color_invalid">Invalid color</string>
+    <!-- Per-element colors, stage 2: non-text indicators + App details header -->
+    <string name="pref_color_group_indicators">List indicators</string>
+    <string name="pref_color_cat_stroke">Card outline</string>
+    <string name="pref_color_cat_freeze">Freeze indicator</string>
+    <string name="pref_color_cat_chips">Profile chips</string>
+    <string name="pref_color_cat_addpill">Add-to-profile (+) pill</string>
+    <string name="pref_color_stroke_user">Color (user app)</string>
+    <string name="pref_color_stroke_system">Color (system app)</string>
+    <string name="pref_color_freeze_frozen">Color (frozen)</string>
+    <string name="pref_color_freeze_thawed">Color (not frozen)</string>
+    <string name="pref_color_chip">Color</string>
+    <string name="pref_color_addpill">Color</string>
+    <string name="pref_color_detail_label">Color</string>
+    <string name="pref_color_detail_package">Color</string>
+    <string name="pref_color_detail_version">Color</string>
     <string name="pref_font_cat_label">App label</string>
     <string name="pref_font_cat_package">Package name</string>
     <string name="pref_font_cat_version">Version</string>
