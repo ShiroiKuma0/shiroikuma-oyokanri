@@ -12,8 +12,10 @@ import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.SeekBar;
+import android.widget.TextView;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -85,9 +87,11 @@ public class FontsPreferences extends Fragment {
             }),
     };
 
+    // Sentinel family value for the trailing "Add custom font…" picker row.
+    private static final String ADD_MARKER = "\u0000add_custom";
+
     @Nullable
-    private String mPendingImportCat;
-    private ActivityResultLauncher<String[]> mOpenFont;
+    private String mPendingImportCat;    private ActivityResultLauncher<String[]> mOpenFont;
     @Nullable
     private Runnable mRefreshPending;
 
@@ -166,14 +170,16 @@ public class FontsPreferences extends Fragment {
         render.run();
 
         rowFont.setOnClickListener(v -> {
-            List<FontUtil.Option> opts = FontUtil.families(requireContext());
-            CharSequence[] items = new CharSequence[opts.size() + 1];
-            for (int i = 0; i < opts.size(); ++i) items[i] = opts.get(i).label;
-            items[opts.size()] = getString(R.string.pref_font_add_custom);
+            final List<FontUtil.Option> opts = new java.util.ArrayList<>(FontUtil.families(requireContext()));
+            opts.add(new FontUtil.Option(getString(R.string.pref_font_add_custom), ADD_MARKER));
+            // Preview each option in its own typeface, at the category's
+            // effective weight so it reflects how the surface will look.
+            int weight = FontPrefs.effectiveWeight(requireContext(), cat.key);
             new MaterialAlertDialogBuilder(requireContext())
                     .setTitle(R.string.pref_font_family)
-                    .setItems(items, (d, which) -> {
-                        if (which == opts.size()) {
+                    .setAdapter(fontPickerAdapter(opts, weight), (d, which) -> {
+                        FontUtil.Option chosen = opts.get(which);
+                        if (ADD_MARKER.equals(chosen.value)) {
                             // "Add custom font…" — remember which category to
                             // assign the picked file to, then launch SAF.
                             mPendingImportCat = cat.key;
@@ -182,7 +188,7 @@ public class FontsPreferences extends Fragment {
                                     "application/x-font-ttf", "application/x-font-otf",
                                     "application/octet-stream", "*/*"});
                         } else {
-                            FontPrefs.setFamily(requireContext(), cat.key, opts.get(which).value);
+                            FontPrefs.setFamily(requireContext(), cat.key, chosen.value);
                             render.run();
                         }
                     })
@@ -238,6 +244,46 @@ public class FontsPreferences extends Fragment {
                     .setNegativeButton(R.string.cancel, null)
                     .show();
         });
+    }
+
+    /**
+     * Adapter for the Font family chooser: each row shows a small caption
+     * (the filename, for imported fonts) above a preview line rendered in
+     * that font at {@code weight}, so the user sees the actual typeface.
+     */
+    @NonNull
+    private ArrayAdapter<FontUtil.Option> fontPickerAdapter(@NonNull List<FontUtil.Option> opts, int weight) {
+        final LayoutInflater inf = LayoutInflater.from(requireContext());
+        return new ArrayAdapter<FontUtil.Option>(requireContext(), 0, opts) {
+            @NonNull
+            @Override
+            public View getView(int position, View convertView, @NonNull ViewGroup parent) {
+                View v = convertView != null ? convertView
+                        : inf.inflate(R.layout.item_font_picker, parent, false);
+                FontUtil.Option o = opts.get(position);
+                TextView caption = v.findViewById(R.id.fp_caption);
+                TextView previewLine = v.findViewById(R.id.fp_preview);
+                if (ADD_MARKER.equals(o.value)) {
+                    caption.setVisibility(View.GONE);
+                    previewLine.setText(o.label);
+                    previewLine.setTypeface(Typeface.DEFAULT);
+                } else {
+                    boolean isFile = o.value.startsWith(FontUtil.FILE_PREFIX);
+                    caption.setVisibility(isFile ? View.VISIBLE : View.GONE);
+                    if (isFile) caption.setText(o.label);
+                    previewLine.setText(isFile ? stripExtension(o.label) : o.label);
+                    Typeface tf = FontUtil.resolveTypeface(o.value, weight, null);
+                    previewLine.setTypeface(tf != null ? tf : Typeface.DEFAULT);
+                }
+                return v;
+            }
+        };
+    }
+
+    @NonNull
+    private static String stripExtension(@NonNull String name) {
+        int dot = name.lastIndexOf('.');
+        return dot > 0 ? name.substring(0, dot) : name;
     }
 
     /**
