@@ -361,6 +361,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         }
         // Set date color to orange if app can read logs (and accepted)
         holder.date.setTextColor(item.canReadLogs ? mColorOrange : mColorSecondary);
+        FontUtil.apply(holder.date, FontPrefs.INSTALL_DATE);
         if (item.isInstalled) {
             // Set UID
             if (item.uidOrAppIds != null) {
@@ -379,6 +380,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         } else {
             holder.sha.setVisibility(View.GONE);
         }
+        FontUtil.apply(holder.sha, FontPrefs.SIGNATURE);
         // Load app icon
         holder.icon.setTag(item.packageName);
         ImageLoader.getInstance().displayImage(item.packageName, item, holder.icon);
@@ -553,6 +555,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         holder.version.setText(item.versionTag);
         // Set version color to dark cyan if the app is inactive
         holder.version.setTextColor(item.isAppInactive ? mColorGreen : mColorSecondary);
+        FontUtil.apply(holder.version, FontPrefs.VERSION);
         // Set app type: system or user app (along with large heap, suspended, multi-arch,
         // has code, vm safe mode)
         if (item.isInstalled) {
@@ -571,6 +574,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         }
         // Set SDK color to orange if the app is using cleartext (e.g. HTTP) traffic
         holder.size.setTextColor(item.usesCleartextTraffic ? mColorOrange : mColorSecondary);
+        FontUtil.apply(holder.size, FontPrefs.SDK);
         // Backup indicator on the LEFT (under the icon) is suppressed in
         // this fork - we surface backup presence and details on the right
         // column instead (version + date + time, in yellow, three lines
@@ -594,6 +598,9 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             holder.backupTime.setVisibility(View.VISIBLE);
             holder.backupTime.setText(timeFmt.format(when));
             holder.backupTime.setTextColor(mColorYellow);
+            FontUtil.apply(holder.backupVersion, FontPrefs.BACKUP_INFO);
+            FontUtil.apply(holder.backupDate, FontPrefs.BACKUP_INFO);
+            FontUtil.apply(holder.backupTime, FontPrefs.BACKUP_INFO);
             // Tapping any of the three backup lines opens the
             // backup/restore dialog for this single app, from which the
             // user can start a fresh backup, restore, or delete the

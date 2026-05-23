@@ -77,6 +77,11 @@ public class FontsPreferences extends Fragment {
             new Group(R.string.pref_font_group_main_list, new Cat[]{
                     new Cat(FontPrefs.LABEL, R.string.pref_font_cat_label),
                     new Cat(FontPrefs.PACKAGE, R.string.pref_font_cat_package),
+                    new Cat(FontPrefs.VERSION, R.string.pref_font_cat_version),
+                    new Cat(FontPrefs.INSTALL_DATE, R.string.pref_font_cat_install_date),
+                    new Cat(FontPrefs.SDK, R.string.pref_font_cat_sdk),
+                    new Cat(FontPrefs.SIGNATURE, R.string.pref_font_cat_signature),
+                    new Cat(FontPrefs.BACKUP_INFO, R.string.pref_font_cat_backup_info),
             }),
     };
 
