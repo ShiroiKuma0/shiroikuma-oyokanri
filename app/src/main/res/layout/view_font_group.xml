@@ -1,53 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!--
-    A font-settings group: an outlined rounded box whose top border is
-    "notched" by the group header text (the header has a solid black
-    background and overlaps the box's top edge, masking the border behind
-    it). Element views are added into group_content at runtime.
+    A font-settings group: a bold header with a full-width underline rule
+    beneath it (HandyRSS treatment), then the element views added into
+    group_content at runtime.
 -->
 <androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:layout_marginVertical="12dp">
+    android:layout_marginTop="20dp"
+    android:layout_marginBottom="6dp">
 
-    <FrameLayout
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/group_header"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/theme_bright_yellow"
+        android:textStyle="bold"
+        android:textSize="22sp"
+        tools:text="Reading view" />
+
+    <View
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="2dp"
+        android:layout_marginTop="4dp"
+        android:background="@color/theme_bright_yellow" />
 
-        <androidx.appcompat.widget.LinearLayoutCompat
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_marginTop="14dp"
-            android:background="@drawable/font_group_box"
-            android:paddingHorizontal="14dp"
-            android:paddingTop="24dp"
-            android:paddingBottom="14dp">
-
-            <androidx.appcompat.widget.LinearLayoutCompat
-                android:id="@+id/group_content"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical" />
-
-        </androidx.appcompat.widget.LinearLayoutCompat>
-
-        <androidx.appcompat.widget.AppCompatTextView
-            android:id="@+id/group_header"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="top|start"
-            android:layout_marginStart="14dp"
-            android:background="@android:color/black"
-            android:paddingHorizontal="8dp"
-            android:textColor="@color/theme_bright_yellow"
-            android:textStyle="bold"
-            android:textSize="18sp"
-            tools:text="Main app list" />
-
-    </FrameLayout>
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:id="@+id/group_content"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" />
 
 </androidx.appcompat.widget.LinearLayoutCompat>

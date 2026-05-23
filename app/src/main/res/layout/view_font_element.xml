@@ -1,119 +1,133 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!--
-    One font category inside a group. An outlined label box names the
-    surface; below it sit inline controls (Font chooser, weight chooser,
-    size slider) and a live preview line. All wired in FontsPreferences.
+    One font category. A bold sub-heading with a text-width underline,
+    then INDENTED controls (Font chooser, weight chooser, size label +
+    value + slider) and a live preview, so the controls visibly belong to
+    the heading. Matches the HandyRSS Reading-view treatment.
 -->
 <androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:layout_marginVertical="8dp">
+    android:layout_marginTop="16dp">
 
-    <androidx.appcompat.widget.AppCompatTextView
-        android:id="@+id/element_label"
+    <!-- Sub-heading with a text-width underline (wrap_content wrapper, so
+         the match_parent rule below spans only the text). -->
+    <androidx.appcompat.widget.LinearLayoutCompat
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:background="@drawable/font_element_label_box"
-        android:paddingHorizontal="12dp"
-        android:paddingVertical="6dp"
-        android:textColor="@color/theme_bright_yellow"
-        android:textStyle="bold"
-        android:textSize="16sp"
-        tools:text="App label" />
-
-    <androidx.appcompat.widget.AppCompatTextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:text="@string/pref_font_family"
-        android:textColor="#9A9A9A"
-        android:textSize="13sp" />
-
-    <androidx.appcompat.widget.LinearLayoutCompat
-        android:id="@+id/row_font"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:clickable="true"
-        android:focusable="true"
-        android:paddingVertical="4dp">
+        android:orientation="vertical">
 
         <androidx.appcompat.widget.AppCompatTextView
-            android:id="@+id/font_value"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:singleLine="true"
-            android:ellipsize="end"
-            android:textColor="@color/theme_bright_yellow"
-            android:textSize="16sp"
-            tools:text="Inherit (default)" />
-
-        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/element_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="▾"
             android:textColor="@color/theme_bright_yellow"
-            android:textSize="16sp" />
+            android:textStyle="bold"
+            android:textSize="18sp"
+            tools:text="Article text" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="2dp"
+            android:layout_marginTop="3dp"
+            android:background="@color/theme_bright_yellow" />
 
     </androidx.appcompat.widget.LinearLayoutCompat>
 
-    <androidx.appcompat.widget.AppCompatTextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text="@string/pref_font_weight"
-        android:textColor="#9A9A9A"
-        android:textSize="13sp" />
-
-    <androidx.appcompat.widget.LinearLayoutCompat
-        android:id="@+id/row_weight"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:clickable="true"
-        android:focusable="true"
-        android:paddingVertical="4dp">
-
-        <androidx.appcompat.widget.AppCompatTextView
-            android:id="@+id/weight_value"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:singleLine="true"
-            android:ellipsize="end"
-            android:textColor="@color/theme_bright_yellow"
-            android:textSize="16sp"
-            tools:text="Regular (400)" />
-
-        <androidx.appcompat.widget.AppCompatTextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="▾"
-            android:textColor="@color/theme_bright_yellow"
-            android:textSize="16sp" />
-
-    </androidx.appcompat.widget.LinearLayoutCompat>
-
+    <!-- Indented controls -->
     <androidx.appcompat.widget.LinearLayoutCompat
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:orientation="vertical"
+        android:layout_marginTop="8dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="0dp">
 
         <androidx.appcompat.widget.AppCompatTextView
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
+            android:text="@string/pref_font_family"
+            android:textColor="#9A9A9A"
+            android:textSize="14sp" />
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:id="@+id/row_font"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingVertical="4dp">
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/font_value"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:textColor="@color/theme_bright_yellow"
+                android:textSize="17sp"
+                tools:text="Animo-Regular.ttf" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="▾"
+                android:textColor="@color/theme_bright_yellow"
+                android:textSize="17sp" />
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/pref_font_weight"
+            android:textColor="#9A9A9A"
+            android:textSize="14sp" />
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:id="@+id/row_weight"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingVertical="4dp">
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/weight_value"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:textColor="@color/theme_bright_yellow"
+                android:textSize="17sp"
+                tools:text="Default" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="▾"
+                android:textColor="@color/theme_bright_yellow"
+                android:textSize="17sp" />
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
             android:text="@string/pref_font_size"
             android:textColor="#9A9A9A"
-            android:textSize="13sp" />
+            android:textSize="14sp" />
 
         <androidx.appcompat.widget.AppCompatTextView
             android:id="@+id/size_value"
@@ -121,23 +135,25 @@
             android:layout_height="wrap_content"
             android:clickable="true"
             android:focusable="true"
+            android:paddingVertical="2dp"
             android:textColor="@color/theme_bright_yellow"
-            android:textSize="16sp"
-            tools:text="18 sp" />
+            android:textSize="17sp"
+            tools:text="16 sp" />
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/preview"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textColor="@color/theme_bright_yellow"
+            android:text="@string/font_preview_text" />
+
+        <androidx.appcompat.widget.AppCompatSeekBar
+            android:id="@+id/size_seek"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp" />
 
     </androidx.appcompat.widget.LinearLayoutCompat>
-
-    <androidx.appcompat.widget.AppCompatSeekBar
-        android:id="@+id/size_seek"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
-
-    <androidx.appcompat.widget.AppCompatTextView
-        android:id="@+id/preview"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:textColor="@color/theme_bright_yellow"
-        android:text="@string/font_preview_text" />
 
 </androidx.appcompat.widget.LinearLayoutCompat>

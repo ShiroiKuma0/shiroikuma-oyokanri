@@ -1685,5 +1685,5 @@
     <string name="pref_font_size">size</string>
     <string name="pref_font_size_inherit">default</string>
     <string name="pref_font_add_custom">Add custom font…</string>
-    <string name="font_preview_text">Aa Bb Cc 0123 Příklad あ漢字</string>
+    <string name="font_preview_text">AaIiMmOoQqWw 012 白い熊相撲道 áÁčČďĎéÉěĚíÍňŇóÓrŘŠŠťŤúÚůŮÝÝžŽ</string>
 </resources>
