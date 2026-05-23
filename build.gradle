@@ -22,11 +22,17 @@ allprojects {
         mavenCentral()
         maven { url "https://jitpack.io" }
     }
-    gradle.projectsEvaluated {
-        tasks.withType(JavaCompile).tap {
-            configureEach {
-                options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
-            }
-        }
+    // shiroikuma fork: upstream enables -Xlint:unchecked/-Xlint:deprecation,
+    // which buries real errors under hundreds of warning lines. Silence all
+    // javac warnings AND the mandatory deprecation/unchecked summary notes
+    // ("Note: ... uses ... API. Recompile with -Xlint:...") instead.
+    // A direct configureEach (not the previous gradle.projectsEvaluated form,
+    // which only reached :app and left :server / :libcore:* still printing the
+    // notes) lazily configures every module's JavaCompile task and is
+    // configuration-cache safe. Errors are unaffected by -nowarn/-Xlint:none,
+    // so build failures still show.
+    tasks.withType(JavaCompile).configureEach {
+        options.compilerArgs << "-Xlint:none" << "-nowarn"
+        options.deprecation = false
     }
 }
