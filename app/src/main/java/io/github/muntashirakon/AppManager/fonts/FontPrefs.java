@@ -62,6 +62,12 @@ public final class FontPrefs {
     public static final String SDK = "sdk";
     public static final String SIGNATURE = "signature";
     public static final String BACKUP_INFO = "backup_info";
+    public static final String UID = "uid";
+    public static final String APP_TYPE = "app_type";
+    // App details (App info) header
+    public static final String DETAIL_LABEL = "detail_label";
+    public static final String DETAIL_PACKAGE = "detail_package";
+    public static final String DETAIL_VERSION = "detail_version";
 
     @NonNull
     private static SharedPreferences sp(@NonNull Context ctx) {

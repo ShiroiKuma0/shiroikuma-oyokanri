@@ -89,6 +89,8 @@ import java.util.concurrent.Future;
 import io.github.muntashirakon.AppManager.BuildConfig;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.accessibility.AccessibilityMultiplexer;
+import io.github.muntashirakon.AppManager.fonts.FontPrefs;
+import io.github.muntashirakon.AppManager.fonts.FontUtil;
 import io.github.muntashirakon.AppManager.accessibility.NoRootAccessibilityService;
 import io.github.muntashirakon.AppManager.apk.ApkFile;
 import io.github.muntashirakon.AppManager.apk.ApkSource;
@@ -284,11 +286,13 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
             ImageLoader.getInstance().displayImage(mPackageName, mApplicationInfo, mIconView);
             // Set package name
             mPackageNameView.setText(mPackageName);
+            FontUtil.apply(mPackageNameView, FontPrefs.DETAIL_PACKAGE);
             mPackageNameView.setOnClickListener(v ->
                     Utils.copyToClipboard(ContextUtils.getContext(), "Package name", mPackageName));
             // Set App Version
             CharSequence version = getString(R.string.version_name_with_code, mPackageInfo.versionName, PackageInfoCompat.getLongVersionCode(mPackageInfo));
             mVersionView.setText(version);
+            FontUtil.apply(mVersionView, FontPrefs.DETAIL_VERSION);
             // Load app label
             mAppInfoModel.loadAppLabel(mApplicationInfo);
             // Load tag cloud
@@ -306,6 +310,7 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
             mAppLabel = appLabel;
             // Set Application Name, aka Label
             mLabelView.setText(mAppLabel);
+            FontUtil.apply(mLabelView, FontPrefs.DETAIL_LABEL);
         });
         mMainModel.getFreezeTypeLiveData().observe(getViewLifecycleOwner(), freezeType -> {
             int freezeTypeN = Optional.ofNullable(freezeType)
@@ -673,6 +678,12 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
     public void onResume() {
         super.onResume();
         if (mActivity.searchView != null) mActivity.searchView.setVisibility(View.GONE);
+        // Re-apply the header fonts in case they were changed in the Fonts
+        // settings screen while this fragment was paused. Cheap (3 views), so
+        // unconditional — no need for the main list's change-flag here.
+        if (mLabelView != null) FontUtil.apply(mLabelView, FontPrefs.DETAIL_LABEL);
+        if (mPackageNameView != null) FontUtil.apply(mPackageNameView, FontPrefs.DETAIL_PACKAGE);
+        if (mVersionView != null) FontUtil.apply(mVersionView, FontPrefs.DETAIL_VERSION);
     }
 
     @Override
