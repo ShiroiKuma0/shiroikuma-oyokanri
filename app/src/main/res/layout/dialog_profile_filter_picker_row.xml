@@ -1,55 +1,68 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!--
-    Per-profile row in the multi-profile filter picker dialog.
+    One row in the multi-profile filter picker dialog. Profile name on
+    the left, then two pill buttons: "+" (include) and "-" (exclude).
 
-    Layout: profile name (weight=1, left) + In chip + Not-in chip (right).
-    The two chips are checkable and mutually exclusive - tapping one
-    clears the other in the picker code. Both unchecked = profile is not
-    part of the active filter.
+    Every visual surface here (row background, name colour, the two
+    pills) is styled programmatically in MainListOptions per the row's
+    tri-state value (neutral / include / exclude), so the views are
+    deliberately plain - plain TextViews for the pills rather than
+    Material Chips, because the states need fills, double borders and
+    line-highlights that the Chip checked/unchecked machinery can't
+    express. The pills are clickable on their own (toggle that polarity)
+    and the whole row is clickable (cycles neutral -> include ->
+    exclude -> neutral).
 -->
 <androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/row_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:layout_marginVertical="4dp"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:paddingHorizontal="8dp"
-    android:paddingVertical="4dp">
+    android:clickable="true"
+    android:focusable="true"
+    android:paddingHorizontal="12dp"
+    android:paddingVertical="8dp">
 
-    <TextView
+    <androidx.appcompat.widget.AppCompatTextView
         android:id="@+id/profile_name"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:textAppearance="?attr/textAppearanceBodyLarge"
         android:ellipsize="end"
         android:maxLines="1"
-        tools:text="Profile name"
-        xmlns:tools="http://schemas.android.com/tools" />
+        tools:text="凍結" />
 
-    <com.google.android.material.chip.Chip
-        android:id="@+id/chip_include"
-        style="@style/Widget.Material3.Chip.Filter"
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/btn_include"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="4dp"
-        android:text="@string/profile_filter_chip_in"
-        android:checkable="true"
-        app:checkedIconVisible="false"
-        app:closeIconVisible="false"
-        app:chipIconVisible="false" />
+        android:layout_marginStart="6dp"
+        android:minWidth="52dp"
+        android:gravity="center"
+        android:clickable="true"
+        android:focusable="true"
+        android:paddingHorizontal="18dp"
+        android:paddingVertical="6dp"
+        android:textAppearance="?attr/textAppearanceBodyLarge"
+        android:text="+" />
 
-    <com.google.android.material.chip.Chip
-        android:id="@+id/chip_exclude"
-        style="@style/Widget.Material3.Chip.Filter"
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/btn_exclude"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="4dp"
-        android:text="@string/profile_filter_chip_not_in"
-        android:checkable="true"
-        app:checkedIconVisible="false"
-        app:closeIconVisible="false"
-        app:chipIconVisible="false" />
+        android:layout_marginStart="6dp"
+        android:minWidth="52dp"
+        android:gravity="center"
+        android:clickable="true"
+        android:focusable="true"
+        android:paddingHorizontal="18dp"
+        android:paddingVertical="6dp"
+        android:textAppearance="?attr/textAppearanceBodyLarge"
+        android:text="−" />
 
 </androidx.appcompat.widget.LinearLayoutCompat>
