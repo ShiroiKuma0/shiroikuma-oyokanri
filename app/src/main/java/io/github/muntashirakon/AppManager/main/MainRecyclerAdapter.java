@@ -55,6 +55,8 @@ import java.util.Objects;
 import io.github.muntashirakon.AppManager.BuildConfig;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.apk.installer.PackageInstallerActivity;
+import io.github.muntashirakon.AppManager.fonts.FontPrefs;
+import io.github.muntashirakon.AppManager.fonts.FontUtil;
 import io.github.muntashirakon.AppManager.apk.installer.PackageInstallerCompat;
 import io.github.muntashirakon.AppManager.backup.dialog.BackupRestoreDialogFragment;
 import io.github.muntashirakon.AppManager.compat.ApplicationInfoCompat;
@@ -434,6 +436,13 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             labelColor = item.isUser ? mColorYellow : mColorOrange;
         }
         holder.label.setTextColor(labelColor);
+        // Custom per-element font (shiroikuma fork). Applied after the
+        // default typeface so a chosen family/weight/size wins; the frozen
+        // italic is then re-derived on top of whatever typeface is now set
+        // (when the category inherits, FontUtil.apply is a no-op and this
+        // just re-applies the same italic/normal as before).
+        FontUtil.apply(holder.label, FontPrefs.LABEL);
+        holder.label.setTypeface(holder.label.getTypeface(), item.isFrozen ? Typeface.ITALIC : Typeface.NORMAL);
         // Set package name
         if (!TextUtils.isEmpty(mSearchQuery) && item.packageName.toLowerCase(Locale.ROOT).contains(mSearchQuery)) {
             // Highlight searched query
@@ -445,6 +454,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         if (item.trackerCount > 0) {
             holder.packageName.setTextColor(ColorCodes.getComponentTrackerIndicatorColor(context));
         } else holder.packageName.setTextColor(mColorSecondary);
+        FontUtil.apply(holder.packageName, FontPrefs.PACKAGE);
         // Populate profile-membership pills (these sit where the cert issuer
         // and backup info text used to live). Each pill is a Chip styled as
         // yellow text inside a yellow hairline-stroked transparent oval —

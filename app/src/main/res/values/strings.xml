@@ -1667,4 +1667,18 @@
     <string name="manual_wireless_debugging_title">Connect using Wireless Debugging</string>
     <string name="launch_activity_dialog_title">Launch activity: action required</string>
     <string name="launch_activity_dialog_message">Android 5.x cannot trigger the <b>Search assistant</b> automatically. To open the activity, activate the Search assistant manually (usually by long-pressing the Home button). Tap <b>Close</b> after the activity opens to restore the original assistant.</string>
+    <!-- Configurable fonts (shiroikuma fork) -->
+    <string name="pref_fonts">Fonts</string>
+    <string name="pref_fonts_description">Set the font, weight and size per interface element</string>
+    <string name="pref_font_group_default">Default</string>
+    <string name="pref_font_cat_default">Default (all text)</string>
+    <string name="pref_font_group_main_list">Main app list</string>
+    <string name="pref_font_cat_label">App label</string>
+    <string name="pref_font_cat_package">Package name</string>
+    <string name="pref_font_family">Font</string>
+    <string name="pref_font_weight">weight</string>
+    <string name="pref_font_size">size</string>
+    <string name="pref_font_size_inherit">default</string>
+    <string name="pref_font_add_custom">Add custom font…</string>
+    <string name="font_preview_text">Aa Bb Cc 0123 Příklad あ漢字</string>
 </resources>
