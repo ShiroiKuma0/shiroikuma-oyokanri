@@ -1674,6 +1674,12 @@
     <string name="pref_font_cat_default">Default (all text)</string>
     <string name="pref_font_group_main_list">Main app list</string>
     <string name="pref_font_group_app_details">App details</string>
+    <string name="copy_displayed_app_ids">Copy displayed app IDs</string>
+    <string name="no_apps_displayed_to_copy">No apps are currently displayed</string>
+    <plurals name="copied_n_app_ids">
+        <item quantity="one"><xliff:g id="count" example="1">%1$d</xliff:g> app ID copied to clipboard</item>
+        <item quantity="other"><xliff:g id="count" example="237">%1$d</xliff:g> app IDs copied to clipboard</item>
+    </plurals>
     <string name="pref_font_cat_label">App label</string>
     <string name="pref_font_cat_package">Package name</string>
     <string name="pref_font_cat_version">Version</string>
