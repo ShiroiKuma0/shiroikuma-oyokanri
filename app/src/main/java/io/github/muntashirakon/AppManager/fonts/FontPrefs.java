@@ -38,6 +38,18 @@ public final class FontPrefs {
     private static final String PREFS_NAME = "shiroikuma_fonts";
     private static final String KEY_IMPORTED = "imported_fonts";
 
+    // Set whenever any font setting changes; the main list consumes it on
+    // resume to re-bind rows so new typefaces/sizes render after the user
+    // leaves the Fonts settings screen. Process-wide (settings runs in a
+    // separate activity, same process).
+    private static volatile boolean sChanged = false;
+
+    public static boolean consumeChanged() {
+        boolean c = sChanged;
+        sChanged = false;
+        return c;
+    }
+
     // Category keys. DEFAULT is the global fallback. The rest map to a
     // specific text surface. Increment 1 wires DEFAULT + LABEL + PACKAGE in
     // the UI and at the bind sites; the remaining constants are declared now
@@ -73,14 +85,17 @@ public final class FontPrefs {
 
     public static void setFamily(@NonNull Context ctx, @NonNull String cat, @NonNull String family) {
         sp(ctx).edit().putString("font_" + cat + "_family", family).apply();
+        sChanged = true;
     }
 
     public static void setWeight(@NonNull Context ctx, @NonNull String cat, int weight) {
         sp(ctx).edit().putInt("font_" + cat + "_weight", weight).apply();
+        sChanged = true;
     }
 
     public static void setSize(@NonNull Context ctx, @NonNull String cat, int size) {
         sp(ctx).edit().putInt("font_" + cat + "_size", size).apply();
+        sChanged = true;
     }
 
     // ---- effective values (category, then DEFAULT, then inherit) ----
@@ -122,6 +137,7 @@ public final class FontPrefs {
                 .remove("font_" + cat + "_weight")
                 .remove("font_" + cat + "_size")
                 .apply();
+        sChanged = true;
     }
 
     // ---- imported font registry ----
@@ -142,5 +158,6 @@ public final class FontPrefs {
         LinkedHashSet<String> set = new LinkedHashSet<>(sp(ctx).getStringSet(KEY_IMPORTED, Collections.emptySet()));
         set.add(path);
         sp(ctx).edit().putStringSet(KEY_IMPORTED, set).apply();
+        sChanged = true;
     }
 }
