@@ -55,6 +55,7 @@ import java.util.Objects;
 import io.github.muntashirakon.AppManager.BuildConfig;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.apk.installer.PackageInstallerActivity;
+import io.github.muntashirakon.AppManager.fonts.ColorPrefs;
 import io.github.muntashirakon.AppManager.fonts.FontPrefs;
 import io.github.muntashirakon.AppManager.fonts.FontUtil;
 import io.github.muntashirakon.AppManager.apk.installer.PackageInstallerCompat;
@@ -124,6 +125,22 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         }
     };
 
+    // Resolved per-element text colours (fork). Defaults are the palette above;
+    // each may be overridden via ColorPrefs. Reloaded in the constructor and
+    // whenever a colour setting changes (reloadColors, called from
+    // MainActivity.onResume). For SIGNATURE the original had no explicit colour,
+    // so it is only applied when the user has set one (mcSignatureSet).
+    private int mcLabelUser, mcLabelSystem, mcLabelFrozen;
+    private int mcPackageNormal, mcPackageTrackers;
+    private int mcVersionNormal, mcVersionInactive;
+    private int mcApptypeNormal, mcApptypePersistent;
+    private int mcDateNormal, mcDateReadable;
+    private int mcUidNormal, mcUidShared;
+    private int mcSdkNormal, mcSdkCleartext;
+    private int mcBackup;
+    private int mcSignature;
+    private boolean mcSignatureSet;
+
     // package name -> profile names containing it. Loaded asynchronously on
     // adapter creation; until the load finishes the map is empty and bind
     // just renders zero pills for every row, which is the same as an app
@@ -144,6 +161,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         mColorIceBlue = ContextCompat.getColor(activity, R.color.theme_ice_blue);
         mLabelFrozenUser = ContextCompat.getColor(activity, R.color.theme_label_frozen_user);
         mLabelFrozenSystem = ContextCompat.getColor(activity, R.color.theme_label_frozen_system);
+        reloadColors();
         ThreadUtils.postOnBackgroundThread(this::loadProfileMembership);
     }
 
@@ -227,6 +245,32 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             notifyItemRangeChanged(0, getItemCount(), PAYLOAD_HIGHLIGHT_CHANGED);
         }
         notifySelectionChange();
+    }
+
+    /**
+     * (Re)load the per-element colour cache from {@link ColorPrefs}, defaulting
+     * to the fork palette. Call after a colour setting changes so the next bind
+     * paints the new colours (see {@link MainActivity#onResume}).
+     */
+    public void reloadColors() {
+        mcLabelUser = ColorPrefs.getColor(mActivity, ColorPrefs.LABEL_USER, mColorYellow);
+        mcLabelSystem = ColorPrefs.getColor(mActivity, ColorPrefs.LABEL_SYSTEM, mColorOrange);
+        mcLabelFrozen = ColorPrefs.getColor(mActivity, ColorPrefs.LABEL_FROZEN, mColorIceBlue);
+        mcPackageNormal = ColorPrefs.getColor(mActivity, ColorPrefs.PACKAGE_NORMAL, mColorYellow);
+        mcPackageTrackers = ColorPrefs.getColor(mActivity, ColorPrefs.PACKAGE_TRACKERS, mColorOrange);
+        mcVersionNormal = ColorPrefs.getColor(mActivity, ColorPrefs.VERSION_NORMAL, mColorSecondary);
+        mcVersionInactive = ColorPrefs.getColor(mActivity, ColorPrefs.VERSION_INACTIVE, mColorGreen);
+        mcApptypeNormal = ColorPrefs.getColor(mActivity, ColorPrefs.APPTYPE_NORMAL, mColorSecondary);
+        mcApptypePersistent = ColorPrefs.getColor(mActivity, ColorPrefs.APPTYPE_PERSISTENT, Color.MAGENTA);
+        mcDateNormal = ColorPrefs.getColor(mActivity, ColorPrefs.DATE_NORMAL, mColorSecondary);
+        mcDateReadable = ColorPrefs.getColor(mActivity, ColorPrefs.DATE_READABLE, mColorOrange);
+        mcUidNormal = ColorPrefs.getColor(mActivity, ColorPrefs.UID_NORMAL, mColorSecondary);
+        mcUidShared = ColorPrefs.getColor(mActivity, ColorPrefs.UID_SHARED, mColorOrange);
+        mcSdkNormal = ColorPrefs.getColor(mActivity, ColorPrefs.SDK_NORMAL, mColorSecondary);
+        mcSdkCleartext = ColorPrefs.getColor(mActivity, ColorPrefs.SDK_CLEARTEXT, mColorOrange);
+        mcBackup = ColorPrefs.getColor(mActivity, ColorPrefs.BACKUP, mColorYellow);
+        mcSignatureSet = ColorPrefs.isSet(mActivity, ColorPrefs.SIGNATURE);
+        mcSignature = ColorPrefs.getColor(mActivity, ColorPrefs.SIGNATURE, mColorSecondary);
     }
 
     /**
@@ -377,7 +421,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             holder.date.setText(ssDate);
         }
         // Set date color to orange if app can read logs (and accepted)
-        holder.date.setTextColor(item.canReadLogs ? mColorOrange : mColorSecondary);
+        holder.date.setTextColor(item.canReadLogs ? mcDateReadable : mcDateNormal);
         FontUtil.apply(holder.date, FontPrefs.INSTALL_DATE);
         if (item.isInstalled) {
             // Set UID
@@ -385,7 +429,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                 holder.userId.setText(item.uidOrAppIds);
             }
             // Set UID text color to orange if the package is shared
-            holder.userId.setTextColor(item.sharedUserId != null ? mColorOrange : mColorSecondary);
+            holder.userId.setTextColor(item.sharedUserId != null ? mcUidShared : mcUidNormal);
         } else holder.userId.setText("");
         FontUtil.apply(holder.userId, FontPrefs.UID);
         if (item.sha != null) {
@@ -396,6 +440,8 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             holder.sha.setVisibility(View.GONE);
         }
         FontUtil.apply(holder.sha, FontPrefs.SIGNATURE);
+        // Signature had no explicit colour originally; only override if set.
+        if (mcSignatureSet) holder.sha.setTextColor(mcSignature);
         // Load app icon
         holder.icon.setTag(item.packageName);
         ImageLoader.getInstance().displayImage(item.packageName, item, holder.icon);
@@ -448,9 +494,9 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         // the user/system distinction is wanted back later, but neither is used here.
         int labelColor;
         if (item.isFrozen) {
-            labelColor = mColorIceBlue;
+            labelColor = mcLabelFrozen;
         } else {
-            labelColor = item.isUser ? mColorYellow : mColorOrange;
+            labelColor = item.isUser ? mcLabelUser : mcLabelSystem;
         }
         holder.label.setTextColor(labelColor);
         // Custom per-element font (shiroikuma fork). Applied after the
@@ -469,8 +515,8 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         // known tracker components (same orange as system-app labels), else
         // yellow.
         if (item.trackerCount > 0) {
-            holder.packageName.setTextColor(mColorOrange);
-        } else holder.packageName.setTextColor(mColorYellow);
+            holder.packageName.setTextColor(mcPackageTrackers);
+        } else holder.packageName.setTextColor(mcPackageNormal);
         FontUtil.apply(holder.packageName, FontPrefs.PACKAGE);
         // Populate profile-membership pills (these sit where the cert issuer
         // and backup info text used to live). Each pill is a Chip styled as
@@ -569,7 +615,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         // Set version (along with HW accelerated, debug and test only flags)
         holder.version.setText(item.versionTag);
         // Set version color to dark cyan if the app is inactive
-        holder.version.setTextColor(item.isAppInactive ? mColorGreen : mColorSecondary);
+        holder.version.setTextColor(item.isAppInactive ? mcVersionInactive : mcVersionNormal);
         FontUtil.apply(holder.version, FontPrefs.VERSION);
         // Set app type: system or user app (along with large heap, suspended, multi-arch,
         // has code, vm safe mode)
@@ -580,7 +626,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             holder.isSystemApp.setText("-");
         }
         // Set app type text color to magenta if the app is persistent
-        holder.isSystemApp.setTextColor(item.isPersistent ? Color.MAGENTA : mColorSecondary);
+        holder.isSystemApp.setTextColor(item.isPersistent ? mcApptypePersistent : mcApptypeNormal);
         FontUtil.apply(holder.isSystemApp, FontPrefs.APP_TYPE);
         // Set SDK
         if (item.sdkString != null) {
@@ -589,7 +635,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             holder.size.setText("-");
         }
         // Set SDK color to orange if the app is using cleartext (e.g. HTTP) traffic
-        holder.size.setTextColor(item.usesCleartextTraffic ? mColorOrange : mColorSecondary);
+        holder.size.setTextColor(item.usesCleartextTraffic ? mcSdkCleartext : mcSdkNormal);
         FontUtil.apply(holder.size, FontPrefs.SDK);
         // Backup indicator on the LEFT (under the icon) is suppressed in
         // this fork - we surface backup presence and details on the right
@@ -607,13 +653,13 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             java.util.Date when = new java.util.Date(item.backup.backupTime);
             holder.backupVersion.setVisibility(View.VISIBLE);
             holder.backupVersion.setText(item.backup.versionName);
-            holder.backupVersion.setTextColor(mColorYellow);
+            holder.backupVersion.setTextColor(mcBackup);
             holder.backupDate.setVisibility(View.VISIBLE);
             holder.backupDate.setText(dateFmt.format(when));
-            holder.backupDate.setTextColor(mColorYellow);
+            holder.backupDate.setTextColor(mcBackup);
             holder.backupTime.setVisibility(View.VISIBLE);
             holder.backupTime.setText(timeFmt.format(when));
-            holder.backupTime.setTextColor(mColorYellow);
+            holder.backupTime.setTextColor(mcBackup);
             FontUtil.apply(holder.backupVersion, FontPrefs.BACKUP_INFO);
             FontUtil.apply(holder.backupDate, FontPrefs.BACKUP_INFO);
             FontUtil.apply(holder.backupTime, FontPrefs.BACKUP_INFO);

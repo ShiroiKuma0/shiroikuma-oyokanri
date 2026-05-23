@@ -1668,8 +1668,8 @@
     <string name="launch_activity_dialog_title">Launch activity: action required</string>
     <string name="launch_activity_dialog_message">Android 5.x cannot trigger the <b>Search assistant</b> automatically. To open the activity, activate the Search assistant manually (usually by long-pressing the Home button). Tap <b>Close</b> after the activity opens to restore the original assistant.</string>
     <!-- Configurable fonts (shiroikuma fork) -->
-    <string name="pref_fonts">Fonts</string>
-    <string name="pref_fonts_description">Set the font, weight and size per interface element</string>
+    <string name="pref_fonts">UI colors &amp; fonts</string>
+    <string name="pref_fonts_description">Set the font, weight, size and color per interface element</string>
     <string name="pref_font_group_default">Default</string>
     <string name="pref_font_cat_default">Default (all text)</string>
     <string name="pref_font_group_main_list">Main app list</string>
@@ -1680,6 +1680,27 @@
         <item quantity="one"><xliff:g id="count" example="1">%1$d</xliff:g> app ID copied to clipboard</item>
         <item quantity="other"><xliff:g id="count" example="237">%1$d</xliff:g> app IDs copied to clipboard</item>
     </plurals>
+    <!-- Per-element colors (fork) -->
+    <string name="pref_color_label_user">Color (user app)</string>
+    <string name="pref_color_label_system">Color (system app)</string>
+    <string name="pref_color_label_frozen">Color (frozen)</string>
+    <string name="pref_color_package_normal">Color (no trackers)</string>
+    <string name="pref_color_package_trackers">Color (has trackers)</string>
+    <string name="pref_color_version_normal">Color (normal)</string>
+    <string name="pref_color_version_inactive">Color (inactive)</string>
+    <string name="pref_color_apptype_normal">Color (normal)</string>
+    <string name="pref_color_apptype_persistent">Color (persistent)</string>
+    <string name="pref_color_date_normal">Color (normal)</string>
+    <string name="pref_color_date_readable">Color (logs readable)</string>
+    <string name="pref_color_uid_normal">Color (normal)</string>
+    <string name="pref_color_uid_shared">Color (shared UID)</string>
+    <string name="pref_color_sdk_normal">Color (normal)</string>
+    <string name="pref_color_sdk_cleartext">Color (cleartext traffic)</string>
+    <string name="pref_color_signature">Color</string>
+    <string name="pref_color_backup">Color</string>
+    <string name="pref_color_default">Default</string>
+    <string name="pref_color_reset">Reset to default</string>
+    <string name="pref_color_invalid">Invalid color</string>
     <string name="pref_font_cat_label">App label</string>
     <string name="pref_font_cat_package">Package name</string>
     <string name="pref_font_cat_version">Version</string>

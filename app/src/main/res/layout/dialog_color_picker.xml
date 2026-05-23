@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!--
+    Colour picker dialog body: a large preview swatch, a hex input
+    (#RRGGBB or #AARRGGBB), and a row of preset swatches (filled in
+    programmatically from the fork palette + black/white). Driven by
+    FontsPreferences.openColorPicker.
+-->
+<androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="24dp"
+    android:paddingTop="12dp">
+
+    <View
+        android:id="@+id/cp_preview"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginBottom="16dp" />
+
+    <androidx.appcompat.widget.AppCompatEditText
+        android:id="@+id/cp_hex"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="#RRGGBB or #AARRGGBB"
+        android:inputType="textNoSuggestions"
+        android:maxLength="9"
+        android:textSize="16sp" />
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:id="@+id/cp_presets"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:orientation="horizontal"
+        android:gravity="center" />
+
+</androidx.appcompat.widget.LinearLayoutCompat>

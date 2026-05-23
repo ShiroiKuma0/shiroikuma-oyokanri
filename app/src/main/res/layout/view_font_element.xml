@@ -154,6 +154,15 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp" />
 
+        <!-- Colour rows for this element are added here programmatically
+             (one per colour role: e.g. normal / highlighted state). -->
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:id="@+id/color_rows"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="vertical" />
+
     </androidx.appcompat.widget.LinearLayoutCompat>
 
 </androidx.appcompat.widget.LinearLayoutCompat>

@@ -59,6 +59,7 @@ import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.apk.behavior.FreezeUnfreeze;
 import io.github.muntashirakon.AppManager.apk.dexopt.DexOptDialog;
 import io.github.muntashirakon.AppManager.apk.list.ListExporter;
+import io.github.muntashirakon.AppManager.fonts.ColorPrefs;
 import io.github.muntashirakon.AppManager.fonts.FontPrefs;
 import io.github.muntashirakon.AppManager.fonts.FontUtil;
 import io.github.muntashirakon.AppManager.backup.dialog.BackupRestoreDialogFragment;
@@ -654,11 +655,15 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         // change (the clear+rebuild path always runs but produces an
         // identical menu, which the widget renders without flicker).
         rebuildSelectionToolbarFromPrefs();
-        // If any per-element font was changed in the Fonts settings screen
-        // while we were paused, re-bind the list so the new typefaces/sizes
-        // render. Guarded by a flag so a normal resume doesn't re-bind.
-        if (mAdapter != null && FontPrefs.consumeChanged()) {
-            FontUtil.clearCache();
+        // If any per-element font or colour was changed in the UI colours &
+        // fonts screen while we were paused, re-bind the list so the new
+        // typefaces/sizes/colours render. Guarded by flags so a normal resume
+        // does not re-bind.
+        boolean fontsChanged = FontPrefs.consumeChanged();
+        boolean colorsChanged = ColorPrefs.consumeChanged();
+        if (mAdapter != null && (fontsChanged || colorsChanged)) {
+            if (fontsChanged) FontUtil.clearCache();
+            if (colorsChanged) mAdapter.reloadColors();
             mAdapter.notifyDataSetChanged();
         }
         ContextCompat.registerReceiver(this, mBatchOpsBroadCastReceiver,
