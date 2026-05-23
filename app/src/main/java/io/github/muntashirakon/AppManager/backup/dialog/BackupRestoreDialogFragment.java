@@ -256,8 +256,8 @@ public class BackupRestoreDialogFragment extends CapsuleBottomSheetDialogFragmen
         finishLoading();
     }
 
-    public BackupFragment getBackupFragment() {
-        return BackupFragment.getInstance(mViewModel.allowCustomUsersInBackup());
+    public BackupFragment getBackupFragment(boolean soleBackupAction) {
+        return BackupFragment.getInstance(mViewModel.allowCustomUsersInBackup(), soleBackupAction);
     }
 
     private void loadMultipleBackupFragment() {
@@ -266,7 +266,7 @@ public class BackupRestoreDialogFragment extends CapsuleBottomSheetDialogFragmen
         finishLoading();
         getChildFragmentManager()
                 .beginTransaction()
-                .replace(R.id.fragment_container_view_tag, getBackupFragment())
+                .replace(R.id.fragment_container_view_tag, getBackupFragment(true))
                 .commit();
     }
 
@@ -285,7 +285,7 @@ public class BackupRestoreDialogFragment extends CapsuleBottomSheetDialogFragmen
 
         mTabTitles = getResources().obtainTypedArray(R.array.backup_restore_tabs_multiple);
         mTabFragments = new Fragment[mTabTitles.length()];
-        mTabFragments[0] = getBackupFragment();
+        mTabFragments[0] = getBackupFragment(false);
         mTabFragments[1] = RestoreMultipleFragment.getInstance();
         getBody().findViewById(R.id.container).setVisibility(View.VISIBLE);
         ViewPager2 viewPager = getBody().findViewById(R.id.pager);
@@ -311,7 +311,7 @@ public class BackupRestoreDialogFragment extends CapsuleBottomSheetDialogFragmen
         finishLoading();
         getChildFragmentManager()
                 .beginTransaction()
-                .replace(R.id.fragment_container_view_tag, getBackupFragment())
+                .replace(R.id.fragment_container_view_tag, getBackupFragment(true))
                 .commit();
     }
 
@@ -330,7 +330,7 @@ public class BackupRestoreDialogFragment extends CapsuleBottomSheetDialogFragmen
 
         mTabTitles = getResources().obtainTypedArray(R.array.backup_restore_tabs_single);
         mTabFragments = new Fragment[mTabTitles.length()];
-        mTabFragments[0] = getBackupFragment();
+        mTabFragments[0] = getBackupFragment(false);
         mTabFragments[1] = RestoreSingleFragment.getInstance();
         getBody().findViewById(R.id.container).setVisibility(View.VISIBLE);
         ViewPager2 viewPager = getBody().findViewById(R.id.pager);

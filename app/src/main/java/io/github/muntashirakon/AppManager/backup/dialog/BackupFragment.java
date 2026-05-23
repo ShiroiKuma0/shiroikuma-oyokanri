@@ -23,6 +23,7 @@ import java.util.Set;
 
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.backup.BackupFlags;
+import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsManager;
 import io.github.muntashirakon.AppManager.utils.DateUtils;
 import io.github.muntashirakon.dialog.TextInputDialogBuilder;
@@ -30,12 +31,22 @@ import io.github.muntashirakon.widget.MaterialAlertView;
 
 public class BackupFragment extends Fragment {
     public static final String ARG_ALLOW_CUSTOM_USERS = "allow_custom";
+    // Fork: true only when Backup is the sole action (no existing backup to
+    // restore/delete). Gates the "Skip backup method dialog" auto-start so it
+    // never fires from the backup tab of the backup+restore picker.
+    public static final String ARG_SOLE_BACKUP_ACTION = "sole_backup";
 
     @NonNull
     public static BackupFragment getInstance(boolean allowCustomUsers) {
+        return getInstance(allowCustomUsers, false);
+    }
+
+    @NonNull
+    public static BackupFragment getInstance(boolean allowCustomUsers, boolean soleBackupAction) {
         BackupFragment fragment = new BackupFragment();
         Bundle args = new Bundle();
         args.putBoolean(ARG_ALLOW_CUSTOM_USERS, allowCustomUsers);
+        args.putBoolean(ARG_SOLE_BACKUP_ACTION, soleBackupAction);
         fragment.setArguments(args);
         return fragment;
     }
@@ -54,6 +65,15 @@ public class BackupFragment extends Fragment {
         mViewModel = new ViewModelProvider(requireParentFragment()).get(BackupRestoreDialogViewModel.class);
         mContext = requireContext();
         boolean allowCustomUsers = requireArguments().getBoolean(ARG_ALLOW_CUSTOM_USERS);
+        // Fork: "Skip backup method dialog" — when Backup is the sole action and
+        // the toggle is on, start the backup with the default options directly
+        // and skip building the picker. handleBackup() still applies the
+        // multiple-backup name prompt / overwrite warning where relevant.
+        if (requireArguments().getBoolean(ARG_SOLE_BACKUP_ACTION, false)
+                && Prefs.Storage.getSkipBackupMethodDialog()) {
+            handleBackup(BackupFlags.fromPref());
+            return;
+        }
 
         MaterialAlertView messageView = view.findViewById(R.id.message);
         RecyclerView recyclerView = view.findViewById(android.R.id.list);

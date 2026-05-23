@@ -228,6 +228,15 @@ public class BackupRestorePreferences extends PreferenceFragment {
         }
         // Backup volume
         mBackupVolume = Prefs.Storage.getVolumePath();
+        // Skip backup method dialog (fork). Non-persistent in XML; state is
+        // read from / written to the dedicated backup-options prefs manually,
+        // like the Rules "Skip freeze method dialog" toggle.
+        SwitchPreferenceCompat skipBackupDialog = Objects.requireNonNull(findPreference("skip_backup_method_dialog"));
+        skipBackupDialog.setChecked(Prefs.Storage.getSkipBackupMethodDialog());
+        skipBackupDialog.setOnPreferenceChangeListener((preference, newValue) -> {
+            Prefs.Storage.setSkipBackupMethodDialog((Boolean) newValue);
+            return true;
+        });
         ((Preference) Objects.requireNonNull(findPreference("backup_volume")))
                 .setOnPreferenceClickListener(preference -> {
                     mModel.loadStorageVolumes();
