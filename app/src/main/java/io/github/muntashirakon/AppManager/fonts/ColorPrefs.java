@@ -63,6 +63,19 @@ public final class ColorPrefs {
     public static final String SIGNATURE = "signature";
     public static final String BACKUP = "backup";
 
+    // ---- colour-role keys (non-text list indicators, Stage 2) ----
+    public static final String STROKE_USER = "stroke_user";
+    public static final String STROKE_SYSTEM = "stroke_system";
+    public static final String FREEZE_FROZEN = "freeze_frozen";
+    public static final String FREEZE_THAWED = "freeze_thawed";
+    public static final String CHIP = "chip";
+    public static final String ADDPILL = "addpill";
+
+    // ---- colour-role keys (App details header, Stage 2) ----
+    public static final String DETAIL_LABEL = "detail_label";
+    public static final String DETAIL_PACKAGE = "detail_package";
+    public static final String DETAIL_VERSION = "detail_version";
+
     @NonNull
     private static SharedPreferences sp(@NonNull Context ctx) {
         return ctx.getApplicationContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -109,21 +122,31 @@ public final class ColorPrefs {
             case DATE_READABLE:
             case UID_SHARED:
             case SDK_CLEARTEXT:
+            case STROKE_SYSTEM:
                 return ContextCompat.getColor(ctx, R.color.theme_bright_orange);
             case LABEL_USER:
             case PACKAGE_NORMAL:
             case BACKUP:
+            case STROKE_USER:
+            case FREEZE_THAWED:
+            case CHIP:
+            case ADDPILL:
                 return ContextCompat.getColor(ctx, R.color.theme_bright_yellow);
             case VERSION_INACTIVE:
                 return ContextCompat.getColor(ctx, io.github.muntashirakon.ui.R.color.stopped);
             case APPTYPE_PERSISTENT:
                 return Color.MAGENTA;
+            case FREEZE_FROZEN:
+                return ContextCompat.getColor(ctx, R.color.theme_ice_blue);
             case VERSION_NORMAL:
             case APPTYPE_NORMAL:
             case DATE_NORMAL:
             case UID_NORMAL:
             case SDK_NORMAL:
             case SIGNATURE:
+            case DETAIL_LABEL:
+            case DETAIL_PACKAGE:
+            case DETAIL_VERSION:
             default:
                 return ContextCompat.getColor(ctx, io.github.muntashirakon.ui.R.color.textColorSecondary);
         }

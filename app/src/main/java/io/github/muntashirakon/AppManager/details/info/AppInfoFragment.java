@@ -89,6 +89,7 @@ import java.util.concurrent.Future;
 import io.github.muntashirakon.AppManager.BuildConfig;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.accessibility.AccessibilityMultiplexer;
+import io.github.muntashirakon.AppManager.fonts.ColorPrefs;
 import io.github.muntashirakon.AppManager.fonts.FontPrefs;
 import io.github.muntashirakon.AppManager.fonts.FontUtil;
 import io.github.muntashirakon.AppManager.accessibility.NoRootAccessibilityService;
@@ -678,12 +679,24 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
     public void onResume() {
         super.onResume();
         if (mActivity.searchView != null) mActivity.searchView.setVisibility(View.GONE);
-        // Re-apply the header fonts in case they were changed in the Fonts
-        // settings screen while this fragment was paused. Cheap (3 views), so
-        // unconditional — no need for the main list's change-flag here.
+        // Re-apply the header fonts in case they were changed in the UI colours
+        // & fonts settings screen while this fragment was paused. Cheap (3
+        // views), so unconditional — no need for the main list's change-flag here.
         if (mLabelView != null) FontUtil.apply(mLabelView, FontPrefs.DETAIL_LABEL);
         if (mPackageNameView != null) FontUtil.apply(mPackageNameView, FontPrefs.DETAIL_PACKAGE);
         if (mVersionView != null) FontUtil.apply(mVersionView, FontPrefs.DETAIL_VERSION);
+        // Header colours had no explicit default originally, so only override
+        // when the user has set one (the fragment is recreated per open, so an
+        // unset colour reverts to the theme default on next open).
+        applyDetailColor(mLabelView, ColorPrefs.DETAIL_LABEL);
+        applyDetailColor(mPackageNameView, ColorPrefs.DETAIL_PACKAGE);
+        applyDetailColor(mVersionView, ColorPrefs.DETAIL_VERSION);
+    }
+
+    private void applyDetailColor(@Nullable TextView view, @NonNull String key) {
+        if (view != null && ColorPrefs.isSet(requireContext(), key)) {
+            view.setTextColor(ColorPrefs.getColor(requireContext(), key));
+        }
     }
 
     @Override

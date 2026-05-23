@@ -135,10 +135,32 @@ public class FontsPreferences extends Fragment {
                             new ColorSpec(ColorPrefs.BACKUP, R.string.pref_color_backup),
                     }),
             }),
+            new Group(R.string.pref_color_group_indicators, new Cat[]{
+                    new Cat(null, R.string.pref_color_cat_stroke, new ColorSpec[]{
+                            new ColorSpec(ColorPrefs.STROKE_USER, R.string.pref_color_stroke_user),
+                            new ColorSpec(ColorPrefs.STROKE_SYSTEM, R.string.pref_color_stroke_system),
+                    }),
+                    new Cat(null, R.string.pref_color_cat_freeze, new ColorSpec[]{
+                            new ColorSpec(ColorPrefs.FREEZE_FROZEN, R.string.pref_color_freeze_frozen),
+                            new ColorSpec(ColorPrefs.FREEZE_THAWED, R.string.pref_color_freeze_thawed),
+                    }),
+                    new Cat(null, R.string.pref_color_cat_chips, new ColorSpec[]{
+                            new ColorSpec(ColorPrefs.CHIP, R.string.pref_color_chip),
+                    }),
+                    new Cat(null, R.string.pref_color_cat_addpill, new ColorSpec[]{
+                            new ColorSpec(ColorPrefs.ADDPILL, R.string.pref_color_addpill),
+                    }),
+            }),
             new Group(R.string.pref_font_group_app_details, new Cat[]{
-                    new Cat(FontPrefs.DETAIL_LABEL, R.string.pref_font_cat_label),
-                    new Cat(FontPrefs.DETAIL_PACKAGE, R.string.pref_font_cat_package),
-                    new Cat(FontPrefs.DETAIL_VERSION, R.string.pref_font_cat_version),
+                    new Cat(FontPrefs.DETAIL_LABEL, R.string.pref_font_cat_label, new ColorSpec[]{
+                            new ColorSpec(ColorPrefs.DETAIL_LABEL, R.string.pref_color_detail_label),
+                    }),
+                    new Cat(FontPrefs.DETAIL_PACKAGE, R.string.pref_font_cat_package, new ColorSpec[]{
+                            new ColorSpec(ColorPrefs.DETAIL_PACKAGE, R.string.pref_color_detail_package),
+                    }),
+                    new Cat(FontPrefs.DETAIL_VERSION, R.string.pref_font_cat_version, new ColorSpec[]{
+                            new ColorSpec(ColorPrefs.DETAIL_VERSION, R.string.pref_color_detail_version),
+                    }),
             }),
     };
 
@@ -192,6 +214,19 @@ public class FontsPreferences extends Fragment {
 
     private void bindElement(@NonNull View element, @NonNull Cat cat) {
         final AppCompatTextView label = element.findViewById(R.id.element_label);
+        label.setText(cat.labelRes);
+
+        if (cat.key == null) {
+            // Colour-only element (non-text indicator): hide the font controls,
+            // render just the colour rows.
+            element.findViewById(R.id.font_controls).setVisibility(View.GONE);
+            LinearLayoutCompat cr = element.findViewById(R.id.color_rows);
+            for (ColorSpec spec : cat.colors) {
+                addColorRow(cr, spec, () -> {});
+            }
+            return;
+        }
+
         final View rowFont = element.findViewById(R.id.row_font);
         final AppCompatTextView fontValue = element.findViewById(R.id.font_value);
         final View rowWeight = element.findViewById(R.id.row_weight);
@@ -199,7 +234,6 @@ public class FontsPreferences extends Fragment {
         final AppCompatTextView sizeValue = element.findViewById(R.id.size_value);
         final AppCompatSeekBar sizeSeek = element.findViewById(R.id.size_seek);
         final AppCompatTextView preview = element.findViewById(R.id.preview);
-        label.setText(cat.labelRes);
 
         sizeSeek.setMax(FontUtil.SIZE_SLIDER_MAX);
 
