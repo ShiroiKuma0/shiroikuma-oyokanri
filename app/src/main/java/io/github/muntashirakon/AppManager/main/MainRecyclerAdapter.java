@@ -229,6 +229,23 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         notifySelectionChange();
     }
 
+    /**
+     * Snapshot of the package names currently shown in the list, in display
+     * order (i.e. after search + all active filters). Used by the toolbar
+     * "copy displayed app IDs" action. Reads the ListAdapter's current
+     * (filtered) list via getItem/getItemCount.
+     */
+    @NonNull
+    public List<String> getDisplayedPackageNames() {
+        int count = getItemCount();
+        List<String> out = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            ApplicationItem item = getItem(i);
+            if (item != null) out.add(item.packageName);
+        }
+        return out;
+    }
+
     @Override
     public void cancelSelection() {
         super.cancelSelection();

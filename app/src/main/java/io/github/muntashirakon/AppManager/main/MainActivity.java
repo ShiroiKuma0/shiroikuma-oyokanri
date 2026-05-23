@@ -92,6 +92,7 @@ import io.github.muntashirakon.AppManager.users.Users;
 import io.github.muntashirakon.AppManager.utils.AppPref;
 import io.github.muntashirakon.AppManager.utils.DateUtils;
 import io.github.muntashirakon.AppManager.utils.StoragePermission;
+import io.github.muntashirakon.AppManager.utils.ClipboardUtils;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 import io.github.muntashirakon.dialog.AlertDialogBuilder;
 import io.github.muntashirakon.dialog.ScrollableDialogBuilder;
@@ -400,6 +401,8 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             MainListOptions listOptions = new MainListOptions();
             listOptions.setListOptionActions(viewModel);
             listOptions.show(getSupportFragmentManager(), MainListOptions.TAG);
+        } else if (id == R.id.action_export_displayed_ids) {
+            copyDisplayedAppIds();
         } else if (id == R.id.action_refresh) {
             if (viewModel != null) {
                 showProgressIndicator(true);
@@ -442,6 +445,24 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             startActivity(intent);
         } else return super.onOptionsItemSelected(item);
         return true;
+    }
+
+    /**
+     * Copy the package names of every app currently shown in the list (after
+     * search + all active filters), one per line, to the clipboard, and flash
+     * a count toast. Writing the primary clip from a foreground activity needs
+     * no IME; only background clipboard reads are restricted on Android 10+.
+     */
+    private void copyDisplayedAppIds() {
+        if (mAdapter == null) return;
+        List<String> ids = mAdapter.getDisplayedPackageNames();
+        if (ids.isEmpty()) {
+            UIUtils.displayShortToast(R.string.no_apps_displayed_to_copy);
+            return;
+        }
+        ClipboardUtils.copyToClipboard(this, "App IDs", TextUtils.join("\n", ids));
+        UIUtils.displayShortToast(getResources().getQuantityString(
+                R.plurals.copied_n_app_ids, ids.size(), ids.size()));
     }
 
     @Override

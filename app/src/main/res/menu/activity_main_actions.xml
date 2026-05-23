@@ -15,6 +15,12 @@
         app:showAsAction="ifRoom" />
 
     <item
+        android:id="@+id/action_export_displayed_ids"
+        android:icon="@drawable/ic_content_copy"
+        android:title="@string/copy_displayed_app_ids"
+        app:showAsAction="ifRoom" />
+
+    <item
         android:id="@+id/action_refresh"
         android:icon="@drawable/ic_refresh"
         android:title="@string/refresh"
