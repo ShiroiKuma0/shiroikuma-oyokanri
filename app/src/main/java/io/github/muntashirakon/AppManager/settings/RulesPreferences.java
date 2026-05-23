@@ -147,6 +147,16 @@ public class RulesPreferences extends PreferenceFragment {
             }
             return true;
         });
+        // Skip freeze method dialog. Its displayed state must be set
+        // explicitly here, exactly like global_blocking_enabled above,
+        // because setPreferenceDataStore(...) is attached AFTER
+        // addPreferencesFromResource(...) - so the switch's inflate-time
+        // getPersistedBoolean read hit the default SharedPreferences
+        // rather than AppPref, and always came back false on reopen even
+        // though the toggle itself persists correctly through the data
+        // store. Reading from Prefs (AppPref) fixes the stale-OFF display.
+        final SwitchPreferenceCompat skipFreeze = Objects.requireNonNull(findPreference("skip_freeze_method_dialog"));
+        skipFreeze.setChecked(Prefs.Blocking.getSkipFreezeMethodDialog());
         // Remove all rules
         ((Preference) Objects.requireNonNull(findPreference("remove_all_rules"))).setOnPreferenceClickListener(preference -> {
             new MaterialAlertDialogBuilder(mActivity)
