@@ -55,6 +55,26 @@ public class BackupItems {
         return new BackupItem(getBaseDirectory().findFile(relativeDir));
     }
 
+    /**
+     * Fork: create a fresh, readable per-package backup directory directly under
+     * the base directory — {base}/{packageName}/{userId[_backupName]} — adding a
+     * numeric suffix on collision. Replaces the upstream {base}/backups/{uuid}
+     * layout so backups land in human-readable app-id folders inside the chosen
+     * backup directory. The v5 metadata format written inside is unchanged.
+     */
+    @NonNull
+    private static Path createPerPackageBackupPath(@UserIdInt int userId, @Nullable String backupName,
+                                                   @NonNull String packageName) throws IOException {
+        Path baseDir = getBaseDirectory().findOrCreateDirectory(packageName);
+        String backupItemName = BackupUtils.getV4BackupName(userId, backupName);
+        String newBackupName = backupItemName;
+        int i = 0;
+        while (baseDir.hasFile(newBackupName)) {
+            newBackupName = backupItemName + "_" + (++i);
+        }
+        return baseDir.createNewDirectory(newBackupName);
+    }
+
     @NonNull
     public static BackupItem findOrCreateBackupItem(@UserIdInt int userId, @Nullable String backupName, @NonNull String packageName) throws IOException {
         Path backupPath;
@@ -67,10 +87,8 @@ public class BackupItems {
                     previousBackupItems.add(backup.getItem());
                 }
             }
-            String backupUuid = UUID.randomUUID().toString();
-            backupPath = getBaseDirectory()
-                    .findOrCreateDirectory(BACKUP_DIRECTORY)
-                    .findOrCreateDirectory(backupUuid);
+            // Fork: readable per-package layout instead of backups/{uuid}.
+            backupPath = createPerPackageBackupPath(userId, backupName, packageName);
         } else {
             backupPath = getBaseDirectory()
                     .findOrCreateDirectory(packageName)
@@ -86,10 +104,8 @@ public class BackupItems {
     public static BackupItem createBackupItemGracefully(@UserIdInt int userId, @Nullable String backupName, @NonNull String packageName) throws IOException {
         Path backupPath;
         if (MetadataManager.getCurrentBackupMetaVersion() >= 5) {
-            String backupUuid = UUID.randomUUID().toString();
-            backupPath = getBaseDirectory()
-                    .findOrCreateDirectory(BACKUP_DIRECTORY)
-                    .findOrCreateDirectory(backupUuid);
+            // Fork: readable per-package layout instead of backups/{uuid}.
+            backupPath = createPerPackageBackupPath(userId, backupName, packageName);
         } else {
             Path baseDir = getBaseDirectory().findOrCreateDirectory(packageName);
             String backupItemName = BackupUtils.getV4BackupName(userId, backupName);
@@ -239,8 +255,13 @@ public class BackupItems {
 
         public String getRelativeDir() {
             if (isV5AndUp()) {
-                // {AppManagerDir}/backups/{UUID}/
-                return BackupUtils.getV5RelativeDir(mBackupPath.getName());
+                // Fork: backups now live at {base}/{packageName}/{userId[_name]};
+                // legacy v5 backups live at {base}/backups/{uuid}. Either way the
+                // relative dir is {parent}/{name}, so derive it generically (this
+                // also keeps existing backups/{uuid} entries resolvable).
+                String name = mBackupPath.getName();
+                String parent = mBackupPath.requireParent().getName();
+                return BackupUtils.getV4RelativeDir(name, parent);
             } else {
                 // {AppManagerDir}/{packagename}/{userid}[_{backup_name}]
                 String userIdBackupName = mBackupPath.getName();
