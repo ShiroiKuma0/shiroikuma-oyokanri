@@ -835,7 +835,9 @@
     <string name="backup_directory_not_set">Not set — using the backup volume</string>
     <string name="backup_directory_choose">Use this directory</string>
     <string name="backup_directory_use_volume">Use backup volume</string>
-    <string name="no_volumes_found">Could not find any volumes with write permission.</string>
+    <string name="pref_skip_backup_method_dialog">Skip backup method dialog</string>
+    <string name="pref_skip_backup_method_dialog_description">When backing up an app for which no backup exists yet, use the default backup options directly without showing the picker, and start the backup immediately. The backup &amp; restore picker for apps that already have a backup is unaffected.</string>
+    <string name="backup_tap_hint">Back up</string>    <string name="no_volumes_found">Could not find any volumes with write permission.</string>
     <string name="unencrypted">Unencrypted</string>
     <string name="encrypted">Encrypted</string>
     <string name="bootloader">Bootloader</string>

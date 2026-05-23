@@ -40,6 +40,13 @@
             app:summary="@string/pref_backup_volume_msg"
             app:title="@string/backup_volume" />
 
+        <SwitchPreferenceCompat
+            app:iconSpaceReserved="false"
+            app:key="skip_backup_method_dialog"
+            app:persistent="false"
+            app:summary="@string/pref_skip_backup_method_dialog_description"
+            app:title="@string/pref_skip_backup_method_dialog" />
+
     </PreferenceCategory>
 
     <PreferenceCategory app:layout="@layout/m3_preference_category_empty">

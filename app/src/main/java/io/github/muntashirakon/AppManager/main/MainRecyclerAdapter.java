@@ -663,6 +663,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                     new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.ROOT);
             java.util.Date when = new java.util.Date(item.backup.backupTime);
             holder.backupVersion.setVisibility(View.VISIBLE);
+            holder.backupVersion.setAlpha(1f);
             holder.backupVersion.setText(item.backup.versionName);
             holder.backupVersion.setTextColor(mcBackup);
             holder.backupDate.setVisibility(View.VISIBLE);
@@ -706,8 +707,30 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             holder.backupVersion.setOnLongClickListener(backupLongTap);
             holder.backupDate.setOnLongClickListener(backupLongTap);
             holder.backupTime.setOnLongClickListener(backupLongTap);
+        } else if (item.isInstalled) {
+            // Fork: no backup yet, but the app is installed — surface a
+            // tappable "Back up" affordance in the same right-column area.
+            // Tapping opens the backup dialog in MODE_BACKUP, which, when
+            // "Skip backup method dialog" is enabled, starts the backup
+            // immediately with the default options.
+            holder.backupVersion.setVisibility(View.VISIBLE);
+            holder.backupVersion.setAlpha(0.6f);
+            holder.backupVersion.setText(R.string.backup_tap_hint);
+            holder.backupVersion.setTextColor(mcBackup);
+            FontUtil.apply(holder.backupVersion, FontPrefs.BACKUP_INFO);
+            holder.backupDate.setVisibility(View.GONE);
+            holder.backupTime.setVisibility(View.GONE);
+            View.OnClickListener startBackupTap = v -> openBackupModeDialog(item);
+            holder.backupVersion.setOnClickListener(startBackupTap);
+            holder.backupDate.setOnClickListener(null);
+            holder.backupTime.setOnClickListener(null);
+            holder.backupVersion.setOnLongClickListener(null);
+            holder.backupDate.setOnLongClickListener(null);
+            holder.backupTime.setOnLongClickListener(null);
         } else {
+            // No backup and not installed: nothing to show or tap.
             holder.backupVersion.setVisibility(View.GONE);
+            holder.backupVersion.setAlpha(1f);
             holder.backupDate.setVisibility(View.GONE);
             holder.backupTime.setVisibility(View.GONE);
             // Clear listeners so a recycled ViewHolder doesn't keep a
@@ -864,6 +887,22 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                 })
                 .setNegativeButton(R.string.cancel, null)
                 .show();
+    }
+
+    /**
+     * Fork: open the backup/restore dialog in MODE_BACKUP for a single
+     * installed app that has no backup yet. When "Skip backup method dialog"
+     * is enabled, the dialog's backup-only path starts the backup immediately
+     * with the default options instead of showing the picker.
+     */
+    private void openBackupModeDialog(@NonNull ApplicationItem item) {
+        BackupRestoreDialogFragment fragment = BackupRestoreDialogFragment.getInstance(
+                Collections.singletonList(new UserPackagePair(
+                        item.packageName, UserHandleHidden.myUserId())),
+                BackupRestoreDialogFragment.MODE_BACKUP);
+        fragment.setOnActionBeginListener(mode -> mActivity.showProgressIndicator(true));
+        fragment.setOnActionCompleteListener((mode, failedPackages) -> mActivity.showProgressIndicator(false));
+        fragment.show(mActivity.getSupportFragmentManager(), BackupRestoreDialogFragment.TAG);
     }
 
     private void showBackupRestoreDialogOrAppNotInstalled(@NonNull ApplicationItem item) {

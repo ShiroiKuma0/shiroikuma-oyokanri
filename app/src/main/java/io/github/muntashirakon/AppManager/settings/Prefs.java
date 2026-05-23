@@ -821,6 +821,26 @@ public final class Prefs {
                     .edit().putString(KEY_BACKUP_DIR, path).apply();
         }
 
+        // Fork: when set, selecting Backup uses the default backup options
+        // directly (no "Backup options" dialog) and starts the backup right
+        // away — analogous to the Rules "Skip freeze method dialog" toggle.
+        // Applies only when Backup is the sole action (no existing backup to
+        // restore/delete); the backup+restore picker is unaffected.
+        private static final String PREFS_BACKUP_OPTS = "am_backup_options";
+        private static final String KEY_SKIP_BACKUP_DIALOG = "skip_method_dialog";
+
+        public static boolean getSkipBackupMethodDialog() {
+            return ContextUtils.getContext()
+                    .getSharedPreferences(PREFS_BACKUP_OPTS, Context.MODE_PRIVATE)
+                    .getBoolean(KEY_SKIP_BACKUP_DIALOG, false);
+        }
+
+        public static void setSkipBackupMethodDialog(boolean skip) {
+            ContextUtils.getContext()
+                    .getSharedPreferences(PREFS_BACKUP_OPTS, Context.MODE_PRIVATE)
+                    .edit().putBoolean(KEY_SKIP_BACKUP_DIALOG, skip).apply();
+        }
+
         @NonNull
         public static Path getAppManagerDirectory() {
             // Fork: a configured backup directory takes precedence over the
