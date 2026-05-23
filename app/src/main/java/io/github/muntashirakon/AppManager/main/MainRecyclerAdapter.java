@@ -369,10 +369,8 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             }
             // Set UID text color to orange if the package is shared
             holder.userId.setTextColor(item.sharedUserId != null ? mColorOrange : mColorSecondary);
-        } else {
-            holder.userId.setText("");
-        }
-
+        } else holder.userId.setText("");
+        FontUtil.apply(holder.userId, FontPrefs.UID);
         if (item.sha != null) {
             // Set signature type (right column)
             holder.sha.setVisibility(View.VISIBLE);
@@ -566,6 +564,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         }
         // Set app type text color to magenta if the app is persistent
         holder.isSystemApp.setTextColor(item.isPersistent ? Color.MAGENTA : mColorSecondary);
+        FontUtil.apply(holder.isSystemApp, FontPrefs.APP_TYPE);
         // Set SDK
         if (item.sdkString != null) {
             holder.size.setText(item.sdkString);

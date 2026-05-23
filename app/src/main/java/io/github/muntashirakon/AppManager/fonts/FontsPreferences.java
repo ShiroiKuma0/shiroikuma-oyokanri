@@ -80,10 +80,17 @@ public class FontsPreferences extends Fragment {
                     new Cat(FontPrefs.LABEL, R.string.pref_font_cat_label),
                     new Cat(FontPrefs.PACKAGE, R.string.pref_font_cat_package),
                     new Cat(FontPrefs.VERSION, R.string.pref_font_cat_version),
+                    new Cat(FontPrefs.APP_TYPE, R.string.pref_font_cat_app_type),
                     new Cat(FontPrefs.INSTALL_DATE, R.string.pref_font_cat_install_date),
+                    new Cat(FontPrefs.UID, R.string.pref_font_cat_uid),
                     new Cat(FontPrefs.SDK, R.string.pref_font_cat_sdk),
                     new Cat(FontPrefs.SIGNATURE, R.string.pref_font_cat_signature),
                     new Cat(FontPrefs.BACKUP_INFO, R.string.pref_font_cat_backup_info),
+            }),
+            new Group(R.string.pref_font_group_app_details, new Cat[]{
+                    new Cat(FontPrefs.DETAIL_LABEL, R.string.pref_font_cat_label),
+                    new Cat(FontPrefs.DETAIL_PACKAGE, R.string.pref_font_cat_package),
+                    new Cat(FontPrefs.DETAIL_VERSION, R.string.pref_font_cat_version),
             }),
     };
 
