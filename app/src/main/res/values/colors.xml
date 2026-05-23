@@ -21,6 +21,7 @@
          the "frozen" indicator colour (snowflake + label) introduced when
          outline/filled drawable swap alone proved too subtle. -->
     <color name="theme_bright_yellow">#FFFF00</color>
+    <color name="theme_bright_orange">#FF7A1A</color>
     <color name="theme_muted_yellow">#B8B800</color>
     <color name="theme_ice_blue">#A8D8E8</color>
     <color name="theme_label_frozen_user">#888888</color>
