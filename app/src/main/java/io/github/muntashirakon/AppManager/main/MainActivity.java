@@ -648,6 +648,14 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             handleBatchOp(BatchOpsManager.OP_FORCE_STOP);
         } else if (id == R.id.action_uninstall) {
             handleBatchOpWithWarning(BatchOpsManager.OP_UNINSTALL);
+        } else if (id == R.id.action_install_existing) {
+            // Fork: reinstall (install-existing) the selection — restores
+            // uninstalled system apps. Non-destructive, so no warning prompt.
+            handleBatchOp(BatchOpsManager.OP_INSTALL_EXISTING);
+        } else if (id == R.id.action_unfreeze) {
+            // Fork: dedicated batch unfreeze (the freeze_unfreeze entry opens
+            // the combined dialog; this one unfreezes the selection directly).
+            handleBatchOp(BatchOpsManager.OP_UNFREEZE);
         } else if (id == R.id.action_add_to_profile) {
             AddToProfileDialogFragment dialog = AddToProfileDialogFragment.getInstance(viewModel.getSelectedPackages()
                     .keySet().toArray(new String[0]));

@@ -291,6 +291,8 @@ public class BatchOpsService extends ForegroundService {
                 return context.getString(R.string.net_policy);
             case BatchOpsManager.OP_UNINSTALL:
                 return context.getString(R.string.uninstall);
+            case BatchOpsManager.OP_INSTALL_EXISTING:
+                return context.getString(R.string.reinstall);
             case BatchOpsManager.OP_UNBLOCK_TRACKERS:
                 return context.getString(R.string.unblock_trackers);
             case BatchOpsManager.OP_BLOCK_COMPONENTS:

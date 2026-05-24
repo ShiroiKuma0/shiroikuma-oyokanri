@@ -57,7 +57,9 @@ public final class MainToolbarPrefs {
      */
     public static final List<String> ALL_KEYS = Collections.unmodifiableList(Arrays.asList(
             "uninstall",
+            "install_existing",
             "freeze_unfreeze",
+            "unfreeze",
             "force_stop",
             "clear_data_cache",
             "save_apk",
@@ -75,7 +77,9 @@ public final class MainToolbarPrefs {
     public static int idForKey(@NonNull String key) {
         switch (key) {
             case "uninstall":               return R.id.action_uninstall;
+            case "install_existing":        return R.id.action_install_existing;
             case "freeze_unfreeze":         return R.id.action_freeze_unfreeze;
+            case "unfreeze":                return R.id.action_unfreeze;
             case "force_stop":              return R.id.action_force_stop;
             case "clear_data_cache":        return R.id.action_clear_data_cache;
             case "save_apk":                return R.id.action_save_apk;
@@ -95,7 +99,9 @@ public final class MainToolbarPrefs {
     public static int titleForKey(@NonNull String key) {
         switch (key) {
             case "uninstall":               return R.string.uninstall;
+            case "install_existing":        return R.string.reinstall;
             case "freeze_unfreeze":         return R.string.freeze_unfreeze;
+            case "unfreeze":                return R.string.unfreeze;
             case "force_stop":              return R.string.force_stop;
             case "clear_data_cache":        return R.string.clear;
             case "save_apk":                return R.string.save_apk;
@@ -115,7 +121,9 @@ public final class MainToolbarPrefs {
     public static int iconForKey(@NonNull String key) {
         switch (key) {
             case "uninstall":               return R.drawable.ic_trash_can;
+            case "install_existing":        return R.drawable.ic_restore;
             case "freeze_unfreeze":         return R.drawable.ic_snowflake;
+            case "unfreeze":                return R.drawable.ic_snowflake_off;
             case "force_stop":              return R.drawable.ic_power_settings;
             case "clear_data_cache":        return R.drawable.ic_brush;
             case "save_apk":                return R.drawable.ic_get_app;
