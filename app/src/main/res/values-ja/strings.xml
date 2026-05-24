@@ -1081,4 +1081,7 @@
     <!-- Fork: user-supplied Japanese translations -->
     <string name="freeze">凍結</string>
     <string name="unfreeze">融解</string>
+    <string name="filter_frozen_apps">凍結済みアプリ</string>
+    <string name="filter_unfrozen_apps">融解済みアプリ</string>
+    <string name="filter_force_stopped_apps">終了済みアプリ</string>
 </resources>
