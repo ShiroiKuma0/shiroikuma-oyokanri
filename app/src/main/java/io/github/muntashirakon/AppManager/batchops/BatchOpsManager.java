@@ -101,6 +101,7 @@ public class BatchOpsManager {
             OP_FREEZE,
             OP_GRANT_PERMISSIONS,
             OP_IMPORT_BACKUPS,
+            OP_INSTALL_EXISTING,
             OP_NET_POLICY,
             OP_REVOKE_PERMISSIONS,
             OP_RESTORE_BACKUP,
@@ -138,6 +139,8 @@ public class BatchOpsManager {
     public static final int OP_NET_POLICY = 20;
     public static final int OP_DEXOPT = 21;
     public static final int OP_ADVANCED_FREEZE = 22;
+    // Fork: reinstall (install-existing) for uninstalled system apps, as a batch op.
+    public static final int OP_INSTALL_EXISTING = 23;
 
     private static final String GROUP_ID = BuildConfig.APPLICATION_ID + ".notification_group.BATCH_OPS";
 
@@ -258,6 +261,8 @@ public class BatchOpsManager {
                 return opBackupRestore(info, BackupRestoreDialogFragment.MODE_RESTORE);
             case OP_UNINSTALL:
                 return opUninstall(info);
+            case OP_INSTALL_EXISTING:
+                return opInstallExisting(info);
             case OP_UNBLOCK_TRACKERS:
                 return opUnblockTrackers(info);
             case OP_BLOCK_COMPONENTS:
@@ -881,6 +886,32 @@ public class BatchOpsManager {
             }
         }
         accessibility.enableUninstall(false);
+        return new Result(failedPackages);
+    }
+
+    // Fork: reinstall (install-existing) for the selected packages — restores
+    // uninstalled system apps for the user. Idempotent for already-installed
+    // packages. Requires INSTALL_PACKAGES / INSTALL_EXISTING_PACKAGES.
+    @NonNull
+    private Result opInstallExisting(@NonNull BatchOpsInfo info) {
+        List<UserPackagePair> failedPackages = new ArrayList<>();
+        float lastProgress = mProgressHandler != null ? mProgressHandler.getLastProgress() : 0;
+        int max = info.size();
+        for (int i = 0; i < max; ++i) {
+            updateProgress(lastProgress, i + 1);
+            UserPackagePair pair = info.getPair(i);
+            try {
+                int code = PackageManagerCompat.installExistingPackageAsUser(pair.getPackageName(),
+                        pair.getUserId(), 0, 0, null);
+                if (code != 1 /* PackageManager.INSTALL_SUCCEEDED */) {
+                    log("====> op=INSTALL_EXISTING, pkg=" + pair + ", code=" + code);
+                    failedPackages.add(pair);
+                }
+            } catch (Throwable th) {
+                log("====> op=INSTALL_EXISTING, pkg=" + pair, th);
+                failedPackages.add(pair);
+            }
+        }
         return new Result(failedPackages);
     }
 

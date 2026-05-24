@@ -18,7 +18,9 @@ import io.github.muntashirakon.widget.MultiSelectionView;
 public class MainBatchOpsHandler implements MultiSelectionView.OnSelectionChangeListener {
     private final MainViewModel mViewModel;
     private final MenuItem mUninstallMenu;
+    private final MenuItem mReinstallMenu;
     private final MenuItem mFreezeUnfreezeMenu;
+    private final MenuItem mUnfreezeMenu;
     private final MenuItem mForceStopMenu;
     private final MenuItem mClearDataCacheMenu;
     private final MenuItem mSaveApkMenu;
@@ -32,6 +34,7 @@ public class MainBatchOpsHandler implements MultiSelectionView.OnSelectionChange
     private final MenuItem mAddToProfileMenu;
 
     private boolean mCanFreezeUnfreezePackages;
+    private boolean mCanInstallExistingPackages;
     private boolean mCanForceStopPackages;
     private boolean mCanClearData;
     private boolean mCanClearCache;
@@ -43,7 +46,9 @@ public class MainBatchOpsHandler implements MultiSelectionView.OnSelectionChange
         Menu selectionMenu = multiSelectionView.getMenu();
         mViewModel = viewModel;
         mUninstallMenu = selectionMenu.findItem(R.id.action_uninstall);
+        mReinstallMenu = selectionMenu.findItem(R.id.action_install_existing);
         mFreezeUnfreezeMenu = selectionMenu.findItem(R.id.action_freeze_unfreeze);
+        mUnfreezeMenu = selectionMenu.findItem(R.id.action_unfreeze);
         mForceStopMenu = selectionMenu.findItem(R.id.action_force_stop);
         mClearDataCacheMenu = selectionMenu.findItem(R.id.action_clear_data_cache);
         mSaveApkMenu = selectionMenu.findItem(R.id.action_save_apk);
@@ -60,6 +65,7 @@ public class MainBatchOpsHandler implements MultiSelectionView.OnSelectionChange
 
     public void updateConstraints() {
         mCanFreezeUnfreezePackages = SelfPermissions.canFreezeUnfreezePackages();
+        mCanInstallExistingPackages = SelfPermissions.canInstallExistingPackages();
         mCanForceStopPackages = SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.FORCE_STOP_PACKAGES);
         mCanClearData = SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.CLEAR_APP_USER_DATA);
         mCanClearCache = SelfPermissions.canClearAppCache();
@@ -99,7 +105,17 @@ public class MainBatchOpsHandler implements MultiSelectionView.OnSelectionChange
         /* === Enable/Disable === */
         // Enable “Uninstall” action iff all selections are installed
         mUninstallMenu.setEnabled(nonZeroSelection && (areAllInstalled || areAllUninstalledWithoutData));
+        // Fork: reinstall (install-existing) — for restoring uninstalled system
+        // apps, so enable only when there is at least one uninstalled item and
+        // every uninstalled item is a system app.
+        if (mReinstallMenu != null) {
+            mReinstallMenu.setEnabled(nonZeroSelection && !areAllInstalled && areAllUninstalledSystem);
+        }
         mFreezeUnfreezeMenu.setEnabled(nonZeroSelection && areAllInstalled);
+        // Fork: dedicated batch unfreeze — only meaningful for installed apps.
+        if (mUnfreezeMenu != null) {
+            mUnfreezeMenu.setEnabled(nonZeroSelection && areAllInstalled);
+        }
         mForceStopMenu.setEnabled(nonZeroSelection && areAllInstalled);
         mClearDataCacheMenu.setEnabled(nonZeroSelection && areAllInstalled);
         mPreventBackgroundMenu.setEnabled(nonZeroSelection && areAllInstalled);
@@ -116,6 +132,12 @@ public class MainBatchOpsHandler implements MultiSelectionView.OnSelectionChange
         mAddToProfileMenu.setEnabled(nonZeroSelection);
         /* === Visible/Invisible === */
         mFreezeUnfreezeMenu.setVisible(mCanFreezeUnfreezePackages);
+        if (mUnfreezeMenu != null) {
+            mUnfreezeMenu.setVisible(mCanFreezeUnfreezePackages);
+        }
+        if (mReinstallMenu != null) {
+            mReinstallMenu.setVisible(mCanInstallExistingPackages);
+        }
         mForceStopMenu.setVisible(mCanForceStopPackages);
         mClearDataCacheMenu.setVisible(mCanClearData || mCanClearCache);
         mPreventBackgroundMenu.setVisible(mCanModifyAppOpMode && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N);
