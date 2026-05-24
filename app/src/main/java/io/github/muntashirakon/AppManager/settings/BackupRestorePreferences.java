@@ -533,7 +533,14 @@ public class BackupRestorePreferences extends PreferenceFragment {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             mActivity.startActivity(intent);
         }
-        Runtime.getRuntime().exit(0);
+        // Hard-kill rather than Runtime.exit(0): an orderly shutdown lets the
+        // still-cached SharedPreferences instances (main prefs, colours, fonts,
+        // the selection-toolbar prefs — all loaded during the session) flush
+        // their in-memory maps back to disk, overwriting the files we just
+        // imported and silently reverting the import. killProcess sends SIGKILL
+        // to ourselves so nothing rewrites them; the relaunched activity comes
+        // up in a fresh process and re-reads every prefs file from disk.
+        android.os.Process.killProcess(android.os.Process.myPid());
     }
 
     @UiThread

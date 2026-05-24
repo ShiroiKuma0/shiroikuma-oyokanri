@@ -29,7 +29,8 @@ import io.github.muntashirakon.io.Path;
  * backups). Captures everything that lives in the app's {@code shared_prefs}
  * directory — the main {@code preferences} store (all options/toggles), the
  * fork's dedicated colour/font prefs, the backup-directory and backup-options
- * prefs, etc. — plus all saved profiles ({@code files/profiles/*.am.json}).
+ * prefs, etc. — plus all saved profiles ({@code files/profiles/*.am.json})
+ * and any user-imported custom font files ({@code files/fonts/}).
  * <p>
  * The archive is a plain zip with two top-level folders, {@code shared_prefs/}
  * and {@code profiles/}, written to a user-selected directory via the Path API
@@ -46,6 +47,10 @@ public final class SettingsBackupManager {
 
     private static final String SP_DIR = "shared_prefs";
     private static final String PROFILES_DIR = "profiles";
+    // Fork: user-imported custom font files live in filesDir/fonts; the font
+    // *choice* is in shiroikuma_fonts.xml (captured via shared_prefs), but the
+    // referenced file must travel with it or the setting points at nothing.
+    private static final String FONTS_DIR = "fonts";
     private static final FileFilter XML_FILTER = f -> f.isFile() && f.getName().endsWith(".xml");
 
     private SettingsBackupManager() {
@@ -66,6 +71,7 @@ public final class SettingsBackupManager {
         Path outFile = destDir.findOrCreateFile(fileName, null);
         File sharedPrefs = new File(context.getApplicationInfo().dataDir, SP_DIR);
         File profiles = new File(context.getFilesDir(), PROFILES_DIR);
+        File fonts = new File(context.getFilesDir(), FONTS_DIR);
         try (ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(outFile.openOutputStream()))) {
             File[] prefFiles = sharedPrefs.isDirectory() ? sharedPrefs.listFiles(XML_FILTER) : null;
             if (prefFiles != null) {
@@ -77,6 +83,12 @@ public final class SettingsBackupManager {
             if (profileFiles != null) {
                 for (File f : profileFiles) {
                     addEntry(zos, f, PROFILES_DIR + "/" + f.getName());
+                }
+            }
+            File[] fontFiles = fonts.isDirectory() ? fonts.listFiles(File::isFile) : null;
+            if (fontFiles != null) {
+                for (File f : fontFiles) {
+                    addEntry(zos, f, FONTS_DIR + "/" + f.getName());
                 }
             }
         }
@@ -93,10 +105,13 @@ public final class SettingsBackupManager {
     public static int importFrom(@NonNull Context context, @NonNull Path zipFile) throws IOException {
         File sharedPrefs = new File(context.getApplicationInfo().dataDir, SP_DIR);
         File profiles = new File(context.getFilesDir(), PROFILES_DIR);
+        File fonts = new File(context.getFilesDir(), FONTS_DIR);
         //noinspection ResultOfMethodCallIgnored
         sharedPrefs.mkdirs();
         //noinspection ResultOfMethodCallIgnored
         profiles.mkdirs();
+        //noinspection ResultOfMethodCallIgnored
+        fonts.mkdirs();
         int restored = 0;
         try (ZipInputStream zis = new ZipInputStream(new BufferedInputStream(zipFile.openInputStream()))) {
             ZipEntry entry;
@@ -113,6 +128,8 @@ public final class SettingsBackupManager {
                     }
                 } else if (name.startsWith(PROFILES_DIR + "/")) {
                     target = new File(profiles, safeBaseName(name.substring(PROFILES_DIR.length() + 1)));
+                } else if (name.startsWith(FONTS_DIR + "/")) {
+                    target = new File(fonts, safeBaseName(name.substring(FONTS_DIR.length() + 1)));
                 }
                 if (target == null) {
                     continue;

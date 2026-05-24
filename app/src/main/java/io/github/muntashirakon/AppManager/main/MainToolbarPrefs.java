@@ -100,7 +100,7 @@ public final class MainToolbarPrefs {
         switch (key) {
             case "uninstall":               return R.string.uninstall;
             case "install_existing":        return R.string.reinstall;
-            case "freeze_unfreeze":         return R.string.freeze_unfreeze;
+            case "freeze_unfreeze":         return R.string.freeze;
             case "unfreeze":                return R.string.unfreeze;
             case "force_stop":              return R.string.force_stop;
             case "clear_data_cache":        return R.string.clear;
