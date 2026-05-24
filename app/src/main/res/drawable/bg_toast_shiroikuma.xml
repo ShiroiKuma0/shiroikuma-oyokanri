@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Fork: black box with a bright-yellow border for themed toasts. Uses
+     literal colours (not ?attr) because toasts are inflated with the
+     application context, which carries no theme. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@android:color/black" />
+    <stroke
+        android:width="2dp"
+        android:color="@color/theme_bright_yellow" />
+    <corners android:radius="14dp" />
+</shape>

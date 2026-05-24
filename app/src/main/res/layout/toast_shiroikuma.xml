@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Fork: themed toast view — black box, yellow text, yellow border. -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/toast_text"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_toast_shiroikuma"
+    android:paddingHorizontal="20dp"
+    android:paddingVertical="12dp"
+    android:textColor="@color/theme_bright_yellow"
+    android:textSize="14sp" />

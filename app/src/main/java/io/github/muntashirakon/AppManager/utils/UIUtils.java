@@ -31,6 +31,7 @@ import android.text.style.UnderlineSpan;
 import android.util.TypedValue;
 import android.view.ContextThemeWrapper;
 import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
@@ -286,54 +287,70 @@ public class UIUtils {
         return searchView;
     }
 
+    // Fork: render every toast as a black box with yellow text and a yellow
+    // border (matching the fork theme) via a custom view. On Android 12+ a
+    // custom toast view is honoured while the app is in the foreground (where
+    // all of these fire from user actions) and falls back to the system text
+    // toast only when posted from the background.
+    @SuppressWarnings("deprecation")
+    @UiThread
+    private static void showThemedToast(@NonNull CharSequence message, int duration) {
+        Context context = ContextUtils.getContext();
+        View view = LayoutInflater.from(context).inflate(R.layout.toast_shiroikuma, null);
+        ((TextView) view.findViewById(R.id.toast_text)).setText(message);
+        Toast toast = new Toast(context);
+        toast.setView(view);
+        toast.setDuration(duration);
+        toast.show();
+    }
+
     @UiThread
     public static void displayShortToast(CharSequence message) {
-        Toast.makeText(ContextUtils.getContext(), message, Toast.LENGTH_SHORT).show();
+        showThemedToast(message, Toast.LENGTH_SHORT);
     }
 
     @UiThread
     public static void displayShortToast(String format, Object... args) {
-        Toast.makeText(ContextUtils.getContext(), String.format(Locale.getDefault(), format, args), Toast.LENGTH_SHORT).show();
+        showThemedToast(String.format(Locale.getDefault(), format, args), Toast.LENGTH_SHORT);
     }
 
     @UiThread
     public static void displayShortToast(@StringRes int res) {
-        Toast.makeText(ContextUtils.getContext(), res, Toast.LENGTH_SHORT).show();
+        showThemedToast(ContextUtils.getContext().getText(res), Toast.LENGTH_SHORT);
     }
 
     @UiThread
     public static void displayShortToast(@StringRes int res, Object... args) {
         Context appContext = ContextUtils.getContext();
-        Toast.makeText(appContext, appContext.getString(res, args), Toast.LENGTH_SHORT).show();
+        showThemedToast(appContext.getString(res, args), Toast.LENGTH_SHORT);
     }
 
     @UiThread
     public static void displayLongToast(CharSequence message) {
-        Toast.makeText(ContextUtils.getContext(), message, Toast.LENGTH_LONG).show();
+        showThemedToast(message, Toast.LENGTH_LONG);
     }
 
 
     @UiThread
     public static void displayLongToast(String format, Object... args) {
-        Toast.makeText(ContextUtils.getContext(), String.format(Locale.getDefault(), format, args),
-                Toast.LENGTH_LONG).show();
+        showThemedToast(String.format(Locale.getDefault(), format, args), Toast.LENGTH_LONG);
     }
 
     @UiThread
     public static void displayLongToast(@StringRes int res) {
-        Toast.makeText(ContextUtils.getContext(), res, Toast.LENGTH_LONG).show();
+        showThemedToast(ContextUtils.getContext().getText(res), Toast.LENGTH_LONG);
     }
 
     @UiThread
     public static void displayLongToast(@StringRes int res, Object... args) {
         Context appContext = ContextUtils.getContext();
-        Toast.makeText(appContext, appContext.getString(res, args), Toast.LENGTH_LONG).show();
+        showThemedToast(appContext.getString(res, args), Toast.LENGTH_LONG);
     }
 
     @UiThread
     public static void displayLongToastPl(@PluralsRes int res, int count, Object... args) {
         Context appContext = ContextUtils.getContext();
-        Toast.makeText(appContext, appContext.getResources().getQuantityString(res, count, args), Toast.LENGTH_LONG).show();
+        showThemedToast(appContext.getResources().getQuantityString(res, count, args), Toast.LENGTH_LONG);
     }
 
     @NonNull
