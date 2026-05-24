@@ -562,7 +562,18 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                             handleBatchOp(BatchOpsManager.OP_CLEAR_DATA))
                     .show();
         } else if (id == R.id.action_freeze_unfreeze) {
-            showFreezeUnfreezeDialog(Prefs.Blocking.getDefaultFreezingMethod());
+            int freezeType = Prefs.Blocking.getDefaultFreezingMethod();
+            if (Prefs.Blocking.getSkipFreezeMethodDialog()) {
+                // Fork: "Skip freeze method dialog" — freeze the selected apps
+                // immediately with the default freeze method, no picker (matches
+                // the single-app behaviour in AppInfoFragment). The per-app
+                // "prefer remembered method" option follows the dialog default
+                // (off). Batch unfreeze still goes through the dialog, so it
+                // remains available by turning the toggle off.
+                handleBatchOp(BatchOpsManager.OP_ADVANCED_FREEZE, new BatchFreezeOptions(freezeType, false));
+            } else {
+                showFreezeUnfreezeDialog(freezeType);
+            }
         } else if (id == R.id.action_disable_background) {
             new MaterialAlertDialogBuilder(this)
                     .setTitle(R.string.are_you_sure)
