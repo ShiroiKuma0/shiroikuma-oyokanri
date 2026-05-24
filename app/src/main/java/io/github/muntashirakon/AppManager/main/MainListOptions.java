@@ -380,6 +380,10 @@ public class MainListOptions extends ListOptions {
      * Build and show the multi-profile filter picker dialog. Each known
      * profile gets a row with two mutually-exclusive checkable chips: "In"
      * (include) and "Not in" (exclude). Both unchecked means the profile is
+     * neutral (not part of the filter). Tapping a row toggles between neutral
+     * and "In"; long-pressing a row sets "Not in"; from "Not in" a tap returns
+     * to neutral. The "+"/"-" pills still set their polarity directly.
+     * OK commits the new filter via viewModel.setProfileFilters and the
      * absent from the filter. The current selection is preloaded; pressing
      * OK commits the new filter via viewModel.setProfileFilters and the
      * outer button's label refreshes to summarise it.
@@ -422,11 +426,20 @@ public class MainListOptions extends ListOptions {
                 if (st[0] == PROFILE_ROW_INCLUDE) include.add(profileName);
                 else if (st[0] == PROFILE_ROW_EXCLUDE) exclude.add(profileName);
             };
-            // Whole-row tap cycles neutral -> include -> exclude -> neutral.
+            // Whole-row tap toggles between neutral and include only; from
+            // "Not in" (exclude) a tap returns to neutral. "Not in" itself is
+            // reached by long-pressing the row (see below).
             row.setOnClickListener(v -> {
-                st[0] = (st[0] + 1) % 3;
+                st[0] = (st[0] == PROFILE_ROW_NEUTRAL) ? PROFILE_ROW_INCLUDE : PROFILE_ROW_NEUTRAL;
                 sync.run();
                 render.run();
+            });
+            // Whole-row long-press switches the row to "Not in" (exclude).
+            row.setOnLongClickListener(v -> {
+                st[0] = PROFILE_ROW_EXCLUDE;
+                sync.run();
+                render.run();
+                return true;
             });
             // The "+" / "-" pills toggle their own polarity directly (tapping
             // an already-selected pill returns the row to neutral). Their
