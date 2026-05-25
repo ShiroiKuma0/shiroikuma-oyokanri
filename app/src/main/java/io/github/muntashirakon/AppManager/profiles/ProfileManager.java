@@ -104,6 +104,39 @@ public class ProfileManager {
         return deleted;
     }
 
+    /**
+     * Resolve the actual on-disk file for a profile by its id. Normally a
+     * profile is stored as {@code <profileId><ext>}, but if a file's name ever
+     * diverges from the id it stores, writing back via the name alone would
+     * silently land in the wrong (or a freshly-created) file. This prefers the
+     * canonically-named file when it exists and otherwise scans the profiles
+     * directory for the file whose stored id matches.
+     *
+     * @return the existing file for {@code profileId}, or {@code null} if none.
+     */
+    @Nullable
+    public static Path resolveExistingProfilePath(@NonNull String profileId) {
+        Path canonical = findProfilePathById(profileId);
+        if (canonical != null && canonical.exists()) {
+            return canonical;
+        }
+        try {
+            Path[] profilePaths = getProfilesDir().listFiles((dir, name) -> name.endsWith(PROFILE_EXT));
+            if (profilePaths != null) {
+                for (Path profilePath : profilePaths) {
+                    try {
+                        if (profileId.equals(BaseProfile.fromPath(profilePath).profileId)) {
+                            return profilePath;
+                        }
+                    } catch (Throwable ignore) {
+                    }
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+        return null;
+    }
+
     @NonNull
     public static String getProfileName(@NonNull String filename) {
         int index = filename.indexOf(PROFILE_EXT);
