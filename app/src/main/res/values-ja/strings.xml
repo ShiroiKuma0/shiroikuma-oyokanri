@@ -1084,4 +1084,6 @@
     <string name="filter_frozen_apps">凍結済みアプリ</string>
     <string name="filter_unfrozen_apps">融解済みアプリ</string>
     <string name="filter_force_stopped_apps">終了済みアプリ</string>
+    <string name="protected_profile_block">%s は「必要」プロファイルで保護されているため、凍結またはアンインストールできません。</string>
+    <string name="protected_profile_block_multiple">「必要」プロファイル内の保護されたアプリ %d 個は変更されません。</string>
 </resources>

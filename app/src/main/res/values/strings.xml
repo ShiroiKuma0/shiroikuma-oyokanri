@@ -1759,4 +1759,7 @@
     <string name="pref_font_size_inherit">default</string>
     <string name="pref_font_add_custom">Add custom font…</string>
     <string name="font_preview_text">AaIiMmOoQqWw 012 白い熊相撲道 áÁčČďĎéÉěĚíÍňŇóÓrŘŠŠťŤúÚůŮÝÝžŽ</string>
+    <!-- Fork: protected ("必要") profile messages -->
+    <string name="protected_profile_block">%s is protected by the 「必要」 profile and can\'t be frozen or uninstalled.</string>
+    <string name="protected_profile_block_multiple">%d protected app(s) in the 「必要」 profile won\'t be changed.</string>
 </resources>

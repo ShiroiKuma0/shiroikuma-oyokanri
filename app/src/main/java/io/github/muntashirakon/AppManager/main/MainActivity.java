@@ -52,6 +52,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Set;
 import java.util.Iterator;
 import java.util.List;
 
@@ -84,6 +85,7 @@ import io.github.muntashirakon.AppManager.misc.SearchViewDebouncer;
 import io.github.muntashirakon.AppManager.oneclickops.OneClickOpsActivity;
 import io.github.muntashirakon.AppManager.profiles.AddToProfileDialogFragment;
 import io.github.muntashirakon.AppManager.profiles.ProfilesActivity;
+import io.github.muntashirakon.AppManager.profiles.ProtectedAppsProfile;
 import io.github.muntashirakon.AppManager.rules.RulesTypeSelectionDialogFragment;
 import io.github.muntashirakon.AppManager.runningapps.RunningAppsActivity;
 import io.github.muntashirakon.AppManager.self.life.FundingCampaignChecker;
@@ -96,6 +98,7 @@ import io.github.muntashirakon.AppManager.utils.AppPref;
 import io.github.muntashirakon.AppManager.utils.DateUtils;
 import io.github.muntashirakon.AppManager.utils.StoragePermission;
 import io.github.muntashirakon.AppManager.utils.ClipboardUtils;
+import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 import io.github.muntashirakon.dialog.AlertDialogBuilder;
 import io.github.muntashirakon.dialog.ScrollableDialogBuilder;
@@ -562,6 +565,7 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                             handleBatchOp(BatchOpsManager.OP_CLEAR_DATA))
                     .show();
         } else if (id == R.id.action_freeze_unfreeze) {
+            warnIfSelectionHasProtectedApps();
             int freezeType = Prefs.Blocking.getDefaultFreezingMethod();
             if (Prefs.Blocking.getSkipFreezeMethodDialog()) {
                 // Fork: "Skip freeze method dialog" — freeze the selected apps
@@ -647,6 +651,7 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         } else if (id == R.id.action_force_stop) {
             handleBatchOp(BatchOpsManager.OP_FORCE_STOP);
         } else if (id == R.id.action_uninstall) {
+            warnIfSelectionHasProtectedApps();
             handleBatchOpWithWarning(BatchOpsManager.OP_UNINSTALL);
         } else if (id == R.id.action_install_existing) {
             // Fork: reinstall (install-existing) the selection — restores
@@ -845,6 +850,34 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                 .setNeutralButton(R.string.unfreeze, (dialog, which, selectedItem) ->
                         handleBatchOp(BatchOpsManager.OP_UNFREEZE))
                 .show();
+    }
+
+    // Fork: when a batch freeze/uninstall includes apps in the protected
+    // "必要" profile, warn concretely. Those apps are refused at the
+    // freeze/uninstall chokepoints, so the rest of the batch still proceeds.
+    // Computed off the main thread because it reads the profiles from disk.
+    private void warnIfSelectionHasProtectedApps() {
+        Collection<String> selected = new ArrayList<>(viewModel.getSelectedPackages().keySet());
+        if (selected.isEmpty()) {
+            return;
+        }
+        ThreadUtils.postOnBackgroundThread(() -> {
+            Set<String> protectedPackages = ProtectedAppsProfile.getProtectedPackages();
+            if (protectedPackages.isEmpty()) {
+                return;
+            }
+            int count = 0;
+            for (String pkg : selected) {
+                if (protectedPackages.contains(pkg)) {
+                    ++count;
+                }
+            }
+            if (count > 0) {
+                int finalCount = count;
+                ThreadUtils.postOnMainThread(() ->
+                        UIUtils.displayLongToast(R.string.protected_profile_block_multiple, finalCount));
+            }
+        });
     }
 
     private void handleBatchOp(@BatchOpsManager.OpType int op) {

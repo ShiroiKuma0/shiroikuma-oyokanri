@@ -133,6 +133,7 @@ import io.github.muntashirakon.AppManager.magisk.MagiskDenyList;
 import io.github.muntashirakon.AppManager.magisk.MagiskHide;
 import io.github.muntashirakon.AppManager.magisk.MagiskProcess;
 import io.github.muntashirakon.AppManager.profiles.AddToProfileDialogFragment;
+import io.github.muntashirakon.AppManager.profiles.ProtectedAppsProfile;
 import io.github.muntashirakon.AppManager.rules.RulesTypeSelectionDialogFragment;
 import io.github.muntashirakon.AppManager.rules.compontents.ComponentsBlocker;
 import io.github.muntashirakon.AppManager.rules.struct.ComponentRule;
@@ -1149,6 +1150,10 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
                                         isSystemApp ? R.string.uninstall_system_app_message : R.string.uninstall_app_message)
                                         .setTitle(mAppLabel)
                                         .setPositiveButton(R.string.uninstall, (dialog1, which1, keepData) -> {
+                                            if (ProtectedAppsProfile.isProtected(mPackageName)) {
+                                                displayLongToast(R.string.protected_profile_block, mAppLabel);
+                                                return;
+                                            }
                                             if (selectedItems.size() == 1) {
                                                 ThreadUtils.postOnBackgroundThread(() -> {
                                                     PackageInstallerCompat installer = PackageInstallerCompat.getNewInstance();
@@ -2060,6 +2065,10 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
 
     @WorkerThread
     private void doFreeze(@FreezeUtils.FreezeMethod int freezeType, boolean remember) {
+        if (ProtectedAppsProfile.isProtected(mPackageName)) {
+            ThreadUtils.postOnMainThread(() -> displayLongToast(R.string.protected_profile_block, mAppLabel));
+            return;
+        }
         try {
             if (remember) {
                 FreezeUtils.storeFreezeMethod(mPackageName, freezeType);
