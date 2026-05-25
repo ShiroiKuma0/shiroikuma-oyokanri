@@ -171,6 +171,15 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
     }
 
     /**
+     * Rebuild the package→profile-names map from disk and re-render. Safe to
+     * call after profile membership changes (e.g. adding an app to a profile)
+     * or on a list refresh.
+     */
+    public void reloadProfileMembership() {
+        ThreadUtils.postOnBackgroundThread(this::loadProfileMembership);
+    }
+
+    /**
      * Reads every profile JSON from disk, builds a package-name to
      * profile-names map, then swaps it in and re-renders the list. Called
      * once on adapter construction; the list is small (handful of profiles)

@@ -287,6 +287,13 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         mAdapter.setHasStableIds(true);
         recyclerView.setLayoutManager(UIUtils.getGridLayoutAt450Dp(this));
         recyclerView.setAdapter(mAdapter);
+        // Refresh the per-row profile pills immediately after an app is added to
+        // a profile via the "+" dialog (the dialog doesn't pause the activity,
+        // so onResume wouldn't fire).
+        getSupportFragmentManager().setFragmentResultListener(
+                AddToProfileDialogFragment.RESULT_KEY, this, (key, bundle) -> {
+                    if (mAdapter != null) mAdapter.reloadProfileMembership();
+                });
         mMultiSelectionView = findViewById(R.id.selection_view);
         // The MultiSelectionView constructor hardcodes setCardElevation(8dp)
         // after any XML attributes are read, so app:cardElevation="0dp" in
@@ -677,6 +684,9 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
     public void onRefresh() {
         showProgressIndicator(true);
         if (viewModel != null) viewModel.loadApplicationItems();
+        // Profile membership (the per-row profile pills) is cached in the
+        // adapter; rebuild it on refresh so newly-added profile memberships show.
+        if (mAdapter != null) mAdapter.reloadProfileMembership();
         mSwipeRefresh.setRefreshing(false);
     }
 
@@ -708,6 +718,9 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
     protected void onResume() {
         super.onResume();
         if (viewModel != null) viewModel.onResume();
+        // Profile membership may have changed elsewhere (e.g. the profiles
+        // editor); rebuild the cached per-row pill data.
+        if (mAdapter != null) mAdapter.reloadProfileMembership();
         if (mAdapter != null && mBatchOpsHandler != null && mAdapter.isInSelectionMode()) {
             mBatchOpsHandler.updateConstraints();
             mMultiSelectionView.updateCounter(false);
