@@ -55,6 +55,8 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.Iterator;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import io.github.muntashirakon.AppManager.BaseActivity;
 import io.github.muntashirakon.AppManager.BuildConfig;
@@ -853,11 +855,12 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
     }
 
     // Fork: when a batch freeze/uninstall includes apps in the protected
-    // "必要" profile, warn concretely. Those apps are refused at the
-    // freeze/uninstall chokepoints, so the rest of the batch still proceeds.
-    // Computed off the main thread because it reads the profiles from disk.
+    // "必要" profile, warn concretely, naming each protected app. Those apps
+    // are refused at the freeze/uninstall chokepoints, so the rest of the
+    // batch still proceeds. Computed off the main thread because it reads the
+    // profiles from disk.
     private void warnIfSelectionHasProtectedApps() {
-        Collection<String> selected = new ArrayList<>(viewModel.getSelectedPackages().keySet());
+        Map<String, ApplicationItem> selected = new LinkedHashMap<>(viewModel.getSelectedPackages());
         if (selected.isEmpty()) {
             return;
         }
@@ -866,17 +869,23 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             if (protectedPackages.isEmpty()) {
                 return;
             }
-            int count = 0;
-            for (String pkg : selected) {
-                if (protectedPackages.contains(pkg)) {
-                    ++count;
+            List<String> labels = new ArrayList<>();
+            for (Map.Entry<String, ApplicationItem> entry : selected.entrySet()) {
+                if (protectedPackages.contains(entry.getKey())) {
+                    ApplicationItem item = entry.getValue();
+                    labels.add(item != null && item.label != null ? item.label : entry.getKey());
                 }
             }
-            if (count > 0) {
-                int finalCount = count;
-                ThreadUtils.postOnMainThread(() ->
-                        UIUtils.displayLongToast(R.string.protected_profile_block_multiple, finalCount));
+            if (labels.isEmpty()) {
+                return;
             }
+            ThreadUtils.postOnMainThread(() -> {
+                if (labels.size() == 1) {
+                    UIUtils.displayLongToast(R.string.protected_profile_block, labels.get(0));
+                } else {
+                    UIUtils.displayLongToast(R.string.protected_profile_block_multiple, TextUtils.join("、", labels));
+                }
+            });
         });
     }
 
