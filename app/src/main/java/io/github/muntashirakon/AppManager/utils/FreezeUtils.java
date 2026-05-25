@@ -23,6 +23,7 @@ import io.github.muntashirakon.AppManager.compat.ManifestCompat;
 import io.github.muntashirakon.AppManager.compat.PackageManagerCompat;
 import io.github.muntashirakon.AppManager.db.AppsDb;
 import io.github.muntashirakon.AppManager.db.entity.FreezeType;
+import io.github.muntashirakon.AppManager.profiles.ProtectedAppsProfile;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
 import io.github.muntashirakon.AppManager.settings.Prefs;
 
@@ -80,6 +81,10 @@ public final class FreezeUtils {
 
     public static void freeze(@NonNull String packageName, @UserIdInt int userId, @FreezeMethod int freezeType)
             throws RemoteException {
+        if (ProtectedAppsProfile.isProtected(packageName)) {
+            throw new RemoteException(packageName + " is in the " + ProtectedAppsProfile.PROTECTED_PROFILE_NAME
+                    + " profile and is protected from freezing.");
+        }
         if (BuildConfig.APPLICATION_ID.equals(packageName) && userId == UserHandleHidden.myUserId()) {
             throw new RemoteException("Could not freeze myself.");
         }

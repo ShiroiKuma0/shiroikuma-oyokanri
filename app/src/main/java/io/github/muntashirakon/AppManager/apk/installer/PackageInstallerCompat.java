@@ -66,6 +66,7 @@ import io.github.muntashirakon.AppManager.compat.PackageManagerCompat;
 import io.github.muntashirakon.AppManager.ipc.ProxyBinder;
 import io.github.muntashirakon.AppManager.logs.Log;
 import io.github.muntashirakon.AppManager.progress.ProgressHandler;
+import io.github.muntashirakon.AppManager.profiles.ProtectedAppsProfile;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
 import io.github.muntashirakon.AppManager.settings.Ops;
 import io.github.muntashirakon.AppManager.types.UserPackagePair;
@@ -1400,6 +1401,11 @@ public final class PackageInstallerCompat {
     @SuppressWarnings("deprecation")
     public boolean uninstall(String packageName, @UserIdInt int userId, boolean keepData) {
         ThreadUtils.ensureWorkerThread();
+        if (ProtectedAppsProfile.isProtected(packageName)) {
+            Log.w(TAG, packageName + " is in the " + ProtectedAppsProfile.PROTECTED_PROFILE_NAME
+                    + " profile; refusing uninstall.");
+            return false;
+        }
         boolean hasDeletePackagesPermission = SelfPermissions.checkSelfOrRemotePermission(Manifest.permission.DELETE_PACKAGES);
         mPackageName = Objects.requireNonNull(packageName);
         String callerPackageName = SelfPermissions.getCallingPackage(Users.getSelfOrRemoteUid());
