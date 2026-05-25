@@ -37,6 +37,10 @@ import io.github.muntashirakon.io.Path;
 public class AddToProfileDialogFragment extends DialogFragment {
     public static final String TAG = AddToProfileDialogFragment.class.getSimpleName();
 
+    /** Fragment-result key broadcast after at least one package is added, so
+     *  callers (e.g. the main list) can refresh any cached profile state. */
+    public static final String RESULT_KEY = "add_to_profile_result";
+
     private static final String ARG_PKGS = "pkgs";
 
     public static AddToProfileDialogFragment getInstance(@NonNull String[] packages) {
@@ -119,8 +123,12 @@ public class AddToProfileDialogFragment extends DialogFragment {
                     // Membership of the protected "必要" profile may have changed.
                     ProtectedAppsProfile.invalidate();
                     boolean finalSuccess = isSuccess;
-                    ThreadUtils.postOnMainThread(() -> UIUtils.displayShortToast(
-                            finalSuccess ? R.string.done : R.string.failed));
+                    ThreadUtils.postOnMainThread(() -> {
+                        UIUtils.displayShortToast(finalSuccess ? R.string.done : R.string.failed);
+                        if (finalSuccess && isAdded()) {
+                            getParentFragmentManager().setFragmentResult(RESULT_KEY, new Bundle());
+                        }
+                    });
                 }))
                 .create();
         dialogRef.set(alertDialog);
