@@ -1,0 +1,131 @@
+# CLAUDE.md — 白い熊 App Manager (`shiroikuma.appmanager`)
+
+This file is loaded automatically by Claude Code. It captures the fork's facts,
+build pipeline, and operating conventions so a fresh session can pick up
+exactly where the previous one left off. The full per-commit changelog and
+engineering lessons live in **`.claude/skills/appmanager-fork/SKILL.md`** —
+consult that for the "why" behind anything in here.
+
+## Project
+
+- Fork of [AppManager](https://github.com/MuntashirAkon/AppManager) (upstream base **4.0.5**, minSdk 21, AGP 8.13.2).
+- `applicationId`: `shiroikuma.appmanager` (installs side-by-side with the official build).
+- Java package (unchanged from upstream): `io.github.muntashirakon.AppManager`.
+- Display label: 白い熊 App Manager.
+- Remote: `origin` → ShiroiKuma0/appmanager.
+- Branch: **`custom`** — all fork work lives here; pushes go to `origin/custom`.
+
+## Target device & environment
+
+- Huawei Mate XT (tri-fold, Android 13, non-rooted, all-files access).
+- ABI shipped: `arm64-v8a` only.
+- Dev machine: Tuxedo OS Prague (TZ **Europe/Prague**).
+- JDK: `/usr/lib/jvm/java-21-openjdk-amd64` (Japanese locale, so `javac` prints `ノート:` instead of `Note:`).
+- Android SDK: `~/android-sdk`. Each build writes `local.properties` with `sdk.dir=$ANDROID_HOME`.
+- Keystore: `~/.android-keystores/appmanager-custom.jks`
+  - alias: `appmanager`
+  - keystore + key password: `appmanager123`
+
+## Build & deploy pipeline
+
+Output APK is named `shiroikuma-appmanager_${customBaseVersionName}+${customBuildNumber}_arm64-v8a.apk`, derived from `gradle.properties`. Always copy the signed APK to `~/tmp/` before pushing to the device, so a record stays on disk.
+
+```bash
+# from repo root
+export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+export PATH="$JAVA_HOME/bin:$PATH"
+export ANDROID_HOME=$HOME/android-sdk
+
+tools/bump-build.sh                            # increments customBuildNumber
+echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+./gradlew clean
+# Filter benign output on BOTH streams; preserve the exit code with pipefail.
+set -o pipefail
+./gradlew :app:assembleRelease \
+    2> >(grep -vE 'ノート:|Note:|\[CXX5304\]' >&2) \
+  | grep -vE 'ノート:|Note:|\[CXX5304\]'
+
+UNSIGNED_APK=$(find app/build/outputs/apk/release -name '*-unsigned.apk' | head -1)
+
+zipalign -p -f 4 "$UNSIGNED_APK" /tmp/am-aligned.apk
+apksigner sign --ks ~/.android-keystores/appmanager-custom.jks \
+    --ks-key-alias appmanager \
+    --ks-pass pass:appmanager123 \
+    --key-pass pass:appmanager123 \
+    --out /tmp/am-signed.apk /tmp/am-aligned.apk
+apksigner verify --verbose /tmp/am-signed.apk 2>&1 | grep -v 'not protected by signature'
+
+VER=$(grep '^customBaseVersionName=' gradle.properties | cut -d= -f2)
+NUM=$(grep '^customBuildNumber='     gradle.properties | cut -d= -f2)
+apk_name="shiroikuma-appmanager_${VER}+${NUM}_arm64-v8a.apk"
+cp /tmp/am-signed.apk ~/tmp/"$apk_name"
+
+# After the user has connected the phone with USB debugging:
+adb push /tmp/am-signed.apk "/sdcard/tmp/$apk_name"
+```
+
+Filter notes:
+- `ノート:` / `Note:` are mandatory `javac` summary notes for deprecation/unchecked usage; `-Xlint:none` and `-nowarn` do not suppress them.
+- `[CXX5304]` is a benign SDK-XML version-skew message from the NDK pipeline. Brackets must be escaped (`\[CXX5304\]`) for `grep -E`.
+
+## Push workflow
+
+When the user says **"Push"**:
+1. `git add -A` (include new files).
+2. Show `git status` for the user to review.
+3. `git commit -m "<concise imperative title>" -m "<multi-line body describing what changed and why>"`.
+4. `git push origin custom` — **never force-push**.
+5. Report the resulting commit hash and a one-line summary.
+
+## Translation workflow
+
+The user supplies an English label plus its Japanese translation and where they see it. Procedure:
+1. Find the matching string-resource name in `app/src/main/res/values/strings.xml` (e.g. "Frozen apps" → `name="filter_frozen_apps"`).
+2. Add `<string name="…">…</string>` to `app/src/main/res/values-ja/strings.xml` under the marker `<!-- Fork: user-supplied Japanese translations -->`.
+3. The translation applies wherever that resource is referenced, including the toolbar (via `MainToolbarPrefs.titleForKey`).
+
+## Protected profile (`必要`)
+
+Any app that is a member of an apps profile named **`必要`** is hard-blocked from being frozen and uninstalled. Enforcement sits at the two low-level chokepoints, so no UI path (single-app, batch, profile application, future code) can bypass it.
+
+| Chokepoint | Behaviour |
+|---|---|
+| `FreezeUtils.freeze(pkg, userId, type)` | Throws `RemoteException` for protected packages. The 2-arg `freeze` delegates to this; all freeze methods (disable/suspend/hide) run after the guard. |
+| `PackageInstallerCompat.uninstall(pkg, userId, keepData)` | Returns `false` at the very top, before any work or accessibility dialog. |
+| `profiles/ProtectedAppsProfile.java` | Helper. `getProtectedPackages()` unions `packages` from every apps-profile named `必要`. 3 s TTL cache. **Fails open** (a stuck block is worse than briefly missing protection). Call `invalidate()` after profile changes. |
+
+Concrete refusal messages fire at four entry points — the main-list freeze icon, app-details freeze, app-details uninstall, and batch freeze/uninstall — using `R.string.protected_profile_block` (single, `%s` = label) and `R.string.protected_profile_block_multiple` (list, `%s` = names joined with `、`).
+
+## Key files & chokepoints
+
+| Concern | File |
+|---|---|
+| Freeze chokepoint | `app/src/main/java/io/github/muntashirakon/AppManager/utils/FreezeUtils.java` |
+| Uninstall chokepoint | `app/src/main/java/io/github/muntashirakon/AppManager/apk/installer/PackageInstallerCompat.java` |
+| Customisable selection toolbar registry | `app/src/main/java/io/github/muntashirakon/AppManager/main/MainToolbarPrefs.java` — add new actions to `ALL_KEYS` + `idForKey`/`titleForKey`/`iconForKey`. An item in the menu XML alone is **invisible**, because the toolbar is rebuilt programmatically. |
+| Toast theming (black/yellow) | `app/src/main/java/io/github/muntashirakon/AppManager/utils/UIUtils.java` routes every `displayShortToast` / `displayLongToast` / `displayLongToastPl` through a custom view (`layout/toast_shiroikuma.xml` + `drawable/bg_toast_shiroikuma.xml`). Custom toast views only render in the foreground on Android 12+. |
+| Profile pills (per row) | `MainRecyclerAdapter.mPackageToProfileNames`, rebuilt by `loadProfileMembership()`. Trigger via `reloadProfileMembership()` on pull-to-refresh, on resume, and on the `AddToProfileDialogFragment.RESULT_KEY` fragment-result signal sent after a successful add. |
+| Settings export/import | `app/src/main/java/io/github/muntashirakon/AppManager/settings/SettingsBackupManager.java` bundles `shared_prefs/*.xml` + `files/profiles/` + `files/fonts/`. On import, hard-kill via `Process.killProcess(myPid)` — **not** `Runtime.exit` — or cached `SharedPreferences` will clobber the imported files on orderly shutdown. |
+| Profile file resolution | `ProfileManager.resolveExistingProfilePath(profileId)` returns the actual file by matching its stored id (scanning if the canonical name doesn't exist). Use this when writing back to a profile rather than `findProfilePathById`, which assumes the filename stem == id. |
+
+## Conventions
+
+- Fork-only Java/XML additions get a comment beginning `// Fork: …` (or `<!-- Fork: … -->`) so they're recognisable later.
+- New public Java files start with `// SPDX-License-Identifier: GPL-3.0-or-later`.
+- The selection toolbar button label is whatever `MainToolbarPrefs.titleForKey` returns; the menu-XML title is overridden.
+- For new toolbar actions: id in the selection-actions menu XML + key registered in `MainToolbarPrefs.ALL_KEYS` + entries in the three switch maps + dispatch in `MainActivity` + (optionally) gating in `MainBatchOpsHandler`.
+
+## Workflow notes for Claude Code (vs. the earlier Claude.ai sessions)
+
+The skill file `.claude/skills/appmanager-fork/SKILL.md` describes a fork-development history that ran inside Claude.ai with a paste-ready patch workflow ("emit a patch → user applies → user says Push → finalize hash"). **In Claude Code that workflow no longer applies** — you have direct file-edit, bash, and git tools. So:
+
+- Edit files in the working tree directly. Don't generate patch files unless the user explicitly asks for one.
+- Don't generate paste-ready shell blocks (cyan echo prefixes, yellow gates, etc.); run the commands yourself.
+- "Build" still means run the full pipeline above. "Push" still triggers the commit-and-push flow.
+- The skill's historical "deliver patch + zip + in-flight bullet → swap to hash" rituals are claude.ai artefacts; just commit directly with a good message body.
+- When a new piece of knowledge surfaces (a new chokepoint, a non-obvious file naming convention, a regression cause), update either this CLAUDE.md or the `appmanager-fork` skill so it persists into the next session.
+
+## Deferred / housekeeping
+
+- The `custom` branch is a working multi-commit stack; the long-stated goal is to squash it down to **two clean commits** (a customisation layer + a configuration-cache layer). Deliberately deferred to a calm session, because commits 1 and 2 have overlapping diff context on `gradle.properties` and `app/build.gradle`, so autosquash/fixup is brittle.
