@@ -1765,4 +1765,25 @@
     <!-- Fork: protected ("必要") profile messages -->
     <string name="protected_profile_block">%s is protected by the 「必要」 profile and can\'t be frozen or uninstalled.</string>
     <string name="protected_profile_block_multiple">These apps are protected by the 「必要」 profile and can\'t be frozen or uninstalled: %s</string>
+
+    <!-- Fork: in-app batch-operation progress dialog + configurable theme -->
+    <string name="pause">Pause</string>
+    <string name="continue_operation">Continue</string>
+    <string name="pref_batch_progress_dialog">In-app batch progress dialog</string>
+    <string name="pref_batch_progress_dialog_msg">Show batch operations (freeze, uninstall, …) as a pop-up in the main window — with Pause/Continue and Cancel — instead of only the notification.</string>
+    <string name="pref_theme_text_color">Text colour</string>
+    <string name="pref_theme_background_color">Background colour</string>
+    <string name="pref_theme_border_color">Border colour</string>
+    <string name="pref_theme_border_width">Border width</string>
+    <string name="theme_border_width_dp">%d dp</string>
+    <!-- Fork: colour preset names (dialog &amp; toast theme) -->
+    <string name="color_yellow">Yellow</string>
+    <string name="color_orange">Orange</string>
+    <string name="color_green">Green</string>
+    <string name="color_cyan">Cyan</string>
+    <string name="color_blue">Blue</string>
+    <string name="color_red">Red</string>
+    <string name="color_white">White</string>
+    <string name="color_black">Black</string>
+    <string name="color_grey">Grey</string>
 </resources>

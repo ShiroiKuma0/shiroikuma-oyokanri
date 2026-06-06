@@ -65,6 +65,7 @@ import io.github.muntashirakon.AppManager.profiles.struct.BaseProfile;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
 import io.github.muntashirakon.AppManager.settings.FeatureController;
 import io.github.muntashirakon.AppManager.settings.Prefs;
+import io.github.muntashirakon.AppManager.batchops.BatchOpsManager;
 import io.github.muntashirakon.AppManager.types.PackageChangeReceiver;
 import io.github.muntashirakon.AppManager.types.UserPackagePair;
 import io.github.muntashirakon.AppManager.usage.AppUsageStatsManager;
@@ -834,6 +835,65 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
     }
 
     @WorkerThread
+    // Fork: snap the list to the post-batch-operation state in a single pass,
+    // driven by BatchOpsService.ACTION_BATCH_OPS_COMPLETED. For freeze/unfreeze
+    // this flips the affected items' freeze state in memory (no per-package
+    // system re-read, which takes many seconds for a large batch) and re-filters
+    // once — so the list snaps immediately instead of letting the system's
+    // throttled per-package change broadcasts repaint it a couple of rows per
+    // second. Those trickle broadcasts still arrive and reconcile the exact
+    // state in the background, but re-filter to the same result, so there is no
+    // visible movement. Other ops fall back to the targeted re-read.
+    public void applyBatchOpResult(@BatchOpsManager.OpType int op, @Nullable String[] packages,
+                                   @Nullable List<String> failedPackages) {
+        if (packages == null || packages.length == 0) {
+            return;
+        }
+        Boolean frozenTarget = freezeTargetForOp(op);
+        if (frozenTarget == null) {
+            // Non-freeze op (e.g. uninstall): targeted re-read of just these packages.
+            executor.submit(() -> updateInfoForPackages(packages, PackageChangeReceiver.ACTION_PACKAGE_ALTERED));
+            return;
+        }
+        boolean frozen = frozenTarget;
+        HashSet<String> targets = new HashSet<>(Arrays.asList(packages));
+        if (failedPackages != null) {
+            // Don't flip packages the operation failed on — they kept their state.
+            targets.removeAll(failedPackages);
+        }
+        if (targets.isEmpty()) {
+            return;
+        }
+        executor.submit(() -> {
+            boolean modified = false;
+            synchronized (mApplicationItems) {
+                for (ApplicationItem item : mApplicationItems) {
+                    if (targets.contains(item.packageName)) {
+                        item.setFrozenStateForBatchOp(frozen);
+                        modified = true;
+                    }
+                }
+            }
+            if (modified) {
+                sortApplicationList(mSortBy, mReverseSort);
+                filterItemsByFlags();
+            }
+        });
+    }
+
+    @Nullable
+    private static Boolean freezeTargetForOp(@BatchOpsManager.OpType int op) {
+        switch (op) {
+            case BatchOpsManager.OP_FREEZE:
+            case BatchOpsManager.OP_ADVANCED_FREEZE:
+                return Boolean.TRUE;
+            case BatchOpsManager.OP_UNFREEZE:
+                return Boolean.FALSE;
+            default:
+                return null;
+        }
+    }
+
     private void updateInfoForUid(int uid, String action) {
         Log.d("updateInfoForUid", "Uid: %d", uid);
         String[] packages;

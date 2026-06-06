@@ -1089,4 +1089,21 @@
     <string name="filter_force_stopped_apps">終了済みアプリ</string>
     <string name="protected_profile_block">%s は「必要」プロファイルで保護されているため、凍結またはアンインストールできません。</string>
     <string name="protected_profile_block_multiple">次のアプリは「必要」プロファイルで保護されているため、凍結またはアンインストールできません：%s</string>
+    <string name="pause">一時停止</string>
+    <string name="continue_operation">続行</string>
+    <string name="pref_batch_progress_dialog">ｱﾌﾟﾘ内ﾊﾞｯﾁ進捗ﾀﾞｲｱﾛｸﾞ</string>
+    <string name="pref_batch_progress_dialog_msg">ﾊﾞｯﾁ操作（凍結・ｱﾝｲﾝｽﾄｰﾙなど）を通知だけでなくﾒｲﾝ画面のﾎﾟｯﾌﾟｱｯﾌﾟで表示します（一時停止／続行・ｷｬﾝｾﾙ付き）。</string>
+    <string name="pref_theme_text_color">文字色</string>
+    <string name="pref_theme_background_color">背景色</string>
+    <string name="pref_theme_border_color">枠線の色</string>
+    <string name="pref_theme_border_width">枠線の太さ</string>
+    <string name="color_yellow">黄</string>
+    <string name="color_orange">橙</string>
+    <string name="color_green">緑</string>
+    <string name="color_cyan">水色</string>
+    <string name="color_blue">青</string>
+    <string name="color_red">赤</string>
+    <string name="color_white">白</string>
+    <string name="color_black">黒</string>
+    <string name="color_grey">灰</string>
 </resources>

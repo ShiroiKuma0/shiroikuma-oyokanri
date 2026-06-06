@@ -632,6 +632,19 @@ public class ApplicationItem extends PackageItemInfo implements IFilterableAppIn
         return mFreezeFlags;
     }
 
+    // Fork: cheaply set the freeze state in memory right after a batch
+    // freeze/unfreeze, so the main list can snap to its final state immediately
+    // instead of waiting for a full per-package re-read from the system (which
+    // takes many seconds for a large batch). Updates the cached freeze flags
+    // (read by the frozen/unfrozen filter) and the isFrozen display flag. The
+    // exact freeze-type bits are best-effort — enough for the frozen/unfrozen
+    // filter and the row indicator; the authoritative state is reconciled by the
+    // normal package-change path that follows.
+    public void setFrozenStateForBatchOp(boolean frozen) {
+        isFrozen = frozen;
+        mFreezeFlags = frozen ? FreezeOption.FREEZE_TYPE_DISABLED : 0;
+    }
+
     @Override
     public boolean isStopped() {
         return isStopped;

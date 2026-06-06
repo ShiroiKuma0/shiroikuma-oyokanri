@@ -228,7 +228,16 @@ public class BatchOpsManager {
 
     public Result performOp(@NonNull BatchOpsInfo info, @Nullable ProgressHandler progressHandler) {
         mProgressHandler = progressHandler;
-        return performOp(info);
+        try {
+            return performOp(info);
+        } catch (BatchOpsProgressMonitor.OperationCancelledException e) {
+            // Fork: the user cancelled via the in-app progress dialog. The
+            // in-flight item (if any) has finished; remaining items are skipped.
+            // Return an empty (successful) result — the service inspects the
+            // monitor's cancelled flag and reports the operation as cancelled,
+            // not failed.
+            return new Result(Collections.emptyList());
+        }
     }
 
     @CheckResult
@@ -993,11 +1002,23 @@ public class BatchOpsManager {
     }
 
     private void updateProgress(float last, int current) {
+        // Fork: pause/cancel checkpoint + feed the in-app progress dialog. Every
+        // op loop calls this once per item, before doing that item's work, so
+        // pause (block the worker thread) and cancel (abort the loop) apply
+        // uniformly across all batch operations and a cancel skips the remaining
+        // items.
+        BatchOpsProgressMonitor monitor = BatchOpsProgressMonitor.getInstance();
+        monitor.awaitWhilePaused();
+        if (monitor.isCancelled()) {
+            throw new BatchOpsProgressMonitor.OperationCancelledException();
+        }
         if (mProgressHandler == null) {
             return;
         }
         // Current progress = last progress + current
-        mProgressHandler.postUpdate(last + current);
+        float progress = last + current;
+        mProgressHandler.postUpdate(progress);
+        monitor.publishProgress(mProgressHandler.getLastMax(), Math.round(progress));
     }
 
     private void fixProgress(int appendMax) {
