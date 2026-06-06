@@ -86,6 +86,7 @@ import io.github.muntashirakon.AppManager.misc.LabsActivity;
 import io.github.muntashirakon.AppManager.misc.SearchViewDebouncer;
 import io.github.muntashirakon.AppManager.oneclickops.OneClickOpsActivity;
 import io.github.muntashirakon.AppManager.profiles.AddToProfileDialogFragment;
+import io.github.muntashirakon.AppManager.profiles.RemoveFromProfileDialogFragment;
 import io.github.muntashirakon.AppManager.profiles.ProfilesActivity;
 import io.github.muntashirakon.AppManager.profiles.ProtectedAppsProfile;
 import io.github.muntashirakon.AppManager.rules.RulesTypeSelectionDialogFragment;
@@ -292,6 +293,11 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         // so onResume wouldn't fire).
         getSupportFragmentManager().setFragmentResultListener(
                 AddToProfileDialogFragment.RESULT_KEY, this, (key, bundle) -> {
+                    if (mAdapter != null) mAdapter.reloadProfileMembership();
+                });
+        // Same refresh after a batch remove-from-profile.
+        getSupportFragmentManager().setFragmentResultListener(
+                RemoveFromProfileDialogFragment.RESULT_KEY, this, (key, bundle) -> {
                     if (mAdapter != null) mAdapter.reloadProfileMembership();
                 });
         mMultiSelectionView = findViewById(R.id.selection_view);
@@ -674,6 +680,12 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             AddToProfileDialogFragment dialog = AddToProfileDialogFragment.getInstance(viewModel.getSelectedPackages()
                     .keySet().toArray(new String[0]));
             dialog.show(getSupportFragmentManager(), AddToProfileDialogFragment.TAG);
+        } else if (id == R.id.action_remove_from_profile) {
+            // Fork: batch counterpart to add-to-profile — removes the selection
+            // from one or more chosen profiles.
+            RemoveFromProfileDialogFragment dialog = RemoveFromProfileDialogFragment.getInstance(viewModel.getSelectedPackages()
+                    .keySet().toArray(new String[0]));
+            dialog.show(getSupportFragmentManager(), RemoveFromProfileDialogFragment.TAG);
         } else {
             return false;
         }

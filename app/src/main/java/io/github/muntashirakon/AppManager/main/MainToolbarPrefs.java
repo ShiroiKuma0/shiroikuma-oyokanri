@@ -70,7 +70,8 @@ public final class MainToolbarPrefs {
             "optimize",
             "export_blocking_rules",
             "export_app_list",
-            "add_to_profile"
+            "add_to_profile",
+            "remove_from_profile"
     ));
 
     @IdRes
@@ -91,6 +92,7 @@ public final class MainToolbarPrefs {
             case "export_blocking_rules":   return R.id.action_export_blocking_rules;
             case "export_app_list":         return R.id.action_export_app_list;
             case "add_to_profile":          return R.id.action_add_to_profile;
+            case "remove_from_profile":     return R.id.action_remove_from_profile;
             default: return 0;
         }
     }
@@ -113,6 +115,7 @@ public final class MainToolbarPrefs {
             case "export_blocking_rules":   return R.string.export_blocking_rules;
             case "export_app_list":         return R.string.export_app_list;
             case "add_to_profile":          return R.string.add_to_profile;
+            case "remove_from_profile":     return R.string.remove_from_profile;
             default: return 0;
         }
     }
@@ -135,6 +138,7 @@ public final class MainToolbarPrefs {
             case "export_blocking_rules":   return R.drawable.ic_file_export;
             case "export_app_list":         return R.drawable.ic_file_export;
             case "add_to_profile":          return R.drawable.ic_file_plus;
+            case "remove_from_profile":     return R.drawable.ic_file_minus;
             default: return 0;
         }
     }

@@ -32,6 +32,7 @@ public class MainBatchOpsHandler implements MultiSelectionView.OnSelectionChange
     private final MenuItem mExportAppListMenu;
     private final MenuItem mOptimizeMenu;
     private final MenuItem mAddToProfileMenu;
+    private final MenuItem mRemoveFromProfileMenu;
 
     private boolean mCanFreezeUnfreezePackages;
     private boolean mCanInstallExistingPackages;
@@ -60,6 +61,7 @@ public class MainBatchOpsHandler implements MultiSelectionView.OnSelectionChange
         mExportAppListMenu = selectionMenu.findItem(R.id.action_export_app_list);
         mOptimizeMenu = selectionMenu.findItem(R.id.action_optimize);
         mAddToProfileMenu = selectionMenu.findItem(R.id.action_add_to_profile);
+        mRemoveFromProfileMenu = selectionMenu.findItem(R.id.action_remove_from_profile);
         updateConstraints();
     }
 
@@ -130,6 +132,9 @@ public class MainBatchOpsHandler implements MultiSelectionView.OnSelectionChange
         mExportAppListMenu.setEnabled(nonZeroSelection);
         mOptimizeMenu.setEnabled(nonZeroSelection);
         mAddToProfileMenu.setEnabled(nonZeroSelection);
+        if (mRemoveFromProfileMenu != null) {
+            mRemoveFromProfileMenu.setEnabled(nonZeroSelection);
+        }
         /* === Visible/Invisible === */
         mFreezeUnfreezeMenu.setVisible(mCanFreezeUnfreezePackages);
         if (mUnfreezeMenu != null) {
