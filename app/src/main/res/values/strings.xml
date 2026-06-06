@@ -1769,6 +1769,7 @@
     <!-- Fork: in-app batch-operation progress dialog + configurable theme -->
     <string name="pause">Pause</string>
     <string name="continue_operation">Continue</string>
+    <string name="operation_cancelled">Cancelled</string>
     <string name="pref_batch_progress_dialog">In-app batch progress dialog</string>
     <string name="pref_batch_progress_dialog_msg">Show batch operations (freeze, uninstall, …) as a pop-up in the main window — with Pause/Continue and Cancel — instead of only the notification.</string>
     <string name="pref_theme_text_color">Text colour</string>

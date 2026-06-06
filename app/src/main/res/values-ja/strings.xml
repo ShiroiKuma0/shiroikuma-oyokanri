@@ -1091,6 +1091,7 @@
     <string name="protected_profile_block_multiple">次のアプリは「必要」プロファイルで保護されているため、凍結またはアンインストールできません：%s</string>
     <string name="pause">一時停止</string>
     <string name="continue_operation">続行</string>
+    <string name="operation_cancelled">中止しました</string>
     <string name="pref_batch_progress_dialog">ｱﾌﾟﾘ内ﾊﾞｯﾁ進捗ﾀﾞｲｱﾛｸﾞ</string>
     <string name="pref_batch_progress_dialog_msg">ﾊﾞｯﾁ操作（凍結・ｱﾝｲﾝｽﾄｰﾙなど）を通知だけでなくﾒｲﾝ画面のﾎﾟｯﾌﾟｱｯﾌﾟで表示します（一時停止／続行・ｷｬﾝｾﾙ付き）。</string>
     <string name="pref_theme_text_color">文字色</string>

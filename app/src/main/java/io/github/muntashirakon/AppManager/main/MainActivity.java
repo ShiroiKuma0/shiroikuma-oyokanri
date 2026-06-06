@@ -3,6 +3,7 @@
 package io.github.muntashirakon.AppManager.main;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -220,12 +221,23 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             if (mBatchProgressDialog != null) {
                 mBatchProgressDialog.dismiss();
             }
-            // Fork: snap the list to its final state in one atomic pass instead of
+            int op = intent.getIntExtra(BatchOpsService.EXTRA_OP, BatchOpsManager.OP_NONE);
+            // Fork: show the completion as our themed toast (the un-themeable
+            // system heads-up is suppressed while we're foreground — see
+            // BatchOpsService.sendNotification). Failures keep their detailed
+            // notification instead, so they get no toast here.
+            int result = intent.getIntExtra(BatchOpsService.EXTRA_RESULT, Activity.RESULT_OK);
+            String opTitle = BatchOpsService.getDesiredOpTitle(context, op);
+            if (result == Activity.RESULT_OK) {
+                UIUtils.displayShortToast(opTitle + " — " + context.getString(R.string.the_operation_was_successful));
+            } else if (result == Activity.RESULT_CANCELED) {
+                UIUtils.displayShortToast(opTitle + " — " + context.getString(R.string.operation_cancelled));
+            }
+            // Snap the list to its final state in one atomic pass instead of
             // letting the system's throttled per-package change broadcasts repaint
             // it a couple of rows per second after the operation already finished.
             if (viewModel != null) {
-                viewModel.applyBatchOpResult(
-                        intent.getIntExtra(BatchOpsService.EXTRA_OP, BatchOpsManager.OP_NONE),
+                viewModel.applyBatchOpResult(op,
                         intent.getStringArrayExtra(BatchOpsService.EXTRA_OP_PKG),
                         intent.getStringArrayListExtra(BatchOpsService.EXTRA_FAILED_PKG));
             }
@@ -801,6 +813,9 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         batchOpsFilter.addAction(BatchOpsService.ACTION_BATCH_OPS_COMPLETED);
         ContextCompat.registerReceiver(this, mBatchOpsBroadCastReceiver,
                 batchOpsFilter, ContextCompat.RECEIVER_NOT_EXPORTED);
+        // Fork: mark the main window foreground so the service suppresses the
+        // system completion heads-up (the themed toast covers it here).
+        BatchOpsProgressMonitor.getInstance().setHostForeground(true);
         // Re-attach the progress dialog if an op is still running (e.g. the user
         // left and came back mid-operation).
         if (BatchOpsProgressMonitor.getInstance().isActive()) {
@@ -884,6 +899,9 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         }
         super.onPause();
         unregisterReceiver(mBatchOpsBroadCastReceiver);
+        // Fork: no longer foreground — let the service post the system completion
+        // notification again (no themed toast while backgrounded).
+        BatchOpsProgressMonitor.getInstance().setHostForeground(false);
         // Fork: drop the progress dialog while backgrounded; it is re-shown on
         // resume if the operation is still running. The op itself keeps going in
         // the foreground service.

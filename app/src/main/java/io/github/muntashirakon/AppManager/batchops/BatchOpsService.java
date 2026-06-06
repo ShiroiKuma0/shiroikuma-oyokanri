@@ -60,6 +60,14 @@ public class BatchOpsService extends ForegroundService {
     public static final String EXTRA_REQUIRES_RESTART = "requires_restart";
 
     /**
+     * Fork: the integer result code of the operation ({@link Activity#RESULT_OK},
+     * {@link Activity#RESULT_CANCELED}, {@link Activity#RESULT_FIRST_USER}),
+     * included in the {@link #ACTION_BATCH_OPS_COMPLETED} broadcast so the main
+     * window can show the right themed-toast message.
+     */
+    public static final String EXTRA_RESULT = "fork_result";
+
+    /**
      * Send to the appropriate broadcast receiver denoting that the batch operation is completed. It
      * includes the following extras:
      * <ul>
@@ -215,6 +223,7 @@ public class BatchOpsService extends ForegroundService {
         broadcastIntent.putExtra(EXTRA_OP, queueItem != null ? queueItem.getOp() : BatchOpsManager.OP_NONE);
         broadcastIntent.putExtra(EXTRA_OP_PKG, queueItem != null ? queueItem.getPackages().toArray(new String[0]) : new String[0]);
         broadcastIntent.putStringArrayListExtra(EXTRA_FAILED_PKG, opResult != null ? opResult.getFailedPackages() : null);
+        broadcastIntent.putExtra(EXTRA_RESULT, result);  // Fork: let the main window theme the completion toast
         sendBroadcast(broadcastIntent);
         sendNotification(result, queueItem, opResult);
     }
@@ -256,6 +265,15 @@ public class BatchOpsService extends ForegroundService {
             PendingIntent pendingIntent = PendingIntentCompat.getActivity(this, 0, intent,
                     PendingIntent.FLAG_ONE_SHOT, false);
             notificationInfo.addAction(0, getString(R.string.restart_device), pendingIntent);
+        }
+        // Fork: while the main window is in the foreground, the in-app themed
+        // toast covers success/cancelled completions, so skip the un-themeable
+        // system heads-up. Failures (and restart-required results) still post so
+        // their "tap to see details" / "restart" actions stay reachable.
+        boolean keepNotification = result == Activity.RESULT_FIRST_USER
+                || (opResult != null && opResult.requiresRestart());
+        if (BatchOpsProgressMonitor.getInstance().isHostForeground() && !keepNotification) {
+            return;
         }
         mProgressHandler.onResult(notificationInfo);
     }
