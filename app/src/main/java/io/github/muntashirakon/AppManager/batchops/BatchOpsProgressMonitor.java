@@ -69,8 +69,21 @@ public final class BatchOpsProgressMonitor {
     private volatile boolean mActive;
     private volatile boolean mPaused;
     private volatile boolean mCancelled;
+    // Fork: whether the main window is in the foreground. Set by MainActivity in
+    // onResume/onPause; read by BatchOpsService to decide whether to post the
+    // system completion heads-up (suppressed while foreground, since the in-app
+    // themed toast covers it).
+    private volatile boolean mHostForeground;
 
     private BatchOpsProgressMonitor() {
+    }
+
+    public void setHostForeground(boolean foreground) {
+        mHostForeground = foreground;
+    }
+
+    public boolean isHostForeground() {
+        return mHostForeground;
     }
 
     @NonNull
