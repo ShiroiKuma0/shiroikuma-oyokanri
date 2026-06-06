@@ -46,4 +46,35 @@
             app:summary="@string/pref_enable_disable_features_msg"
             app:title="@string/enable_disable_features" />
     </PreferenceCategory>
+
+    <!-- Fork: in-app batch-operation progress dialog + the configurable theme
+         (text/background/border colour + width) shared by the dialog and the
+         themed toasts. -->
+    <PreferenceCategory app:layout="@layout/m3_preference_category_empty">
+        <SwitchPreferenceCompat
+            app:iconSpaceReserved="false"
+            app:key="batch_progress_dialog"
+            app:summary="@string/pref_batch_progress_dialog_msg"
+            app:title="@string/pref_batch_progress_dialog" />
+
+        <Preference
+            app:iconSpaceReserved="false"
+            app:key="theme_text_color"
+            app:title="@string/pref_theme_text_color" />
+
+        <Preference
+            app:iconSpaceReserved="false"
+            app:key="theme_background_color"
+            app:title="@string/pref_theme_background_color" />
+
+        <Preference
+            app:iconSpaceReserved="false"
+            app:key="theme_border_color"
+            app:title="@string/pref_theme_border_color" />
+
+        <Preference
+            app:iconSpaceReserved="false"
+            app:key="theme_border_width"
+            app:title="@string/pref_theme_border_width" />
+    </PreferenceCategory>
 </PreferenceScreen>

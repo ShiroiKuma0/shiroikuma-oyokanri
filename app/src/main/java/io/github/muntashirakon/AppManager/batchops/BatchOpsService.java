@@ -132,6 +132,11 @@ public class BatchOpsService extends ForegroundService {
             sendResults(Activity.RESULT_CANCELED, item, null);
             return;
         }
+        // Fork: feed the in-app batch-progress dialog (op title + item count) and
+        // reset its pause/cancel state for this run, before announcing the start
+        // so the dialog opens against a populated monitor.
+        BatchOpsProgressMonitor monitor = BatchOpsProgressMonitor.getInstance();
+        monitor.begin(getDesiredOpTitle(this, item.getOp()), item.getPackages().size());
         sendStarted(item);
         // Update progress
         if (mProgressHandler != null) {
@@ -140,8 +145,14 @@ public class BatchOpsService extends ForegroundService {
         BatchOpsManager batchOpsManager = new BatchOpsManager();
         BatchOpsManager.Result result = batchOpsManager.performOp(BatchOpsInfo.fromQueue(item), mProgressHandler);
         batchOpsManager.conclude();
-        OpHistoryManager.addHistoryItem(HISTORY_TYPE_BATCH_OPS, item, result.isSuccessful());
-        if (result.isSuccessful()) {
+        // Fork: read the cancelled flag before finish() clears it, so a
+        // user-cancelled run is reported as cancelled rather than failed.
+        boolean cancelled = monitor.isCancelled();
+        monitor.finish();
+        OpHistoryManager.addHistoryItem(HISTORY_TYPE_BATCH_OPS, item, result.isSuccessful() && !cancelled);
+        if (cancelled) {
+            sendResults(Activity.RESULT_CANCELED, item, result);
+        } else if (result.isSuccessful()) {
             sendResults(Activity.RESULT_OK, item, result);
         } else {
             sendResults(Activity.RESULT_FIRST_USER, item, result);

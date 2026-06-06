@@ -69,6 +69,7 @@ import io.github.muntashirakon.AppManager.fonts.FontPrefs;
 import io.github.muntashirakon.AppManager.fonts.FontUtil;
 import io.github.muntashirakon.AppManager.backup.dialog.BackupRestoreDialogFragment;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsManager;
+import io.github.muntashirakon.AppManager.batchops.BatchOpsProgressMonitor;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsService;
 import io.github.muntashirakon.AppManager.batchops.BatchQueueItem;
 import io.github.muntashirakon.AppManager.batchops.struct.BatchFreezeOptions;
@@ -196,10 +197,33 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                 viewModel.saveExportedAppList(ListExporter.EXPORT_TYPE_MARKDOWN, Paths.get(uri));
             });
 
+    // Fork: the in-app batch-operation progress dialog (mirrors the foreground
+    // notification in the main window, with Pause/Continue + Cancel).
+    @Nullable
+    private BatchProgressDialog mBatchProgressDialog;
+
     private final BroadcastReceiver mBatchOpsBroadCastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
+            // Fork: a batch op has started — surface it in the progress dialog.
+            if (BatchOpsService.ACTION_BATCH_OPS_STARTED.equals(intent.getAction())) {
+                showBatchProgressDialog();
+                return;
+            }
+            // ACTION_BATCH_OPS_COMPLETED
             showProgressIndicator(false);
+            if (mBatchProgressDialog != null) {
+                mBatchProgressDialog.dismiss();
+            }
+            // Fork: snap the list to its final state in one atomic pass instead of
+            // letting the system's throttled per-package change broadcasts repaint
+            // it a couple of rows per second after the operation already finished.
+            if (viewModel != null) {
+                viewModel.applyBatchOpResult(
+                        intent.getIntExtra(BatchOpsService.EXTRA_OP, BatchOpsManager.OP_NONE),
+                        intent.getStringArrayExtra(BatchOpsService.EXTRA_OP_PKG),
+                        intent.getStringArrayListExtra(BatchOpsService.EXTRA_FAILED_PKG));
+            }
         }
     };
 
@@ -761,8 +785,18 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             if (colorsChanged) mAdapter.reloadColors();
             mAdapter.notifyDataSetChanged();
         }
+        // Fork: also listen for batch-op START so the in-app progress dialog can
+        // open; COMPLETED dismisses it.
+        IntentFilter batchOpsFilter = new IntentFilter();
+        batchOpsFilter.addAction(BatchOpsService.ACTION_BATCH_OPS_STARTED);
+        batchOpsFilter.addAction(BatchOpsService.ACTION_BATCH_OPS_COMPLETED);
         ContextCompat.registerReceiver(this, mBatchOpsBroadCastReceiver,
-                new IntentFilter(BatchOpsService.ACTION_BATCH_OPS_COMPLETED), ContextCompat.RECEIVER_NOT_EXPORTED);
+                batchOpsFilter, ContextCompat.RECEIVER_NOT_EXPORTED);
+        // Re-attach the progress dialog if an op is still running (e.g. the user
+        // left and came back mid-operation).
+        if (BatchOpsProgressMonitor.getInstance().isActive()) {
+            showBatchProgressDialog();
+        }
     }
 
     /**
@@ -841,6 +875,12 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         }
         super.onPause();
         unregisterReceiver(mBatchOpsBroadCastReceiver);
+        // Fork: drop the progress dialog while backgrounded; it is re-shown on
+        // resume if the operation is still running. The op itself keeps going in
+        // the foreground service.
+        if (mBatchProgressDialog != null) {
+            mBatchProgressDialog.dismiss();
+        }
     }
 
     @Override
@@ -934,6 +974,18 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                 .setPositiveButton(R.string.yes, (dialog, which) -> handleBatchOp(op))
                 .setNegativeButton(R.string.no, null)
                 .show();
+    }
+
+    // Fork: open the in-app batch-progress dialog if the user has it enabled.
+    // Safe to call repeatedly — the dialog ignores a show() while already shown.
+    private void showBatchProgressDialog() {
+        if (!Prefs.Appearance.showBatchProgressDialog()) {
+            return;
+        }
+        if (mBatchProgressDialog == null) {
+            mBatchProgressDialog = new BatchProgressDialog(this);
+        }
+        mBatchProgressDialog.show();
     }
 
     void showProgressIndicator(boolean show) {

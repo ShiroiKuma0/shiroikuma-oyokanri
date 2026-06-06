@@ -287,17 +287,22 @@ public class UIUtils {
         return searchView;
     }
 
-    // Fork: render every toast as a black box with yellow text and a yellow
-    // border (matching the fork theme) via a custom view. On Android 12+ a
-    // custom toast view is honoured while the app is in the foreground (where
-    // all of these fire from user actions) and falls back to the system text
-    // toast only when posted from the background.
+    // Fork: render every toast as a themed box (matching the fork theme) via a
+    // custom view. The colours/border come from the configurable fork theme
+    // (see ForkThemeUtils), shared with the in-app batch-progress dialog, rather
+    // than the static colours baked into the layout. On Android 12+ a custom
+    // toast view is honoured while the app is in the foreground (where all of
+    // these fire from user actions) and falls back to the system text toast only
+    // when posted from the background.
     @SuppressWarnings("deprecation")
     @UiThread
     private static void showThemedToast(@NonNull CharSequence message, int duration) {
         Context context = ContextUtils.getContext();
         View view = LayoutInflater.from(context).inflate(R.layout.toast_shiroikuma, null);
-        ((TextView) view.findViewById(R.id.toast_text)).setText(message);
+        TextView text = view.findViewById(R.id.toast_text);
+        text.setText(message);
+        text.setTextColor(ForkThemeUtils.getTextColor());
+        text.setBackground(ForkThemeUtils.makeThemedBackground(context, 14f));
         Toast toast = new Toast(context);
         toast.setView(view);
         toast.setDuration(duration);

@@ -270,6 +270,49 @@ public final class Prefs {
         public static boolean useSystemFont() {
             return AppPref.getBoolean(AppPref.PrefKey.PREF_USE_SYSTEM_FONT_BOOL);
         }
+
+        // Fork: in-app batch-operation progress dialog + the configurable theme
+        // (text/background/border colour and border width) shared by that dialog
+        // and the themed toasts.
+        public static boolean showBatchProgressDialog() {
+            return AppPref.getBoolean(AppPref.PrefKey.PREF_BATCH_PROGRESS_DIALOG_BOOL);
+        }
+
+        public static void setShowBatchProgressDialog(boolean show) {
+            AppPref.set(AppPref.PrefKey.PREF_BATCH_PROGRESS_DIALOG_BOOL, show);
+        }
+
+        public static int getThemeTextColor() {
+            return AppPref.getInt(AppPref.PrefKey.PREF_THEME_TEXT_COLOR_INT);
+        }
+
+        public static void setThemeTextColor(int color) {
+            AppPref.set(AppPref.PrefKey.PREF_THEME_TEXT_COLOR_INT, color);
+        }
+
+        public static int getThemeBackgroundColor() {
+            return AppPref.getInt(AppPref.PrefKey.PREF_THEME_BACKGROUND_COLOR_INT);
+        }
+
+        public static void setThemeBackgroundColor(int color) {
+            AppPref.set(AppPref.PrefKey.PREF_THEME_BACKGROUND_COLOR_INT, color);
+        }
+
+        public static int getThemeBorderColor() {
+            return AppPref.getInt(AppPref.PrefKey.PREF_THEME_BORDER_COLOR_INT);
+        }
+
+        public static void setThemeBorderColor(int color) {
+            AppPref.set(AppPref.PrefKey.PREF_THEME_BORDER_COLOR_INT, color);
+        }
+
+        public static int getThemeBorderWidthDp() {
+            return AppPref.getInt(AppPref.PrefKey.PREF_THEME_BORDER_WIDTH_INT);
+        }
+
+        public static void setThemeBorderWidthDp(int widthDp) {
+            AppPref.set(AppPref.PrefKey.PREF_THEME_BORDER_WIDTH_INT, widthDp);
+        }
     }
 
     public static final class BackupRestore {

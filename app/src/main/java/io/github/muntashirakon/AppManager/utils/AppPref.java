@@ -156,6 +156,15 @@ public class AppPref {
 
         PREF_USE_SYSTEM_FONT_BOOL,
         PREF_ZIP_ALIGN_BOOL,
+
+        // Fork: show batch-operation progress in an in-app dialog (in addition
+        // to the notification) and the configurable fork theme that styles both
+        // the dialog and the themed toasts.
+        PREF_BATCH_PROGRESS_DIALOG_BOOL,
+        PREF_THEME_TEXT_COLOR_INT,
+        PREF_THEME_BACKGROUND_COLOR_INT,
+        PREF_THEME_BORDER_COLOR_INT,
+        PREF_THEME_BORDER_WIDTH_INT,
         ;
 
         private static final String[] sKeys = new String[values().length];
@@ -421,6 +430,7 @@ public class AppPref {
             case PREF_ZIP_ALIGN_BOOL:
             case PREF_SEND_NOTIFICATIONS_TO_CONNECTED_DEVICES_BOOL:
             case PREF_ENABLE_AUTO_LOCK_BOOL:
+            case PREF_BATCH_PROGRESS_DIALOG_BOOL:  // Fork: in-app batch progress dialog, on by default
                 return true;
             case PREF_CONCURRENCY_THREAD_COUNT_INT:
             case PREF_APP_THEME_CUSTOM_INT:
@@ -510,6 +520,16 @@ public class AppPref {
                 return DebloaterListOptions.getDefaultFilterFlags();
             case PREF_FM_LAST_PATH_STR:
                 return "{}";
+            // Fork: configurable theme for the batch progress dialog + toasts.
+            // Defaults reproduce the original hard-coded look (bright-yellow
+            // text/border on black, 2dp border).
+            case PREF_THEME_TEXT_COLOR_INT:
+            case PREF_THEME_BORDER_COLOR_INT:
+                return 0xFFFF_FF00;  // Opaque bright yellow
+            case PREF_THEME_BACKGROUND_COLOR_INT:
+                return 0xFF00_0000;  // Opaque black
+            case PREF_THEME_BORDER_WIDTH_INT:
+                return 2;  // dp
         }
         throw new IllegalArgumentException("Pref key not found.");
     }
