@@ -1,4 +1,5 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later OR CC-BY-SA-4.0 -->
 <resources>
-    <color name="ic_launcher_background">#090503</color>
+    <!-- Fork: pure black to match the black/yellow theme. -->
+    <color name="ic_launcher_background">#000000</color>
 </resources>
