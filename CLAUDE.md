@@ -128,6 +128,6 @@ The skill file `.claude/skills/appmanager-fork/SKILL.md` describes a fork-develo
 - The skill's historical "deliver patch + zip + in-flight bullet → swap to hash" rituals are claude.ai artefacts; just commit directly with a good message body.
 - When a new piece of knowledge surfaces (a new chokepoint, a non-obvious file naming convention, a regression cause), update either this CLAUDE.md or the `appmanager-fork` skill so it persists into the next session.
 
-## Deferred / housekeeping
+## Commit / branch process
 
-- The `custom` branch is a working multi-commit stack; the long-stated goal is to squash it down to **two clean commits** (a customisation layer + a configuration-cache layer). Deliberately deferred to a calm session, because commits 1 and 2 have overlapping diff context on `gradle.properties` and `app/build.gradle`, so autosquash/fixup is brittle.
+- `custom` is a growing stack of small, self-describing commits on top of upstream `master`. **Keep appending commits**; when a new upstream version is released, **rebase `custom` onto it**. There is no goal to squash the history down to a fixed number of commits — do not autosquash/collapse the stack.
