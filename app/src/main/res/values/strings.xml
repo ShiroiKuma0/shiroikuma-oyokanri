@@ -914,6 +914,9 @@
     <string name="incomplete_usb_debugging">USB debugging setup incomplete…</string>
     <string name="launching">Launching…</string>
     <string name="add_to_profile">Add to profile</string>
+    <!-- Fork: batch remove-from-profile selection action -->
+    <string name="remove_from_profile">Remove from profile</string>
+    <string name="no_profile_contains_selection">None of the selected apps belong to a profile.</string>
     <string name="add">Add</string>
     <string name="os_version">OS version</string>
     <string name="reverse">Reverse</string>
