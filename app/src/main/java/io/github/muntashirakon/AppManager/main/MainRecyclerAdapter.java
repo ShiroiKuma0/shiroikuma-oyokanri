@@ -47,10 +47,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import io.github.muntashirakon.AppManager.BuildConfig;
 import io.github.muntashirakon.AppManager.R;
@@ -580,8 +582,20 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                 final String profileName = name;
                 chip.setOnClickListener(v -> {
                     if (mActivity.viewModel == null) return;
-                    mActivity.viewModel.setFilterProfileNegate(false);
-                    mActivity.viewModel.setFilterProfileName(profileName);
+                    // Fork: clicking a pill narrows *within* the current view rather
+                    // than replacing the whole filter — add this profile to the
+                    // include set so the result is the intersection of every active
+                    // profile filter ("filter within this selection for this
+                    // profile"). With no filter active this behaves exactly like
+                    // filtering for just this profile.
+                    Set<String> include = new LinkedHashSet<>(mActivity.viewModel.getProfileFiltersInclude());
+                    Set<String> exclude = new LinkedHashSet<>(mActivity.viewModel.getProfileFiltersExclude());
+                    // A pill only ever appears on apps that belong to the profile, so
+                    // the profile can't sensibly remain in the exclude set; drop it
+                    // there before including it.
+                    exclude.remove(profileName);
+                    include.add(profileName);
+                    mActivity.viewModel.setProfileFilters(include, exclude);
                 });
                 chip.setOnLongClickListener(v -> {
                     removePackageFromProfile(pkgForRow, profileName);
