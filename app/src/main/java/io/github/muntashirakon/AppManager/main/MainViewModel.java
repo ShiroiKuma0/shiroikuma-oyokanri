@@ -502,11 +502,15 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
     }
 
     public void saveExportedAppList(@ListExporter.ExportType int exportType, @NonNull Path path) {
+        // Fork: snapshot the selection synchronously so the caller can clear it
+        // right after launching the export (selections are cleared after every
+        // action) without racing this background task.
+        Map<String, ApplicationItem> selectedSnapshot = new LinkedHashMap<>(getSelectedPackages());
         executor.submit(() -> {
             try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(path.openOutputStream(), StandardCharsets.UTF_8))) {
                 List<PackageInfo> packageInfoList = new ArrayList<>();
-                for (String packageName : getSelectedPackages().keySet()) {
-                    int[] userIds = Objects.requireNonNull(getSelectedPackages().get(packageName)).userIds;
+                for (String packageName : selectedSnapshot.keySet()) {
+                    int[] userIds = Objects.requireNonNull(selectedSnapshot.get(packageName)).userIds;
                     for (int userId : userIds) {
                         packageInfoList.add(PackageManagerCompat.getPackageInfo(packageName,
                                 PackageManagerCompat.MATCH_STATIC_SHARED_AND_SDK_LIBRARIES, userId));
