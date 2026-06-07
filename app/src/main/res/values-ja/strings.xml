@@ -1089,6 +1089,9 @@
     <string name="filter_force_stopped_apps">終了済みアプリ</string>
     <string name="protected_profile_block">%s は「必要」プロファイルで保護されているため、凍結またはアンインストールできません。</string>
     <string name="protected_profile_block_multiple">次のアプリは「必要」プロファイルで保護されているため、凍結またはアンインストールできません：%s</string>
+    <plurals name="confirm_uninstall_count">
+        <item quantity="other">%d 個のアプリをアンインストールします！本当に宜しいですか？</item>
+    </plurals>
     <string name="pause">一時停止</string>
     <string name="continue_operation">続行</string>
     <string name="operation_cancelled">中止しました</string>

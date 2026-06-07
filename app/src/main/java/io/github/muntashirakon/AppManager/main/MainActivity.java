@@ -53,6 +53,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Set;
 import java.util.Iterator;
 import java.util.List;
@@ -710,7 +711,7 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             handleBatchOp(BatchOpsManager.OP_FORCE_STOP);
         } else if (id == R.id.action_uninstall) {
             warnIfSelectionHasProtectedApps();
-            handleBatchOpWithWarning(BatchOpsManager.OP_UNINSTALL);
+            confirmBatchUninstall();
         } else if (id == R.id.action_install_existing) {
             // Fork: reinstall (install-existing) the selection — restores
             // uninstalled system apps. Non-destructive, so no warning prompt.
@@ -1000,13 +1001,24 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         clearSelection();
     }
 
-    private void handleBatchOpWithWarning(@BatchOpsManager.OpType int op) {
-        new MaterialAlertDialogBuilder(this)
-                .setTitle(R.string.are_you_sure)
-                .setMessage(R.string.this_action_cannot_be_undone)
-                .setPositiveButton(R.string.yes, (dialog, which) -> handleBatchOp(op))
-                .setNegativeButton(R.string.no, null)
-                .show();
+    // Fork: large, themed confirmation before a batch uninstall. Replaces the
+    // old generic "Are you sure?" prompt: it states how many apps will be
+    // removed and lists every one (label in bold, package id in italic,
+    // column-aligned) in a scrollable area covering most of the window, so the
+    // full set can be reviewed before confirming. Built from the live selection
+    // (still alive here — handleBatchOp captures it and clears it on confirm).
+    private void confirmBatchUninstall() {
+        if (viewModel == null) return;
+        Collection<ApplicationItem> items = viewModel.getSelectedApplicationItems();
+        if (items.isEmpty()) return;
+        List<String[]> apps = new ArrayList<>(items.size());
+        for (ApplicationItem item : items) {
+            String label = item.label != null ? item.label : item.packageName;
+            apps.add(new String[]{label, item.packageName});
+        }
+        Collections.sort(apps, (a, b) -> a[0].compareToIgnoreCase(b[0]));
+        new BatchUninstallConfirmDialog(this, apps,
+                () -> handleBatchOp(BatchOpsManager.OP_UNINSTALL)).show();
     }
 
     // Fork: clear the multi-selection and exit selection mode once an action has
