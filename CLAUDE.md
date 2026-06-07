@@ -28,6 +28,8 @@ consult that for the "why" behind anything in here.
 
 ## Build & deploy pipeline
 
+**Always build after changes.** Whenever you finish a set of working-tree edits (Java/XML/resources), run the full pipeline below to completion — bump, assemble, sign, verify, copy the signed APK to `~/tmp/` — without waiting for the user to say "Build". Treat a task as unfinished until it has produced a fresh signed APK on disk. If the build fails, stop and surface the error rather than reporting the change as done. The only step that still waits for the user is the final `adb push` to the device (it needs the phone connected with USB debugging).
+
 Output APK is named `shiroikuma-appmanager_${customBaseVersionName}+${customBuildNumber}_arm64-v8a.apk`, derived from `gradle.properties`. Always copy the signed APK to `~/tmp/` before pushing to the device, so a record stays on disk.
 
 ```bash
@@ -124,7 +126,7 @@ The skill file `.claude/skills/appmanager-fork/SKILL.md` describes a fork-develo
 
 - Edit files in the working tree directly. Don't generate patch files unless the user explicitly asks for one.
 - Don't generate paste-ready shell blocks (cyan echo prefixes, yellow gates, etc.); run the commands yourself.
-- "Build" still means run the full pipeline above. "Push" still triggers the commit-and-push flow.
+- "Build" still means run the full pipeline above. "Push" still triggers the commit-and-push flow. Note that you also build automatically after finishing any change (see **"Always build after changes"** under Build & deploy pipeline) — an explicit "Build" is just a way to force it again.
 - The skill's historical "deliver patch + zip + in-flight bullet → swap to hash" rituals are claude.ai artefacts; just commit directly with a good message body.
 - When a new piece of knowledge surfaces (a new chokepoint, a non-obvious file naming convention, a regression cause), update either this CLAUDE.md or the `appmanager-fork` skill so it persists into the next session.
 

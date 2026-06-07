@@ -1766,6 +1766,12 @@
     <string name="protected_profile_block">%s is protected by the 「必要」 profile and can\'t be frozen or uninstalled.</string>
     <string name="protected_profile_block_multiple">These apps are protected by the 「必要」 profile and can\'t be frozen or uninstalled: %s</string>
 
+    <!-- Fork: batch-uninstall confirmation dialog (large, themed, lists every app) -->
+    <plurals name="confirm_uninstall_count">
+        <item quantity="one">Will uninstall %d application! Are you sure?</item>
+        <item quantity="other">Will uninstall %d applications! Are you sure?</item>
+    </plurals>
+
     <!-- Fork: in-app batch-operation progress dialog + configurable theme -->
     <string name="pause">Pause</string>
     <string name="continue_operation">Continue</string>
