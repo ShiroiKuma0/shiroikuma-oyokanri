@@ -32,6 +32,8 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.PluralsRes;
+import androidx.annotation.StringRes;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.widget.SearchView;
 import androidx.collection.ArrayMap;
@@ -632,7 +634,9 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                 // "prefer remembered method" option follows the dialog default
                 // (off). Batch unfreeze still goes through the dialog, so it
                 // remains available by turning the toggle off.
-                handleBatchOp(BatchOpsManager.OP_ADVANCED_FREEZE, new BatchFreezeOptions(freezeType, false));
+                BatchFreezeOptions options = new BatchFreezeOptions(freezeType, false);
+                confirmBatchOp(R.plurals.confirm_freeze_count, R.string.freeze, false,
+                        () -> handleBatchOp(BatchOpsManager.OP_ADVANCED_FREEZE, options));
             } else {
                 showFreezeUnfreezeDialog(freezeType);
             }
@@ -711,15 +715,20 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             handleBatchOp(BatchOpsManager.OP_FORCE_STOP);
         } else if (id == R.id.action_uninstall) {
             warnIfSelectionHasProtectedApps();
-            confirmBatchUninstall();
+            confirmBatchOp(R.plurals.confirm_uninstall_count, R.string.uninstall, true,
+                    () -> handleBatchOp(BatchOpsManager.OP_UNINSTALL));
         } else if (id == R.id.action_install_existing) {
             // Fork: reinstall (install-existing) the selection — restores
-            // uninstalled system apps. Non-destructive, so no warning prompt.
-            handleBatchOp(BatchOpsManager.OP_INSTALL_EXISTING);
+            // uninstalled system apps. Reviewed through the themed confirm
+            // dialog like the other batch ops (non-destructive, so no undo
+            // warning).
+            confirmBatchOp(R.plurals.confirm_reinstall_count, R.string.reinstall, false,
+                    () -> handleBatchOp(BatchOpsManager.OP_INSTALL_EXISTING));
         } else if (id == R.id.action_unfreeze) {
             // Fork: dedicated batch unfreeze (the freeze_unfreeze entry opens
             // the combined dialog; this one unfreezes the selection directly).
-            handleBatchOp(BatchOpsManager.OP_UNFREEZE);
+            confirmBatchOp(R.plurals.confirm_unfreeze_count, R.string.unfreeze, false,
+                    () -> handleBatchOp(BatchOpsManager.OP_UNFREEZE));
         } else if (id == R.id.action_add_to_profile) {
             AddToProfileDialogFragment dialog = AddToProfileDialogFragment.getInstance(viewModel.getSelectedPackages()
                     .keySet().toArray(new String[0]));
@@ -939,11 +948,13 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                         return;
                     }
                     BatchFreezeOptions options = new BatchFreezeOptions(selectedItem, checkBox.isChecked());
-                    handleBatchOp(BatchOpsManager.OP_ADVANCED_FREEZE, options);
+                    confirmBatchOp(R.plurals.confirm_freeze_count, R.string.freeze, false,
+                            () -> handleBatchOp(BatchOpsManager.OP_ADVANCED_FREEZE, options));
                 })
                 .setNegativeButton(R.string.cancel, null)
                 .setNeutralButton(R.string.unfreeze, (dialog, which, selectedItem) ->
-                        handleBatchOp(BatchOpsManager.OP_UNFREEZE))
+                        confirmBatchOp(R.plurals.confirm_unfreeze_count, R.string.unfreeze, false,
+                                () -> handleBatchOp(BatchOpsManager.OP_UNFREEZE)))
                 .show();
     }
 
@@ -1001,13 +1012,16 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         clearSelection();
     }
 
-    // Fork: large, themed confirmation before a batch uninstall. Replaces the
-    // old generic "Are you sure?" prompt: it states how many apps will be
-    // removed and lists every one (label in bold, package id in italic,
-    // column-aligned) in a scrollable area covering most of the window, so the
-    // full set can be reviewed before confirming. Built from the live selection
-    // (still alive here — handleBatchOp captures it and clears it on confirm).
-    private void confirmBatchUninstall() {
+    // Fork: large, themed confirmation before a batch operation (uninstall,
+    // reinstall, freeze, unfreeze). Replaces the old generic "Are you sure?"
+    // prompt: it states how many apps will be affected and lists every one
+    // (label in bold, package id in italic, column-aligned) in a scrollable area
+    // covering most of the window, so the full set can be reviewed before
+    // confirming. Built from the live selection (still alive here — onConfirm
+    // runs handleBatchOp, which captures the selection and clears it). The undo
+    // warning subtitle is shown only for destructive ops (uninstall).
+    private void confirmBatchOp(@PluralsRes int titlePluralRes, @StringRes int okLabelRes,
+                                boolean destructive, @NonNull Runnable onConfirm) {
         if (viewModel == null) return;
         Collection<ApplicationItem> items = viewModel.getSelectedApplicationItems();
         if (items.isEmpty()) return;
@@ -1017,8 +1031,9 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             apps.add(new String[]{label, item.packageName});
         }
         Collections.sort(apps, (a, b) -> a[0].compareToIgnoreCase(b[0]));
-        new BatchUninstallConfirmDialog(this, apps,
-                () -> handleBatchOp(BatchOpsManager.OP_UNINSTALL)).show();
+        CharSequence title = getResources().getQuantityString(titlePluralRes, apps.size(), apps.size());
+        CharSequence subtitle = destructive ? getText(R.string.this_action_cannot_be_undone) : null;
+        new BatchConfirmDialog(this, title, subtitle, okLabelRes, apps, onConfirm::run).show();
     }
 
     // Fork: clear the multi-selection and exit selection mode once an action has
