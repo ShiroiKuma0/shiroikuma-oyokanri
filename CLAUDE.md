@@ -28,7 +28,9 @@ consult that for the "why" behind anything in here.
 
 ## Build & deploy pipeline
 
-**Always build after changes.** Whenever you finish a set of working-tree edits (Java/XML/resources), run the full pipeline below to completion — bump, assemble, sign, verify, copy the signed APK to `~/tmp/` — without waiting for the user to say "Build". Treat a task as unfinished until it has produced a fresh signed APK on disk. If the build fails, stop and surface the error rather than reporting the change as done. The only step that still waits for the user is the final `adb push` to the device (it needs the phone connected with USB debugging).
+**Always build after changes.** Whenever you finish a set of working-tree edits (Java/XML/resources), run the full pipeline below to completion — bump, assemble, sign, verify, copy the signed APK to `~/tmp/` — without waiting for the user to say "Build". Treat a task as unfinished until it has produced a fresh signed APK on disk. If the build fails, stop and surface the error rather than reporting the change as done.
+
+**Always ask before `adb push`.** The final `adb push` to the device is the one step that is never automatic: after every successful build, explicitly ask the user whether to push the signed APK to the device. Never push without asking, and never silently skip it — end the build report with the question (it needs the phone connected with USB debugging). Push only once the user confirms.
 
 Output APK is named `shiroikuma-appmanager_${customBaseVersionName}+${customBuildNumber}_arm64-v8a.apk`, derived from `gradle.properties`. Always copy the signed APK to `~/tmp/` before pushing to the device, so a record stays on disk.
 
