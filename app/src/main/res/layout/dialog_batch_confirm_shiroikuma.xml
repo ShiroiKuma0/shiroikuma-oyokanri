@@ -1,23 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<!-- Fork: batch-uninstall confirmation dialog. Sized to cover most of the
-     window (still a floating dialog, with the list peeking out at the edges) so
-     the full set of apps to be removed is reviewable. The container background
-     and every text colour are applied at runtime from the configurable fork
-     theme (ForkThemeUtils), so the border is the configurable yellow by default;
-     no colours are hard-coded here. The app rows are added programmatically into
-     the TableLayout so the label/id columns line up across every row. -->
+<!-- Fork: batch-operation confirmation dialog (uninstall / reinstall / freeze /
+     unfreeze). Sized to cover most of the window (still a floating dialog, with
+     the list peeking out at the edges) so the full set of affected apps is
+     reviewable. The container background and every text colour are applied at
+     runtime from the configurable fork theme (ForkThemeUtils), so the border is
+     the configurable yellow by default; no colours are hard-coded here. The app
+     rows are added programmatically into the TableLayout so the label/id columns
+     line up across every row. The title, optional subtitle and OK-button label
+     are all set by BatchConfirmDialog per operation. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/uninstall_confirm_container"
+    android:id="@+id/batch_confirm_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="24dp">
 
     <TextView
-        android:id="@+id/uninstall_confirm_title"
+        android:id="@+id/batch_confirm_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:textSize="18sp"
@@ -25,15 +27,15 @@
         tools:text="Will uninstall 79 applications! Are you sure?" />
 
     <TextView
-        android:id="@+id/uninstall_confirm_subtitle"
+        android:id="@+id/batch_confirm_subtitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:textSize="14sp"
-        android:text="@string/this_action_cannot_be_undone" />
+        tools:text="@string/this_action_cannot_be_undone" />
 
     <ScrollView
-        android:id="@+id/uninstall_confirm_scroll"
+        android:id="@+id/batch_confirm_scroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
@@ -42,7 +44,7 @@
         android:scrollbars="vertical">
 
         <TableLayout
-            android:id="@+id/uninstall_confirm_table"
+            android:id="@+id/batch_confirm_table"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:shrinkColumns="1" />
@@ -56,18 +58,18 @@
         android:orientation="horizontal">
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/uninstall_confirm_cancel"
+            android:id="@+id/batch_confirm_cancel"
             style="@style/Widget.AppTheme.Button.TextButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/cancel" />
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/uninstall_confirm_ok"
+            android:id="@+id/batch_confirm_ok"
             style="@style/Widget.AppTheme.Button.TextButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:text="@string/uninstall" />
+            tools:text="@string/uninstall" />
     </LinearLayout>
 </LinearLayout>

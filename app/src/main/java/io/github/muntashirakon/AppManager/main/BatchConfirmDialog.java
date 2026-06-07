@@ -8,6 +8,7 @@ import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
+import android.text.TextUtils;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
 import android.view.View;
@@ -17,6 +18,8 @@ import android.widget.TableRow;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
 import androidx.annotation.UiThread;
 
 import com.google.android.material.button.MaterialButton;
@@ -27,11 +30,16 @@ import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.utils.ForkThemeUtils;
 
 /**
- * Fork: large, themed confirmation dialog shown before a batch uninstall. It
- * states up front how many apps will be removed ("Will uninstall N
- * applications! Are you sure?") and lists every one of them — app label in bold,
- * the package id in italic next to it, both column-aligned — in a scrollable
- * area so the full set can be reviewed before confirming.
+ * Fork: large, themed confirmation dialog shown before a batch operation
+ * (uninstall, reinstall, freeze, unfreeze). It states up front how many apps the
+ * operation will touch ("Will uninstall N applications! Are you sure?") and lists
+ * every one of them — app label in bold, the package id in italic next to it,
+ * both column-aligned — in a scrollable area so the full set can be reviewed
+ * before confirming.
+ *
+ * <p>The title, the optional warning subtitle (e.g. "cannot be undone", shown
+ * only for destructive ops) and the OK-button label are all supplied per
+ * operation by the caller, so the same dialog serves every batch action.
  *
  * <p>The dialog is sized to cover most of the window while still floating as a
  * dialog (the underlying app list peeks out at the edges); the app list scrolls
@@ -40,43 +48,57 @@ import io.github.muntashirakon.AppManager.utils.ForkThemeUtils;
  * and everything is adjustable from the appearance settings.
  */
 @UiThread
-public class BatchUninstallConfirmDialog {
+public class BatchConfirmDialog {
     public interface OnConfirmListener {
         void onConfirm();
     }
 
     private final Activity mActivity;
+    private final CharSequence mTitle;
+    @Nullable
+    private final CharSequence mSubtitle;
+    @StringRes
+    private final int mOkLabelRes;
     // Each entry is { label, packageName }.
     private final List<String[]> mApps;
     private final OnConfirmListener mOnConfirm;
 
-    public BatchUninstallConfirmDialog(@NonNull Activity activity, @NonNull List<String[]> apps,
-                                       @NonNull OnConfirmListener onConfirm) {
+    public BatchConfirmDialog(@NonNull Activity activity, @NonNull CharSequence title,
+                              @Nullable CharSequence subtitle, @StringRes int okLabelRes,
+                              @NonNull List<String[]> apps, @NonNull OnConfirmListener onConfirm) {
         mActivity = activity;
+        mTitle = title;
+        mSubtitle = subtitle;
+        mOkLabelRes = okLabelRes;
         mApps = apps;
         mOnConfirm = onConfirm;
     }
 
     public void show() {
-        View view = mActivity.getLayoutInflater().inflate(R.layout.dialog_uninstall_confirm_shiroikuma, null);
-        View container = view.findViewById(R.id.uninstall_confirm_container);
-        TextView titleView = view.findViewById(R.id.uninstall_confirm_title);
-        TextView subtitleView = view.findViewById(R.id.uninstall_confirm_subtitle);
-        TableLayout table = view.findViewById(R.id.uninstall_confirm_table);
-        MaterialButton cancelButton = view.findViewById(R.id.uninstall_confirm_cancel);
-        MaterialButton okButton = view.findViewById(R.id.uninstall_confirm_ok);
+        View view = mActivity.getLayoutInflater().inflate(R.layout.dialog_batch_confirm_shiroikuma, null);
+        View container = view.findViewById(R.id.batch_confirm_container);
+        TextView titleView = view.findViewById(R.id.batch_confirm_title);
+        TextView subtitleView = view.findViewById(R.id.batch_confirm_subtitle);
+        TableLayout table = view.findViewById(R.id.batch_confirm_table);
+        MaterialButton cancelButton = view.findViewById(R.id.batch_confirm_cancel);
+        MaterialButton okButton = view.findViewById(R.id.batch_confirm_ok);
 
         int textColor = ForkThemeUtils.getTextColor();
         // Dim the package-id column to ~70% of the text colour so the bold label
         // reads as primary and the italic id as a quieter secondary line.
         int idColor = (textColor & 0x00FFFFFF) | 0xB3000000;
 
-        titleView.setText(mActivity.getResources().getQuantityString(
-                R.plurals.confirm_uninstall_count, mApps.size(), mApps.size()));
+        titleView.setText(mTitle);
+        titleView.setTextColor(textColor);
+        if (TextUtils.isEmpty(mSubtitle)) {
+            subtitleView.setVisibility(View.GONE);
+        } else {
+            subtitleView.setText(mSubtitle);
+            subtitleView.setTextColor(textColor);
+        }
+        okButton.setText(mOkLabelRes);
 
         container.setBackground(ForkThemeUtils.makeThemedBackground(container.getContext(), 16f));
-        titleView.setTextColor(textColor);
-        subtitleView.setTextColor(textColor);
         ColorStateList accent = ColorStateList.valueOf(textColor);
         cancelButton.setTextColor(accent);
         cancelButton.setRippleColor(accent);
@@ -114,7 +136,7 @@ public class BatchUninstallConfirmDialog {
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
         dialog.setContentView(view);
         // A back press / outside tap just dismisses (same as choosing Cancel);
-        // nothing is uninstalled until the user taps the positive button.
+        // nothing happens until the user taps the positive button.
         dialog.setCancelable(true);
 
         Window window = dialog.getWindow();

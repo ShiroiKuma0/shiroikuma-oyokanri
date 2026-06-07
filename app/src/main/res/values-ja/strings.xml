@@ -1092,6 +1092,15 @@
     <plurals name="confirm_uninstall_count">
         <item quantity="other">%d 個のアプリをアンインストールします！本当に宜しいですか？</item>
     </plurals>
+    <plurals name="confirm_reinstall_count">
+        <item quantity="other">%d 個のアプリを再インストールします！本当に宜しいですか？</item>
+    </plurals>
+    <plurals name="confirm_freeze_count">
+        <item quantity="other">%d 個のアプリを凍結します！本当に宜しいですか？</item>
+    </plurals>
+    <plurals name="confirm_unfreeze_count">
+        <item quantity="other">%d 個のアプリを融解します！本当に宜しいですか？</item>
+    </plurals>
     <string name="pause">一時停止</string>
     <string name="continue_operation">続行</string>
     <string name="operation_cancelled">中止しました</string>
