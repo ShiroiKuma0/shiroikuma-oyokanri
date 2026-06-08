@@ -59,6 +59,19 @@ public class ImageLoader implements Closeable {
         return sInstance;
     }
 
+    // Fork: build a version-aware icon-cache tag. The icon caches (in-memory LruCache +
+    // on-disk PNG in ImageFileCache) are keyed by this tag with no version awareness
+    // upstream, so reinstalling an APK with the same package name but a new icon keeps
+    // serving the stale cached icon until the 7-day disk GC. Folding lastUpdateTime into
+    // the tag means a reinstall (which bumps lastUpdateTime) yields a fresh key that misses
+    // both cache layers, so the new icon loads immediately. The '@' separator can never
+    // appear in a package name or a Java component class name, so a versioned tag never
+    // collides with the plain-package or component tags used elsewhere.
+    @NonNull
+    public static String versionedTag(@NonNull String packageName, long lastUpdateTime) {
+        return packageName + "@" + lastUpdateTime;
+    }
+
     private final LruCache<String, Bitmap> mMemoryCache = new LruCache<>(300);
     private final ImageFileCache mImageFileCache = new ImageFileCache();
     private boolean mIsClosed = false;
@@ -137,8 +150,13 @@ public class ImageLoader implements Closeable {
         public ImageFetcherResult fetchImage(@NonNull String tag) {
             PackageManager pm = ContextUtils.getContext().getPackageManager();
             Drawable drawable = mInfo != null ? mInfo.loadIcon(pm) : null;
+            // Fork: memory-cache package icons only — either the plain package name (most
+            // call sites) or a versioned package tag "pkg@time" (see versionedTag). Component
+            // icons, whose tag is the component class name, still aren't memory-cached.
+            boolean isPackageIcon = mInfo != null
+                    && (tag.equals(mInfo.packageName) || tag.startsWith(mInfo.packageName + "@"));
             return new ImageFetcherResult(tag, drawable != null ? UIUtils.getBitmapFromDrawable(drawable) : null,
-                    mInfo != null && tag.equals(mInfo.packageName), true,
+                    isPackageIcon, true,
                     new DefaultImageDrawable("android_default_icon", pm.getDefaultActivityIcon()));
         }
     }

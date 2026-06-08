@@ -1057,11 +1057,20 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
             // ACTION_DB_PACKAGE_ALTERED which skips updateApplications entirely).
             // Without this enrichment, a delayed broadcast can overwrite a correct
             // list state — see the project skill's freeze-indicator notes.
+            // Fork: read lastUpdateTime live here too. The main-list icon-cache key folds in
+            // lastUpdateTime (ImageLoader.versionedTag, used by MainRecyclerAdapter) so a
+            // reinstall busts the stale cached icon — but the DB-cached app.lastUpdateTime can
+            // lag a reinstall, leaving the key unchanged and the old icon on screen. getPackageInfo
+            // yields both the live ApplicationInfo (for freeze state) and the live lastUpdateTime
+            // in one query, replacing the former getApplicationInfo call at no extra cost.
+            long liveLastUpdateTime = app.lastUpdateTime;
             try {
-                ApplicationInfo liveAi = getApplication().getPackageManager().getApplicationInfo(packageName,
+                PackageInfo livePi = getApplication().getPackageManager().getPackageInfo(packageName,
                         PackageManager.MATCH_DISABLED_COMPONENTS | PackageManager.MATCH_UNINSTALLED_PACKAGES);
+                ApplicationInfo liveAi = livePi.applicationInfo;
                 item.isDisabled = !liveAi.enabled;
                 item.isFrozen = FreezeUtils.isFrozen(liveAi);
+                liveLastUpdateTime = livePi.lastUpdateTime;
             } catch (Throwable e) {
                 // Not installed / not accessible — fall back to cached values
                 item.isFrozen = !app.isEnabled;
@@ -1073,7 +1082,7 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
             item.sharedUserId = app.sharedUserId;
             item.sha = new Pair<>(app.certName, app.certAlgo);
             item.firstInstallTime = app.firstInstallTime;
-            item.lastUpdateTime = app.lastUpdateTime;
+            item.lastUpdateTime = liveLastUpdateTime; // Fork: live (see freeze/lastUpdateTime block above)
             item.hasActivities = app.hasActivities;
             item.hasSplits = app.hasSplits;
             item.blockedCount = app.rulesCount;

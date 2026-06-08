@@ -465,8 +465,13 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         // Signature had no explicit colour originally; only override if set.
         if (mcSignatureSet) holder.sha.setTextColor(mcSignature);
         // Load app icon
-        holder.icon.setTag(item.packageName);
-        ImageLoader.getInstance().displayImage(item.packageName, item, holder.icon);
+        // Fork: version-aware cache key — fold lastUpdateTime in so a reinstall (which bumps
+        // lastUpdateTime) busts the stale in-memory + on-disk icon cache instead of showing
+        // the old icon. The tag set here must match the one passed to displayImage(), since
+        // ImageLoader's recycled-view guard compares them before binding the bitmap.
+        String iconTag = ImageLoader.versionedTag(item.packageName, item.lastUpdateTime);
+        holder.icon.setTag(iconTag);
+        ImageLoader.getInstance().displayImage(iconTag, item, holder.icon);
         // Frozen apps: dim the icon, show a snowflake under it, italicize the label.
         // item.isFrozen covers PM-disabled, suspended, and hidden mechanisms. It is
         // populated from a live PackageManager query at list-load (see PackageUtils
