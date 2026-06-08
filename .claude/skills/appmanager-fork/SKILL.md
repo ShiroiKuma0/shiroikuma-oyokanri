@@ -760,3 +760,7 @@ If MuntashirAkon eventually adds new `BuildConfig.DEBUG`-gated features we want 
 - **Don't rely on `Intent.ACTION_PACKAGE_CHANGED` to refresh UI after AppManager's own freeze actions.** It's unreliable for the suspend and hide freeze methods, and on some OEMs doesn't fire at all even for `pm disable`. Instead, fire AppManager's in-process `BroadcastUtils.sendPackageAltered(context, packageNames)` immediately after the action completes — that routes through `MainViewModel.updateInfoForPackages()` deterministically. See commit 6's `AppInfoFragment.doFreeze` / `doUnfreeze` hooks.
 - **Pre-patch sandbox state must mirror `origin/custom`.** Whenever generating a patch, first `git fetch origin '+refs/heads/*:refs/remotes/origin/*'` and `git reset --hard origin/custom` in the sandbox. Working from a stale local commit produces patches with subtly wrong diff context that fail to apply at the user's terminal. See "Mandatory pre-patch protocol" section near the top.
 
+
+---
+
+**Commit convention — no Claude attribution.** Never add a `Co-Authored-By: Claude …` / "Generated with Claude" trailer to commit messages or PR bodies; end the message at the last line of the body. This overrides the harness default. (Global rule: `~/.claude/CLAUDE.md`.)
