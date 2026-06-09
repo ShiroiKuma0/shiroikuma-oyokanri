@@ -2,6 +2,7 @@
 
 package io.github.muntashirakon.AppManager.main;
 
+import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.Application;
 import android.content.Intent;
@@ -44,6 +45,7 @@ import java.util.ListIterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.Future;
 
 import io.github.muntashirakon.AppManager.apk.list.ListExporter;
@@ -848,32 +850,106 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
     // second. Those trickle broadcasts still arrive and reconcile the exact
     // state in the background, but re-filter to the same result, so there is no
     // visible movement. Other ops fall back to the targeted re-read.
-    public void applyBatchOpResult(@BatchOpsManager.OpType int op, @Nullable String[] packages,
+    public void applyBatchOpResult(@BatchOpsManager.OpType int op, int result, @Nullable String[] packages,
                                    @Nullable List<String> failedPackages) {
         if (packages == null || packages.length == 0) {
             return;
         }
-        Boolean frozenTarget = freezeTargetForOp(op);
-        if (frozenTarget == null) {
-            // Non-freeze op (e.g. uninstall): targeted re-read of just these packages.
-            executor.submit(() -> updateInfoForPackages(packages, PackageChangeReceiver.ACTION_PACKAGE_ALTERED));
-            return;
-        }
-        boolean frozen = frozenTarget;
+        // Fork: the cheap in-memory snaps below assume every queued package was
+        // actually processed (RESULT_OK = all succeeded, RESULT_FIRST_USER = ran to
+        // completion with some failed-and-listed). On RESULT_CANCELED the op stopped
+        // early: the package list still names every queued app but the failed list is
+        // empty, so an optimistic flip would mislabel the unprocessed ones. Fall back
+        // to the true-state re-read for the whole batch in that case.
+        boolean ranToCompletion = result != Activity.RESULT_CANCELED;
         HashSet<String> targets = new HashSet<>(Arrays.asList(packages));
         if (failedPackages != null) {
-            // Don't flip packages the operation failed on — they kept their state.
+            // Don't touch packages the operation failed on — they kept their state.
             targets.removeAll(failedPackages);
         }
         if (targets.isEmpty()) {
             return;
         }
+        Boolean frozenTarget = freezeTargetForOp(op);
+        if (ranToCompletion && frozenTarget != null) {
+            boolean frozen = frozenTarget;
+            snapApplicationItems(targets, item -> item.setFrozenStateForBatchOp(frozen));
+            return;
+        }
+        if (ranToCompletion && op == BatchOpsManager.OP_INSTALL_EXISTING) {
+            // Fork: reinstall (install-existing) restores an uninstalled system app
+            // to installed. Flip the cached installed flag in memory and re-filter
+            // once, so the rows drop out of the "Uninstalled apps" filter at once —
+            // the same instant snap freeze/unfreeze gets — instead of trickling out
+            // one-by-one as the system's throttled per-package PACKAGE_ADDED
+            // broadcasts arrive. The trailing re-reads then confirm the same state.
+            snapApplicationItems(targets, ApplicationItem::setInstalledStateForBatchOp);
+            return;
+        }
+        if (ranToCompletion && op == BatchOpsManager.OP_UNINSTALL) {
+            snapUninstalledApplicationItems(targets);
+            return;
+        }
+        // Other non-freeze ops: targeted re-read of just these packages.
+        executor.submit(() -> updateInfoForPackages(packages, PackageChangeReceiver.ACTION_PACKAGE_ALTERED));
+    }
+
+    // Fork: snap the main list to its final state after a batch uninstall
+    // (keepData=false) in one pass — the same instant treatment freeze/unfreeze
+    // and reinstall get — instead of letting the system's throttled per-package
+    // PACKAGE_REMOVED broadcasts repaint it row-by-row. Each affected row resolves
+    // to exactly what the per-package re-read (AppDb.updateApplicationInternal,
+    // which re-queries PM with MATCH_UNINSTALLED_PACKAGES) would produce:
+    //   - an updated system app: uninstall only reverts the update, so it stays
+    //     installed — left untouched here, its version is refreshed by the re-read;
+    //   - a pure system app: uninstalled-for-user, survives as an "uninstalled"
+    //     entry → flip isInstalled=false (the inverse of reinstall);
+    //   - a user app with a backup: survives as a backup entry → flip likewise;
+    //   - a user app with no backup: gone → remove the row outright.
+    // The trailing broadcasts then merely confirm the same state, so there is no
+    // visible row-by-row churn.
+    private void snapUninstalledApplicationItems(@NonNull Set<String> targets) {
+        executor.submit(() -> {
+            boolean modified = false;
+            synchronized (mApplicationItems) {
+                ListIterator<ApplicationItem> it = mApplicationItems.listIterator();
+                while (it.hasNext()) {
+                    ApplicationItem item = it.next();
+                    if (!targets.contains(item.packageName)) {
+                        continue;
+                    }
+                    if (item.isUpdatedSystemApp()) {
+                        // Reverts to the factory version but stays installed; leave
+                        // the installed flag alone and let the re-read refresh it.
+                        continue;
+                    }
+                    if (item.isSystem || item.backup != null) {
+                        item.setUninstalledStateForBatchOp();
+                    } else {
+                        mSelectedPackageApplicationItemMap.remove(item.packageName);
+                        it.remove();
+                    }
+                    modified = true;
+                }
+            }
+            if (modified) {
+                sortApplicationList(mSortBy, mReverseSort);
+                filterItemsByFlags();
+            }
+        });
+    }
+
+    // Fork: apply an in-memory mutation to every list row whose package is in
+    // `targets`, then re-sort and re-filter once on the model executor. Lets a
+    // completed batch op snap the main list to its final state in a single pass
+    // instead of waiting on the system's throttled per-package change broadcasts.
+    private void snapApplicationItems(@NonNull Set<String> targets, @NonNull ItemMutator mutator) {
         executor.submit(() -> {
             boolean modified = false;
             synchronized (mApplicationItems) {
                 for (ApplicationItem item : mApplicationItems) {
                     if (targets.contains(item.packageName)) {
-                        item.setFrozenStateForBatchOp(frozen);
+                        mutator.mutate(item);
                         modified = true;
                     }
                 }
@@ -883,6 +959,11 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
                 filterItemsByFlags();
             }
         });
+    }
+
+    // Fork: SAM for the in-memory row mutation applied by snapApplicationItems.
+    private interface ItemMutator {
+        void mutate(@NonNull ApplicationItem item);
     }
 
     @Nullable
