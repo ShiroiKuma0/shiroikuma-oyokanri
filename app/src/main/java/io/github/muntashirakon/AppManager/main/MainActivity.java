@@ -240,7 +240,7 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             // letting the system's throttled per-package change broadcasts repaint
             // it a couple of rows per second after the operation already finished.
             if (viewModel != null) {
-                viewModel.applyBatchOpResult(op,
+                viewModel.applyBatchOpResult(op, result,
                         intent.getStringArrayExtra(BatchOpsService.EXTRA_OP_PKG),
                         intent.getStringArrayListExtra(BatchOpsService.EXTRA_FAILED_PKG));
             }

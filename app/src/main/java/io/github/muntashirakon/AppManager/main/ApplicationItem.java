@@ -645,6 +645,32 @@ public class ApplicationItem extends PackageItemInfo implements IFilterableAppIn
         mFreezeFlags = frozen ? FreezeOption.FREEZE_TYPE_DISABLED : 0;
     }
 
+    // Fork: cheaply mark this row installed in memory right after a batch
+    // reinstall (install-existing) of an uninstalled system app, so the main list
+    // can snap to its final state immediately — the row drops out of the
+    // "Uninstalled apps" filter at once — instead of waiting for the system's
+    // throttled per-package PACKAGE_ADDED broadcasts to re-read it one-by-one.
+    // Only the installed flags are best-effort here; the full live data (version,
+    // sizes, etc.) is reconciled by the normal package-change path that follows.
+    public void setInstalledStateForBatchOp() {
+        isInstalled = true;
+        isOnlyDataInstalled = false;
+    }
+
+    // Fork: cheaply mark this row uninstalled in memory right after a batch
+    // uninstall (keepData=false) — the inverse of setInstalledStateForBatchOp —
+    // so the main list snaps immediately: the row drops out of the "Installed
+    // apps" filter and into "Uninstalled apps" at once, instead of waiting for
+    // the system's throttled per-package PACKAGE_REMOVED broadcasts. Only applied
+    // to rows that survive an uninstall as an entry (a system app, or any app with
+    // a backup); a user app with no backup is gone and is removed outright by the
+    // caller rather than flipped. Best-effort installed flags; the full live data
+    // is reconciled by the normal package-change path that follows.
+    public void setUninstalledStateForBatchOp() {
+        isInstalled = false;
+        isOnlyDataInstalled = false;
+    }
+
     @Override
     public boolean isStopped() {
         return isStopped;
