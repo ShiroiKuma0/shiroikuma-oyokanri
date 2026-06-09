@@ -41,13 +41,24 @@ public final class BatchOpsProgressMonitor {
         public final int current;
         public final int max;
         public final boolean paused;
+        // Fork: the app currently being processed, so the dialog can show its
+        // label (bold) and package id (italic) under the counter. Null when no
+        // per-app item is in flight (e.g. between begin() and the first item, or
+        // for ops that don't report a current package).
+        @Nullable
+        public final CharSequence currentLabel;
+        @Nullable
+        public final String currentPackage;
 
-        State(boolean active, @Nullable CharSequence title, int current, int max, boolean paused) {
+        State(boolean active, @Nullable CharSequence title, int current, int max, boolean paused,
+              @Nullable CharSequence currentLabel, @Nullable String currentPackage) {
             this.active = active;
             this.title = title;
             this.current = current;
             this.max = max;
             this.paused = paused;
+            this.currentLabel = currentLabel;
+            this.currentPackage = currentPackage;
         }
     }
 
@@ -59,11 +70,15 @@ public final class BatchOpsProgressMonitor {
     }
 
     private final MutableLiveData<State> mState = new MutableLiveData<>(
-            new State(false, null, 0, 0, false));
+            new State(false, null, 0, 0, false, null, null));
     private final Object mPauseLock = new Object();
 
     @Nullable
     private volatile CharSequence mTitle;
+    @Nullable
+    private volatile CharSequence mCurrentLabel;
+    @Nullable
+    private volatile String mCurrentPackage;
     private volatile int mCurrent;
     private volatile int mMax;
     private volatile boolean mActive;
@@ -115,6 +130,8 @@ public final class BatchOpsProgressMonitor {
         mTitle = title;
         mMax = max;
         mCurrent = 0;
+        mCurrentLabel = null;
+        mCurrentPackage = null;
         publish();
     }
 
@@ -125,6 +142,23 @@ public final class BatchOpsProgressMonitor {
             mMax = max;
         }
         mCurrent = current;
+        publish();
+    }
+
+    /**
+     * Fork: report a new current value along with the app being processed, so the
+     * dialog can show its label and package id. Used by the per-app ops
+     * (freeze/unfreeze/uninstall/reinstall).
+     */
+    @AnyThread
+    public void publishProgress(int max, int current, @Nullable CharSequence currentLabel,
+                                @Nullable String currentPackage) {
+        if (max > 0) {
+            mMax = max;
+        }
+        mCurrent = current;
+        mCurrentLabel = currentLabel;
+        mCurrentPackage = currentPackage;
         publish();
     }
 
@@ -185,6 +219,6 @@ public final class BatchOpsProgressMonitor {
     }
 
     private void publish() {
-        mState.postValue(new State(mActive, mTitle, mCurrent, mMax, mPaused));
+        mState.postValue(new State(mActive, mTitle, mCurrent, mMax, mPaused, mCurrentLabel, mCurrentPackage));
     }
 }
