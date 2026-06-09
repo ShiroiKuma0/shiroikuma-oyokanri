@@ -28,6 +28,29 @@
         android:textSize="15sp"
         tools:text="12 / 30" />
 
+    <!-- Fork: the app currently being processed — label in bold, id in italics. -->
+    <TextView
+        android:id="@+id/batch_progress_current_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        tools:text="App Manager" />
+
+    <TextView
+        android:id="@+id/batch_progress_current_package"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textSize="13sp"
+        android:textStyle="italic"
+        tools:text="io.github.muntashirakon.AppManager" />
+
     <com.google.android.material.progressindicator.LinearProgressIndicator
         android:id="@+id/batch_progress_bar"
         android:layout_width="match_parent"

@@ -601,8 +601,8 @@ public class BatchOpsManager {
         int max = info.size();
         UserPackagePair pair;
         for (int i = 0; i < max; ++i) {
-            updateProgress(lastProgress, i + 1);
             pair = info.getPair(i);
+            updateProgress(lastProgress, i + 1, pair.getPackageName(), pair.getUserId());
             int type;
             if (options.isPreferCustom()) {
                 type = Optional.ofNullable(FreezeUtils.loadFreezeMethod(pair.getPackageName()))
@@ -625,8 +625,8 @@ public class BatchOpsManager {
         int max = info.size();
         UserPackagePair pair;
         for (int i = 0; i < max; ++i) {
-            updateProgress(lastProgress, i + 1);
             pair = info.getPair(i);
+            updateProgress(lastProgress, i + 1, pair.getPackageName(), pair.getUserId());
             try {
                 if (freeze) {
                     FreezeUtils.freeze(pair.getPackageName(), pair.getUserId());
@@ -886,8 +886,8 @@ public class BatchOpsManager {
         int max = info.size();
         UserPackagePair pair;
         for (int i = 0; i < max; ++i) {
-            updateProgress(lastProgress, i + 1);
             pair = info.getPair(i);
+            updateProgress(lastProgress, i + 1, pair.getPackageName(), pair.getUserId());
             PackageInstallerCompat installer = PackageInstallerCompat.getNewInstance();
             if (!installer.uninstall(pair.getPackageName(), pair.getUserId(), false)) {
                 log("====> op=UNINSTALL, pkg=" + pair);
@@ -907,8 +907,8 @@ public class BatchOpsManager {
         float lastProgress = mProgressHandler != null ? mProgressHandler.getLastProgress() : 0;
         int max = info.size();
         for (int i = 0; i < max; ++i) {
-            updateProgress(lastProgress, i + 1);
             UserPackagePair pair = info.getPair(i);
+            updateProgress(lastProgress, i + 1, pair.getPackageName(), pair.getUserId());
             try {
                 int code = PackageManagerCompat.installExistingPackageAsUser(pair.getPackageName(),
                         pair.getUserId(), 0, 0, null);
@@ -1002,6 +1002,15 @@ public class BatchOpsManager {
     }
 
     private void updateProgress(float last, int current) {
+        updateProgress(last, current, null, UserHandleHidden.myUserId());
+    }
+
+    // Fork: per-item progress checkpoint that also reports the app currently
+    // being processed to the in-app dialog. The per-app ops the user watches
+    // (freeze/unfreeze/uninstall/reinstall) pass the package + user being worked
+    // on so the dialog can show its label (bold) and id (italic); ops that don't
+    // care pass a null package via the no-package overload above.
+    private void updateProgress(float last, int current, @Nullable String packageName, int userId) {
         // Fork: pause/cancel checkpoint + feed the in-app progress dialog. Every
         // op loop calls this once per item, before doing that item's work, so
         // pause (block the worker thread) and cancel (abort the loop) apply
@@ -1018,7 +1027,29 @@ public class BatchOpsManager {
         // Current progress = last progress + current
         float progress = last + current;
         mProgressHandler.postUpdate(progress);
-        monitor.publishProgress(mProgressHandler.getLastMax(), Math.round(progress));
+        if (packageName == null) {
+            monitor.publishProgress(mProgressHandler.getLastMax(), Math.round(progress));
+        } else {
+            monitor.publishProgress(mProgressHandler.getLastMax(), Math.round(progress),
+                    getCurrentItemLabel(packageName, userId), packageName);
+        }
+    }
+
+    // Fork: best-effort app label for the dialog's current-item line. Includes
+    // MATCH_UNINSTALLED_PACKAGES so reinstall (install-existing) — whose targets
+    // are uninstalled system apps — still resolves a real label. Returns null if
+    // it can't be resolved; the dialog then falls back to the package id.
+    @Nullable
+    private CharSequence getCurrentItemLabel(@NonNull String packageName, int userId) {
+        try {
+            Context context = ContextUtils.getContext();
+            ApplicationInfo ai = PackageManagerCompat.getApplicationInfo(packageName,
+                    PackageManagerCompat.MATCH_UNINSTALLED_PACKAGES
+                            | PackageManagerCompat.MATCH_STATIC_SHARED_AND_SDK_LIBRARIES, userId);
+            return ai.loadLabel(context.getPackageManager());
+        } catch (Throwable ignore) {
+            return null;
+        }
     }
 
     private void fixProgress(int appendMax) {

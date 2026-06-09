@@ -45,6 +45,8 @@ public class BatchProgressDialog {
     private Dialog mDialog;
     private TextView mTitleView;
     private TextView mCounterView;
+    private TextView mCurrentLabelView;
+    private TextView mCurrentPackageView;
     private LinearProgressIndicator mProgressBar;
     private MaterialButton mPauseButton;
 
@@ -65,6 +67,8 @@ public class BatchProgressDialog {
         View view = mActivity.getLayoutInflater().inflate(R.layout.dialog_batch_progress_shiroikuma, null);
         mTitleView = view.findViewById(R.id.batch_progress_title);
         mCounterView = view.findViewById(R.id.batch_progress_counter);
+        mCurrentLabelView = view.findViewById(R.id.batch_progress_current_label);
+        mCurrentPackageView = view.findViewById(R.id.batch_progress_current_package);
         mProgressBar = view.findViewById(R.id.batch_progress_bar);
         mPauseButton = view.findViewById(R.id.batch_progress_pause);
         MaterialButton cancelButton = view.findViewById(R.id.batch_progress_cancel);
@@ -122,6 +126,8 @@ public class BatchProgressDialog {
         container.setBackground(ForkThemeUtils.makeThemedBackground(container.getContext(), 16f));
         mTitleView.setTextColor(textColor);
         mCounterView.setTextColor(textColor);
+        mCurrentLabelView.setTextColor(textColor);
+        mCurrentPackageView.setTextColor(textColor);
         ColorStateList accent = ColorStateList.valueOf(textColor);
         mPauseButton.setTextColor(accent);
         mPauseButton.setRippleColor(accent);
@@ -143,6 +149,22 @@ public class BatchProgressDialog {
         mCounterView.setText(String.format(Locale.getDefault(), "%d / %d", current, max));
         mProgressBar.setMax(Math.max(max, 1));
         mProgressBar.setProgressCompat(current, true);
+        // Fork: the app currently in flight — label (bold) over id (italic). Fall
+        // back to the package id for the label line if the label didn't resolve;
+        // hide both lines when nothing is being processed.
+        CharSequence label = state.currentLabel;
+        String pkg = state.currentPackage;
+        boolean hasLabel = label != null && label.length() > 0;
+        boolean hasPkg = pkg != null && pkg.length() > 0;
+        if (hasLabel || hasPkg) {
+            mCurrentLabelView.setText(hasLabel ? label : pkg);
+            mCurrentLabelView.setVisibility(View.VISIBLE);
+            mCurrentPackageView.setText(pkg);
+            mCurrentPackageView.setVisibility(hasPkg ? View.VISIBLE : View.GONE);
+        } else {
+            mCurrentLabelView.setVisibility(View.GONE);
+            mCurrentPackageView.setVisibility(View.GONE);
+        }
         updatePauseLabel(state.paused);
     }
 
