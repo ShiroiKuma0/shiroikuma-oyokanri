@@ -19,7 +19,6 @@ import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.RemoteException;
 import android.os.UserHandleHidden;
-import android.text.InputType;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.TextUtils;
@@ -92,7 +91,6 @@ import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 import io.github.muntashirakon.AppManager.utils.appearance.ColorCodes;
 import io.github.muntashirakon.dialog.SearchableItemsDialogBuilder;
-import io.github.muntashirakon.dialog.TextInputDialogBuilder;
 import io.github.muntashirakon.io.Path;
 import io.github.muntashirakon.io.Paths;
 import io.github.muntashirakon.util.AccessibilityUtils;
@@ -255,32 +253,20 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
     }
 
     /**
-     * Fork: show the per-app note dialog. Pre-fills the current note (if any) in
-     * an immediately-editable multi-line field; Save persists it (a blank entry
-     * deletes the note), Cancel discards. The edited row is refreshed via
-     * notifyItemChanged using the holder's <em>current</em> binding position
-     * (re-read at save time, never the stale bind position) so it stays correct
-     * under RecyclerView recycling. Notes ride the existing settings
-     * export/import automatically (see {@link AppNotesManager}).
+     * Fork: show the per-app note dialog (shared builder lives in
+     * {@link AppNotesManager#showNoteDialog}). On save, the edited row is
+     * refreshed via notifyItemChanged using the holder's <em>current</em>
+     * binding position (re-read at save time, never the stale bind position) so
+     * it stays correct under RecyclerView recycling.
      */
     private void showNoteDialog(@NonNull ViewHolder holder, @NonNull String packageName,
                                 @NonNull CharSequence appLabel) {
-        new TextInputDialogBuilder(mActivity, R.string.note)
-                .setTitle(appLabel)
-                .setInputText(AppNotesManager.getNote(mActivity, packageName))
-                .setInputInputType(InputType.TYPE_CLASS_TEXT
-                        | InputType.TYPE_TEXT_FLAG_MULTI_LINE
-                        | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES)
-                .setHelperText(R.string.note_blank_deletes_helper)
-                .setNegativeButton(R.string.cancel, null)
-                .setPositiveButton(R.string.save, (dialog, which, inputText, isChecked) -> {
-                    AppNotesManager.setNote(mActivity, packageName, inputText);
-                    int pos = holder.getBindingAdapterPosition();
-                    if (pos != RecyclerView.NO_POSITION) {
-                        notifyItemChanged(pos);
-                    }
-                })
-                .show();
+        AppNotesManager.showNoteDialog(mActivity, packageName, appLabel, () -> {
+            int pos = holder.getBindingAdapterPosition();
+            if (pos != RecyclerView.NO_POSITION) {
+                notifyItemChanged(pos);
+            }
+        });
     }
 
     @UiThread
