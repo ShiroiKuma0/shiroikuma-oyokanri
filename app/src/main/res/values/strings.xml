@@ -1805,4 +1805,7 @@
     <string name="color_white">White</string>
     <string name="color_black">Black</string>
     <string name="color_grey">Grey</string>
+    <!-- Fork: per-app notes (main-list note badge + top-right add "+") -->
+    <string name="note">Note</string>
+    <string name="note_blank_deletes_helper">Leave blank to delete the note.</string>
 </resources>
