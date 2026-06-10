@@ -69,24 +69,53 @@
             android:layout_height="wrap_content"
             android:layout_weight="1">
 
-            <androidx.appcompat.widget.AppCompatImageView
-                android:id="@+id/favorite_icon"
+            <!-- Fork: top-right affordances. The note "+" (shown only when the
+                 app has no note) sits to the LEFT of the debug star so the two
+                 never overlap; the star keeps its own id and bind behaviour. -->
+            <androidx.appcompat.widget.LinearLayoutCompat
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:src="@drawable/item_favorite"
-                android:layout_gravity="end|top"
-                tools:ignore="ContentDescription" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_gravity="end|top">
+
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:id="@+id/note_add"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_marginEnd="6dp"
+                    android:src="@drawable/ic_add"
+                    android:visibility="gone"
+                    tools:ignore="ContentDescription"
+                    tools:visibility="visible" />
+
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:id="@+id/favorite_icon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:src="@drawable/item_favorite"
+                    tools:ignore="ContentDescription" />
+
+            </androidx.appcompat.widget.LinearLayoutCompat>
 
             <androidx.appcompat.widget.LinearLayoutCompat
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:orientation="vertical">
 
+                <!-- Fork: the per-app note badge is rendered as a compound
+                     drawableEnd on the label (set in MainRecyclerAdapter), so it
+                     hugs the end of the app name instead of being pushed to the
+                     far edge of the row, and stays visible even when the name
+                     ellipsizes. The label is wrap_content for the same reason.
+                     Only the glyph's hit region is tappable (see the label touch
+                     listener in the adapter). -->
                 <androidx.appcompat.widget.AppCompatTextView
                     android:id="@+id/label"
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:singleLine="true"
+                    android:ellipsize="end"
                     android:textAppearance="?android:attr/textAppearanceListItem"
                     tools:text="@string/app_name" />
 

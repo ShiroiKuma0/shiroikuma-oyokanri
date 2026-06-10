@@ -1119,4 +1119,6 @@
     <string name="color_white">白</string>
     <string name="color_black">黒</string>
     <string name="color_grey">灰</string>
+    <string name="note">メモ</string>
+    <string name="note_blank_deletes_helper">空欄にするとメモを削除します。</string>
 </resources>
