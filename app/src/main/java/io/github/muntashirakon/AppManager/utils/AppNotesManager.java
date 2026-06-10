@@ -4,9 +4,14 @@ package io.github.muntashirakon.AppManager.utils;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.text.InputType;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.UiThread;
+
+import io.github.muntashirakon.AppManager.R;
+import io.github.muntashirakon.dialog.TextInputDialogBuilder;
 
 // Fork: free-text per-app notes (e.g. "do not freeze — needed for X").
 // Stored in a dedicated SharedPreferences file (shiroikuma_notes.xml), keyed by
@@ -62,5 +67,32 @@ public final class AppNotesManager {
     /** Remove the note for {@code pkg}, if any. */
     public static void clear(@NonNull Context ctx, @NonNull String pkg) {
         sp(ctx).edit().remove(pkg).apply();
+    }
+
+    /**
+     * Show the note view/edit dialog for {@code pkg} — shared by the main list
+     * and the app-details screen. Pre-fills the current note (if any) in an
+     * immediately-editable multi-line field; Save persists it (a blank entry
+     * deletes the note), Cancel discards. {@code onSaved} (optional) runs on the
+     * UI thread after a save, e.g. to refresh the calling row.
+     */
+    @UiThread
+    public static void showNoteDialog(@NonNull Context ctx, @NonNull String pkg,
+                                      @Nullable CharSequence appLabel, @Nullable Runnable onSaved) {
+        new TextInputDialogBuilder(ctx, R.string.note)
+                .setTitle(appLabel)
+                .setInputText(getNote(ctx, pkg))
+                .setInputInputType(InputType.TYPE_CLASS_TEXT
+                        | InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                        | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES)
+                .setHelperText(R.string.note_blank_deletes_helper)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.save, (dialog, which, inputText, isChecked) -> {
+                    setNote(ctx, pkg, inputText);
+                    if (onSaved != null) {
+                        onSaved.run();
+                    }
+                })
+                .show();
     }
 }

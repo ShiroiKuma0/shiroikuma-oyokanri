@@ -153,6 +153,7 @@ import io.github.muntashirakon.AppManager.uri.GrantUriUtils;
 import io.github.muntashirakon.AppManager.usage.AppUsageStatsManager;
 import io.github.muntashirakon.AppManager.users.UserInfo;
 import io.github.muntashirakon.AppManager.users.Users;
+import io.github.muntashirakon.AppManager.utils.AppNotesManager;
 import io.github.muntashirakon.AppManager.utils.ArrayUtils;
 import io.github.muntashirakon.AppManager.utils.BetterActivityResult;
 import io.github.muntashirakon.AppManager.utils.BroadcastUtils;
@@ -1386,6 +1387,13 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
                             return true;
                         });
             }
+            // Fork: per-app note — same dialog as the main list (view/edit,
+            // pre-filled, blank deletes). No onSaved refresh needed here: the
+            // action button is static, and the main list re-binds on resume.
+            ActionItem noteAction = new ActionItem(R.string.note, R.drawable.ic_note_24dp);
+            actionItems.add(noteAction);
+            noteAction.setOnClickListener(v ->
+                    AppNotesManager.showNoteDialog(mActivity, mPackageName, mAppLabel, null));
             // Set uninstall
             ActionItem uninstallAction = new ActionItem(R.string.uninstall, R.drawable.ic_trash_can);
             actionItems.add(uninstallAction);
