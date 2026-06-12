@@ -1711,6 +1711,12 @@
         <item quantity="one"><xliff:g id="count" example="1">%1$d</xliff:g> app ID copied to clipboard</item>
         <item quantity="other"><xliff:g id="count" example="237">%1$d</xliff:g> app IDs copied to clipboard</item>
     </plurals>
+    <!-- Main-list layout picker (fork) -->
+    <string name="list_layout">List layout</string>
+    <string name="layout_adaptive">Adaptive (default)</string>
+    <string name="layout_2_columns">2 columns</string>
+    <string name="layout_3_columns">3 columns</string>
+    <string name="layout_4_columns">4 columns</string>
     <!-- Per-element colors (fork) -->
     <string name="pref_color_label_user">Color (user app)</string>
     <string name="pref_color_label_system">Color (system app)</string>

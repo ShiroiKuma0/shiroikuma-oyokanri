@@ -42,6 +42,7 @@ import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -136,6 +137,8 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
     private SearchViewDebouncer mSearchDebouncer;
     private LinearProgressIndicator mProgressIndicator;
     private SwipeRefreshLayout mSwipeRefresh;
+    // Fork: kept so the layout picker can swap the layout manager at runtime.
+    private RecyclerView mRecyclerView;
     private MultiSelectionView mMultiSelectionView;
     MainBatchOpsHandler mBatchOpsHandler;
     private MenuItem mAppUsageMenu;
@@ -332,15 +335,15 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
 
         mProgressIndicator = findViewById(R.id.progress_linear);
         mProgressIndicator.setVisibilityAfterHide(View.GONE);
-        RecyclerView recyclerView = findViewById(R.id.item_list);
-        recyclerView.requestFocus(); // Initially (the view isn't actually focusable)
+        mRecyclerView = findViewById(R.id.item_list);
+        mRecyclerView.requestFocus(); // Initially (the view isn't actually focusable)
         mSwipeRefresh = findViewById(R.id.swipe_refresh);
         mSwipeRefresh.setOnRefreshListener(this);
 
         mAdapter = new MainRecyclerAdapter(MainActivity.this);
         mAdapter.setHasStableIds(true);
-        recyclerView.setLayoutManager(UIUtils.getGridLayoutAt450Dp(this));
-        recyclerView.setAdapter(mAdapter);
+        applyListLayout();
+        mRecyclerView.setAdapter(mAdapter);
         // Refresh the per-row profile pills immediately after an app is added to
         // a profile via the "+" dialog (the dialog doesn't pause the activity,
         // so onResume wouldn't fire).
@@ -524,6 +527,8 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             listOptions.show(getSupportFragmentManager(), MainListOptions.TAG);
         } else if (id == R.id.action_export_displayed_ids) {
             copyDisplayedAppIds();
+        } else if (id == R.id.action_layout_columns) {
+            showLayoutPicker();
         } else if (id == R.id.action_clear_filters) {
             if (viewModel != null) {
                 viewModel.clearAllFilters();
@@ -576,6 +581,44 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             startActivity(intent);
         } else return super.onOptionsItemSelected(item);
         return true;
+    }
+
+    /**
+     * Fork: apply the persisted main-list layout. Adaptive (the original
+     * auto-fit grid, one column per 450dp) when no fixed column count is set,
+     * otherwise a fixed 2/3/4-column grid.
+     */
+    private void applyListLayout() {
+        int columns = MainLayoutPrefs.getColumns(this);
+        if (columns <= MainLayoutPrefs.COLUMNS_ADAPTIVE) {
+            mRecyclerView.setLayoutManager(UIUtils.getGridLayoutAt450Dp(this));
+        } else {
+            mRecyclerView.setLayoutManager(new GridLayoutManager(this, columns));
+        }
+    }
+
+    /**
+     * Fork: single-choice picker behind the 3x3 grid toolbar icon. Selecting
+     * an entry persists it and swaps the layout manager immediately.
+     */
+    private void showLayoutPicker() {
+        String[] choices = new String[]{
+                getString(R.string.layout_adaptive),
+                getString(R.string.layout_2_columns),
+                getString(R.string.layout_3_columns),
+                getString(R.string.layout_4_columns)};
+        int columns = MainLayoutPrefs.getColumns(this);
+        int checked = (columns >= 2 && columns <= 4) ? columns - 1 : 0;
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.list_layout)
+                .setSingleChoiceItems(choices, checked, (dialog, which) -> {
+                    int newColumns = which == 0 ? MainLayoutPrefs.COLUMNS_ADAPTIVE : which + 1;
+                    MainLayoutPrefs.setColumns(this, newColumns);
+                    applyListLayout();
+                    dialog.dismiss();
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
     }
 
     /**
