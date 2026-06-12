@@ -1,4 +1,4 @@
-# CLAUDE.md — 白い熊 App Manager (`shiroikuma.appmanager`)
+# CLAUDE.md — 白い熊の応用管理 (`shiroikuma.oyokanri`)
 
 This file is loaded automatically by Claude Code. It captures the fork's facts,
 build pipeline, and operating conventions so a fresh session can pick up
@@ -9,10 +9,10 @@ consult that for the "why" behind anything in here.
 ## Project
 
 - Fork of [AppManager](https://github.com/MuntashirAkon/AppManager) (upstream base **4.0.5**, minSdk 21, AGP 8.13.2).
-- `applicationId`: `shiroikuma.appmanager` (installs side-by-side with the official build).
+- `applicationId`: `shiroikuma.oyokanri` (installs side-by-side with the official build; renamed from the former `shiroikuma.appmanager`, so it is a fresh install rather than an update).
 - Java package (unchanged from upstream): `io.github.muntashirakon.AppManager`.
-- Display label: 白い熊 App Manager.
-- Remote: `origin` → ShiroiKuma0/appmanager.
+- Display label: 白い熊の応用管理.
+- Remote: `origin` → ShiroiKuma0/shiroikuma-oyokanri (formerly ShiroiKuma0/appmanager).
 - Branch: **`custom`** — all fork work lives here; pushes go to `origin/custom`.
 
 ## Target device & environment
@@ -32,7 +32,7 @@ consult that for the "why" behind anything in here.
 
 **Always ask how to deliver, after every build.** Delivery of the signed APK is never automatic. After every successful build, summarise what was built and ask **via the `AskUserQuestion` tool** how to deliver it, offering two options in this order: **scp to skhw** (the first / recommended choice → run the `scp` skill) and **adb push to the device** (`adb push /tmp/am-signed.apk /sdcard/tmp/<apk_name>`, needs the phone connected with USB debugging). The tool also lets the user pick "Other" (e.g. neither). Never deliver without asking, and never silently skip the question. Deliver only the chosen way, only once the user answers.
 
-Output APK is named `shiroikuma-appmanager_${customBaseVersionName}+${customBuildNumber}_arm64-v8a.apk`, derived from `gradle.properties`. Always copy the signed APK to `~/tmp/` before pushing to the device, so a record stays on disk.
+Output APK is named `shiroikuma-oyokanri_${customBaseVersionName}+${customBuildNumber}_arm64-v8a.apk`, derived from `gradle.properties`. Always copy the signed APK to `~/tmp/` before pushing to the device, so a record stays on disk.
 
 ```bash
 # from repo root
@@ -62,7 +62,7 @@ apksigner verify --verbose /tmp/am-signed.apk 2>&1 | grep -v 'not protected by s
 
 VER=$(grep '^customBaseVersionName=' gradle.properties | cut -d= -f2)
 NUM=$(grep '^customBuildNumber='     gradle.properties | cut -d= -f2)
-apk_name="shiroikuma-appmanager_${VER}+${NUM}_arm64-v8a.apk"
+apk_name="shiroikuma-oyokanri_${VER}+${NUM}_arm64-v8a.apk"
 cp /tmp/am-signed.apk ~/tmp/"$apk_name"
 
 # After the user has connected the phone with USB debugging:

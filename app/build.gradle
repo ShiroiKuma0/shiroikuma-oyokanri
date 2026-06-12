@@ -15,7 +15,7 @@ android {
     buildToolsVersion = build_tools
 
     defaultConfig {
-        applicationId 'shiroikuma.appmanager'
+        applicationId 'shiroikuma.oyokanri'
         minSdk min_sdk
         targetSdk target_sdk
         versionCode customBaseVersionCode * 10000 + customBuildNumber
@@ -50,7 +50,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            resValue "string", "app_name", "白い熊 App Manager"
+            resValue "string", "app_name", "白い熊の応用管理"
         }
         debug {
             applicationIdSuffix '.debug'
