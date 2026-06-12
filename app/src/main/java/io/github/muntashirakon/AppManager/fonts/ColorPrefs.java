@@ -76,6 +76,13 @@ public final class ColorPrefs {
     public static final String DETAIL_PACKAGE = "detail_package";
     public static final String DETAIL_VERSION = "detail_version";
 
+    // ---- colour-role keys (main-list separator grid; widths in SeparatorPrefs) ----
+    public static final String SEPARATOR_H = "separator_h";
+    public static final String SEPARATOR_V = "separator_v";
+
+    // ---- colour-role key (selected card frame; width/radius in SelectionFramePrefs) ----
+    public static final String SELECTED_FRAME = "selected_frame";
+
     @NonNull
     private static SharedPreferences sp(@NonNull Context ctx) {
         return ctx.getApplicationContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -131,6 +138,9 @@ public final class ColorPrefs {
             case FREEZE_THAWED:
             case CHIP:
             case ADDPILL:
+            case SEPARATOR_H:
+            case SEPARATOR_V:
+            case SELECTED_FRAME:
                 return ContextCompat.getColor(ctx, R.color.theme_bright_yellow);
             case VERSION_INACTIVE:
                 return ContextCompat.getColor(ctx, io.github.muntashirakon.ui.R.color.stopped);

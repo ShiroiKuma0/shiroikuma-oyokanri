@@ -63,6 +63,7 @@ import io.github.muntashirakon.AppManager.apk.installer.PackageInstallerActivity
 import io.github.muntashirakon.AppManager.fonts.ColorPrefs;
 import io.github.muntashirakon.AppManager.fonts.FontPrefs;
 import io.github.muntashirakon.AppManager.fonts.FontUtil;
+import io.github.muntashirakon.AppManager.fonts.SelectionFramePrefs;
 import io.github.muntashirakon.AppManager.apk.installer.PackageInstallerCompat;
 import io.github.muntashirakon.AppManager.backup.dialog.BackupRestoreDialogFragment;
 import io.github.muntashirakon.AppManager.compat.ApplicationInfoCompat;
@@ -133,6 +134,20 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         }
     };
 
+    // Fork: normal cells are square (edge-to-edge separator grid) with NO
+    // stroke at all — the separator lines are the only chrome between apps
+    // (the old per-state outlines — running yellow/orange, uninstalled,
+    // disabled — stacked against the separators and read as random frames).
+    // The selected card's frame is fully owned by the bind from prefs —
+    // colour (ColorPrefs.SELECTED_FRAME), border width and corner roundness
+    // (SelectionFramePrefs) — thick rounded yellow by default. The prefs are
+    // read AT BIND TIME (cheap in-memory map lookups, and only selected cards
+    // pay them) so the frame is always fresh — on the tri-fold, settings and
+    // the main list can be resumed side by side (multi-window), where the
+    // onResume consume-flag refresh never fires. (Never derive the radius
+    // from getRadius(): M3 shape resolution needs laid-out bounds and returns
+    // 0 before layout — the cause of the square-selection regression in +72.)
+
     // Resolved per-element text colours (fork). Defaults are the palette above;
     // each may be overridden via ColorPrefs. Reloaded in the constructor and
     // whenever a colour setting changes (reloadColors, called from
@@ -148,8 +163,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
     private int mcBackup;
     private int mcSignature;
     private boolean mcSignatureSet;
-    // Non-text indicators (Stage 2): card outline, freeze snowflake, chips, + pill.
-    private int mcStrokeUser, mcStrokeSystem;
+    // Non-text indicators (Stage 2): freeze snowflake, chips, + pill.
     private int mcFreezeFrozen, mcFreezeThawed;
     private int mcChip, mcAddPill;
 
@@ -309,12 +323,13 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         mcBackup = ColorPrefs.getColor(mActivity, ColorPrefs.BACKUP, mColorYellow);
         mcSignatureSet = ColorPrefs.isSet(mActivity, ColorPrefs.SIGNATURE);
         mcSignature = ColorPrefs.getColor(mActivity, ColorPrefs.SIGNATURE, mColorSecondary);
-        mcStrokeUser = ColorPrefs.getColor(mActivity, ColorPrefs.STROKE_USER, mColorYellow);
-        mcStrokeSystem = ColorPrefs.getColor(mActivity, ColorPrefs.STROKE_SYSTEM, mColorOrange);
         mcFreezeFrozen = ColorPrefs.getColor(mActivity, ColorPrefs.FREEZE_FROZEN, mColorIceBlue);
         mcFreezeThawed = ColorPrefs.getColor(mActivity, ColorPrefs.FREEZE_THAWED, mColorYellow);
         mcChip = ColorPrefs.getColor(mActivity, ColorPrefs.CHIP, mColorYellow);
         mcAddPill = ColorPrefs.getColor(mActivity, ColorPrefs.ADDPILL, mColorYellow);
+        // (The selected card's frame is deliberately NOT cached here — it is
+        // read at bind time so it stays fresh in multi-window, where the
+        // onResume flag consumption never runs.)
     }
 
     /**
@@ -432,24 +447,20 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             }
             return true;
         });
-        // Box-stroke colors (custom theme): uninstalled > disabled > running > stopped(none)
-        if (!item.isInstalled) {
-            cardView.setStrokeColor(ColorCodes.getAppUninstalledIndicatorColor(context));
-        } else if (item.isDisabled) {
-            cardView.setStrokeColor(ColorCodes.getAppDisabledIndicatorColor(context));
-        } else if (item.isStopped) {
-            // Force-stopped apps lose their distinctive border in this fork
-            cardView.setStrokeColor(Color.TRANSPARENT);
+        // Fork: square cells for the edge-to-edge separator grid; the selected
+        // card gets the configurable frame (thick rounded yellow by default).
+        if (isSelected(position)) {
+            float density = context.getResources().getDisplayMetrics().density;
+            float frameWidthDp = SelectionFramePrefs.getWidthDp(context);
+            cardView.setRadius(SelectionFramePrefs.getRadiusDp(context) * density);
+            cardView.setStrokeWidth(frameWidthDp <= 0f ? 0 : Math.max(1, Math.round(frameWidthDp * density)));
+            cardView.setStrokeColor(ColorPrefs.getColor(context, ColorPrefs.SELECTED_FRAME, mColorYellow));
         } else {
-            // Running apps (installed, not disabled, not stopped) get a
-            // box-stroke that matches the row's label colour:
-            //   user app   -> yellow (same as the user-app label)
-            //   system app -> orange (same as the system-app label)
-            // Frozen-and-running cases keep the orange/yellow stroke even
-            // though the label flips to ice blue - the stroke conveys the
-            // running/active state, not the frozen state, which the
-            // snowflake icon and italic label already do.
-            cardView.setStrokeColor(item.isUser ? mcStrokeUser : mcStrokeSystem);
+            // No stroke on unselected cells — only the separator grid shows
+            // between apps. (This dropped the old per-state outlines:
+            // running yellow/orange, uninstalled, disabled.)
+            cardView.setRadius(0f);
+            cardView.setStrokeWidth(0);
         }
         // Display yellow star if the app is in debug mode
         holder.debugIcon.setVisibility(item.debuggable ? View.VISIBLE : View.INVISIBLE);
