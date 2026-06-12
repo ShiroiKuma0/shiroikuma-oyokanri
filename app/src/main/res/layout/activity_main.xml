@@ -41,10 +41,13 @@
         android:focusable="false"
         app:layout_behavior="com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior">
 
+        <!-- Fork: black list background (same as the cards) so no grey ever
+             shows between or under the edge-to-edge cells. -->
         <io.github.muntashirakon.widget.RecyclerView
             android:id="@+id/item_list"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:background="@android:color/black"
             android:scrollbars="none"
             android:focusable="false"
             android:clipToPadding="false"

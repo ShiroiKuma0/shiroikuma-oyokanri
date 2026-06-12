@@ -14,10 +14,12 @@
     android:layout_marginTop="16dp">
 
     <!-- Sub-heading with a text-width underline (wrap_content wrapper, so
-         the match_parent rule below spans only the text). -->
+         the match_parent rule below spans only the text). Level-2 indent:
+         32dp; each lower level doubles (controls below sit at 64dp). -->
     <androidx.appcompat.widget.LinearLayoutCompat
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginStart="32dp"
         android:orientation="vertical">
 
         <androidx.appcompat.widget.AppCompatTextView
@@ -43,7 +45,7 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:layout_marginTop="8dp"
-        android:paddingStart="16dp"
+        android:paddingStart="64dp"
         android:paddingEnd="0dp">
 
         <androidx.appcompat.widget.LinearLayoutCompat

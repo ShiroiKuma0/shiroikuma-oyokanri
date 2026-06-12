@@ -39,6 +39,7 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
+import java.util.Locale;
 
 import io.github.muntashirakon.AppManager.R;
 
@@ -136,10 +137,8 @@ public class FontsPreferences extends Fragment {
                     }),
             }),
             new Group(R.string.pref_color_group_indicators, new Cat[]{
-                    new Cat(null, R.string.pref_color_cat_stroke, new ColorSpec[]{
-                            new ColorSpec(ColorPrefs.STROKE_USER, R.string.pref_color_stroke_user),
-                            new ColorSpec(ColorPrefs.STROKE_SYSTEM, R.string.pref_color_stroke_system),
-                    }),
+                    // (The former "Card outline" colour rows are gone: unselected
+                    // cells draw no stroke since the edge-to-edge separator grid.)
                     new Cat(null, R.string.pref_color_cat_freeze, new ColorSpec[]{
                             new ColorSpec(ColorPrefs.FREEZE_FROZEN, R.string.pref_color_freeze_frozen),
                             new ColorSpec(ColorPrefs.FREEZE_THAWED, R.string.pref_color_freeze_thawed),
@@ -210,6 +209,105 @@ public class FontsPreferences extends Fragment {
             }
             container.addView(groupView);
         }
+        // Fork: main-list separators (width slider + colour each) — built
+        // manually because the data-driven Cat structure is font/colour-only.
+        View sepGroup = inflater.inflate(R.layout.view_font_group, container, false);
+        ((AppCompatTextView) sepGroup.findViewById(R.id.group_header)).setText(R.string.pref_sep_group);
+        LinearLayoutCompat sepContent = sepGroup.findViewById(R.id.group_content);
+        sepContent.addView(buildSeparatorElement(inflater, sepContent, true));
+        sepContent.addView(buildSeparatorElement(inflater, sepContent, false));
+        container.addView(sepGroup);
+        // Fork: the selected card's frame (colour + border width + roundness).
+        View frameGroup = inflater.inflate(R.layout.view_font_group, container, false);
+        ((AppCompatTextView) frameGroup.findViewById(R.id.group_header)).setText(R.string.pref_selframe_group);
+        LinearLayoutCompat frameContent = frameGroup.findViewById(R.id.group_content);
+        frameContent.addView(buildSelectionFrameElement(inflater, frameContent));
+        container.addView(frameGroup);
+    }
+
+    /**
+     * The selected (checked) card's frame: border-width slider (0.5dp steps,
+     * 0 = no border), corner-roundness slider (1dp steps, 0 = square), and a
+     * colour row reusing the standard picker.
+     */
+    @NonNull
+    private View buildSelectionFrameElement(@NonNull LayoutInflater inflater, @NonNull LinearLayoutCompat parent) {
+        View element = inflater.inflate(R.layout.view_selection_frame_element, parent, false);
+        ((AppCompatTextView) element.findViewById(R.id.element_label)).setText(R.string.pref_selframe_cat);
+        final AppCompatTextView widthValue = element.findViewById(R.id.frame_width_value);
+        final AppCompatSeekBar widthSeek = element.findViewById(R.id.frame_width_seek);
+        final AppCompatTextView radiusValue = element.findViewById(R.id.frame_radius_value);
+        final AppCompatSeekBar radiusSeek = element.findViewById(R.id.frame_radius_seek);
+        widthSeek.setMax(Math.round(SelectionFramePrefs.MAX_WIDTH_DP * 2));  // half-dp steps
+        radiusSeek.setMax(SelectionFramePrefs.MAX_RADIUS_DP);
+        final Runnable render = () -> {
+            float widthDp = SelectionFramePrefs.getWidthDp(requireContext());
+            int radiusDp = SelectionFramePrefs.getRadiusDp(requireContext());
+            widthValue.setText(String.format(Locale.US, "%.1f dp", widthDp));
+            widthSeek.setProgress(Math.round(widthDp * 2));
+            radiusValue.setText(String.format(Locale.US, "%d dp", radiusDp));
+            radiusSeek.setProgress(radiusDp);
+        };
+        render.run();
+        widthSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                SelectionFramePrefs.setWidthDp(requireContext(), progress / 2f);
+                render.run();
+            }
+            @Override public void onStartTrackingTouch(SeekBar sb) {}
+            @Override public void onStopTrackingTouch(SeekBar sb) {}
+        });
+        radiusSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                SelectionFramePrefs.setRadiusDp(requireContext(), progress);
+                render.run();
+            }
+            @Override public void onStartTrackingTouch(SeekBar sb) {}
+            @Override public void onStopTrackingTouch(SeekBar sb) {}
+        });
+        LinearLayoutCompat colorRows = element.findViewById(R.id.color_rows);
+        addColorRow(colorRows, new ColorSpec(ColorPrefs.SELECTED_FRAME, R.string.pref_color_separator), () -> {});
+        return element;
+    }
+
+    /**
+     * One separator element: heading, width value + slider (0–{@link SeparatorPrefs#MAX_WIDTH_DP}dp
+     * in 0.5dp steps, 0 = none), and a colour row reusing the standard picker.
+     */
+    @NonNull
+    private View buildSeparatorElement(@NonNull LayoutInflater inflater, @NonNull LinearLayoutCompat parent,
+                                       boolean horizontal) {
+        View element = inflater.inflate(R.layout.view_separator_element, parent, false);
+        ((AppCompatTextView) element.findViewById(R.id.element_label)).setText(
+                horizontal ? R.string.pref_sep_cat_horizontal : R.string.pref_sep_cat_vertical);
+        final AppCompatTextView widthValue = element.findViewById(R.id.sep_width_value);
+        final AppCompatSeekBar widthSeek = element.findViewById(R.id.sep_width_seek);
+        widthSeek.setMax(Math.round(SeparatorPrefs.MAX_WIDTH_DP * 2));  // half-dp steps
+        final Runnable render = () -> {
+            float dp = SeparatorPrefs.getWidthDp(requireContext(), horizontal);
+            widthValue.setText(String.format(Locale.US, "%.1f dp", dp));
+            widthSeek.setProgress(Math.round(dp * 2));
+        };
+        render.run();
+        widthSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                SeparatorPrefs.setWidthDp(requireContext(), horizontal, progress / 2f);
+                render.run();
+            }
+            @Override public void onStartTrackingTouch(SeekBar sb) {}
+            @Override public void onStopTrackingTouch(SeekBar sb) {}
+        });
+        LinearLayoutCompat colorRows = element.findViewById(R.id.color_rows);
+        addColorRow(colorRows, new ColorSpec(
+                horizontal ? ColorPrefs.SEPARATOR_H : ColorPrefs.SEPARATOR_V,
+                R.string.pref_color_separator), () -> {});
+        return element;
     }
 
     private void bindElement(@NonNull View element, @NonNull Cat cat) {

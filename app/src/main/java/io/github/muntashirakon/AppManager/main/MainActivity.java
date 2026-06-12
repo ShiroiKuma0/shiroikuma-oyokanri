@@ -74,6 +74,8 @@ import io.github.muntashirakon.AppManager.apk.list.ListExporter;
 import io.github.muntashirakon.AppManager.fonts.ColorPrefs;
 import io.github.muntashirakon.AppManager.fonts.FontPrefs;
 import io.github.muntashirakon.AppManager.fonts.FontUtil;
+import io.github.muntashirakon.AppManager.fonts.SelectionFramePrefs;
+import io.github.muntashirakon.AppManager.fonts.SeparatorPrefs;
 import io.github.muntashirakon.AppManager.backup.dialog.BackupRestoreDialogFragment;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsManager;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsProgressMonitor;
@@ -139,6 +141,8 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
     private SwipeRefreshLayout mSwipeRefresh;
     // Fork: kept so the layout picker can swap the layout manager at runtime.
     private RecyclerView mRecyclerView;
+    // Fork: separator grid between the edge-to-edge list cells.
+    private MainSeparatorDecoration mSeparatorDecoration;
     private MultiSelectionView mMultiSelectionView;
     MainBatchOpsHandler mBatchOpsHandler;
     private MenuItem mAppUsageMenu;
@@ -344,6 +348,10 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         mAdapter.setHasStableIds(true);
         applyListLayout();
         mRecyclerView.setAdapter(mAdapter);
+        // Fork: configurable separator lines between cells (widths in
+        // SeparatorPrefs, colours in ColorPrefs).
+        mSeparatorDecoration = new MainSeparatorDecoration(this);
+        mRecyclerView.addItemDecoration(mSeparatorDecoration);
         // Refresh the per-row profile pills immediately after an app is added to
         // a profile via the "+" dialog (the dialog doesn't pause the activity,
         // so onResume wouldn't fire).
@@ -466,7 +474,37 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             toolbar.setOverflowIcon(overflow);
         }
         // --- end custom theme
+        // Fork: long-press the overflow (hamburger) button opens the
+        // 白い熊の応用管理 UI settings page directly. Posted because the menu
+        // views are laid out after this method returns.
+        if (toolbar != null) {
+            final androidx.appcompat.widget.Toolbar tb = toolbar;
+            tb.post(() -> attachOverflowLongPress(tb));
+        }
         return super.onCreateOptionsMenu(menu);
+    }
+
+    /**
+     * Fork: wire a long-press on the toolbar's overflow (hamburger) button to
+     * open the 白い熊の応用管理 UI settings page. The overflow button is the
+     * only ImageView child of the toolbar's ActionMenuView (the visible
+     * action items are ActionMenuItemViews, which extend TextView).
+     */
+    private void attachOverflowLongPress(@NonNull androidx.appcompat.widget.Toolbar toolbar) {
+        for (int i = 0; i < toolbar.getChildCount(); ++i) {
+            View child = toolbar.getChildAt(i);
+            if (!(child instanceof androidx.appcompat.widget.ActionMenuView)) continue;
+            androidx.appcompat.widget.ActionMenuView menuView = (androidx.appcompat.widget.ActionMenuView) child;
+            for (int j = 0; j < menuView.getChildCount(); ++j) {
+                View button = menuView.getChildAt(j);
+                if (button instanceof ImageView) {
+                    button.setOnLongClickListener(v -> {
+                        startActivity(SettingsActivity.getSettingsIntent(this, "fonts_prefs"));
+                        return true;
+                    });
+                }
+            }
+        }
     }
 
     @Override
@@ -581,6 +619,43 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             startActivity(intent);
         } else return super.onOptionsItemSelected(item);
         return true;
+    }
+
+    /**
+     * Fork: if any per-element font, colour, separator or selection-frame
+     * setting was changed in the UI settings screen, re-bind the list and/or
+     * refresh the separator decoration so the change renders. Flag-guarded,
+     * so calls on unchanged state are free. Called from onResume AND from
+     * onTopResumedActivityChanged — on the tri-fold the settings screen and
+     * the main list can be resumed side by side (multi-window), where
+     * switching windows never goes through onResume.
+     */
+    private void refreshForkAppearanceIfChanged() {
+        boolean fontsChanged = FontPrefs.consumeChanged();
+        boolean colorsChanged = ColorPrefs.consumeChanged();
+        boolean separatorsChanged = SeparatorPrefs.consumeChanged();
+        boolean framesChanged = SelectionFramePrefs.consumeChanged();
+        if (mAdapter != null && (fontsChanged || colorsChanged || framesChanged)) {
+            if (fontsChanged) FontUtil.clearCache();
+            if (colorsChanged) mAdapter.reloadColors();
+            mAdapter.notifyDataSetChanged();
+        }
+        // The separator grid reads both ColorPrefs (colours) and
+        // SeparatorPrefs (widths) — refresh it when either changed.
+        if ((colorsChanged || separatorsChanged) && mSeparatorDecoration != null && mRecyclerView != null) {
+            mSeparatorDecoration.reload(this);
+            mRecyclerView.invalidateItemDecorations();
+        }
+    }
+
+    @Override
+    public void onTopResumedActivityChanged(boolean isTopResumedActivity) {
+        super.onTopResumedActivityChanged(isTopResumedActivity);
+        // Fork: in multi-window, regaining top-resumed is the only signal that
+        // the user came back from a side-by-side settings window.
+        if (isTopResumedActivity) {
+            refreshForkAppearanceIfChanged();
+        }
     }
 
     /**
@@ -868,17 +943,7 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         // change (the clear+rebuild path always runs but produces an
         // identical menu, which the widget renders without flicker).
         rebuildSelectionToolbarFromPrefs();
-        // If any per-element font or colour was changed in the UI colours &
-        // fonts screen while we were paused, re-bind the list so the new
-        // typefaces/sizes/colours render. Guarded by flags so a normal resume
-        // does not re-bind.
-        boolean fontsChanged = FontPrefs.consumeChanged();
-        boolean colorsChanged = ColorPrefs.consumeChanged();
-        if (mAdapter != null && (fontsChanged || colorsChanged)) {
-            if (fontsChanged) FontUtil.clearCache();
-            if (colorsChanged) mAdapter.reloadColors();
-            mAdapter.notifyDataSetChanged();
-        }
+        refreshForkAppearanceIfChanged();
         // Fork: also listen for batch-op START so the in-app progress dialog can
         // open; COMPLETED dismisses it.
         IntentFilter batchOpsFilter = new IntentFilter();
