@@ -26,6 +26,14 @@
         android:title="@string/copy_displayed_app_ids"
         app:showAsAction="ifRoom" />
 
+    <!-- Fork: main-list layout picker (adaptive / 2 / 3 / 4 columns). Last
+         ifRoom item, so it sits immediately left of the overflow button. -->
+    <item
+        android:id="@+id/action_layout_columns"
+        android:icon="@drawable/ic_grid_3x3"
+        android:title="@string/list_layout"
+        app:showAsAction="ifRoom" />
+
     <item
         android:id="@+id/action_refresh"
         android:icon="@drawable/ic_refresh"

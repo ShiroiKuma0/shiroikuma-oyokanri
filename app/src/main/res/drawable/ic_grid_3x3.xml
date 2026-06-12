@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fork: 3x3 yellow tile grid for the main-list layout picker. Literal colour
+     (not ?attr) so the icon renders yellow even before the menu tint loop runs. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFF00"
+        android:pathData="M1.5,1.5h6v6h-6z M9,1.5h6v6h-6z M16.5,1.5h6v6h-6z M1.5,9h6v6h-6z M9,9h6v6h-6z M16.5,9h6v6h-6z M1.5,16.5h6v6h-6z M9,16.5h6v6h-6z M16.5,16.5h6v6h-6z" />
+</vector>
