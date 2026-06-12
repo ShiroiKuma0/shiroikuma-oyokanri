@@ -1,28 +1,28 @@
 ---
 name: appmanager-fork
-description: Build the user's patched fork of AppManager for Android (package shiroikuma.appmanager, installable side-by-side with the official AppManager from F-Droid). The fork exposes AM Debug features (Finder, Crazy Logger, scanner missing-classes, historical operations, Unfrozen filter) in a release-grade build and neuters the upstream build-expiry checker. Use this skill any time the user mentions AppManager, MuntashirAkon/AppManager, ShiroiKuma0/appmanager, io.github.muntashirakon.AppManager, shiroikuma.appmanager, App Manager Custom, AM Debug, AMInsecureDebugBuilds, the AppManager fork, the Finder activity, asks to pull a new AppManager upstream master, asks to rebase the custom branch onto a newer master, asks to rebuild AppManager, or references their AppManager build pipeline. Default to assuming this skill applies when in doubt during a session about AppManager. Companion to and follows the same shell formatting as `shell-block-formatting`, `simplex-chat-build`, and `shiroikumanojisho-build`.
+description: Build the user's patched fork of AppManager for Android (package shiroikuma.oyokanri, formerly shiroikuma.appmanager; installable side-by-side with the official AppManager from F-Droid). The fork exposes AM Debug features (Finder, Crazy Logger, scanner missing-classes, historical operations, Unfrozen filter) in a release-grade build and neuters the upstream build-expiry checker. Use this skill any time the user mentions AppManager, 白い熊の応用管理, oyokanri, MuntashirAkon/AppManager, ShiroiKuma0/shiroikuma-oyokanri, ShiroiKuma0/appmanager, io.github.muntashirakon.AppManager, shiroikuma.oyokanri, shiroikuma.appmanager, App Manager Custom, AM Debug, AMInsecureDebugBuilds, the AppManager fork, the Finder activity, asks to pull a new AppManager upstream master, asks to rebase the custom branch onto a newer master, asks to rebuild AppManager, or references their AppManager build pipeline. Default to assuming this skill applies when in doubt during a session about AppManager. Companion to and follows the same shell formatting as `shell-block-formatting`, `simplex-chat-build`, and `shiroikumanojisho-build`.
 ---
 
 # AppManager — patched fork build skill
 
-The user maintains a downstream-patched build of [AppManager](https://github.com/MuntashirAkon/AppManager) on Android. They build it on a Tuxedo OS workstation from their fork (`ShiroiKuma0/appmanager`) and sideload the APK alongside the official AppManager. The fork has three purposes: (1) install side-by-side with the official build via a different `applicationId`; (2) light up the AM Debug-only features that MuntashirAkon has gated behind `BuildConfig.DEBUG` in master but no longer publishes prebuilt AM Debug APKs of (the `MuntashirAkon/AMInsecureDebugBuilds` distribution repo was discontinued); (3) remove the built-in build-expiry check so the build doesn't self-disable after N months.
+The user maintains a downstream-patched build of [AppManager](https://github.com/MuntashirAkon/AppManager) on Android. They build it on a Tuxedo OS workstation from their fork (`ShiroiKuma0/shiroikuma-oyokanri`, formerly `ShiroiKuma0/appmanager`) and sideload the APK alongside the official AppManager. The fork has three purposes: (1) install side-by-side with the official build via a different `applicationId`; (2) light up the AM Debug-only features that MuntashirAkon has gated behind `BuildConfig.DEBUG` in master but no longer publishes prebuilt AM Debug APKs of (the `MuntashirAkon/AMInsecureDebugBuilds` distribution repo was discontinued); (3) remove the built-in build-expiry check so the build doesn't self-disable after N months.
 
 ## Project identity
 
 | Item | Value |
 |------|-------|
 | Upstream repo | `MuntashirAkon/AppManager` |
-| User's fork | `ShiroiKuma0/appmanager` (lowercase, intentional) |
-| Local working tree | `~/git/shiroikuma-appmanager` |
-| Local remote names | `upstream` → `MuntashirAkon/AppManager` (SSH), `origin` → `ShiroiKuma0/appmanager` (SSH) |
+| User's fork | `ShiroiKuma0/shiroikuma-oyokanri` (lowercase, intentional; renamed from `ShiroiKuma0/appmanager`) |
+| Local working tree | `~/git/shiroikuma-appmanager` (directory name unchanged) |
+| Local remote names | `upstream` → `MuntashirAkon/AppManager` (SSH), `origin` → `ShiroiKuma0/shiroikuma-oyokanri` (SSH) |
 | Persistent branch | `custom` (force-pushable on each rebase) |
 | Base | **rolling on `upstream/master`** — NOT pinned to a release tag (see "Why master, not a tag" below) |
-| Custom Android applicationId | `shiroikuma.appmanager` |
-| Custom app display name (release) | `白い熊 App Manager` |
+| Custom Android applicationId | `shiroikuma.oyokanri` (renamed from `shiroikuma.appmanager`) |
+| Custom app display name (release) | `白い熊の応用管理` (renamed from `白い熊 App Manager`) |
 | Java/Kotlin namespace (unchanged) | `io.github.muntashirakon.AppManager` |
 | Custom signing keystore | `~/.android-keystores/appmanager-custom.jks` (alias `appmanager`, passphrase `appmanager123`) |
 | Output APK directory | `~/tmp/` |
-| Output APK name | `shiroikuma-appmanager_<versionName>_arm64-v8a.apk` where versionName is `<customBaseVersionName>+<customBuildNumber>`, e.g. `shiroikuma-appmanager_4.0.5+21_arm64-v8a.apk`. No datetime, no git sha. |
+| Output APK name | `shiroikuma-oyokanri_<versionName>_arm64-v8a.apk` where versionName is `<customBaseVersionName>+<customBuildNumber>`, e.g. `shiroikuma-oyokanri_4.0.5+21_arm64-v8a.apk` (renamed from the former `shiroikuma-appmanager_…`). No datetime, no git sha. |
 | On-device deploy path | `/sdcard/tmp/` |
 | Build host | Tuxedo OS |
 | Target ABI | `arm64-v8a` only (skip `armeabi-v7a`, `x86`, `x86_64`; `universalApk false`) |
@@ -44,7 +44,7 @@ Steps every time, in the sandbox:
 ```bash
 cd /home/claude/AppManager
 # Ensure origin is configured (one-time):
-git remote add origin https://github.com/ShiroiKuma0/appmanager.git 2>/dev/null || true
+git remote add origin https://github.com/ShiroiKuma0/shiroikuma-oyokanri.git 2>/dev/null || true
 # Fetch with full refspec so origin/<branch> remote-tracking refs land properly:
 git fetch origin '+refs/heads/*:refs/remotes/origin/*'
 # Hard-reset sandbox to whatever the user has on origin/custom RIGHT NOW:
@@ -371,7 +371,7 @@ E Ops : java.io.FileNotFoundException: am.jar
 E Ops :   at io.github.muntashirakon.AppManager.servermanager.ServerConfig.init(ServerConfig.java:61)
 ```
 
-Line 61 is `AssetsUtils.copyFile(context, Constants.JAR_NAME, SERVER_RUNNER_JAR[0], force)`, which calls `context.getAssets().openFd("am.jar")` — and that throws immediately when the asset isn't packaged. The exception is caught by `MainPreferencesViewModel.loadCustomCommands()`, which `postValue(null)`s both `mCustomCommand0` and `mCustomCommand1` LiveData fields. The UI surface is the **Settings → Mode of operation → Custom command** page: the two code boxes that should show `sh /storage/emulated/0/Android/data/shiroikuma.appmanager/cache/run_server.sh <port> <token>` (and the equivalent under `/data/user_de/0/.../cache/`) stay blank.
+Line 61 is `AssetsUtils.copyFile(context, Constants.JAR_NAME, SERVER_RUNNER_JAR[0], force)`, which calls `context.getAssets().openFd("am.jar")` — and that throws immediately when the asset isn't packaged. The exception is caught by `MainPreferencesViewModel.loadCustomCommands()`, which `postValue(null)`s both `mCustomCommand0` and `mCustomCommand1` LiveData fields. The UI surface is the **Settings → Mode of operation → Custom command** page: the two code boxes that should show `sh /storage/emulated/0/Android/data/shiroikuma.oyokanri/cache/run_server.sh <port> <token>` (and the equivalent under `/data/user_de/0/.../cache/`) stay blank.
 
 **Diagnostic that confirms it.** Compare `app/src/main/assets/` (which DOES contain `am.jar` and `main.jar` after build) to the APK's `assets/` (which does NOT). The JARs are written *eventually*, just not in time for `mergeAssets` to pick them up.
 
@@ -693,7 +693,7 @@ First build with no NDK installed takes 15–30 minutes (NDK download + Gradle d
 
 Build output goes to `~/tmp/shiroikuma-appmanager_<versionName>_arm64-v8a.apk` (where `versionName` = `<customBaseVersionName>+<customBuildNumber>`, e.g. `shiroikuma-appmanager_4.0.5+21_arm64-v8a.apk` — no datetime, no git sha; read `customBaseVersionName` and the post-bump `customBuildNumber` from `gradle.properties`) and is `adb push`ed to `/sdcard/tmp/` — the pipeline does **not** `adb install` anymore. Install on device via file manager from `/sdcard/tmp/`. Each `cp`/`adb` line in the pipeline is preceded by a bright-white (`\e[1;37m`) `>>>` echo showing the full command with complete source+destination paths. If `adb push` fails (no device connected, USB debugging off), the local `~/tmp/` copy is the fallback — transfer via KDE Connect, Bluetooth, file copy. The pipeline must also **abort if `git apply` fails** (the `r()` helper does not stop on error, so a failed apply otherwise silently builds the unpatched tree — this bit us once, producing a clean APK missing the just-added feature); gate the build behind an explicit apply check.
 
-The custom build's keystore is stable, so updates over an existing custom build install cleanly without uninstall. **Do not** install over the F-Droid official AppManager — different signing keys, Android will refuse. The two coexist because applicationIds differ (`io.github.muntashirakon.AppManager` vs `shiroikuma.appmanager`).
+The custom build's keystore is stable, so updates over an existing custom build install cleanly without uninstall. **Do not** install over the F-Droid official AppManager — different signing keys, Android will refuse. The two coexist because applicationIds differ (`io.github.muntashirakon.AppManager` vs `shiroikuma.oyokanri`).
 
 ## Upstream sync — rebase `custom` onto fresh master
 

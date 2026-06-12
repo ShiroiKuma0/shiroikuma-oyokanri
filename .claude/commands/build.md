@@ -1,4 +1,4 @@
-Run the full release build & deploy pipeline for `shiroikuma.appmanager`, exactly as documented in `CLAUDE.md` → "Build & deploy pipeline".
+Run the full release build & deploy pipeline for `shiroikuma.oyokanri`, exactly as documented in `CLAUDE.md` → "Build & deploy pipeline".
 
 Steps:
 1. `tools/bump-build.sh` to bump `customBuildNumber`, then read `customBaseVersionName` and `customBuildNumber` from `gradle.properties` to derive the APK name.
