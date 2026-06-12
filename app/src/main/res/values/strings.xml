@@ -1697,7 +1697,7 @@
     <string name="launch_activity_dialog_title">Launch activity: action required</string>
     <string name="launch_activity_dialog_message">Android 5.x cannot trigger the <b>Search assistant</b> automatically. To open the activity, activate the Search assistant manually (usually by long-pressing the Home button). Tap <b>Close</b> after the activity opens to restore the original assistant.</string>
     <!-- Configurable fonts (shiroikuma fork) -->
-    <string name="pref_fonts">白い熊の応用管理 UI</string>
+    <string name="pref_fonts">白い熊 応用管理 UI</string>
     <string name="pref_fonts_description">Set the font, weight, size and color per interface element</string>
     <string name="pref_font_group_default">Default</string>
     <string name="pref_font_cat_default">Default (all text)</string>
