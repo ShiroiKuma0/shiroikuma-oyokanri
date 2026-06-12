@@ -50,7 +50,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            resValue "string", "app_name", "白い熊の応用管理"
+            resValue "string", "app_name", "白い熊 応用管理"
         }
         debug {
             applicationIdSuffix '.debug'
