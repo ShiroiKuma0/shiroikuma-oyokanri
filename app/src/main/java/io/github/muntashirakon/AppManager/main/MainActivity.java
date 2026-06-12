@@ -20,6 +20,7 @@ import android.text.Spanned;
 import android.text.TextUtils;
 import android.text.style.ForegroundColorSpan;
 import android.view.Gravity;
+import android.content.res.ColorStateList;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -56,6 +57,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.Iterator;
 import java.util.List;
@@ -104,6 +106,7 @@ import io.github.muntashirakon.AppManager.usage.AppUsageActivity;
 import io.github.muntashirakon.AppManager.users.Users;
 import io.github.muntashirakon.AppManager.utils.AppPref;
 import io.github.muntashirakon.AppManager.utils.DateUtils;
+import io.github.muntashirakon.AppManager.utils.ForkThemeUtils;
 import io.github.muntashirakon.AppManager.utils.StoragePermission;
 import io.github.muntashirakon.AppManager.utils.ClipboardUtils;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
@@ -136,6 +139,12 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
     private MultiSelectionView mMultiSelectionView;
     MainBatchOpsHandler mBatchOpsHandler;
     private MenuItem mAppUsageMenu;
+    // Fork: floating selection reminder (count + hidden) above the action toolbar,
+    // and the "Selected apps" sheet it opens.
+    private View mSelectionReminder;
+    private TextView mSelectionReminderText;
+    @Nullable
+    private SelectionListBottomSheet mSelectionSheet;
 
     private final StoragePermission mStoragePermission = StoragePermission.init(this);
 
@@ -358,7 +367,15 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         mMultiSelectionView.setAdapter(mAdapter);
         mMultiSelectionView.updateCounter(true);
         mBatchOpsHandler = new MainBatchOpsHandler(mMultiSelectionView, viewModel);
-        mMultiSelectionView.setOnSelectionChangeListener(mBatchOpsHandler);
+        // Fork: also refresh the floating selection reminder on every selection
+        // change. setDefaultList() fires this too, so a filter/search change that
+        // hides selected apps updates the "· N hidden" count as well.
+        mMultiSelectionView.setOnSelectionChangeListener(count -> {
+            boolean refresh = mBatchOpsHandler.onSelectionChange(count);
+            updateSelectionReminder();
+            return refresh;
+        });
+        setupSelectionReminder();
         // Override the XML-inflated selection toolbar with the user's
         // customised order from MainToolbarPrefs, and wire each visible
         // toolbar button to open the same prefs screen on long-press.
@@ -582,11 +599,14 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
     @Override
     public void onSelectionModeEnabled() {
         mOnBackPressedCallback.setEnabled(true);
+        updateSelectionReminder();
     }
 
     @Override
     public void onSelectionModeDisabled() {
         mOnBackPressedCallback.setEnabled(false);
+        // Selection cleared/exited — drop the reminder and close its sheet.
+        updateSelectionReminder();
     }
 
     @Override
@@ -1047,6 +1067,138 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         if (mMultiSelectionView != null && mAdapter != null && mAdapter.isInSelectionMode()) {
             mMultiSelectionView.cancel();
         }
+    }
+
+    // Fork: one-time setup of the floating selection reminder pill — theme it from
+    // the fork palette and wire its two tap targets (body → list sheet, ✕ → clear
+    // all). Its bottom margin tracks the action toolbar's height (below).
+    private void setupSelectionReminder() {
+        mSelectionReminder = findViewById(R.id.selection_reminder);
+        mSelectionReminderText = findViewById(R.id.selection_reminder_text);
+        if (mSelectionReminder == null) {
+            return;
+        }
+        View body = mSelectionReminder.findViewById(R.id.selection_reminder_body);
+        ImageView icon = mSelectionReminder.findViewById(R.id.selection_reminder_icon);
+        ImageView clear = mSelectionReminder.findViewById(R.id.selection_reminder_clear);
+        int textColor = ForkThemeUtils.getTextColor();
+        ForkThemeUtils.applyThemedBackground(mSelectionReminder, 18f);
+        mSelectionReminderText.setTextColor(textColor);
+        icon.setImageTintList(ColorStateList.valueOf(textColor));
+        clear.setImageTintList(ColorStateList.valueOf(textColor));
+        body.setOnClickListener(v -> showSelectionList());
+        clear.setOnClickListener(v -> clearSelection());
+        // Keep the pill sitting just above the action toolbar as the toolbar's
+        // height changes (it can minimise/expand or grow with the nav-bar inset).
+        if (mMultiSelectionView != null) {
+            mMultiSelectionView.addOnLayoutChangeListener(
+                    (v, l, t, r, b, ol, ot, or, ob) -> positionSelectionReminder());
+        }
+    }
+
+    // Fork: recompute and repaint the selection reminder. Shown whenever the
+    // selection is non-empty; appends "· N hidden" when some selected apps aren't
+    // in the current filtered/searched view (the actual danger signal).
+    private void updateSelectionReminder() {
+        if (viewModel == null || mSelectionReminder == null) {
+            return;
+        }
+        List<String> selected = viewModel.getSelectedPackageNames();
+        int count = selected.size();
+        if (count <= 0) {
+            if (mSelectionReminder.getVisibility() != View.GONE) {
+                mSelectionReminder.setVisibility(View.GONE);
+            }
+            if (mSelectionSheet != null) {
+                mSelectionSheet.dismiss();
+            }
+            return;
+        }
+        int hidden = 0;
+        if (mAdapter != null) {
+            Set<String> displayed = new HashSet<>(mAdapter.getDisplayedPackageNames());
+            for (String pkg : selected) {
+                if (!displayed.contains(pkg)) hidden++;
+            }
+        }
+        String text = getString(R.string.selection_reminder_count, count);
+        if (hidden > 0) {
+            text += getString(R.string.selection_reminder_hidden_suffix, hidden);
+        }
+        mSelectionReminderText.setText(text);
+        positionSelectionReminder();
+        if (mSelectionReminder.getVisibility() != View.VISIBLE) {
+            mSelectionReminder.setVisibility(View.VISIBLE);
+        }
+    }
+
+    // Fork: keep the pill's bottom margin equal to the action toolbar's height
+    // (plus a small gap), so it floats just above it regardless of toolbar height.
+    private void positionSelectionReminder() {
+        if (mSelectionReminder == null || mMultiSelectionView == null) {
+            return;
+        }
+        ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) mSelectionReminder.getLayoutParams();
+        int gap = (int) ForkThemeUtils.dpToPx(this, 8f);
+        int toolbarHeight = mMultiSelectionView.getVisibility() == View.VISIBLE
+                ? mMultiSelectionView.getHeight() : 0;
+        int desired = toolbarHeight + gap;
+        if (lp.bottomMargin != desired) {
+            lp.bottomMargin = desired;
+            mSelectionReminder.setLayoutParams(lp);
+        }
+    }
+
+    // Fork: open the "Selected apps" sheet from the reminder pill.
+    private void showSelectionList() {
+        if (viewModel == null) {
+            return;
+        }
+        if (mSelectionSheet == null) {
+            mSelectionSheet = new SelectionListBottomSheet(this, new SelectionListBottomSheet.Host() {
+                @NonNull
+                @Override
+                public List<ApplicationItem> getSelectedItems() {
+                    return viewModel.getSelectedApplicationItemsSnapshot();
+                }
+
+                @NonNull
+                @Override
+                public Set<String> getDisplayedPackages() {
+                    return mAdapter != null ? new HashSet<>(mAdapter.getDisplayedPackageNames())
+                            : new HashSet<>();
+                }
+
+                @Override
+                public void deselect(@NonNull ApplicationItem item) {
+                    viewModel.deselect(item);
+                }
+
+                @Override
+                public void clearAll() {
+                    clearSelection();
+                }
+
+                @Override
+                public void onSelectionChanged() {
+                    onSelectionMutatedExternally();
+                }
+            });
+        }
+        mSelectionSheet.show();
+    }
+
+    // Fork: after the selection is changed from the sheet (per-app deselect or
+    // clear-all), repaint the visible row highlights, the action-toolbar counter
+    // (which also exits selection mode when the count hits zero), and the pill.
+    private void onSelectionMutatedExternally() {
+        if (mAdapter != null) {
+            mAdapter.notifyDataSetChanged();
+        }
+        if (mMultiSelectionView != null) {
+            mMultiSelectionView.updateCounter(true);
+        }
+        updateSelectionReminder();
     }
 
     // Fork: open the in-app batch-progress dialog if the user has it enabled.

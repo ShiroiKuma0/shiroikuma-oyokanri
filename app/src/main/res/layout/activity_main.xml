@@ -64,4 +64,70 @@
         app:cardElevation="0dp"
         app:menu="@menu/activity_main_selection_actions" />
 
+    <!-- Fork: floating selection reminder. Sits just above the selection action
+         toolbar (its bottom margin is set in code to the toolbar's height) and is
+         shown whenever the selection is non-empty. Tap the body to list the
+         selected apps; tap the ✕ to clear the whole selection. The pill
+         background, text and icon colours are applied at runtime from the
+         configurable fork theme (ForkThemeUtils). Kept last so it floats on top. -->
+    <LinearLayout
+        android:id="@+id/selection_reminder"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="8dp"
+        android:elevation="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="14dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="6dp"
+        android:paddingBottom="6dp"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <LinearLayout
+            android:id="@+id/selection_reminder_body"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
+
+            <ImageView
+                android:id="@+id/selection_reminder_icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginEnd="8dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_check_circle" />
+
+            <TextView
+                android:id="@+id/selection_reminder_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                tools:text="100 selected · 70 hidden" />
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/selection_reminder_clear"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginStart="6dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:contentDescription="@string/clear_all"
+            android:focusable="true"
+            android:padding="6dp"
+            android:src="@drawable/ic_close_24dp" />
+    </LinearLayout>
+
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

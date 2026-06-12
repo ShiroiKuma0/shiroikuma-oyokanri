@@ -1079,6 +1079,11 @@
     <string name="sort_by_installation_date">インストール日時</string>
     <string name="netpolicy_cannot_be_modified_for_core_apps">ネットポリシーは、Androidコアアプリでは変更できません。</string>
     <!-- Fork: user-supplied Japanese translations -->
+    <string name="selection_reminder_count">%1$d個選択中</string>
+    <string name="selection_reminder_hidden_suffix"> ・%1$d個非表示</string>
+    <string name="selected_apps_title">選択中のアプリ (%1$d)</string>
+    <string name="clear_all">すべて解除</string>
+    <string name="selection_hidden_tag">・非表示</string>
     <string name="remove_from_profile">ﾌﾟﾛﾌｧｲﾙから削除</string>
     <string name="item_remove">削除</string>
     <string name="no_profile_contains_selection">選択したアプリはどのﾌﾟﾛﾌｧｲﾙにも属していません。</string>
