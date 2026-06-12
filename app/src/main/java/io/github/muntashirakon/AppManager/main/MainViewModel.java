@@ -260,6 +260,25 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
         return mSelectedPackageApplicationItemMap.values();
     }
 
+    // Fork: thread-safe snapshots of the current selection for the selection
+    // reminder pill + "Selected apps" sheet. Taken under the same lock that
+    // select()/deselect() use, so they never race a concurrent re-read on the
+    // model executor (which would otherwise risk a ConcurrentModificationException
+    // while the UI iterates the live map).
+    @NonNull
+    public List<String> getSelectedPackageNames() {
+        synchronized (mApplicationItems) {
+            return new ArrayList<>(mSelectedPackageApplicationItemMap.keySet());
+        }
+    }
+
+    @NonNull
+    public List<ApplicationItem> getSelectedApplicationItemsSnapshot() {
+        synchronized (mApplicationItems) {
+            return new ArrayList<>(mSelectedPackageApplicationItemMap.values());
+        }
+    }
+
     public String getSearchQuery() {
         return mSearchQuery;
     }

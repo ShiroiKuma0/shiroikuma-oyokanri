@@ -1808,4 +1808,10 @@
     <!-- Fork: per-app notes (main-list note badge + top-right add "+") -->
     <string name="note">Note</string>
     <string name="note_blank_deletes_helper">Leave blank to delete the note.</string>
+    <!-- Fork: floating selection reminder + selected-apps bottom sheet -->
+    <string name="selection_reminder_count">%1$d selected</string>
+    <string name="selection_reminder_hidden_suffix"> · %1$d hidden</string>
+    <string name="selected_apps_title">Selected apps (%1$d)</string>
+    <string name="clear_all">Clear all</string>
+    <string name="selection_hidden_tag">· hidden</string>
 </resources>
