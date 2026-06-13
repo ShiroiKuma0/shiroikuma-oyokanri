@@ -102,7 +102,6 @@ import io.github.muntashirakon.AppManager.profiles.ProfilesActivity;
 import io.github.muntashirakon.AppManager.profiles.ProtectedAppsProfile;
 import io.github.muntashirakon.AppManager.rules.RulesTypeSelectionDialogFragment;
 import io.github.muntashirakon.AppManager.processreaper.ProcessMonitorActivity;
-import io.github.muntashirakon.AppManager.runningapps.RunningAppsActivity;
 import io.github.muntashirakon.AppManager.self.life.FundingCampaignChecker;
 import io.github.muntashirakon.AppManager.settings.FeatureController;
 import io.github.muntashirakon.AppManager.settings.Prefs;
@@ -446,10 +445,6 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         }
         MenuItem finderMenu = menu.findItem(R.id.action_finder);
         finderMenu.setVisible(true);
-        // Fork: retire the legacy "Running apps" screen — superseded by the
-        // process monitor (the gauge icon). Hidden, not deleted (reversible).
-        MenuItem legacyRunning = menu.findItem(R.id.action_running_apps);
-        if (legacyRunning != null) legacyRunning.setVisible(false);
         // --- Custom theme: tint every action icon (including the overflow menu)
         // yellow, to match the main-screen palette. Also wrap each title in a
         // SpannableString with a yellow ForegroundColorSpan because the
@@ -621,9 +616,6 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                 startActivity(intent);
             } catch (Exception ignored) {
             }
-        } else if (id == R.id.action_running_apps) {
-            Intent runningAppsIntent = new Intent(this, RunningAppsActivity.class);
-            startActivity(runningAppsIntent);
         } else if (id == R.id.action_process_monitor) {
             // Fork: fallback — the action view normally handles the tap, but
             // route here too in case it ever surfaces without its action view.

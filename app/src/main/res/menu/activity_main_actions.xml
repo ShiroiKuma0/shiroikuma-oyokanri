@@ -65,10 +65,6 @@
         android:icon="@drawable/ic_data_usage"
         android:title="@string/app_usage" />
 
-    <item
-        android:id="@+id/action_running_apps"
-        android:icon="@drawable/ic_pulse"
-        android:title="@string/running_apps" />
 
     <item
         android:id="@+id/action_profiles"
