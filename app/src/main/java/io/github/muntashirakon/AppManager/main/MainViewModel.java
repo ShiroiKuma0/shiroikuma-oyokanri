@@ -739,7 +739,11 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
                 }
                 for (ApplicationItem item : candidateApplicationItems) {
                     item.setPackageUsageInfo(packageUsageInfoList.get(item.packageName));
-                    item.setRunning(runningPackages.contains(item.packageName));
+                    // Fork: a frozen app (disabled/suspended/hidden) is dormant and
+                    // must never count as running. getRunningAppProcesses() reports
+                    // per-process pkgLists, so a frozen system app sharing a UID/
+                    // process with a live sibling would otherwise be flagged running.
+                    item.setRunning(runningPackages.contains(item.packageName) && !item.isFrozen);
                 }
                 List<ApplicationItem> result = filterItem.getFilteredAppInfoList(candidateApplicationItems);
                 // Include intersection: keep only apps matching all include profiles.

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!--
+    Fork: one row of the main-list colour/style legend on the 白い熊 応用管理 UI
+    page. A fixed-width "sample" chip (styled in code to mirror the real list —
+    coloured text, a stroked box, or a shaded background) followed by a plain
+    description of what that styling signifies. Indented to 32dp like the other
+    level-2 elements.
+-->
+<androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:layout_marginTop="8dp"
+    android:paddingStart="32dp"
+    android:paddingEnd="8dp">
+
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/legend_sample"
+        android:layout_width="112dp"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:singleLine="true"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="5dp"
+        android:textColor="#E8E8E8"
+        android:textSize="14sp"
+        tools:text="App name" />
+
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/legend_desc"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="14dp"
+        android:textColor="#C8C8C8"
+        android:textSize="15sp"
+        tools:text="User app" />
+
+</androidx.appcompat.widget.LinearLayoutCompat>

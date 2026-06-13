@@ -15,6 +15,8 @@ import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
+
+import androidx.core.graphics.ColorUtils;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.RemoteException;
@@ -63,6 +65,7 @@ import io.github.muntashirakon.AppManager.apk.installer.PackageInstallerActivity
 import io.github.muntashirakon.AppManager.fonts.ColorPrefs;
 import io.github.muntashirakon.AppManager.fonts.FontPrefs;
 import io.github.muntashirakon.AppManager.fonts.FontUtil;
+import io.github.muntashirakon.AppManager.fonts.RunningBoxPrefs;
 import io.github.muntashirakon.AppManager.fonts.SelectionFramePrefs;
 import io.github.muntashirakon.AppManager.apk.installer.PackageInstallerCompat;
 import io.github.muntashirakon.AppManager.backup.dialog.BackupRestoreDialogFragment;
@@ -119,6 +122,12 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
     // the outline-vs-filled drawable swap alone was too subtle to read.
     private final int mColorYellow;
     private final int mColorIceBlue;
+    // Fork: dark "dormant" films painted as the card background (cool = frozen,
+    // mauve = uninstalled). Defaults; overridable via ColorPrefs at runtime.
+    private final int mColorFilmFrozen;
+    private final int mColorFilmUninstalled;
+    // Fork: uninstalled labels are dimmed to ~65% alpha so they read as inactive.
+    private static final int UNINSTALLED_LABEL_DIM_ALPHA = 0xA6;
     private final int mLabelFrozenUser;
     private final int mLabelFrozenSystem;
 
@@ -166,6 +175,10 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
     // Non-text indicators (Stage 2): freeze snowflake, chips, + pill.
     private int mcFreezeFrozen, mcFreezeThawed;
     private int mcChip, mcAddPill;
+    // Fork: re-added running/active box strokes (yellow user / orange system)
+    // and the dormant-row films (cool = frozen, mauve = uninstalled).
+    private int mcStrokeUser, mcStrokeSystem;
+    private int mcFilmFrozen, mcFilmUninstalled;
 
     // package name -> profile names containing it. Loaded asynchronously on
     // adapter creation; until the load finishes the map is empty and bind
@@ -185,6 +198,8 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         mQueryStringHighlight = ColorCodes.getQueryStringHighlightColor(activity);
         mColorYellow = ContextCompat.getColor(activity, R.color.theme_bright_yellow);
         mColorIceBlue = ContextCompat.getColor(activity, R.color.theme_ice_blue);
+        mColorFilmFrozen = ContextCompat.getColor(activity, R.color.theme_film_frozen);
+        mColorFilmUninstalled = ContextCompat.getColor(activity, R.color.theme_film_uninstalled);
         mLabelFrozenUser = ContextCompat.getColor(activity, R.color.theme_label_frozen_user);
         mLabelFrozenSystem = ContextCompat.getColor(activity, R.color.theme_label_frozen_system);
         reloadColors();
@@ -327,6 +342,10 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         mcFreezeThawed = ColorPrefs.getColor(mActivity, ColorPrefs.FREEZE_THAWED, mColorYellow);
         mcChip = ColorPrefs.getColor(mActivity, ColorPrefs.CHIP, mColorYellow);
         mcAddPill = ColorPrefs.getColor(mActivity, ColorPrefs.ADDPILL, mColorYellow);
+        mcStrokeUser = ColorPrefs.getColor(mActivity, ColorPrefs.STROKE_USER, mColorYellow);
+        mcStrokeSystem = ColorPrefs.getColor(mActivity, ColorPrefs.STROKE_SYSTEM, mColorOrange);
+        mcFilmFrozen = ColorPrefs.getColor(mActivity, ColorPrefs.FILM_FROZEN, mColorFilmFrozen);
+        mcFilmUninstalled = ColorPrefs.getColor(mActivity, ColorPrefs.FILM_UNINSTALLED, mColorFilmUninstalled);
         // (The selected card's frame is deliberately NOT cached here — it is
         // read at bind time so it stays fresh in multi-window, where the
         // onResume flag consumption never runs.)
@@ -447,20 +466,45 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             }
             return true;
         });
+        // Fork: dormant-row film behind ALL content. The card background is
+        // normally black; uninstalled rows get a faint mauve tint and frozen
+        // rows a faint cool tint, so dormant apps read at a glance even before
+        // you parse the label. Painted as the card background (not a foreground
+        // overlay) so the label text on top is never washed. Uninstalled takes
+        // priority over frozen. Set unconditionally — the ViewHolder recycles.
+        int filmColor;
+        if (!item.isInstalled) {
+            filmColor = mcFilmUninstalled;
+        } else if (item.isFrozen) {
+            filmColor = mcFilmFrozen;
+        } else {
+            filmColor = Color.BLACK;
+        }
+        cardView.setCardBackgroundColor(filmColor);
         // Fork: square cells for the edge-to-edge separator grid; the selected
         // card gets the configurable frame (thick rounded yellow by default).
+        float density = context.getResources().getDisplayMetrics().density;
         if (isSelected(position)) {
-            float density = context.getResources().getDisplayMetrics().density;
             float frameWidthDp = SelectionFramePrefs.getWidthDp(context);
             cardView.setRadius(SelectionFramePrefs.getRadiusDp(context) * density);
             cardView.setStrokeWidth(frameWidthDp <= 0f ? 0 : Math.max(1, Math.round(frameWidthDp * density)));
             cardView.setStrokeColor(ColorPrefs.getColor(context, ColorPrefs.SELECTED_FRAME, mColorYellow));
         } else {
-            // No stroke on unselected cells — only the separator grid shows
-            // between apps. (This dropped the old per-state outlines:
-            // running yellow/orange, uninstalled, disabled.)
             cardView.setRadius(0f);
-            cardView.setStrokeWidth(0);
+            // Fork: active apps (installed, not frozen, not force-stopped) get a
+            // 1dp box matching their label colour — yellow (user) / orange
+            // (system) — so "live" apps stand out from dormant ones at a glance.
+            // Frozen and uninstalled rows are conveyed by their films instead,
+            // and force-stopped rows get no box (as in the original behaviour).
+            if (item.isInstalled && !item.isFrozen && !item.isStopped) {
+                // Width read at bind time (like the selection frame) so the
+                // settings slider takes effect on the next list refresh. 0 = none.
+                float boxDp = RunningBoxPrefs.getWidthDp(context);
+                cardView.setStrokeWidth(boxDp <= 0f ? 0 : Math.max(1, Math.round(boxDp * density)));
+                cardView.setStrokeColor(item.isUser ? mcStrokeUser : mcStrokeSystem);
+            } else {
+                cardView.setStrokeWidth(0);
+            }
         }
         // Display yellow star if the app is in debug mode
         holder.debugIcon.setVisibility(item.debuggable ? View.VISIBLE : View.INVISIBLE);
@@ -541,23 +585,25 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             holder.iconColumn.setOnClickListener(null);
             holder.iconColumn.setClickable(false);
         }
-        holder.label.setTypeface(null, item.isFrozen ? Typeface.ITALIC : Typeface.NORMAL);
+        // Fork: italic marks BOTH frozen and uninstalled (dormant) rows.
+        boolean dormantItalic = item.isFrozen || !item.isInstalled;
+        holder.label.setTypeface(null, dormantItalic ? Typeface.ITALIC : Typeface.NORMAL);
         // Set app label
         if (!TextUtils.isEmpty(mSearchQuery) && item.label.toLowerCase(Locale.ROOT).contains(mSearchQuery)) {
             // Highlight searched query
             holder.label.setText(UIUtils.getHighlightedText(item.label, mSearchQuery, mQueryStringHighlight));
         } else holder.label.setText(item.label);
-        // Set app label color (custom theme — 3-state):
-        // - frozen (user OR system)   : ice blue (same hue as the snowflake)
-        // - non-frozen + user         : bright yellow
-        // - non-frozen + system app   : orange (same as cleartext-traffic SDK highlight)
-        // The mLabelFrozenUser / mLabelFrozenSystem fields are kept around in case
-        // the user/system distinction is wanted back later, but neither is used here.
-        int labelColor;
-        if (item.isFrozen) {
-            labelColor = mcLabelFrozen;
-        } else {
-            labelColor = item.isUser ? mcLabelUser : mcLabelSystem;
+        // Set app label color (custom theme). The label hue now encodes app
+        // *type* — user = yellow, system = orange — NOT freeze state. Freeze is
+        // shown by the snowflake + cool film, so frozen user vs system apps stay
+        // distinguishable (the old ice-blue override collapsed them into one
+        // colour). mcLabelFrozen / LABEL_FROZEN are retained so settings
+        // export keeps the key, but they're no longer applied to the label.
+        // Uninstalled rows keep their type colour but DIMMED to ~65% — an
+        // "inactive" cue stacking with the italic + the mauve film.
+        int labelColor = item.isUser ? mcLabelUser : mcLabelSystem;
+        if (!item.isInstalled) {
+            labelColor = ColorUtils.setAlphaComponent(labelColor, UNINSTALLED_LABEL_DIM_ALPHA);
         }
         holder.label.setTextColor(labelColor);
         // Custom per-element font (shiroikuma fork). Applied after the
@@ -566,7 +612,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         // (when the category inherits, FontUtil.apply is a no-op and this
         // just re-applies the same italic/normal as before).
         FontUtil.apply(holder.label, FontPrefs.LABEL);
-        holder.label.setTypeface(holder.label.getTypeface(), item.isFrozen ? Typeface.ITALIC : Typeface.NORMAL);
+        holder.label.setTypeface(holder.label.getTypeface(), dormantItalic ? Typeface.ITALIC : Typeface.NORMAL);
         // Fork: per-app note affordance. Mutually exclusive per row —
         //   has a note -> note glyph as a compound drawableEnd hugging the app
         //                 name (tap the glyph to view/edit); top-right "+" hidden

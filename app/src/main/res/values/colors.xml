@@ -27,4 +27,11 @@
     <color name="theme_label_frozen_user">#888888</color>
     <color name="theme_label_frozen_system">#A07A5A</color>
     <color name="theme_screen_bg">#1F1F1F</color>
+    <!-- Fork: dormant-row "films" painted as the card background (cards are
+         normally black). Desaturated, opaque, deliberately faint so the
+         yellow/orange label text on top stays legible. Cool slate-cyan marks
+         frozen rows; dusty mauve marks uninstalled rows — two different
+         temperatures so the categories read apart at a glance. -->
+    <color name="theme_film_frozen">#15242E</color>
+    <color name="theme_film_uninstalled">#241826</color>
 </resources>

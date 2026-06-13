@@ -70,6 +70,9 @@ public final class ColorPrefs {
     public static final String FREEZE_THAWED = "freeze_thawed";
     public static final String CHIP = "chip";
     public static final String ADDPILL = "addpill";
+    // Fork: dormant-row films (painted as the card background)
+    public static final String FILM_FROZEN = "film_frozen";
+    public static final String FILM_UNINSTALLED = "film_uninstalled";
 
     // ---- colour-role keys (App details header, Stage 2) ----
     public static final String DETAIL_LABEL = "detail_label";
@@ -148,6 +151,10 @@ public final class ColorPrefs {
                 return Color.MAGENTA;
             case FREEZE_FROZEN:
                 return ContextCompat.getColor(ctx, R.color.theme_ice_blue);
+            case FILM_FROZEN:
+                return ContextCompat.getColor(ctx, R.color.theme_film_frozen);
+            case FILM_UNINSTALLED:
+                return ContextCompat.getColor(ctx, R.color.theme_film_uninstalled);
             case VERSION_NORMAL:
             case APPTYPE_NORMAL:
             case DATE_NORMAL:

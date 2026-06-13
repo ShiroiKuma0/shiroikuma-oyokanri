@@ -2,6 +2,7 @@
 
 package io.github.muntashirakon.AppManager.fonts;
 
+import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -30,6 +31,7 @@ import androidx.appcompat.widget.AppCompatSeekBar;
 import androidx.appcompat.widget.AppCompatTextView;
 import androidx.appcompat.widget.LinearLayoutCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.graphics.ColorUtils;
 import androidx.fragment.app.Fragment;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -217,12 +219,166 @@ public class FontsPreferences extends Fragment {
         sepContent.addView(buildSeparatorElement(inflater, sepContent, true));
         sepContent.addView(buildSeparatorElement(inflater, sepContent, false));
         container.addView(sepGroup);
+        // Fork: the running/active app box (border width + user/system colours).
+        View boxGroup = inflater.inflate(R.layout.view_font_group, container, false);
+        ((AppCompatTextView) boxGroup.findViewById(R.id.group_header)).setText(R.string.pref_runbox_group);
+        LinearLayoutCompat boxContent = boxGroup.findViewById(R.id.group_content);
+        boxContent.addView(buildRunningBoxElement(inflater, boxContent));
+        container.addView(boxGroup);
         // Fork: the selected card's frame (colour + border width + roundness).
         View frameGroup = inflater.inflate(R.layout.view_font_group, container, false);
         ((AppCompatTextView) frameGroup.findViewById(R.id.group_header)).setText(R.string.pref_selframe_group);
         LinearLayoutCompat frameContent = frameGroup.findViewById(R.id.group_content);
         frameContent.addView(buildSelectionFrameElement(inflater, frameContent));
         container.addView(frameGroup);
+        // Fork: a reference legend at the TOP of the page — sample chips styled
+        // in code to mirror the live list, with what each colour/style means.
+        View legendGroup = inflater.inflate(R.layout.view_font_group, container, false);
+        ((AppCompatTextView) legendGroup.findViewById(R.id.group_header)).setText(R.string.pref_legend_group);
+        LinearLayoutCompat legendContent = legendGroup.findViewById(R.id.group_content);
+        buildLegend(inflater, legendContent);
+        container.addView(legendGroup, 0);
+    }
+
+    /** Fork: applies the sample-chip styling for one legend row. */
+    private interface LegendStyler {
+        void apply(@NonNull AppCompatTextView sample);
+    }
+
+    /**
+     * Fork: the colour/style legend. Each row's sample chip is styled to look
+     * like the real main-list row (coloured label text, a stroked box, a shaded
+     * background, or a tinted snowflake), reading the CURRENT configured colours
+     * so it stays accurate after recolouring — reopen the page to refresh.
+     */
+    private void buildLegend(@NonNull LayoutInflater inflater, @NonNull LinearLayoutCompat content) {
+        final Context ctx = requireContext();
+        final float density = ctx.getResources().getDisplayMetrics().density;
+        final CharSequence sample = getString(R.string.pref_legend_sample);
+
+        addLegendHeader(content, R.string.pref_legend_sec_name, density);
+        addLegendRow(inflater, content, sample, R.string.pref_legend_user,
+                tv -> tv.setTextColor(ColorPrefs.getColor(ctx, ColorPrefs.LABEL_USER)));
+        addLegendRow(inflater, content, sample, R.string.pref_legend_system,
+                tv -> tv.setTextColor(ColorPrefs.getColor(ctx, ColorPrefs.LABEL_SYSTEM)));
+        addLegendRow(inflater, content, sample, R.string.pref_legend_dormant, tv -> {
+            tv.setTextColor(ColorPrefs.getColor(ctx, ColorPrefs.LABEL_USER));
+            tv.setTypeface(null, Typeface.ITALIC);
+        });
+        addLegendRow(inflater, content, sample, R.string.pref_legend_uninstalled, tv -> {
+            tv.setTextColor(ColorUtils.setAlphaComponent(ColorPrefs.getColor(ctx, ColorPrefs.LABEL_USER), 0xA6));
+            tv.setTypeface(null, Typeface.ITALIC);
+        });
+
+        addLegendHeader(content, R.string.pref_legend_sec_id, density);
+        addLegendRow(inflater, content, "com.app", R.string.pref_legend_id_normal,
+                tv -> tv.setTextColor(ColorPrefs.getColor(ctx, ColorPrefs.PACKAGE_NORMAL)));
+        addLegendRow(inflater, content, "com.app", R.string.pref_legend_id_trackers,
+                tv -> tv.setTextColor(ColorPrefs.getColor(ctx, ColorPrefs.PACKAGE_TRACKERS)));
+
+        addLegendHeader(content, R.string.pref_legend_sec_box, density);
+        addLegendRow(inflater, content, sample, R.string.pref_legend_box_user,
+                tv -> tv.setBackground(boxChip(ColorPrefs.getColor(ctx, ColorPrefs.STROKE_USER),
+                        RunningBoxPrefs.getWidthDp(ctx), density)));
+        addLegendRow(inflater, content, sample, R.string.pref_legend_box_system,
+                tv -> tv.setBackground(boxChip(ColorPrefs.getColor(ctx, ColorPrefs.STROKE_SYSTEM),
+                        RunningBoxPrefs.getWidthDp(ctx), density)));
+        addLegendRow(inflater, content, sample, R.string.pref_legend_box_none, tv -> {});
+        addLegendRow(inflater, content, sample, R.string.pref_legend_selected,
+                tv -> tv.setBackground(boxChip(ColorPrefs.getColor(ctx, ColorPrefs.SELECTED_FRAME),
+                        Math.max(2f, SelectionFramePrefs.getWidthDp(ctx)), density)));
+
+        addLegendHeader(content, R.string.pref_legend_sec_shading, density);
+        addLegendRow(inflater, content, sample, R.string.pref_legend_film_frozen,
+                tv -> tv.setBackground(shadeChip(ColorPrefs.getColor(ctx, ColorPrefs.FILM_FROZEN), density)));
+        addLegendRow(inflater, content, sample, R.string.pref_legend_film_uninstalled,
+                tv -> tv.setBackground(shadeChip(ColorPrefs.getColor(ctx, ColorPrefs.FILM_UNINSTALLED), density)));
+
+        addLegendHeader(content, R.string.pref_legend_sec_freeze, density);
+        addLegendRow(inflater, content, "❄", R.string.pref_legend_freeze_on,
+                tv -> tv.setTextColor(ColorPrefs.getColor(ctx, ColorPrefs.FREEZE_FROZEN)));
+        addLegendRow(inflater, content, "❄", R.string.pref_legend_freeze_off,
+                tv -> tv.setTextColor(ColorPrefs.getColor(ctx, ColorPrefs.FREEZE_THAWED)));
+    }
+
+    private void addLegendHeader(@NonNull LinearLayoutCompat content, int textRes, float density) {
+        AppCompatTextView h = new AppCompatTextView(requireContext());
+        h.setText(textRes);
+        h.setTextColor(ContextCompat.getColor(requireContext(), R.color.theme_bright_yellow));
+        h.setTypeface(h.getTypeface(), Typeface.BOLD);
+        h.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        LinearLayoutCompat.LayoutParams lp = new LinearLayoutCompat.LayoutParams(
+                LinearLayoutCompat.LayoutParams.WRAP_CONTENT, LinearLayoutCompat.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = Math.round(14 * density);
+        lp.setMarginStart(Math.round(16 * density));
+        h.setLayoutParams(lp);
+        content.addView(h);
+    }
+
+    private void addLegendRow(@NonNull LayoutInflater inflater, @NonNull LinearLayoutCompat parent,
+                              @NonNull CharSequence sampleText, int descRes, @NonNull LegendStyler styler) {
+        View row = inflater.inflate(R.layout.view_legend_row, parent, false);
+        AppCompatTextView sample = row.findViewById(R.id.legend_sample);
+        sample.setText(sampleText);
+        styler.apply(sample);
+        ((AppCompatTextView) row.findViewById(R.id.legend_desc)).setText(descRes);
+        parent.addView(row);
+    }
+
+    /** A transparent rounded chip with a coloured stroke (mimics a card box). */
+    @NonNull
+    private GradientDrawable boxChip(int strokeColor, float widthDp, float density) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(Color.TRANSPARENT);
+        g.setCornerRadius(4 * density);
+        int w = widthDp <= 0f ? Math.round(density) : Math.max(1, Math.round(widthDp * density));
+        g.setStroke(w, strokeColor);
+        return g;
+    }
+
+    /** A filled rounded chip in the shading colour, hair-lined so dark tints show. */
+    @NonNull
+    private GradientDrawable shadeChip(int fillColor, float density) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(fillColor);
+        g.setCornerRadius(4 * density);
+        g.setStroke(Math.max(1, Math.round(density)), 0xFF555555);
+        return g;
+    }
+
+    /**
+     * Fork: the running/active app box — a border-width slider (0.5dp steps,
+     * 0 = no box) plus the user/system stroke colours. Reuses the separator
+     * element layout (label + width value/slider + colour rows). Default width
+     * is the thicker {@link RunningBoxPrefs#DEFAULT_WIDTH_DP}.
+     */
+    @NonNull
+    private View buildRunningBoxElement(@NonNull LayoutInflater inflater, @NonNull LinearLayoutCompat parent) {
+        View element = inflater.inflate(R.layout.view_separator_element, parent, false);
+        ((AppCompatTextView) element.findViewById(R.id.element_label)).setText(R.string.pref_runbox_cat);
+        final AppCompatTextView widthValue = element.findViewById(R.id.sep_width_value);
+        final AppCompatSeekBar widthSeek = element.findViewById(R.id.sep_width_seek);
+        widthSeek.setMax(Math.round(RunningBoxPrefs.MAX_WIDTH_DP * 2));  // half-dp steps
+        final Runnable render = () -> {
+            float dp = RunningBoxPrefs.getWidthDp(requireContext());
+            widthValue.setText(String.format(Locale.US, "%.1f dp", dp));
+            widthSeek.setProgress(Math.round(dp * 2));
+        };
+        render.run();
+        widthSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                RunningBoxPrefs.setWidthDp(requireContext(), progress / 2f);
+                render.run();
+            }
+            @Override public void onStartTrackingTouch(SeekBar sb) {}
+            @Override public void onStopTrackingTouch(SeekBar sb) {}
+        });
+        LinearLayoutCompat colorRows = element.findViewById(R.id.color_rows);
+        addColorRow(colorRows, new ColorSpec(ColorPrefs.STROKE_USER, R.string.pref_color_stroke_user), () -> {});
+        addColorRow(colorRows, new ColorSpec(ColorPrefs.STROKE_SYSTEM, R.string.pref_color_stroke_system), () -> {});
+        return element;
     }
 
     /**
