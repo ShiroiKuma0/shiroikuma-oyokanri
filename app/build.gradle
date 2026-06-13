@@ -113,18 +113,28 @@ android {
     }
 }
 
-// Ensure :server:create<Variant>ServerJars writes am.jar + main.jar into
-// app/src/main/assets/ BEFORE mergeAssets snapshots that directory. Upstream wires
-// the JAR-creation task only as `javaCompileProvider.get().finalizedBy(jarTask)` in
-// server/build.gradle, which is too loose under configuration-cache + parallel
-// scheduling: mergeAssets can run before the finalizer completes, producing an APK
-// that's missing am.jar / main.jar. The runtime symptom is
-// ServerConfig.init() throwing `FileNotFoundException: am.jar`, leaving the
-// "Mode of operation -> Custom command" UI with empty command boxes.
-android.applicationVariants.configureEach { variant ->
-    String variantName = variant.buildType.name.capitalize()
-    variant.mergeAssetsProvider.configure {
-        dependsOn ":server:create${variantName}ServerJars"
+// Fork: make the asset merge wait for :server:create<Variant>ServerJars, which
+// writes am.jar + main.jar into app/src/main/assets/. Upstream only wires that
+// task as `javaCompile.finalizedBy(jarTask)` (server/build.gradle) — too loose
+// under configuration-cache + parallel scheduling, so mergeAssets can snapshot
+// the directory mid-write. The earlier fix used the legacy applicationVariants
+// API, which is unreliable under the configuration cache: in build +79 the edge
+// silently did not hold and mergeAssets captured a 0-BYTE main.jar, which made
+// AppManager's ADB server fail to launch (ADB mode hangs on init, then falls
+// back to no-root). Wire the dependency directly on the merge tasks (plain task
+// references, configuration-cache safe); the JARs are also written atomically
+// server-side so a partial file can never be snapshotted even if this regresses.
+['Debug', 'Release'].each { v ->
+    tasks.matching { it.name == "merge${v}Assets" }.configureEach {
+        dependsOn ":server:create${v}ServerJars"
+    }
+    // Upstream (4.1.1) additionally makes the lint model/analysis tasks wait for the
+    // server JARs. Kept, but expressed through the same plain tasks.matching edge
+    // rather than upstream's applicationVariants form, for the reason above.
+    tasks.matching {
+        it.name == "generate${v}LintReportModel" || it.name == "lintAnalyze${v}"
+    }.configureEach {
+        dependsOn ":server:create${v}ServerJars"
     }
 }
 
@@ -217,18 +227,6 @@ dependencies {
         exclude group: 'org.bouncycastle', module: 'bcprov-jdk18on'
         exclude group: 'org.bouncycastle', module: 'bcpkix-jdk18on'
         exclude group: 'org.bouncycastle', module: 'bcutil-jdk18on'
-    }
-}
-
-android.applicationVariants.configureEach { variant ->
-    String buildTypeCap = variant.buildType.name.capitalize()
-    tasks.named("merge${buildTypeCap}Assets").configure { mergeTask ->
-        mergeTask.dependsOn(":server:create${buildTypeCap}ServerJars")
-    }
-    tasks.matching {
-        it.name == "generate${buildTypeCap}LintReportModel" || it.name == "lintAnalyze${buildTypeCap}"
-    }.configureEach {
-        dependsOn(":server:create${buildTypeCap}ServerJars")
     }
 }
 

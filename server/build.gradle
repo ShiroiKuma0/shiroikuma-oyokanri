@@ -4,6 +4,7 @@
 import javax.inject.Inject
 import java.nio.file.Files
 import java.nio.file.Paths
+import java.nio.file.StandardCopyOption
 import java.util.stream.Collectors
 
 plugins {
@@ -57,6 +58,7 @@ android.libraryVariants.configureEach { variant ->
     int capturedTargetSdk = target_sdk
     String capturedSdkDirPath = android.sdkDirectory.path
     String capturedBuildToolsVersion = android.buildToolsVersion
+    String capturedServerBuildDir = project.layout.buildDirectory.get().asFile.absolutePath
     String androidJar = "${capturedSdkDirPath}/platforms/android-${capturedTargetSdk}/android.jar"
     String d8Path = "${capturedSdkDirPath}/build-tools/${capturedBuildToolsVersion}/d8"
     def serverClassesDirProvider = compileTask.map { it.destinationDirectory.get().asFile.absolutePath }
@@ -101,8 +103,23 @@ android.libraryVariants.configureEach { variant ->
                 }
             }
 
+            // Fork: write each JAR to a temp path then atomically move it into
+            // place. d8 writes the output incrementally, so a consumer (the app's
+            // mergeAssets) that races this task could otherwise snapshot a 0-byte
+            // partial file — that shipped a broken main.jar in build +79 and broke
+            // ADB mode. The move is a same-filesystem rename, so a consumer sees
+            // either the old complete JAR or the new complete JAR, never a partial.
+            // Temp JARs live in build/ (NOT in assets/, so a stray temp can never
+            // be packaged) and keep the .jar extension (d8 rejects other suffixes).
+            // Per-variant subdir: the release + debug jar tasks run in parallel and
+            // would otherwise collide on a shared temp path.
+            String tmpDir = "${capturedServerBuildDir}/serverjars-tmp/${buildType}"
+            Files.createDirectories(Paths.get(tmpDir))
+            String amJarTmp = "${tmpDir}/am.jar"
+            String mainJarTmp = "${tmpDir}/main.jar"
+
             println("Creating am.jar...")
-            def amArgs = ['--release', '--min-api', capturedMinSdk, '--output', amJar.absolutePath, '--lib', androidJar]
+            def amArgs = ['--release', '--min-api', capturedMinSdk, '--output', amJarTmp, '--lib', androidJar]
             amArgs.addAll(Files.list(Paths.get(libserverClassDir)).filter {
                 !it.fileName.toString().startsWith("IRootServiceManager")
             }.map { it.toString() }.sorted().collect(Collectors.toList()))
@@ -110,10 +127,11 @@ android.libraryVariants.configureEach { variant ->
                 !it.fileName.toString().startsWith("RootServiceMain") && Files.isRegularFile(it)
             }.map { it.toString() }.sorted().collect(Collectors.toList()))
             runD8(amArgs)
+            Files.move(Paths.get(amJarTmp), amJar.toPath(), StandardCopyOption.REPLACE_EXISTING)
             println("Created ${amJar}")
 
             println("Creating main.jar...")
-            def mainArgs = ['--release', '--min-api', capturedMinSdk, '--output', mainJar.absolutePath, '--lib', androidJar]
+            def mainArgs = ['--release', '--min-api', capturedMinSdk, '--output', mainJarTmp, '--lib', androidJar]
             mainArgs.addAll(Files.list(Paths.get(libserverClassDir)).filter {
                 it.fileName.toString().startsWith("IRootServiceManager") || it.fileName.toString().startsWith("ServerUtils")
             }.map { it.toString() }.sorted().collect(Collectors.toList()))
@@ -121,6 +139,7 @@ android.libraryVariants.configureEach { variant ->
                 it.fileName.toString().startsWith("RootServiceMain") && Files.isRegularFile(it)
             }.map { it.toString() }.sorted().collect(Collectors.toList()))
             runD8(mainArgs)
+            Files.move(Paths.get(mainJarTmp), mainJar.toPath(), StandardCopyOption.REPLACE_EXISTING)
             println("Created ${mainJar}")
         }
     }
