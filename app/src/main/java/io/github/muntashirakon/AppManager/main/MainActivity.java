@@ -74,6 +74,7 @@ import io.github.muntashirakon.AppManager.apk.list.ListExporter;
 import io.github.muntashirakon.AppManager.fonts.ColorPrefs;
 import io.github.muntashirakon.AppManager.fonts.FontPrefs;
 import io.github.muntashirakon.AppManager.fonts.FontUtil;
+import io.github.muntashirakon.AppManager.fonts.RunningBoxPrefs;
 import io.github.muntashirakon.AppManager.fonts.SelectionFramePrefs;
 import io.github.muntashirakon.AppManager.fonts.SeparatorPrefs;
 import io.github.muntashirakon.AppManager.backup.dialog.BackupRestoreDialogFragment;
@@ -635,7 +636,10 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         boolean colorsChanged = ColorPrefs.consumeChanged();
         boolean separatorsChanged = SeparatorPrefs.consumeChanged();
         boolean framesChanged = SelectionFramePrefs.consumeChanged();
-        if (mAdapter != null && (fontsChanged || colorsChanged || framesChanged)) {
+        // Fork: the running-app box width is read at bind time, so a change
+        // just needs a re-bind (same as the frame).
+        boolean runBoxChanged = RunningBoxPrefs.consumeChanged();
+        if (mAdapter != null && (fontsChanged || colorsChanged || framesChanged || runBoxChanged)) {
             if (fontsChanged) FontUtil.clearCache();
             if (colorsChanged) mAdapter.reloadColors();
             mAdapter.notifyDataSetChanged();

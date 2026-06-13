@@ -1718,6 +1718,32 @@
     <string name="pref_sep_width">Width (0 = none)</string>
     <string name="pref_color_separator">Color</string>
     <!-- Selected card frame (fork) -->
+    <!-- Fork: running/active app box (border width + user/system colours) -->
+    <string name="pref_runbox_group">Running app box</string>
+    <string name="pref_runbox_cat">Box</string>
+    <!-- Fork: main-list colour/style legend (reference on the UI page). The
+         sample chips reflect the current configured colours. -->
+    <string name="pref_legend_group">Legend — what the colours mean</string>
+    <string name="pref_legend_sample">App name</string>
+    <string name="pref_legend_sec_name">App name (label)</string>
+    <string name="pref_legend_sec_id">Package name (the app ID)</string>
+    <string name="pref_legend_sec_box">Box (card border)</string>
+    <string name="pref_legend_sec_shading">Shading (card background)</string>
+    <string name="pref_legend_sec_freeze">Snowflake (freeze state)</string>
+    <string name="pref_legend_user">User app</string>
+    <string name="pref_legend_system">System app</string>
+    <string name="pref_legend_dormant">Frozen or uninstalled (italic)</string>
+    <string name="pref_legend_uninstalled">Uninstalled (dimmed)</string>
+    <string name="pref_legend_id_normal">No trackers detected</string>
+    <string name="pref_legend_id_trackers">Contains known trackers</string>
+    <string name="pref_legend_box_user">Running user app</string>
+    <string name="pref_legend_box_system">Running system app</string>
+    <string name="pref_legend_box_none">Frozen, uninstalled or force-stopped (no box)</string>
+    <string name="pref_legend_selected">Selected app</string>
+    <string name="pref_legend_film_frozen">Frozen</string>
+    <string name="pref_legend_film_uninstalled">Uninstalled</string>
+    <string name="pref_legend_freeze_on">Frozen (filled snowflake)</string>
+    <string name="pref_legend_freeze_off">Active — not frozen (outline)</string>
     <string name="pref_selframe_group">Selected app frame</string>
     <string name="pref_selframe_cat">Frame</string>
     <string name="pref_selframe_width">Border width (0 = none)</string>
