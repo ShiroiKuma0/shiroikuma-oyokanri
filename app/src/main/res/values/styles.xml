@@ -148,6 +148,12 @@
     <style name="ThemeOverlay.AppTheme.MaterialAlertDialog.YellowOnBlack" parent="ThemeOverlay.Material3.MaterialAlertDialog">
         <item name="android:windowBackground">@drawable/alert_dialog_bg_yellow_on_black</item>
         <item name="alertDialogStyle">@style/MaterialAlertDialog.AppTheme.YellowOnBlack</item>
+        <!-- Fork: the SELECTED control state (radio dot/ring, checkbox, switch)
+             defaults to the M3 accent and reads grey on this palette. Pin the
+             activated colour to yellow so single-choice dialog radios match. -->
+        <item name="colorControlActivated">@color/theme_bright_yellow</item>
+        <item name="android:colorControlActivated">@color/theme_bright_yellow</item>
+        <item name="colorAccent">@color/theme_bright_yellow</item>
     </style>
 
     <style name="MaterialAlertDialog.AppTheme.YellowOnBlack" parent="MaterialAlertDialog.Material3">
