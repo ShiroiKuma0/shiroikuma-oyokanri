@@ -6,11 +6,11 @@ import android.content.Context;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.inputmethod.BaseInputConnection;
-import android.widget.Toast;
 
 import java.lang.reflect.Field;
 
 import io.github.muntashirakon.AppManager.utils.ClipboardUtils;
+import io.github.muntashirakon.AppManager.utils.UIUtils;
 import io.github.muntashirakon.AppManager.utils.Utils;
 import io.github.rosemoe.sora.text.Cursor;
 import io.github.rosemoe.sora.text.TextRange;
@@ -51,7 +51,7 @@ public class CodeEditorWidget extends CodeEditor {
             }
         } catch (Exception e) {
             Log.w(TAG, e);
-            Toast.makeText(getContext(), e.toString(), Toast.LENGTH_SHORT).show();
+            UIUtils.displayShortToast(e.toString());
         }
     }
 
