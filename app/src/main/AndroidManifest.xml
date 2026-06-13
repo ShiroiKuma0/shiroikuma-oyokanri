@@ -186,6 +186,13 @@
             android:enableOnBackInvokedCallback="true"
             android:exported="true"
             android:label="@string/running_apps" />
+        <!-- Fork: process monitor / reaper screen (black/yellow theme) -->
+        <activity
+            android:name=".processreaper.ProcessMonitorActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:exported="false"
+            android:label="@string/monitor_title"
+            android:theme="@style/AppTheme.YellowOnBlack" />
         <activity
             android:name=".settings.SettingsActivity"
             android:enableOnBackInvokedCallback="true"

@@ -44,6 +44,8 @@ import java.util.List;
 import java.util.Locale;
 
 import io.github.muntashirakon.AppManager.R;
+import io.github.muntashirakon.AppManager.processreaper.MonitorPrefs;
+import io.github.muntashirakon.AppManager.processreaper.MonitorSeparatorPrefs;
 
 /**
  * Settings → Appearance → Fonts. Lets each text surface pick family, weight
@@ -225,6 +227,24 @@ public class FontsPreferences extends Fragment {
         LinearLayoutCompat boxContent = boxGroup.findViewById(R.id.group_content);
         boxContent.addView(buildRunningBoxElement(inflater, boxContent));
         container.addView(boxGroup);
+        // Fork: process monitor — app-icon size + the four row-state colours.
+        View monGroup = inflater.inflate(R.layout.view_font_group, container, false);
+        ((AppCompatTextView) monGroup.findViewById(R.id.group_header)).setText(R.string.pref_monitor_group);
+        LinearLayoutCompat monContent = monGroup.findViewById(R.id.group_content);
+        monContent.addView(buildMonitorIconElement(inflater, monContent));
+        monContent.addView(buildMonitorPaddingElement(inflater, monContent));
+        View monColors = inflater.inflate(R.layout.view_font_element, monContent, false);
+        ((AppCompatTextView) monColors.findViewById(R.id.element_label)).setText(R.string.pref_monitor_row_colors);
+        monColors.findViewById(R.id.font_controls).setVisibility(View.GONE);
+        LinearLayoutCompat monCr = monColors.findViewById(R.id.color_rows);
+        addColorRow(monCr, new ColorSpec(ColorPrefs.MONITOR_KILLABLE, R.string.pref_monitor_killable), () -> {});
+        addColorRow(monCr, new ColorSpec(ColorPrefs.MONITOR_LEAK, R.string.pref_monitor_leak), () -> {});
+        addColorRow(monCr, new ColorSpec(ColorPrefs.MONITOR_PROTECTED, R.string.pref_monitor_protected), () -> {});
+        addColorRow(monCr, new ColorSpec(ColorPrefs.MONITOR_USER_PROTECTED, R.string.pref_monitor_user_protected), () -> {});
+        monContent.addView(monColors);
+        monContent.addView(buildMonitorSeparatorElement(inflater, monContent, true));
+        monContent.addView(buildMonitorSeparatorElement(inflater, monContent, false));
+        container.addView(monGroup);
         // Fork: the selected card's frame (colour + border width + roundness).
         View frameGroup = inflater.inflate(R.layout.view_font_group, container, false);
         ((AppCompatTextView) frameGroup.findViewById(R.id.group_header)).setText(R.string.pref_selframe_group);
@@ -346,23 +366,86 @@ public class FontsPreferences extends Fragment {
         return g;
     }
 
+    /** Fork: the process-monitor app-icon size slider (reuses the separator element). */
+    @NonNull
+    private View buildMonitorIconElement(@NonNull LayoutInflater inflater, @NonNull LinearLayoutCompat parent) {
+        View element = inflater.inflate(R.layout.view_separator_element, parent, false);
+        ((AppCompatTextView) element.findViewById(R.id.element_label)).setText(R.string.pref_monitor_icon_size);
+        ((AppCompatTextView) element.findViewById(R.id.sep_sublabel)).setText(R.string.pref_monitor_icon_size_hint);
+        final AppCompatTextView valueView = element.findViewById(R.id.sep_width_value);
+        final AppCompatSeekBar seek = element.findViewById(R.id.sep_width_seek);
+        final int min = MonitorPrefs.MIN_ICON_DP;
+        seek.setMax(MonitorPrefs.MAX_ICON_DP - min);
+        final Runnable render = () -> {
+            int dp = MonitorPrefs.getIconSizeDp(requireContext());
+            valueView.setText(String.format(Locale.US, "%d dp", dp));
+            seek.setProgress(dp - min);
+        };
+        render.run();
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                MonitorPrefs.setIconSizeDp(requireContext(), min + progress);
+                render.run();
+            }
+            @Override public void onStartTrackingTouch(SeekBar sb) {}
+            @Override public void onStopTrackingTouch(SeekBar sb) {}
+        });
+        return element;
+    }
+
+    /** Fork: the process-monitor row vertical-padding slider. */
+    @NonNull
+    private View buildMonitorPaddingElement(@NonNull LayoutInflater inflater, @NonNull LinearLayoutCompat parent) {
+        View element = inflater.inflate(R.layout.view_separator_element, parent, false);
+        ((AppCompatTextView) element.findViewById(R.id.element_label)).setText(R.string.pref_monitor_row_pad);
+        ((AppCompatTextView) element.findViewById(R.id.sep_sublabel)).setText(R.string.pref_monitor_row_pad_hint);
+        final AppCompatTextView valueView = element.findViewById(R.id.sep_width_value);
+        final AppCompatSeekBar seek = element.findViewById(R.id.sep_width_seek);
+        seek.setMax(MonitorPrefs.MAX_ROW_PAD_DP);
+        final Runnable render = () -> {
+            int dp = MonitorPrefs.getRowPaddingDp(requireContext());
+            valueView.setText(String.format(Locale.US, "%d dp", dp));
+            seek.setProgress(dp);
+        };
+        render.run();
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                MonitorPrefs.setRowPaddingDp(requireContext(), progress);
+                render.run();
+            }
+            @Override public void onStartTrackingTouch(SeekBar sb) {}
+            @Override public void onStopTrackingTouch(SeekBar sb) {}
+        });
+        return element;
+    }
+
     /**
-     * Fork: the running/active app box — a border-width slider (0.5dp steps,
-     * 0 = no box) plus the user/system stroke colours. Reuses the separator
-     * element layout (label + width value/slider + colour rows). Default width
-     * is the thicker {@link RunningBoxPrefs#DEFAULT_WIDTH_DP}.
+     * Fork: the running/active app box — border-width slider (0.5dp steps, 0 =
+     * no box), corner-roundness slider (1dp steps, 0 = square), and the
+     * user/system stroke colours. Reuses the selection-frame element (two
+     * sliders + colour rows).
      */
     @NonNull
     private View buildRunningBoxElement(@NonNull LayoutInflater inflater, @NonNull LinearLayoutCompat parent) {
-        View element = inflater.inflate(R.layout.view_separator_element, parent, false);
+        View element = inflater.inflate(R.layout.view_selection_frame_element, parent, false);
         ((AppCompatTextView) element.findViewById(R.id.element_label)).setText(R.string.pref_runbox_cat);
-        final AppCompatTextView widthValue = element.findViewById(R.id.sep_width_value);
-        final AppCompatSeekBar widthSeek = element.findViewById(R.id.sep_width_seek);
+        final AppCompatTextView widthValue = element.findViewById(R.id.frame_width_value);
+        final AppCompatSeekBar widthSeek = element.findViewById(R.id.frame_width_seek);
+        final AppCompatTextView radiusValue = element.findViewById(R.id.frame_radius_value);
+        final AppCompatSeekBar radiusSeek = element.findViewById(R.id.frame_radius_seek);
         widthSeek.setMax(Math.round(RunningBoxPrefs.MAX_WIDTH_DP * 2));  // half-dp steps
+        radiusSeek.setMax(RunningBoxPrefs.MAX_RADIUS_DP);
         final Runnable render = () -> {
-            float dp = RunningBoxPrefs.getWidthDp(requireContext());
-            widthValue.setText(String.format(Locale.US, "%.1f dp", dp));
-            widthSeek.setProgress(Math.round(dp * 2));
+            float widthDp = RunningBoxPrefs.getWidthDp(requireContext());
+            int radiusDp = RunningBoxPrefs.getRadiusDp(requireContext());
+            widthValue.setText(String.format(Locale.US, "%.1f dp", widthDp));
+            widthSeek.setProgress(Math.round(widthDp * 2));
+            radiusValue.setText(String.format(Locale.US, "%d dp", radiusDp));
+            radiusSeek.setProgress(radiusDp);
         };
         render.run();
         widthSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -375,9 +458,52 @@ public class FontsPreferences extends Fragment {
             @Override public void onStartTrackingTouch(SeekBar sb) {}
             @Override public void onStopTrackingTouch(SeekBar sb) {}
         });
+        radiusSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                RunningBoxPrefs.setRadiusDp(requireContext(), progress);
+                render.run();
+            }
+            @Override public void onStartTrackingTouch(SeekBar sb) {}
+            @Override public void onStopTrackingTouch(SeekBar sb) {}
+        });
         LinearLayoutCompat colorRows = element.findViewById(R.id.color_rows);
         addColorRow(colorRows, new ColorSpec(ColorPrefs.STROKE_USER, R.string.pref_color_stroke_user), () -> {});
         addColorRow(colorRows, new ColorSpec(ColorPrefs.STROKE_SYSTEM, R.string.pref_color_stroke_system), () -> {});
+        return element;
+    }
+
+    /** Fork: one process-monitor separator (horizontal or vertical): width slider + colour. */
+    @NonNull
+    private View buildMonitorSeparatorElement(@NonNull LayoutInflater inflater, @NonNull LinearLayoutCompat parent,
+                                              boolean horizontal) {
+        View element = inflater.inflate(R.layout.view_separator_element, parent, false);
+        ((AppCompatTextView) element.findViewById(R.id.element_label)).setText(
+                horizontal ? R.string.pref_sep_cat_horizontal : R.string.pref_sep_cat_vertical);
+        final AppCompatTextView widthValue = element.findViewById(R.id.sep_width_value);
+        final AppCompatSeekBar widthSeek = element.findViewById(R.id.sep_width_seek);
+        widthSeek.setMax(Math.round(MonitorSeparatorPrefs.MAX_WIDTH_DP * 2));
+        final Runnable render = () -> {
+            float dp = MonitorSeparatorPrefs.getWidthDp(requireContext(), horizontal);
+            widthValue.setText(String.format(Locale.US, "%.1f dp", dp));
+            widthSeek.setProgress(Math.round(dp * 2));
+        };
+        render.run();
+        widthSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                MonitorSeparatorPrefs.setWidthDp(requireContext(), horizontal, progress / 2f);
+                render.run();
+            }
+            @Override public void onStartTrackingTouch(SeekBar sb) {}
+            @Override public void onStopTrackingTouch(SeekBar sb) {}
+        });
+        LinearLayoutCompat colorRows = element.findViewById(R.id.color_rows);
+        addColorRow(colorRows, new ColorSpec(
+                horizontal ? ColorPrefs.MONITOR_SEPARATOR_H : ColorPrefs.MONITOR_SEPARATOR_V,
+                R.string.pref_color_separator), () -> {});
         return element;
     }
 
@@ -625,20 +751,78 @@ public class FontsPreferences extends Fragment {
     }
 
     /** Colour picker dialog: hex input + live preview + preset palette swatches. */
+    /** Wire one A/R/G/B slider: drag updates argb[index] + the hex/preview (the hex stays canonical). */
+    private void wireColorChannel(@NonNull AppCompatSeekBar seek, @NonNull AppCompatTextView val,
+                                  @NonNull int[] argb, int index, @NonNull EditText hexInput,
+                                  @NonNull View preview, @NonNull boolean[] updating) {
+        seek.setMax(255);
+        seek.setProgress(argb[index]);
+        val.setText(String.valueOf(argb[index]));
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                val.setText(String.valueOf(progress));
+                if (!fromUser) return;
+                argb[index] = progress;
+                int col = Color.argb(argb[0], argb[1], argb[2], argb[3]);
+                updating[0] = true;
+                hexInput.setText(hex(col));
+                updating[0] = false;
+                preview.setBackground(swatchDrawable(col));
+            }
+            @Override public void onStartTrackingTouch(SeekBar sb) {}
+            @Override public void onStopTrackingTouch(SeekBar sb) {}
+        });
+    }
+
     private void openColorPicker(@NonNull ColorSpec spec, @NonNull Runnable onChanged) {
         View body = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_color_picker, null);
         final View preview = body.findViewById(R.id.cp_preview);
         final EditText hexInput = body.findViewById(R.id.cp_hex);
         final LinearLayoutCompat presets = body.findViewById(R.id.cp_presets);
+        final AppCompatSeekBar aSeek = body.findViewById(R.id.cp_alpha);
+        final AppCompatSeekBar rSeek = body.findViewById(R.id.cp_red);
+        final AppCompatSeekBar gSeek = body.findViewById(R.id.cp_green);
+        final AppCompatSeekBar bSeek = body.findViewById(R.id.cp_blue);
+        final AppCompatTextView aVal = body.findViewById(R.id.cp_alpha_val);
+        final AppCompatTextView rVal = body.findViewById(R.id.cp_red_val);
+        final AppCompatTextView gVal = body.findViewById(R.id.cp_green_val);
+        final AppCompatTextView bVal = body.findViewById(R.id.cp_blue_val);
+        final int[] argb = new int[4];
+        final boolean[] updating = {false};
         int current = ColorPrefs.getColor(requireContext(), spec.key);
         hexInput.setText(hex(current));
         preview.setBackground(swatchDrawable(current));
+        argb[0] = Color.alpha(current);
+        argb[1] = Color.red(current);
+        argb[2] = Color.green(current);
+        argb[3] = Color.blue(current);
+        wireColorChannel(aSeek, aVal, argb, 0, hexInput, preview, updating);
+        wireColorChannel(rSeek, rVal, argb, 1, hexInput, preview, updating);
+        wireColorChannel(gSeek, gVal, argb, 2, hexInput, preview, updating);
+        wireColorChannel(bSeek, bVal, argb, 3, hexInput, preview, updating);
         hexInput.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
             @Override public void afterTextChanged(Editable e) {
+                if (updating[0]) return;
                 Integer col = parseColor(e.toString());
-                if (col != null) preview.setBackground(swatchDrawable(col));
+                if (col == null) return;
+                preview.setBackground(swatchDrawable(col));
+                argb[0] = Color.alpha(col);
+                argb[1] = Color.red(col);
+                argb[2] = Color.green(col);
+                argb[3] = Color.blue(col);
+                updating[0] = true;
+                aSeek.setProgress(argb[0]);
+                rSeek.setProgress(argb[1]);
+                gSeek.setProgress(argb[2]);
+                bSeek.setProgress(argb[3]);
+                aVal.setText(String.valueOf(argb[0]));
+                rVal.setText(String.valueOf(argb[1]));
+                gVal.setText(String.valueOf(argb[2]));
+                bVal.setText(String.valueOf(argb[3]));
+                updating[0] = false;
             }
         });
         int[] palette = {

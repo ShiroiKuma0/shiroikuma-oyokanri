@@ -2,9 +2,8 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!--
     Colour picker dialog body: a large preview swatch, a hex input
-    (#RRGGBB or #AARRGGBB), and a row of preset swatches (filled in
-    programmatically from the fork palette + black/white). Driven by
-    FontsPreferences.openColorPicker.
+    (#RRGGBB or #AARRGGBB), four A/R/G/B sliders (kept in sync with the hex),
+    and a row of preset swatches. Driven by FontsPreferences.openColorPicker.
 -->
 <androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -27,6 +26,47 @@
         android:inputType="textNoSuggestions"
         android:maxLength="9"
         android:textSize="16sp" />
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <androidx.appcompat.widget.AppCompatTextView android:layout_width="22dp" android:layout_height="wrap_content" android:text="A" android:textColor="@color/theme_bright_yellow" android:textStyle="bold" />
+        <androidx.appcompat.widget.AppCompatSeekBar android:id="@+id/cp_alpha" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" />
+        <androidx.appcompat.widget.AppCompatTextView android:id="@+id/cp_alpha_val" android:layout_width="40dp" android:layout_height="wrap_content" android:gravity="end" android:textColor="#9A9A9A" />
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <androidx.appcompat.widget.AppCompatTextView android:layout_width="22dp" android:layout_height="wrap_content" android:text="R" android:textColor="@color/theme_bright_yellow" android:textStyle="bold" />
+        <androidx.appcompat.widget.AppCompatSeekBar android:id="@+id/cp_red" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" />
+        <androidx.appcompat.widget.AppCompatTextView android:id="@+id/cp_red_val" android:layout_width="40dp" android:layout_height="wrap_content" android:gravity="end" android:textColor="#9A9A9A" />
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <androidx.appcompat.widget.AppCompatTextView android:layout_width="22dp" android:layout_height="wrap_content" android:text="G" android:textColor="@color/theme_bright_yellow" android:textStyle="bold" />
+        <androidx.appcompat.widget.AppCompatSeekBar android:id="@+id/cp_green" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" />
+        <androidx.appcompat.widget.AppCompatTextView android:id="@+id/cp_green_val" android:layout_width="40dp" android:layout_height="wrap_content" android:gravity="end" android:textColor="#9A9A9A" />
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <androidx.appcompat.widget.AppCompatTextView android:layout_width="22dp" android:layout_height="wrap_content" android:text="B" android:textColor="@color/theme_bright_yellow" android:textStyle="bold" />
+        <androidx.appcompat.widget.AppCompatSeekBar android:id="@+id/cp_blue" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" />
+        <androidx.appcompat.widget.AppCompatTextView android:id="@+id/cp_blue_val" android:layout_width="40dp" android:layout_height="wrap_content" android:gravity="end" android:textColor="#9A9A9A" />
+    </androidx.appcompat.widget.LinearLayoutCompat>
 
     <androidx.appcompat.widget.LinearLayoutCompat
         android:id="@+id/cp_presets"

@@ -1,0 +1,416 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package io.github.muntashirakon.AppManager.processreaper;
+
+import android.app.Application;
+import android.content.Context;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.os.SystemClock;
+import android.os.UserHandleHidden;
+import android.provider.Settings;
+import android.text.TextUtils;
+import android.text.format.Formatter;
+import android.util.Pair;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.lifecycle.AndroidViewModel;
+import androidx.lifecycle.MutableLiveData;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
+import io.github.muntashirakon.AppManager.BuildConfig;
+import io.github.muntashirakon.AppManager.compat.PackageManagerCompat;
+import io.github.muntashirakon.AppManager.runner.Runner;
+import io.github.muntashirakon.AppManager.runningapps.AppProcessItem;
+import io.github.muntashirakon.AppManager.runningapps.ProcessItem;
+import io.github.muntashirakon.AppManager.runningapps.ProcessParser;
+import io.github.muntashirakon.AppManager.settings.Ops;
+import io.github.muntashirakon.AppManager.utils.ThreadUtils;
+
+public class ProcessMonitorViewModel extends AndroidViewModel {
+    public static final int SORT_RAM = 0;
+    public static final int SORT_CPU = 1;
+
+    private static final long CLK_TCK = 100L;
+
+    // Transient helper commands whose repetition (PPid 1, no package) reads as a leak.
+    private static final Set<String> TRANSIENT = new HashSet<>(Arrays.asList(
+            "logcat", "sh", "toybox", "sleep", "tail", "inotifywait", "sed", "awk", "cat"));
+
+    /** A displayed row — a single process, a shared-process (one pid, many packages), or a leak group. */
+    public static final class Row {
+        public final ProcessItem item;                  // representative
+        public final ProcessClassifier.Result cls;
+        public final List<Integer> pids;                // every pid this row kills
+        public final int memberCount;                   // packages (shared) or pids (leak)
+        public final boolean isLeak;
+        public final String title;
+        public final String subtitle;
+        public final String meta;
+        public final String ram;
+        public final String cpu;
+        public final double cpuPercent;                 // for sorting
+        public final long memBytes;                     // for sorting
+
+        Row(ProcessItem item, ProcessClassifier.Result cls, List<Integer> pids, int memberCount,
+            boolean isLeak, String title, String subtitle, String meta, String ram, String cpu,
+            double cpuPercent, long memBytes) {
+            this.item = item;
+            this.cls = cls;
+            this.pids = pids;
+            this.memberCount = memberCount;
+            this.isLeak = isLeak;
+            this.title = title;
+            this.subtitle = subtitle;
+            this.meta = meta;
+            this.ram = ram;
+            this.cpu = cpu;
+            this.cpuPercent = cpuPercent;
+            this.memBytes = memBytes;
+        }
+    }
+
+    /** Intermediate per-(pid, package) entry before dedup/leak grouping. */
+    private static final class Base {
+        final ProcessItem item;
+        final ProcessClassifier.Result cls;
+        final double cpuPct;
+
+        Base(ProcessItem item, ProcessClassifier.Result cls, double cpuPct) {
+            this.item = item;
+            this.cls = cls;
+            this.cpuPct = cpuPct;
+        }
+    }
+
+    private final MutableLiveData<List<Row>> mRows = new MutableLiveData<>();
+    private final MutableLiveData<Boolean> mLoading = new MutableLiveData<>();
+    private final MutableLiveData<Pair<Row, Boolean>> mKillResult = new MutableLiveData<>();
+    private final MutableLiveData<int[]> mBulkKillResult = new MutableLiveData<>();  // {ok, total}
+
+    private final java.util.concurrent.atomic.AtomicBoolean mBusy = new java.util.concurrent.atomic.AtomicBoolean(false);
+    private final Map<String, String> mLabelCache = new HashMap<>();
+    private Map<Integer, Long> mPrevTicks;
+    private long mPrevSampleMs;
+    private volatile int mSort = SORT_RAM;
+
+    public ProcessMonitorViewModel(@NonNull Application application) {
+        super(application);
+    }
+
+    public MutableLiveData<List<Row>> getRows() {
+        return mRows;
+    }
+
+    public MutableLiveData<Boolean> getLoading() {
+        return mLoading;
+    }
+
+    public MutableLiveData<Pair<Row, Boolean>> getKillResult() {
+        return mKillResult;
+    }
+
+    public MutableLiveData<int[]> getBulkKillResult() {
+        return mBulkKillResult;
+    }
+
+    public int getSort() {
+        return mSort;
+    }
+
+    public void setSort(int sort) {
+        mSort = sort;
+    }
+
+    public void load() {
+        if (!mBusy.compareAndSet(false, true)) {
+            return;
+        }
+        mLoading.postValue(true);
+        ThreadUtils.postOnBackgroundThread(() -> {
+            try {
+                Context ctx = getApplication();
+                PackageManager pm = ctx.getPackageManager();
+                String selfPkg = BuildConfig.APPLICATION_ID;
+                String ime = activeImePackage();
+                boolean root = Ops.isWorkingUidRoot();
+                Set<String> userProtected = ReaperPrefs.getProtectedPackages(ctx);
+
+                Map<Integer, Long> ticks = sampleCpuTicks();
+                long nowMs = SystemClock.elapsedRealtime();
+                Map<Integer, Long> prev = mPrevTicks;
+                double dtSec = (mPrevSampleMs > 0) ? (nowMs - mPrevSampleMs) / 1000.0 : 0;
+
+                // 1. Classify every per-(pid, package) entry.
+                List<Base> base = new ArrayList<>();
+                for (ProcessItem p : ProcessParser.getRunningProcessList()) {
+                    ProcessClassifier.Result cls = ProcessClassifier.classify(p, selfPkg, ime, root, userProtected);
+                    base.add(new Base(p, cls, cpuPercentFor(p, prev, ticks, dtSec)));
+                }
+                mPrevTicks = ticks;
+                mPrevSampleMs = nowMs;
+
+                // 2. Dedup by pid — a shared process (e.g. system_server) appears
+                //    once per package; collapse it into a single row.
+                LinkedHashMap<Integer, List<Base>> byPid = new LinkedHashMap<>();
+                for (Base b : base) {
+                    List<Base> list = byPid.get(b.item.pid);
+                    if (list == null) {
+                        list = new ArrayList<>();
+                        byPid.put(b.item.pid, list);
+                    }
+                    list.add(b);
+                }
+                List<Row> rows = new ArrayList<>();
+                List<Base> leakCandidates = new ArrayList<>();
+                for (List<Base> grp : byPid.values()) {
+                    Base rep = grp.get(0);
+                    if (grp.size() > 1) {
+                        rows.add(sharedRow(ctx, pm, grp));
+                    } else if (rep.cls.killable && rep.cls.method == ProcessClassifier.METHOD_SIGKILL) {
+                        // Shell-owned (uid 2000) process — defer; it may be a leak
+                        // member. NOTE: ProcessParser tags these as AppProcessItem
+                        // (uid 2000 == com.android.shell), so gate on the SIGKILL
+                        // method (= shell-owned), NOT on the item type.
+                        leakCandidates.add(rep);
+                    } else {
+                        rows.add(singleRow(ctx, pm, rep));
+                    }
+                }
+
+                // 3. Leak grouping — cluster identical package-less shell commands.
+                LinkedHashMap<String, List<Base>> byComm = new LinkedHashMap<>();
+                for (Base b : leakCandidates) {
+                    String comm = comm(b.item);
+                    List<Base> list = byComm.get(comm);
+                    if (list == null) {
+                        list = new ArrayList<>();
+                        byComm.put(comm, list);
+                    }
+                    list.add(b);
+                }
+                for (Map.Entry<String, List<Base>> e : byComm.entrySet()) {
+                    List<Base> g = e.getValue();
+                    boolean leak = g.size() >= 3 || (TRANSIENT.contains(e.getKey()) && g.size() >= 2);
+                    if (leak) {
+                        rows.add(leakRow(ctx, e.getKey(), g));
+                    } else {
+                        for (Base b : g) rows.add(singleRow(ctx, pm, b));
+                    }
+                }
+
+                sort(rows);
+                mRows.postValue(rows);
+            } finally {
+                mLoading.postValue(false);
+                mBusy.set(false);
+            }
+        });
+    }
+
+    @NonNull
+    private Row singleRow(@NonNull Context ctx, @NonNull PackageManager pm, @NonNull Base b) {
+        ProcessItem p = b.item;
+        String title, subtitle;
+        // Shell-owned processes (SIGKILL) are tagged com.android.shell by
+        // ProcessParser — show their actual command, not the "Shell" label.
+        if (p instanceof AppProcessItem && b.cls.method != ProcessClassifier.METHOD_SIGKILL) {
+            PackageInfo pi = ((AppProcessItem) p).packageInfo;
+            title = labelFor(pi, pm);
+            subtitle = !TextUtils.isEmpty(p.name) ? p.name : pi.packageName;
+        } else {
+            title = comm(p);
+            subtitle = p.getCommandlineArgsAsString();
+        }
+        return new Row(p, b.cls, Collections.singletonList(p.pid), 1, false,
+                title, subtitle, meta(p), Formatter.formatShortFileSize(ctx, p.getMemory()),
+                cpuStr(b.cpuPct), b.cpuPct, p.getMemory());
+    }
+
+    @NonNull
+    private Row sharedRow(@NonNull Context ctx, @NonNull PackageManager pm, @NonNull List<Base> grp) {
+        Base rep = grp.get(0);
+        ProcessItem p = rep.item;
+        String proc = p.getCommandlineArgsAsString();
+        if (TextUtils.isEmpty(proc)) proc = comm(p);
+        StringBuilder apps = new StringBuilder();
+        for (int i = 0; i < grp.size() && i < 4; i++) {
+            if (i > 0) apps.append(", ");
+            ProcessItem mi = grp.get(i).item;
+            apps.append(mi instanceof AppProcessItem
+                    ? labelFor(((AppProcessItem) mi).packageInfo, pm) : comm(mi));
+        }
+        if (grp.size() > 4) apps.append(", …");
+        String subtitle = grp.size() + " apps: " + apps;
+        return new Row(p, rep.cls, Collections.singletonList(p.pid), grp.size(), false,
+                proc, subtitle, meta(p), Formatter.formatShortFileSize(ctx, p.getMemory()),
+                cpuStr(rep.cpuPct), rep.cpuPct, p.getMemory());
+    }
+
+    @NonNull
+    private Row leakRow(@NonNull Context ctx, @NonNull String comm, @NonNull List<Base> g) {
+        long mem = 0;
+        double cpu = 0;
+        List<Integer> pids = new ArrayList<>(g.size());
+        for (Base b : g) {
+            mem += b.item.getMemory();
+            if (!Double.isNaN(b.cpuPct)) cpu += b.cpuPct;
+            pids.add(b.item.pid);
+        }
+        ProcessItem rep = g.get(0).item;
+        String title = comm + "  ×" + g.size();
+        String subtitle = ctx.getString(io.github.muntashirakon.AppManager.R.string.monitor_leak_subtitle, g.size());
+        String meta = "uid " + rep.uid + "  ·  SIGKILL";
+        return new Row(rep, g.get(0).cls, pids, g.size(), true,
+                title, subtitle, meta, Formatter.formatShortFileSize(ctx, mem),
+                cpuStr(cpu), cpu, mem);
+    }
+
+    private void sort(@NonNull List<Row> rows) {
+        final boolean byCpu = mSort == SORT_CPU;
+        Collections.sort(rows, (a, b) -> {
+            // Leaks pinned to the top — they're the most actionable, and (being
+            // tiny orphaned helpers) would otherwise sink to the bottom of a
+            // RAM/CPU sort and be missed.
+            if (a.isLeak != b.isLeak) return a.isLeak ? -1 : 1;
+            if (byCpu) {
+                double ca = Double.isNaN(a.cpuPercent) ? -1 : a.cpuPercent;
+                double cb = Double.isNaN(b.cpuPercent) ? -1 : b.cpuPercent;
+                int c = Double.compare(cb, ca);
+                if (c != 0) return c;
+            }
+            return Long.compare(b.memBytes, a.memBytes);
+        });
+    }
+
+    public void kill(@NonNull Row row) {
+        ThreadUtils.postOnBackgroundThread(() -> mKillResult.postValue(new Pair<>(row, doKill(row))));
+    }
+
+    public void killSelected(@NonNull List<Row> rows) {
+        ThreadUtils.postOnBackgroundThread(() -> {
+            int ok = 0, total = 0;
+            for (Row row : rows) {
+                if (!row.cls.killable) continue;
+                total++;
+                if (doKill(row)) ok++;
+            }
+            mBulkKillResult.postValue(new int[]{ok, total});
+        });
+    }
+
+    private boolean doKill(@NonNull Row row) {
+        try {
+            if (row.cls.method == ProcessClassifier.METHOD_FORCE_STOP
+                    && row.item instanceof AppProcessItem) {
+                String pkg = ((AppProcessItem) row.item).packageInfo.packageName;
+                PackageManagerCompat.forceStopPackage(pkg, UserHandleHidden.getUserId(row.item.uid));
+                return true;
+            } else if (row.cls.method == ProcessClassifier.METHOD_SIGKILL) {
+                List<String> args = new ArrayList<>(row.pids.size() + 2);
+                args.add("kill");
+                args.add("-9");
+                for (Integer pid : row.pids) args.add(String.valueOf(pid));
+                return Runner.runCommand(args.toArray(new String[0])).isSuccessful();
+            }
+        } catch (Throwable t) {
+            // fall through to false
+        }
+        return false;
+    }
+
+    private double cpuPercentFor(@NonNull ProcessItem p, @Nullable Map<Integer, Long> prev,
+                                 @NonNull Map<Integer, Long> ticks, double dtSec) {
+        if (prev == null || dtSec <= 0.05) return Double.NaN;
+        Long pv = prev.get(p.pid);
+        Long cur = ticks.get(p.pid);
+        if (pv == null || cur == null) return Double.NaN;
+        double d = cur - pv;
+        if (d < 0) d = 0;
+        return 100.0 * d / CLK_TCK / dtSec;
+    }
+
+    @NonNull
+    private static String cpuStr(double pct) {
+        return (Double.isNaN(pct) || Double.isInfinite(pct))
+                ? "—" : String.format(Locale.US, "%.1f%% cpu", pct);
+    }
+
+    @NonNull
+    private static String meta(@NonNull ProcessItem p) {
+        String user = !TextUtils.isEmpty(p.user) ? p.user : ("uid " + p.uid);
+        return "PID " + p.pid + "  ·  " + user + (!TextUtils.isEmpty(p.state) ? "  ·  " + p.state : "");
+    }
+
+    @NonNull
+    private Map<Integer, Long> sampleCpuTicks() {
+        Map<Integer, Long> map = new HashMap<>(400);
+        try {
+            Runner.Result r = Runner.runCommand("cat /proc/[0-9]*/stat 2>/dev/null");
+            if (r == null || !r.isSuccessful()) return map;
+            for (String line : r.getOutputAsList()) {
+                int open = line.indexOf('(');
+                int close = line.lastIndexOf(')');
+                if (open < 0 || close < 0 || close < open) continue;
+                int pid;
+                try {
+                    pid = Integer.parseInt(line.substring(0, open).trim());
+                } catch (NumberFormatException e) {
+                    continue;
+                }
+                String[] f = line.substring(close + 1).trim().split("\\s+");
+                if (f.length < 13) continue;
+                try {
+                    map.put(pid, Long.parseLong(f[11]) + Long.parseLong(f[12]));
+                } catch (NumberFormatException ignore) {
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+        return map;
+    }
+
+    @NonNull
+    private String labelFor(@NonNull PackageInfo pi, @NonNull PackageManager pm) {
+        String cached = mLabelCache.get(pi.packageName);
+        if (cached != null) return cached;
+        CharSequence lbl = pi.applicationInfo != null ? pi.applicationInfo.loadLabel(pm) : null;
+        String label = !TextUtils.isEmpty(lbl) ? lbl.toString() : pi.packageName;
+        mLabelCache.put(pi.packageName, label);
+        return label;
+    }
+
+    @NonNull
+    private static String comm(@NonNull ProcessItem p) {
+        String[] args = p.getCommandlineArgs();
+        String first = (args.length > 0 && !TextUtils.isEmpty(args[0])) ? args[0] : p.name;
+        if (first == null) return "?";
+        int slash = first.lastIndexOf('/');
+        String base = slash >= 0 ? first.substring(slash + 1) : first;
+        return TextUtils.isEmpty(base) ? first : base;
+    }
+
+    @Nullable
+    private String activeImePackage() {
+        try {
+            String s = Settings.Secure.getString(getApplication().getContentResolver(),
+                    Settings.Secure.DEFAULT_INPUT_METHOD);
+            if (!TextUtils.isEmpty(s) && s.contains("/")) {
+                return s.substring(0, s.indexOf('/'));
+            }
+        } catch (Throwable ignore) {
+        }
+        return null;
+    }
+}

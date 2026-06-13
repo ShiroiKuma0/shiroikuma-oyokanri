@@ -49,6 +49,16 @@ public final class ProcessParser {
         }
     }
 
+    /**
+     * Fork: public entry point for the process monitor / reaper. This class and
+     * {@link #parse()} are otherwise package-private; this builds + parses the
+     * live process list off the privileged service (or {@code ps} fallback).
+     */
+    @NonNull
+    public static List<ProcessItem> getRunningProcessList() {
+        return new ProcessParser().parse();
+    }
+
     @SuppressWarnings("unchecked")
     @NonNull
     List<ProcessItem> parse() {

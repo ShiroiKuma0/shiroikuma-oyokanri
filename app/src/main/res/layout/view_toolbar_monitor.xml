@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!--
+    Fork: the standalone process-monitor entry button on the main top bar.
+    A custom action view (not a plain menu icon) so it can carry a trailing
+    gap (paddingEnd) that visually separates it from the filter-icon cluster
+    to its right. Click is wired in MainActivity.onCreateOptionsMenu.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="match_parent"
+    android:paddingEnd="14dp"
+    android:paddingStart="2dp">
+
+    <ImageView
+        android:id="@+id/action_monitor_btn"
+        android:layout_width="44dp"
+        android:layout_height="match_parent"
+        android:padding="10dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_monitor"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/monitor_title"
+        android:tooltipText="@string/monitor_title" />
+
+</FrameLayout>

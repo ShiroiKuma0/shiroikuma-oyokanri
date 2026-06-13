@@ -23,9 +23,12 @@ public final class RunningBoxPrefs {
 
     private static final String PREFS_NAME = "shiroikuma_running_box";
     private static final String KEY_WIDTH = "width_dp";
+    private static final String KEY_RADIUS = "radius_dp";
 
     public static final float DEFAULT_WIDTH_DP = 2.5f;
     public static final float MAX_WIDTH_DP = 8f;
+    public static final int DEFAULT_RADIUS_DP = 0;   // square, matching the edge-to-edge grid
+    public static final int MAX_RADIUS_DP = 24;
 
     private static volatile boolean sChanged = false;
 
@@ -48,6 +51,18 @@ public final class RunningBoxPrefs {
         if (dp < 0f) dp = 0f;
         if (dp > MAX_WIDTH_DP) dp = MAX_WIDTH_DP;
         sp(ctx).edit().putFloat(KEY_WIDTH, dp).apply();
+        sChanged = true;
+    }
+
+    /** Corner radius (dp) of the running-app box. 0 = square (default). */
+    public static int getRadiusDp(@NonNull Context ctx) {
+        return sp(ctx).getInt(KEY_RADIUS, DEFAULT_RADIUS_DP);
+    }
+
+    public static void setRadiusDp(@NonNull Context ctx, int dp) {
+        if (dp < 0) dp = 0;
+        if (dp > MAX_RADIUS_DP) dp = MAX_RADIUS_DP;
+        sp(ctx).edit().putInt(KEY_RADIUS, dp).apply();
         sChanged = true;
     }
 }

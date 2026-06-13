@@ -46,6 +46,7 @@
         android:paddingEnd="0dp">
 
         <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/sep_sublabel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/pref_sep_width"

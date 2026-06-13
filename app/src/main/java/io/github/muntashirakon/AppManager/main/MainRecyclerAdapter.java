@@ -490,19 +490,19 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             cardView.setStrokeWidth(frameWidthDp <= 0f ? 0 : Math.max(1, Math.round(frameWidthDp * density)));
             cardView.setStrokeColor(ColorPrefs.getColor(context, ColorPrefs.SELECTED_FRAME, mColorYellow));
         } else {
-            cardView.setRadius(0f);
             // Fork: active apps (installed, not frozen, not force-stopped) get a
-            // 1dp box matching their label colour — yellow (user) / orange
-            // (system) — so "live" apps stand out from dormant ones at a glance.
-            // Frozen and uninstalled rows are conveyed by their films instead,
-            // and force-stopped rows get no box (as in the original behaviour).
+            // box matching their label colour — yellow (user) / orange (system).
+            // Frozen/uninstalled rows use their films; force-stopped rows get no
+            // box. Width AND corner roundness are read at bind time (like the
+            // selection frame) from RunningBoxPrefs; non-box cells stay square
+            // (radius 0) to keep the edge-to-edge separator grid straight.
             if (item.isInstalled && !item.isFrozen && !item.isStopped) {
-                // Width read at bind time (like the selection frame) so the
-                // settings slider takes effect on the next list refresh. 0 = none.
                 float boxDp = RunningBoxPrefs.getWidthDp(context);
+                cardView.setRadius(RunningBoxPrefs.getRadiusDp(context) * density);
                 cardView.setStrokeWidth(boxDp <= 0f ? 0 : Math.max(1, Math.round(boxDp * density)));
                 cardView.setStrokeColor(item.isUser ? mcStrokeUser : mcStrokeSystem);
             } else {
+                cardView.setRadius(0f);
                 cardView.setStrokeWidth(0);
             }
         }

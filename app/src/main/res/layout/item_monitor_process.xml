@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Fork: one process row. App icon (size from MonitorPrefs) · text block · the
+     two quick-action buttons (Protect/Unprotect on top, Kill on the bottom,
+     both no-confirmation) · stats (mem/cpu/badge) on the far right. -->
+<androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@android:color/black"
+    android:foreground="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true">
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:id="@+id/monitor_content"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="6dp">
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/monitor_icon"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginEnd="10dp"
+            android:scaleType="fitCenter"
+            tools:src="@drawable/ic_android" />
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/monitor_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:textColor="@color/theme_bright_yellow"
+                android:textSize="16sp"
+                tools:text="Some App" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/monitor_subtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:textColor="#9A9A9A"
+                android:textSize="13sp"
+                tools:text="com.some.app:service" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/monitor_meta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:textColor="#7A7A7A"
+                android:textSize="12sp"
+                tools:text="PID 1234  ·  u0_a1  ·  S" />
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/monitor_btn_protect"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/monitor_protect"
+                tools:src="@drawable/ic_unlock" />
+
+            <Space
+                android:layout_width="1dp"
+                android:layout_height="14dp" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/monitor_btn_kill"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/monitor_kill"
+                android:src="@drawable/ic_close_24dp" />
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:minWidth="76dp"
+            android:gravity="end"
+            android:orientation="vertical">
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/monitor_ram"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/theme_bright_yellow"
+                android:textStyle="bold"
+                android:textSize="15sp"
+                tools:text="412 MB" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/monitor_cpu"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:textColor="#9A9A9A"
+                android:textSize="12sp"
+                tools:text="3.2% cpu" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/monitor_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:textStyle="bold"
+                android:textSize="11sp"
+                tools:text="KILLABLE" />
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
+</androidx.appcompat.widget.LinearLayoutCompat>

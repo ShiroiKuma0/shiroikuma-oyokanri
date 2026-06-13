@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <!-- Visible only in selection mode (toggled in onPrepareOptionsMenu) -->
+    <item
+        android:id="@+id/action_monitor_kill_selected"
+        android:icon="@drawable/ic_stop"
+        android:title="@string/monitor_kill_selected"
+        android:visible="false"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_monitor_pause"
+        android:icon="@drawable/ic_pause"
+        android:title="@string/monitor_pause"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_monitor_sort"
+        android:icon="@drawable/ic_sort"
+        android:title="@string/monitor_sort"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_monitor_columns"
+        android:icon="@drawable/ic_grid_3x3"
+        android:title="@string/monitor_columns"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_monitor_refresh"
+        android:icon="@drawable/ic_refresh"
+        android:title="@string/refresh"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_monitor_interval"
+        android:title="@string/monitor_interval"
+        app:showAsAction="never" />
+</menu>

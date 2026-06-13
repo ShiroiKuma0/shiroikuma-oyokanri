@@ -1,0 +1,44 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!--
+    Fork: the process monitor / reaper screen (Phase 1). Live process list
+    sorted by RAM (hoggers first), each row classified PROTECTED vs KILLABLE;
+    tap a killable row to smart-kill it (app → force-stop, orphaned shell pid →
+    SIGKILL). Live CPU sampling, leak grouping and bulk select land next.
+-->
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".processreaper.ProcessMonitorActivity">
+
+    <include layout="@layout/appbar" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_behavior="com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior">
+
+        <io.github.muntashirakon.widget.RecyclerView
+            android:id="@+id/monitor_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@android:color/black"
+            android:clipToPadding="false"
+            android:fitsSystemWindows="true"
+            tools:listitem="@layout/item_monitor_process" />
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/monitor_empty"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:padding="32dp"
+            android:textColor="#9A9A9A"
+            android:textSize="16sp"
+            android:visibility="gone"
+            android:text="@string/monitor_empty" />
+
+    </FrameLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
