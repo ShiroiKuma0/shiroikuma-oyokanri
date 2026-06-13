@@ -28,6 +28,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import io.github.muntashirakon.AppManager.BuildConfig;
 import io.github.muntashirakon.AppManager.compat.PackageManagerCompat;
@@ -103,6 +105,27 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
     private final Map<String, String> mLabelCache = new HashMap<>();
     private Map<Integer, Long> mPrevTicks;
     private long mPrevSampleMs;
+    // pid → ppid, harvested for free from the same /proc/*/stat batch the CPU
+    // sampler reads. Used to protect our own shell subtree (see ProcessClassifier
+    // .ancestryProtectedPids). Touched only on the serialized background thread.
+    private Map<Integer, Integer> mPpid = Collections.emptyMap();
+    // Foreground/top app + foreground-service packages, refreshed at most every
+    // ACTIVE_TTL_MS (the dumpsys parse is comparatively heavy vs. the /proc tick
+    // read, and foreground state changes slowly). Touched only on the serialized
+    // background load thread.
+    private Set<String> mActivePkgs = Collections.emptySet();
+    private long mActivePkgsMs;
+    private static final long ACTIVE_TTL_MS = 5_000L;
+    // Per-pid PSS (proportional set size) — the *accurate* footprint, since RSS
+    // double-counts shared pages. Killing a process frees roughly its PSS, so
+    // it's the right number for a reaper to rank by. Non-root shell can't read
+    // /proc/<pid>/smaps_rollup (ptrace-gated, EPERM cross-process), so the only
+    // source is `dumpsys meminfo`, which is heavy — cached for PSS_TTL_MS, much
+    // longer than the CPU tick because memory moves slowly. Touched only on the
+    // serialized background load thread; rows fall back to RSS when PSS is absent.
+    private Map<Integer, Long> mPss = Collections.emptyMap();
+    private long mPssMs;
+    private static final long PSS_TTL_MS = 15_000L;
     private volatile int mSort = SORT_RAM;
 
     public ProcessMonitorViewModel(@NonNull Application application) {
@@ -146,16 +169,43 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
                 String ime = activeImePackage();
                 boolean root = Ops.isWorkingUidRoot();
                 Set<String> userProtected = ReaperPrefs.getProtectedPackages(ctx);
+                Set<String> active = activePackages();
+                pssMemory();  // refresh mPss (cached); row builders read it below
 
-                Map<Integer, Long> ticks = sampleCpuTicks();
+                // Enumerate FIRST, then read /proc/*/stat — the stat snapshot both
+                // supplies CPU ticks + PPid and acts as a liveness filter. Our own
+                // command pipeline (ProcessParser's `ps`, our `cat`/`sed`/`sh`)
+                // spawns transient helpers that land in the enumeration but die
+                // milliseconds later; they share the names in TRANSIENT (sh/cat/…)
+                // so they'd masquerade as leaks. Dropping any pid absent from the
+                // (later) stat read removes those ghosts; the persistent server
+                // shell that survives is caught by ancestry below.
+                List<ProcessItem> procsRaw = ProcessParser.getRunningProcessList();
+                Map<Integer, Long> ticks = sampleCpuTicks();  // also refreshes mPpid
                 long nowMs = SystemClock.elapsedRealtime();
                 Map<Integer, Long> prev = mPrevTicks;
                 double dtSec = (mPrevSampleMs > 0) ? (nowMs - mPrevSampleMs) / 1000.0 : 0;
 
-                // 1. Classify every per-(pid, package) entry.
+                List<ProcessItem> procs;
+                if (ticks.isEmpty()) {
+                    procs = procsRaw;  // stat read failed — don't filter everything out
+                } else {
+                    procs = new ArrayList<>(procsRaw.size());
+                    for (ProcessItem p : procsRaw) {
+                        if (ticks.containsKey(p.pid)) procs.add(p);  // still alive
+                    }
+                }
+
+                // 1. Classify every per-(pid, package) entry. Our own shell subtree
+                //    (the privileged server + the shells it runs commands through)
+                //    is protected by ancestry so the reaper can't sever its own kill.
+                Set<Integer> seedRoots = grepOurRootPids();
+                Set<Integer> ancestryProtected =
+                        ProcessClassifier.ancestryProtectedPids(procs, mPpid, seedRoots, selfPkg);
                 List<Base> base = new ArrayList<>();
-                for (ProcessItem p : ProcessParser.getRunningProcessList()) {
-                    ProcessClassifier.Result cls = ProcessClassifier.classify(p, selfPkg, ime, root, userProtected);
+                for (ProcessItem p : procs) {
+                    ProcessClassifier.Result cls = ProcessClassifier.classify(
+                            p, selfPkg, ime, root, userProtected, active, ancestryProtected);
                     base.add(new Base(p, cls, cpuPercentFor(p, prev, ticks, dtSec)));
                 }
                 mPrevTicks = ticks;
@@ -233,9 +283,10 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
             title = comm(p);
             subtitle = p.getCommandlineArgsAsString();
         }
+        long mem = memBytesFor(p);
         return new Row(p, b.cls, Collections.singletonList(p.pid), 1, false,
-                title, subtitle, meta(p), Formatter.formatShortFileSize(ctx, p.getMemory()),
-                cpuStr(b.cpuPct), b.cpuPct, p.getMemory());
+                title, subtitle, meta(p), Formatter.formatShortFileSize(ctx, mem),
+                cpuStr(b.cpuPct), b.cpuPct, mem);
     }
 
     @NonNull
@@ -253,9 +304,10 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
         }
         if (grp.size() > 4) apps.append(", …");
         String subtitle = grp.size() + " apps: " + apps;
+        long mem = memBytesFor(p);
         return new Row(p, rep.cls, Collections.singletonList(p.pid), grp.size(), false,
-                proc, subtitle, meta(p), Formatter.formatShortFileSize(ctx, p.getMemory()),
-                cpuStr(rep.cpuPct), rep.cpuPct, p.getMemory());
+                proc, subtitle, meta(p), Formatter.formatShortFileSize(ctx, mem),
+                cpuStr(rep.cpuPct), rep.cpuPct, mem);
     }
 
     @NonNull
@@ -264,7 +316,7 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
         double cpu = 0;
         List<Integer> pids = new ArrayList<>(g.size());
         for (Base b : g) {
-            mem += b.item.getMemory();
+            mem += memBytesFor(b.item);
             if (!Double.isNaN(b.cpuPct)) cpu += b.cpuPct;
             pids.add(b.item.pid);
         }
@@ -318,11 +370,26 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
                 PackageManagerCompat.forceStopPackage(pkg, UserHandleHidden.getUserId(row.item.uid));
                 return true;
             } else if (row.cls.method == ProcessClassifier.METHOD_SIGKILL) {
-                List<String> args = new ArrayList<>(row.pids.size() + 2);
-                args.add("kill");
-                args.add("-9");
-                for (Integer pid : row.pids) args.add(String.valueOf(pid));
-                return Runner.runCommand(args.toArray(new String[0])).isSuccessful();
+                StringBuilder pids = new StringBuilder();
+                for (Integer pid : row.pids) pids.append(pid).append(' ');
+                String pl = pids.toString().trim();
+                if (pl.isEmpty()) return false;
+                // Report by whether the kill was PERMITTED, not by an immediate
+                // liveness probe. `kill -9` returns before the kernel finishes
+                // teardown, so checking /proc right after races a dying/zombie
+                // entry and reports a false failure (the row vanishes yet the toast
+                // says "Couldn't kill"). For a same-uid SIGKILL the only true
+                // failure is EPERM ("Operation not permitted"); ESRCH ("No such
+                // process" — a member already exited) means the goal is met.
+                Runner.Result r = Runner.runCommand("kill -9 " + pl + " 2>&1");
+                if (r == null) return false;
+                for (String l : r.getOutputAsList()) {
+                    String low = l.toLowerCase(Locale.ROOT);
+                    if (low.contains("not permitted") || low.contains("permission denied")) {
+                        return false;
+                    }
+                }
+                return true;
             }
         } catch (Throwable t) {
             // fall through to false
@@ -356,9 +423,13 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
     @NonNull
     private Map<Integer, Long> sampleCpuTicks() {
         Map<Integer, Long> map = new HashMap<>(400);
+        Map<Integer, Integer> ppid = new HashMap<>(400);
         try {
             Runner.Result r = Runner.runCommand("cat /proc/[0-9]*/stat 2>/dev/null");
-            if (r == null || !r.isSuccessful()) return map;
+            if (r == null || !r.isSuccessful()) {
+                mPpid = ppid;
+                return map;
+            }
             for (String line : r.getOutputAsList()) {
                 int open = line.indexOf('(');
                 int close = line.lastIndexOf(')');
@@ -369,11 +440,152 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
                 } catch (NumberFormatException e) {
                     continue;
                 }
+                // Fields after "pid (comm)": [0]=state, [1]=ppid, … [11]=utime, [12]=stime.
                 String[] f = line.substring(close + 1).trim().split("\\s+");
                 if (f.length < 13) continue;
                 try {
                     map.put(pid, Long.parseLong(f[11]) + Long.parseLong(f[12]));
+                    ppid.put(pid, Integer.parseInt(f[1]));
                 } catch (NumberFormatException ignore) {
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+        mPpid = ppid;
+        return map;
+    }
+
+    /**
+     * Packages that are actively in use — the foreground/top app(s) (multiple on
+     * the foldable in split-screen) and any process hosting a live foreground
+     * service (media, navigation, recorder, sync). Cached for {@link #ACTIVE_TTL_MS}
+     * because the two {@code dumpsys} parses are heavier than the per-tick read and
+     * the answer changes slowly. Best-effort: a parse failure just yields fewer
+     * protections (the prior behaviour), never a crash.
+     */
+    @NonNull
+    private Set<String> activePackages() {
+        long now = SystemClock.elapsedRealtime();
+        if (mActivePkgsMs != 0 && now - mActivePkgsMs < ACTIVE_TTL_MS) return mActivePkgs;
+        mActivePkgs = gatherActivePackages();
+        mActivePkgsMs = now;
+        return mActivePkgs;
+    }
+
+    // u<USER_ID> <pkg>/<activity> — captures the package of a resumed activity.
+    private static final Pattern RESUMED_PKG = Pattern.compile("u\\d+\\s+([\\w.]+)/");
+
+    @NonNull
+    private Set<String> gatherActivePackages() {
+        Set<String> active = new HashSet<>();
+        // Foreground services: walk each ServiceRecord block in `dumpsys activity
+        // services`; a block carrying `isForeground=true` protects its package.
+        try {
+            Runner.Result r = Runner.runCommand("dumpsys activity services 2>/dev/null");
+            if (r != null && r.isSuccessful()) {
+                String curPkg = null;
+                for (String line : r.getOutputAsList()) {
+                    String t = line.trim();
+                    if (t.startsWith("* ServiceRecord{")) {
+                        curPkg = null;
+                    } else if (t.startsWith("packageName=")) {
+                        curPkg = t.substring("packageName=".length()).trim();
+                    } else if (curPkg != null && t.contains("isForeground=true")) {
+                        active.add(curPkg);
+                    }
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+        // Foreground / top app(s): every resumed activity in `dumpsys activity
+        // activities` (more than one when split across the fold).
+        try {
+            Runner.Result r = Runner.runCommand("dumpsys activity activities 2>/dev/null");
+            if (r != null && r.isSuccessful()) {
+                for (String line : r.getOutputAsList()) {
+                    if (!line.contains("ResumedActivity")) continue;
+                    Matcher m = RESUMED_PKG.matcher(line);
+                    if (m.find()) active.add(m.group(1));
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+        return active;
+    }
+
+    // "/proc/<pid>/cmdline" → pid.
+    private static final Pattern PROC_PID = Pattern.compile("/proc/(\\d+)/cmdline");
+
+    /**
+     * Pids of our privilege roots, read straight from {@code /proc/*​/cmdline} —
+     * NOT from {@link ProcessParser}, whose fields don't expose our package for the
+     * uid-2000 {@code :priv:0} server (its {@code comm} is "main"). Any process
+     * whose cmdline carries our package or "shizuku" is a root; the classifier then
+     * protects its whole subtree. Always includes our own pid as a backstop.
+     */
+    @NonNull
+    private Set<Integer> grepOurRootPids() {
+        Set<Integer> roots = new HashSet<>();
+        roots.add(android.os.Process.myPid());
+        try {
+            Runner.Result r = Runner.runCommand(
+                    "grep -la -e " + BuildConfig.APPLICATION_ID
+                            + " -e shizuku -e am_local_server /proc/[0-9]*/cmdline 2>/dev/null");
+            if (r != null && r.isSuccessful()) {
+                for (String line : r.getOutputAsList()) {
+                    Matcher m = PROC_PID.matcher(line);
+                    if (m.find()) {
+                        try {
+                            roots.add(Integer.parseInt(m.group(1)));
+                        } catch (NumberFormatException ignore) {
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+        return roots;
+    }
+
+    /** Accurate per-process footprint: PSS from {@code dumpsys meminfo} when known, else RSS. */
+    private long memBytesFor(@NonNull ProcessItem p) {
+        Long pss = mPss.get(p.pid);
+        return pss != null ? pss : p.getMemory();
+    }
+
+    @NonNull
+    private Map<Integer, Long> pssMemory() {
+        long now = SystemClock.elapsedRealtime();
+        if (mPssMs != 0 && now - mPssMs < PSS_TTL_MS) return mPss;
+        mPss = samplePss();
+        mPssMs = now;
+        return mPss;
+    }
+
+    // "   707,250K: name (pid 914 / activities)" → group 1 = PSS kB, group 2 = pid.
+    private static final Pattern PSS_LINE = Pattern.compile("^\\s*([\\d,]+)K:\\s+.*\\(pid\\s+(\\d+)");
+
+    @NonNull
+    private Map<Integer, Long> samplePss() {
+        Map<Integer, Long> map = new HashMap<>(256);
+        try {
+            Runner.Result r = Runner.runCommand("dumpsys meminfo 2>/dev/null");
+            if (r == null || !r.isSuccessful()) return map;
+            boolean inSection = false;
+            for (String line : r.getOutputAsList()) {
+                if (!inSection) {
+                    if (line.contains("Total PSS by process")) inSection = true;
+                    continue;
+                }
+                String t = line.trim();
+                if (t.isEmpty() || t.startsWith("Total ")) break;  // section ends
+                Matcher m = PSS_LINE.matcher(line);
+                if (m.find()) {
+                    try {
+                        long kb = Long.parseLong(m.group(1).replace(",", ""));
+                        map.put(Integer.parseInt(m.group(2)), kb * 1024L);
+                    } catch (NumberFormatException ignore) {
+                    }
                 }
             }
         } catch (Throwable ignore) {
