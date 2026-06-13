@@ -1762,6 +1762,11 @@
     <string name="pref_monitor_icon_size_hint">Icon size</string>
     <string name="pref_monitor_row_pad">Row padding</string>
     <string name="pref_monitor_row_pad_hint">Vertical padding (0 = tightest)</string>
+    <string name="pref_monitor_leak_count">Leak threshold</string>
+    <string name="pref_monitor_leak_count_hint">Identical shell processes to flag as a leak</string>
+    <string name="pref_monitor_leak_age">Leak min age</string>
+    <string name="pref_monitor_leak_age_hint">Only flag once a cluster has lasted this long</string>
+    <string name="pref_monitor_leak_age_off">off</string>
     <string name="pref_monitor_row_colors">Row state colours</string>
     <string name="pref_monitor_killable">Killable</string>
     <string name="pref_monitor_leak">Leak</string>

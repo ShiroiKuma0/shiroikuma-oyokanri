@@ -233,6 +233,8 @@ public class FontsPreferences extends Fragment {
         LinearLayoutCompat monContent = monGroup.findViewById(R.id.group_content);
         monContent.addView(buildMonitorIconElement(inflater, monContent));
         monContent.addView(buildMonitorPaddingElement(inflater, monContent));
+        monContent.addView(buildMonitorLeakCountElement(inflater, monContent));
+        monContent.addView(buildMonitorLeakAgeElement(inflater, monContent));
         View monColors = inflater.inflate(R.layout.view_font_element, monContent, false);
         ((AppCompatTextView) monColors.findViewById(R.id.element_label)).setText(R.string.pref_monitor_row_colors);
         monColors.findViewById(R.id.font_controls).setVisibility(View.GONE);
@@ -415,6 +417,63 @@ public class FontsPreferences extends Fragment {
             public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
                 if (!fromUser) return;
                 MonitorPrefs.setRowPaddingDp(requireContext(), progress);
+                render.run();
+            }
+            @Override public void onStartTrackingTouch(SeekBar sb) {}
+            @Override public void onStopTrackingTouch(SeekBar sb) {}
+        });
+        return element;
+    }
+
+    /** Fork: the leak-grouping count threshold slider (min identical processes). */
+    @NonNull
+    private View buildMonitorLeakCountElement(@NonNull LayoutInflater inflater, @NonNull LinearLayoutCompat parent) {
+        View element = inflater.inflate(R.layout.view_separator_element, parent, false);
+        ((AppCompatTextView) element.findViewById(R.id.element_label)).setText(R.string.pref_monitor_leak_count);
+        ((AppCompatTextView) element.findViewById(R.id.sep_sublabel)).setText(R.string.pref_monitor_leak_count_hint);
+        final AppCompatTextView valueView = element.findViewById(R.id.sep_width_value);
+        final AppCompatSeekBar seek = element.findViewById(R.id.sep_width_seek);
+        seek.setMax(MonitorPrefs.MAX_LEAK_COUNT - MonitorPrefs.MIN_LEAK_COUNT);
+        final Runnable render = () -> {
+            int n = MonitorPrefs.getLeakThreshold(requireContext());
+            valueView.setText(String.format(Locale.US, "%d", n));
+            seek.setProgress(n - MonitorPrefs.MIN_LEAK_COUNT);
+        };
+        render.run();
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                MonitorPrefs.setLeakThreshold(requireContext(), MonitorPrefs.MIN_LEAK_COUNT + progress);
+                render.run();
+            }
+            @Override public void onStartTrackingTouch(SeekBar sb) {}
+            @Override public void onStopTrackingTouch(SeekBar sb) {}
+        });
+        return element;
+    }
+
+    /** Fork: the leak min-age slider (sustained-age filter; 0 = off). */
+    @NonNull
+    private View buildMonitorLeakAgeElement(@NonNull LayoutInflater inflater, @NonNull LinearLayoutCompat parent) {
+        View element = inflater.inflate(R.layout.view_separator_element, parent, false);
+        ((AppCompatTextView) element.findViewById(R.id.element_label)).setText(R.string.pref_monitor_leak_age);
+        ((AppCompatTextView) element.findViewById(R.id.sep_sublabel)).setText(R.string.pref_monitor_leak_age_hint);
+        final AppCompatTextView valueView = element.findViewById(R.id.sep_width_value);
+        final AppCompatSeekBar seek = element.findViewById(R.id.sep_width_seek);
+        seek.setMax(MonitorPrefs.MAX_LEAK_AGE_SEC / MonitorPrefs.LEAK_AGE_STEP_SEC);
+        final Runnable render = () -> {
+            int s = MonitorPrefs.getLeakMinAgeSec(requireContext());
+            valueView.setText(s <= 0 ? getString(R.string.pref_monitor_leak_age_off)
+                    : String.format(Locale.US, "%d s", s));
+            seek.setProgress(s / MonitorPrefs.LEAK_AGE_STEP_SEC);
+        };
+        render.run();
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                MonitorPrefs.setLeakMinAgeSec(requireContext(), progress * MonitorPrefs.LEAK_AGE_STEP_SEC);
                 render.run();
             }
             @Override public void onStartTrackingTouch(SeekBar sb) {}

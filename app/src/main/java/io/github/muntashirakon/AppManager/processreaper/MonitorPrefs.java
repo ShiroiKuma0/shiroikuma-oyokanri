@@ -19,6 +19,8 @@ public final class MonitorPrefs {
     private static final String KEY_COLUMNS = "columns";
     private static final String KEY_ICON_DP = "icon_dp";
     private static final String KEY_ROW_PAD_DP = "row_pad_dp";
+    private static final String KEY_LEAK_COUNT = "leak_count";
+    private static final String KEY_LEAK_AGE_SEC = "leak_age_sec";
 
     public static final int MIN_COLUMNS = 1;
     public static final int MAX_COLUMNS = 3;
@@ -27,6 +29,17 @@ public final class MonitorPrefs {
     public static final int MAX_ICON_DP = 72;
     public static final int DEFAULT_ROW_PAD_DP = 6;
     public static final int MAX_ROW_PAD_DP = 16;
+    // Leak grouping: a cluster of N identical package-less shell commands. The
+    // count threshold is tunable; known-transient comms keep a floor of 2.
+    public static final int DEFAULT_LEAK_COUNT = 3;
+    public static final int MIN_LEAK_COUNT = 2;
+    public static final int MAX_LEAK_COUNT = 10;
+    // Optional minimum age (seconds): when > 0, a cluster is only a leak if its
+    // oldest member has lived this long — so a momentary burst isn't flagged.
+    // 0 = disabled (the default). Slider steps of LEAK_AGE_STEP_SEC.
+    public static final int DEFAULT_LEAK_AGE_SEC = 0;
+    public static final int MAX_LEAK_AGE_SEC = 300;
+    public static final int LEAK_AGE_STEP_SEC = 15;
 
     @NonNull
     private static SharedPreferences sp(@NonNull Context ctx) {
@@ -67,5 +80,29 @@ public final class MonitorPrefs {
         if (dp < 0) dp = 0;
         if (dp > MAX_ROW_PAD_DP) dp = MAX_ROW_PAD_DP;
         sp(ctx).edit().putInt(KEY_ROW_PAD_DP, dp).apply();
+    }
+
+    /** Minimum identical-process count to flag a leak (known-transient comms floor at 2). */
+    public static int getLeakThreshold(@NonNull Context ctx) {
+        int n = sp(ctx).getInt(KEY_LEAK_COUNT, DEFAULT_LEAK_COUNT);
+        return Math.max(MIN_LEAK_COUNT, Math.min(MAX_LEAK_COUNT, n));
+    }
+
+    public static void setLeakThreshold(@NonNull Context ctx, int n) {
+        if (n < MIN_LEAK_COUNT) n = MIN_LEAK_COUNT;
+        if (n > MAX_LEAK_COUNT) n = MAX_LEAK_COUNT;
+        sp(ctx).edit().putInt(KEY_LEAK_COUNT, n).apply();
+    }
+
+    /** Minimum sustained age (seconds) for a leak; 0 = disabled. */
+    public static int getLeakMinAgeSec(@NonNull Context ctx) {
+        int s = sp(ctx).getInt(KEY_LEAK_AGE_SEC, DEFAULT_LEAK_AGE_SEC);
+        return Math.max(0, Math.min(MAX_LEAK_AGE_SEC, s));
+    }
+
+    public static void setLeakMinAgeSec(@NonNull Context ctx, int s) {
+        if (s < 0) s = 0;
+        if (s > MAX_LEAK_AGE_SEC) s = MAX_LEAK_AGE_SEC;
+        sp(ctx).edit().putInt(KEY_LEAK_AGE_SEC, s).apply();
     }
 }

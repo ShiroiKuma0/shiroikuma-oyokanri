@@ -109,6 +109,9 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
     // sampler reads. Used to protect our own shell subtree (see ProcessClassifier
     // .ancestryProtectedPids). Touched only on the serialized background thread.
     private Map<Integer, Integer> mPpid = Collections.emptyMap();
+    // pid → process start time (clock ticks since boot, /proc stat field 22),
+    // from the same batch. Used for the optional leak min-age filter.
+    private Map<Integer, Long> mStart = Collections.emptyMap();
     // Foreground/top app + foreground-service packages, refreshed at most every
     // ACTIVE_TTL_MS (the dumpsys parse is comparatively heavy vs. the /proc tick
     // read, and foreground state changes slowly). Touched only on the serialized
@@ -250,9 +253,26 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
                     }
                     list.add(b);
                 }
+                int leakCount = MonitorPrefs.getLeakThreshold(ctx);
+                int transientFloor = Math.min(2, leakCount);
+                int leakMinAge = MonitorPrefs.getLeakMinAgeSec(ctx);
                 for (Map.Entry<String, List<Base>> e : byComm.entrySet()) {
                     List<Base> g = e.getValue();
-                    boolean leak = g.size() >= 3 || (TRANSIENT.contains(e.getKey()) && g.size() >= 2);
+                    boolean countOk = g.size() >= leakCount
+                            || (TRANSIENT.contains(e.getKey()) && g.size() >= transientFloor);
+                    // Optional: require the cluster to be sustained — its OLDEST
+                    // member must have lived at least leakMinAge seconds — so a
+                    // momentary burst of identical processes isn't flagged.
+                    boolean ageOk = leakMinAge <= 0;
+                    if (!ageOk) {
+                        for (Base b : g) {
+                            if (ageSec(b.item.pid) >= leakMinAge) {
+                                ageOk = true;
+                                break;
+                            }
+                        }
+                    }
+                    boolean leak = countOk && ageOk;
                     if (leak) {
                         rows.add(leakRow(ctx, e.getKey(), g));
                     } else {
@@ -424,10 +444,12 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
     private Map<Integer, Long> sampleCpuTicks() {
         Map<Integer, Long> map = new HashMap<>(400);
         Map<Integer, Integer> ppid = new HashMap<>(400);
+        Map<Integer, Long> start = new HashMap<>(400);
         try {
             Runner.Result r = Runner.runCommand("cat /proc/[0-9]*/stat 2>/dev/null");
             if (r == null || !r.isSuccessful()) {
                 mPpid = ppid;
+                mStart = start;
                 return map;
             }
             for (String line : r.getOutputAsList()) {
@@ -440,19 +462,30 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
                 } catch (NumberFormatException e) {
                     continue;
                 }
-                // Fields after "pid (comm)": [0]=state, [1]=ppid, … [11]=utime, [12]=stime.
+                // Fields after "pid (comm)": [0]=state, [1]=ppid, … [11]=utime,
+                // [12]=stime, … [19]=starttime (proc stat field 22).
                 String[] f = line.substring(close + 1).trim().split("\\s+");
                 if (f.length < 13) continue;
                 try {
                     map.put(pid, Long.parseLong(f[11]) + Long.parseLong(f[12]));
                     ppid.put(pid, Integer.parseInt(f[1]));
+                    if (f.length > 19) start.put(pid, Long.parseLong(f[19]));
                 } catch (NumberFormatException ignore) {
                 }
             }
         } catch (Throwable ignore) {
         }
         mPpid = ppid;
+        mStart = start;
         return map;
+    }
+
+    /** Process age in seconds from /proc start time, or 0 if unknown. */
+    private double ageSec(int pid) {
+        Long st = mStart.get(pid);
+        if (st == null) return 0;
+        double age = SystemClock.elapsedRealtime() / 1000.0 - st / (double) CLK_TCK;
+        return age > 0 ? age : 0;
     }
 
     /**
