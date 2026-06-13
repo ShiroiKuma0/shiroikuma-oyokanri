@@ -33,6 +33,7 @@
             android:layout_marginTop="@dimen/padding_small"
             android:layout_marginBottom="@dimen/padding_very_small"
             android:text="@string/app_name"
+            android:textColor="@color/theme_bright_yellow"
             android:textAlignment="center" />
 
         <com.google.android.material.textview.MaterialTextView
@@ -42,6 +43,7 @@
             android:layout_below="@id/title"
             android:layout_centerHorizontal="true"
             android:textAlignment="center"
+            android:textColor="@color/theme_bright_yellow"
             android:text="@string/authenticating" />
     </RelativeLayout>
 
@@ -53,5 +55,6 @@
         android:gravity="center_horizontal|bottom"
         android:padding="@dimen/padding_large"
         android:textAlignment="center"
+        android:textColor="@color/theme_bright_yellow"
         tools:text="Version 2.7.0" />
 </androidx.appcompat.widget.LinearLayoutCompat>
