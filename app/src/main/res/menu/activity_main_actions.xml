@@ -8,6 +8,16 @@
         android:title="@string/user_manual"
         app:showAsAction="never" />
 
+    <!-- Fork: process monitor / reaper entry. Standalone gauge icon to the
+         LEFT of the filter icon, with a trailing gap (custom actionLayout) so
+         it reads as its own control. Click wired in MainActivity. -->
+    <item
+        android:id="@+id/action_process_monitor"
+        android:icon="@drawable/ic_monitor"
+        android:title="@string/monitor_title"
+        app:actionLayout="@layout/view_toolbar_monitor"
+        app:showAsAction="always" />
+
     <item
         android:id="@+id/action_list_options"
         android:icon="@drawable/ic_filter"

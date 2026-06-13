@@ -101,6 +101,7 @@ import io.github.muntashirakon.AppManager.profiles.RemoveFromProfileDialogFragme
 import io.github.muntashirakon.AppManager.profiles.ProfilesActivity;
 import io.github.muntashirakon.AppManager.profiles.ProtectedAppsProfile;
 import io.github.muntashirakon.AppManager.rules.RulesTypeSelectionDialogFragment;
+import io.github.muntashirakon.AppManager.processreaper.ProcessMonitorActivity;
 import io.github.muntashirakon.AppManager.runningapps.RunningAppsActivity;
 import io.github.muntashirakon.AppManager.self.life.FundingCampaignChecker;
 import io.github.muntashirakon.AppManager.settings.FeatureController;
@@ -445,6 +446,10 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         }
         MenuItem finderMenu = menu.findItem(R.id.action_finder);
         finderMenu.setVisible(true);
+        // Fork: retire the legacy "Running apps" screen — superseded by the
+        // process monitor (the gauge icon). Hidden, not deleted (reversible).
+        MenuItem legacyRunning = menu.findItem(R.id.action_running_apps);
+        if (legacyRunning != null) legacyRunning.setVisible(false);
         // --- Custom theme: tint every action icon (including the overflow menu)
         // yellow, to match the main-screen palette. Also wrap each title in a
         // SpannableString with a yellow ForegroundColorSpan because the
@@ -475,6 +480,17 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             toolbar.setOverflowIcon(overflow);
         }
         // --- end custom theme
+        // Fork: wire the standalone process-monitor entry (custom action view,
+        // left of the filter icon). Its actionLayout intercepts the tap, so the
+        // click is set on the view rather than routed through onOptionsItemSelected.
+        MenuItem monitorItem = menu.findItem(R.id.action_process_monitor);
+        if (monitorItem != null && monitorItem.getActionView() != null) {
+            View monitorView = monitorItem.getActionView();
+            View monitorTarget = monitorView.findViewById(R.id.action_monitor_btn);
+            if (monitorTarget == null) monitorTarget = monitorView;
+            monitorTarget.setOnClickListener(v ->
+                    startActivity(new Intent(this, ProcessMonitorActivity.class)));
+        }
         // Fork: long-press the overflow (hamburger) button opens the
         // 白い熊 応用管理 UI settings page directly. Posted because the menu
         // views are laid out after this method returns.
@@ -608,6 +624,10 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         } else if (id == R.id.action_running_apps) {
             Intent runningAppsIntent = new Intent(this, RunningAppsActivity.class);
             startActivity(runningAppsIntent);
+        } else if (id == R.id.action_process_monitor) {
+            // Fork: fallback — the action view normally handles the tap, but
+            // route here too in case it ever surfaces without its action view.
+            startActivity(new Intent(this, ProcessMonitorActivity.class));
         } else if (id == R.id.action_profiles) {
             Intent profilesIntent = new Intent(this, ProfilesActivity.class);
             startActivity(profilesIntent);

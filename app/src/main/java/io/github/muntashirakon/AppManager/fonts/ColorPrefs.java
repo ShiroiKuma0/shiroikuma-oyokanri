@@ -74,6 +74,14 @@ public final class ColorPrefs {
     public static final String FILM_FROZEN = "film_frozen";
     public static final String FILM_UNINSTALLED = "film_uninstalled";
 
+    // ---- colour-role keys (process monitor / reaper row state) ----
+    public static final String MONITOR_KILLABLE = "monitor_killable";        // default yellow
+    public static final String MONITOR_LEAK = "monitor_leak";                // default orange
+    public static final String MONITOR_PROTECTED = "monitor_protected";      // default grey
+    public static final String MONITOR_USER_PROTECTED = "monitor_user_protected"; // default ice blue
+    public static final String MONITOR_SEPARATOR_H = "monitor_separator_h";   // default dark grey
+    public static final String MONITOR_SEPARATOR_V = "monitor_separator_v";   // default dark grey
+
     // ---- colour-role keys (App details header, Stage 2) ----
     public static final String DETAIL_LABEL = "detail_label";
     public static final String DETAIL_PACKAGE = "detail_package";
@@ -133,6 +141,7 @@ public final class ColorPrefs {
             case UID_SHARED:
             case SDK_CLEARTEXT:
             case STROKE_SYSTEM:
+            case MONITOR_LEAK:
                 return ContextCompat.getColor(ctx, R.color.theme_bright_orange);
             case LABEL_USER:
             case PACKAGE_NORMAL:
@@ -144,13 +153,18 @@ public final class ColorPrefs {
             case SEPARATOR_H:
             case SEPARATOR_V:
             case SELECTED_FRAME:
+            case MONITOR_KILLABLE:
                 return ContextCompat.getColor(ctx, R.color.theme_bright_yellow);
             case VERSION_INACTIVE:
                 return ContextCompat.getColor(ctx, io.github.muntashirakon.ui.R.color.stopped);
             case APPTYPE_PERSISTENT:
                 return Color.MAGENTA;
             case FREEZE_FROZEN:
+            case MONITOR_USER_PROTECTED:
                 return ContextCompat.getColor(ctx, R.color.theme_ice_blue);
+            case MONITOR_SEPARATOR_H:
+            case MONITOR_SEPARATOR_V:
+                return 0xFF2A2A2A;  // subtle dark grey (matches the old hairline)
             case FILM_FROZEN:
                 return ContextCompat.getColor(ctx, R.color.theme_film_frozen);
             case FILM_UNINSTALLED:

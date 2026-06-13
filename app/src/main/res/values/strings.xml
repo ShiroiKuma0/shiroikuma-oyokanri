@@ -1718,9 +1718,55 @@
     <string name="pref_sep_width">Width (0 = none)</string>
     <string name="pref_color_separator">Color</string>
     <!-- Selected card frame (fork) -->
+    <!-- Fork: process monitor / reaper screen -->
+    <string name="monitor_title">Process monitor</string>
+    <string name="monitor_empty">No processes</string>
+    <string name="monitor_summary">%1$d processes · %2$d killable · %3$d leaks</string>
+    <string name="monitor_badge_killable">KILLABLE</string>
+    <string name="monitor_badge_protected">PROTECTED</string>
+    <string name="monitor_badge_leak">LEAK</string>
+    <string name="monitor_leak_subtitle">leak — %d identical processes, one-tap kill all</string>
+    <string name="monitor_kill_method_sigkill_multi">Sends SIGKILL to %d processes.</string>
+    <string name="monitor_kill_selected">Kill selected</string>
+    <string name="monitor_n_selected">%d selected</string>
+    <string name="monitor_kill_selected_confirm_title">Kill %d selected?</string>
+    <string name="monitor_kill_selected_confirm_msg">Force-stops apps and SIGKILLs shell processes. This can\'t be undone.</string>
+    <string name="monitor_killed_n_of_m">Killed %1$d of %2$d</string>
+    <string name="monitor_protect">Protect</string>
+    <string name="monitor_protected_added">Protected %s — won\'t be offered for kill</string>
+    <string name="monitor_unprotect_title">Allow killing %s?</string>
+    <string name="monitor_unprotect_msg">You marked this app protected. Remove that protection so it can be killed?</string>
+    <string name="monitor_allow_killing">Allow killing</string>
+    <string name="monitor_unprotected">Unprotected %s</string>
+    <string name="monitor_columns">Columns</string>
+    <string name="monitor_columns_n">%d columns</string>
+    <string name="monitor_kill">Kill</string>
+    <string name="monitor_kill_confirm_title">Kill %s?</string>
+    <string name="monitor_kill_method_forcestop">Force-stops the app — its services and alarms too. It cold-starts next time you open it.</string>
+    <string name="monitor_kill_method_sigkill">Sends SIGKILL to pid %d (a package-less shell process).</string>
+    <string name="monitor_protected">Protected: %s</string>
+    <string name="monitor_killed">Killed %s</string>
+    <string name="monitor_kill_failed">Couldn\'t kill %s</string>
+    <string name="monitor_pause">Pause</string>
+    <string name="monitor_resume">Resume</string>
+    <string name="monitor_sort">Sort</string>
+    <string name="monitor_sort_ram">Sorting by RAM</string>
+    <string name="monitor_sort_cpu">Sorting by CPU</string>
+    <string name="monitor_interval">Refresh interval</string>
     <!-- Fork: running/active app box (border width + user/system colours) -->
     <string name="pref_runbox_group">Running app box</string>
     <string name="pref_runbox_cat">Box</string>
+    <!-- Fork: process monitor settings (colours + app-icon size) -->
+    <string name="pref_monitor_group">Process monitor</string>
+    <string name="pref_monitor_icon_size">App icon</string>
+    <string name="pref_monitor_icon_size_hint">Icon size</string>
+    <string name="pref_monitor_row_pad">Row padding</string>
+    <string name="pref_monitor_row_pad_hint">Vertical padding (0 = tightest)</string>
+    <string name="pref_monitor_row_colors">Row state colours</string>
+    <string name="pref_monitor_killable">Killable</string>
+    <string name="pref_monitor_leak">Leak</string>
+    <string name="pref_monitor_protected">Protected (unkillable)</string>
+    <string name="pref_monitor_user_protected">Protected by you</string>
     <!-- Fork: main-list colour/style legend (reference on the UI page). The
          sample chips reflect the current configured colours. -->
     <string name="pref_legend_group">Legend — what the colours mean</string>
