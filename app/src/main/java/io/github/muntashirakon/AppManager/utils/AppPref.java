@@ -40,7 +40,6 @@ import io.github.muntashirakon.AppManager.fm.FmListOptions;
 import io.github.muntashirakon.AppManager.logcat.helper.LogcatHelper;
 import io.github.muntashirakon.AppManager.main.MainListOptions;
 import io.github.muntashirakon.AppManager.rules.struct.ComponentRule;
-import io.github.muntashirakon.AppManager.runningapps.RunningAppsActivity;
 import io.github.muntashirakon.AppManager.settings.Ops;
 
 public class AppPref {
@@ -462,9 +461,9 @@ public class AppPref {
             case PREF_OVERLAYS_SORT_ORDER_INT:
                 return AppDetailsFragment.SORT_BY_PRIORITY;
             case PREF_RUNNING_APPS_SORT_ORDER_INT:
-                return RunningAppsActivity.SORT_BY_PID;
+                return 0;  // legacy running-apps sort default (was SORT_BY_PID)
             case PREF_RUNNING_APPS_FILTER_FLAGS_INT:
-                return RunningAppsActivity.FILTER_NONE;
+                return 0;  // legacy running-apps filter default (was FILTER_NONE)
             case PREF_ENCRYPTION_STR:
                 return CryptoUtils.MODE_NO_ENCRYPTION;
             case PREF_OPEN_PGP_PACKAGE_STR:

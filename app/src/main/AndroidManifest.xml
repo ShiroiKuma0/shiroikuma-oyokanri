@@ -181,11 +181,6 @@
             android:enableOnBackInvokedCallback="true"
             android:exported="false"
             android:label="@string/one_click_ops" />
-        <activity
-            android:name=".runningapps.RunningAppsActivity"
-            android:enableOnBackInvokedCallback="true"
-            android:exported="true"
-            android:label="@string/running_apps" />
         <!-- Fork: process monitor / reaper screen (black/yellow theme) -->
         <activity
             android:name=".processreaper.ProcessMonitorActivity"

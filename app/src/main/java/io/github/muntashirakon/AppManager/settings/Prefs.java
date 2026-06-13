@@ -44,7 +44,6 @@ import io.github.muntashirakon.AppManager.fm.FmListOptions;
 import io.github.muntashirakon.AppManager.logcat.helper.LogcatHelper;
 import io.github.muntashirakon.AppManager.main.MainListOptions;
 import io.github.muntashirakon.AppManager.rules.struct.ComponentRule;
-import io.github.muntashirakon.AppManager.runningapps.RunningAppsActivity;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
 import io.github.muntashirakon.AppManager.utils.AppPref;
 import io.github.muntashirakon.AppManager.utils.ArrayUtils;
@@ -694,7 +693,7 @@ public final class Prefs {
             return AppPref.getInt(AppPref.PrefKey.PREF_MAIN_WINDOW_SORT_ORDER_INT);
         }
 
-        public static void setSortOrder(@RunningAppsActivity.SortOrder int sortOrder) {
+        public static void setSortOrder(@MainListOptions.SortOrder int sortOrder) {
             AppPref.set(AppPref.PrefKey.PREF_MAIN_WINDOW_SORT_ORDER_INT, sortOrder);
         }
 
@@ -772,34 +771,6 @@ public final class Prefs {
 
         public static int getAdbLocalServerPort() {
             return AppPref.getInt(AppPref.PrefKey.PREF_ADB_LOCAL_SERVER_PORT_INT);
-        }
-    }
-
-    public static final class RunningApps {
-        @RunningAppsActivity.SortOrder
-        public static int getSortOrder() {
-            return AppPref.getInt(AppPref.PrefKey.PREF_RUNNING_APPS_SORT_ORDER_INT);
-        }
-
-        public static void setSortOrder(@RunningAppsActivity.SortOrder int sortOrder) {
-            AppPref.set(AppPref.PrefKey.PREF_RUNNING_APPS_SORT_ORDER_INT, sortOrder);
-        }
-
-        @RunningAppsActivity.Filter
-        public static int getFilters() {
-            return AppPref.getInt(AppPref.PrefKey.PREF_RUNNING_APPS_FILTER_FLAGS_INT);
-        }
-
-        public static void setFilters(@RunningAppsActivity.Filter int filters) {
-            AppPref.set(AppPref.PrefKey.PREF_RUNNING_APPS_FILTER_FLAGS_INT, filters);
-        }
-
-        public static boolean enableKillForSystemApps() {
-            return AppPref.getBoolean(AppPref.PrefKey.PREF_ENABLE_KILL_FOR_SYSTEM_BOOL);
-        }
-
-        public static void setEnableKillForSystemApps(boolean enable) {
-            AppPref.set(AppPref.PrefKey.PREF_ENABLE_KILL_FOR_SYSTEM_BOOL, enable);
         }
     }
 
