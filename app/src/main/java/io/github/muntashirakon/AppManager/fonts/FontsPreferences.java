@@ -21,7 +21,7 @@ import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.SeekBar;
 import android.widget.TextView;
-import android.widget.Toast;
+import io.github.muntashirakon.AppManager.utils.UIUtils;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -674,7 +674,7 @@ public class FontsPreferences extends Fragment {
                         ColorPrefs.setColor(requireContext(), spec.key, col);
                         onChanged.run();
                     } else {
-                        Toast.makeText(requireContext(), R.string.pref_color_invalid, Toast.LENGTH_SHORT).show();
+                        UIUtils.displayShortToast(R.string.pref_color_invalid);
                     }
                 })
                 .setNeutralButton(R.string.pref_color_reset, (d, w) -> {
