@@ -52,6 +52,13 @@ set -o pipefail
 
 UNSIGNED_APK=$(find app/build/outputs/apk/release -name '*-unsigned.apk' | head -1)
 
+# HARD GATE: the embedded server JARs must be present AND non-empty, or ADB mode
+# is dead on arrival (see "Server JARs" note below). Refuse to sign otherwise.
+for j in assets/am.jar assets/main.jar; do
+    sz=$(unzip -p "$UNSIGNED_APK" "$j" 2>/dev/null | wc -c)
+    [ "$sz" -gt 0 ] || { echo "FATAL: $j is empty/missing in APK — refusing to ship"; exit 1; }
+done
+
 zipalign -p -f 4 "$UNSIGNED_APK" /tmp/am-aligned.apk
 apksigner sign --ks ~/.android-keystores/appmanager-custom.jks \
     --ks-key-alias appmanager \
@@ -72,6 +79,24 @@ adb push /tmp/am-signed.apk "/sdcard/tmp/$apk_name"
 Filter notes:
 - `ノート:` / `Note:` are mandatory `javac` summary notes for deprecation/unchecked usage; `-Xlint:none` and `-nowarn` do not suppress them.
 - `[CXX5304]` is a benign SDK-XML version-skew message from the NDK pipeline. Brackets must be escaped (`\[CXX5304\]`) for `grep -E`.
+
+**Server JARs (`assets/am.jar` + `main.jar`) — the ADB-mode landmine.** Both are
+gitignored and regenerated every build by `:server:create<Variant>ServerJars`
+(server/build.gradle), which `d8`-compiles them straight into `app/src/main/assets/`.
+`main.jar` is the bootstrap the ADB shell runs to launch AppManager's server; an
+empty/missing one makes **ADB mode hang on init then fall back to no-root** (build
++79 shipped a **0-byte main.jar** this way and looked like a code regression — it
+was a build race). Two structural guards now prevent it, plus the gate above:
+1. **Ordering** — `app/build.gradle` makes `merge<Variant>Assets dependsOn
+   :server:create<Variant>ServerJars` via a plain `tasks.matching` edge (the old
+   `applicationVariants.mergeAssetsProvider` edge was unreliable under the
+   configuration cache — that's how +79 slipped through).
+2. **Atomic writes** — server/build.gradle `d8`s each JAR into a **per-variant**
+   `server/build/serverjars-tmp/<buildType>/` dir (temp name must keep the `.jar`
+   suffix — d8 rejects others; per-variant because release+debug jar tasks run in
+   parallel and share nothing), then `Files.move`s it into `assets/`, so a racing
+   consumer sees a whole JAR or none, never a partial. Diagnose a suspected recurrence
+   with `unzip -p <apk> assets/main.jar | wc -c` (compare a known-good vs bad APK).
 
 ## Push workflow
 
