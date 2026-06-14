@@ -21,6 +21,11 @@
         android:title="@string/monitor_pause"
         app:showAsAction="ifRoom" />
     <item
+        android:id="@+id/action_monitor_filter"
+        android:icon="@drawable/ic_filter_list"
+        android:title="@string/monitor_filter"
+        app:showAsAction="ifRoom" />
+    <item
         android:id="@+id/action_monitor_sort"
         android:icon="@drawable/ic_sort"
         android:title="@string/monitor_sort"

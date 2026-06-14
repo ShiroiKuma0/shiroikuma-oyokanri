@@ -167,6 +167,21 @@ public class FontsPreferences extends Fragment {
             }),
     };
 
+    // Fork: the five text surfaces of the process detail page (built into a manual
+    // group alongside the icon-size / line-padding sliders).
+    private static final Cat[] DETAIL_CATS = {
+            new Cat(FontPrefs.MONITOR_DETAIL_LABEL, R.string.pref_detail_cat_label, new ColorSpec[]{
+                    new ColorSpec(ColorPrefs.MONITOR_DETAIL_LABEL, R.string.pref_detail_color_label)}),
+            new Cat(FontPrefs.MONITOR_DETAIL_ID, R.string.pref_detail_cat_id, new ColorSpec[]{
+                    new ColorSpec(ColorPrefs.MONITOR_DETAIL_ID, R.string.pref_detail_color_id)}),
+            new Cat(FontPrefs.MONITOR_DETAIL_SECTION, R.string.pref_detail_cat_section, new ColorSpec[]{
+                    new ColorSpec(ColorPrefs.MONITOR_DETAIL_SECTION, R.string.pref_detail_color_section)}),
+            new Cat(FontPrefs.MONITOR_DETAIL_ROW_LABEL, R.string.pref_detail_cat_row_label, new ColorSpec[]{
+                    new ColorSpec(ColorPrefs.MONITOR_DETAIL_ROW_LABEL, R.string.pref_detail_color_row_label)}),
+            new Cat(FontPrefs.MONITOR_DETAIL_ROW_VALUE, R.string.pref_detail_cat_row_value, new ColorSpec[]{
+                    new ColorSpec(ColorPrefs.MONITOR_DETAIL_ROW_VALUE, R.string.pref_detail_color_row_value)}),
+    };
+
     // Sentinel family value for the trailing "Add custom font…" picker row.
     private static final String ADD_MARKER = "\u0000add_custom";
 
@@ -247,6 +262,19 @@ public class FontsPreferences extends Fragment {
         monContent.addView(buildMonitorSeparatorElement(inflater, monContent, true));
         monContent.addView(buildMonitorSeparatorElement(inflater, monContent, false));
         container.addView(monGroup);
+        // Fork: process detail page — icon size, line padding, and the five text
+        // surfaces (each: font family/weight/size + colour, via bindElement).
+        View detGroup = inflater.inflate(R.layout.view_font_group, container, false);
+        ((AppCompatTextView) detGroup.findViewById(R.id.group_header)).setText(R.string.pref_detail_group);
+        LinearLayoutCompat detContent = detGroup.findViewById(R.id.group_content);
+        detContent.addView(buildDetailIconElement(inflater, detContent));
+        detContent.addView(buildDetailPaddingElement(inflater, detContent));
+        for (Cat c : DETAIL_CATS) {
+            View el = inflater.inflate(R.layout.view_font_element, detContent, false);
+            bindElement(el, c);
+            detContent.addView(el);
+        }
+        container.addView(detGroup);
         // Fork: the selected card's frame (colour + border width + roundness).
         View frameGroup = inflater.inflate(R.layout.view_font_group, container, false);
         ((AppCompatTextView) frameGroup.findViewById(R.id.group_header)).setText(R.string.pref_selframe_group);
@@ -366,6 +394,63 @@ public class FontsPreferences extends Fragment {
         g.setCornerRadius(4 * density);
         g.setStroke(Math.max(1, Math.round(density)), 0xFF555555);
         return g;
+    }
+
+    /** Fork: the process-detail header icon size slider. */
+    @NonNull
+    private View buildDetailIconElement(@NonNull LayoutInflater inflater, @NonNull LinearLayoutCompat parent) {
+        View element = inflater.inflate(R.layout.view_separator_element, parent, false);
+        ((AppCompatTextView) element.findViewById(R.id.element_label)).setText(R.string.pref_detail_icon_size);
+        ((AppCompatTextView) element.findViewById(R.id.sep_sublabel)).setText(R.string.pref_detail_icon_size_hint);
+        final AppCompatTextView valueView = element.findViewById(R.id.sep_width_value);
+        final AppCompatSeekBar seek = element.findViewById(R.id.sep_width_seek);
+        final int min = MonitorPrefs.MIN_DETAIL_ICON_DP;
+        seek.setMax(MonitorPrefs.MAX_DETAIL_ICON_DP - min);
+        final Runnable render = () -> {
+            int dp = MonitorPrefs.getDetailIconDp(requireContext());
+            valueView.setText(String.format(Locale.US, "%d dp", dp));
+            seek.setProgress(dp - min);
+        };
+        render.run();
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                MonitorPrefs.setDetailIconDp(requireContext(), min + progress);
+                render.run();
+            }
+            @Override public void onStartTrackingTouch(SeekBar sb) {}
+            @Override public void onStopTrackingTouch(SeekBar sb) {}
+        });
+        return element;
+    }
+
+    /** Fork: the process-detail per-row vertical-padding slider. */
+    @NonNull
+    private View buildDetailPaddingElement(@NonNull LayoutInflater inflater, @NonNull LinearLayoutCompat parent) {
+        View element = inflater.inflate(R.layout.view_separator_element, parent, false);
+        ((AppCompatTextView) element.findViewById(R.id.element_label)).setText(R.string.pref_detail_row_pad);
+        ((AppCompatTextView) element.findViewById(R.id.sep_sublabel)).setText(R.string.pref_detail_row_pad_hint);
+        final AppCompatTextView valueView = element.findViewById(R.id.sep_width_value);
+        final AppCompatSeekBar seek = element.findViewById(R.id.sep_width_seek);
+        seek.setMax(MonitorPrefs.MAX_DETAIL_ROW_PAD_DP);
+        final Runnable render = () -> {
+            int dp = MonitorPrefs.getDetailRowPadDp(requireContext());
+            valueView.setText(String.format(Locale.US, "%d dp", dp));
+            seek.setProgress(dp);
+        };
+        render.run();
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                MonitorPrefs.setDetailRowPadDp(requireContext(), progress);
+                render.run();
+            }
+            @Override public void onStartTrackingTouch(SeekBar sb) {}
+            @Override public void onStopTrackingTouch(SeekBar sb) {}
+        });
+        return element;
     }
 
     /** Fork: the process-monitor app-icon size slider (reuses the separator element). */

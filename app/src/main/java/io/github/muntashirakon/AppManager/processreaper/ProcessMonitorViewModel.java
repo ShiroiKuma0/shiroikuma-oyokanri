@@ -4,8 +4,10 @@ package io.github.muntashirakon.AppManager.processreaper;
 
 import android.app.Application;
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.os.Process;
 import android.os.SystemClock;
 import android.os.UserHandleHidden;
 import android.provider.Settings;
@@ -102,6 +104,13 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
     // auto-refresh because every load re-applies it.
     private volatile List<Row> mAllRows = Collections.emptyList();
     private volatile String mQuery = "";
+    // Category filter (faceted, AND across the two dimensions, OR within; 0 = unconstrained).
+    // Killability facets OR-combine: a Togglable row (protected now but user-flippable
+    // to killable) also matches Protected, so Killable+Togglable = all eventually-killable.
+    public static final int F_KILLABLE = 1, F_PROTECTED = 2, F_TOGGLABLE = 4;    // killability dim
+    public static final int F_USER = 1, F_SYSTEM = 2, F_SHELL = 4, F_LEAK = 8;  // type dim
+    private volatile int mFilterKill = 0;
+    private volatile int mFilterType = 0;
     private final MutableLiveData<Boolean> mLoading = new MutableLiveData<>();
     private final MutableLiveData<Pair<Row, Boolean>> mKillResult = new MutableLiveData<>();
     private final MutableLiveData<int[]> mBulkKillResult = new MutableLiveData<>();  // {ok, total}
@@ -113,10 +122,10 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
     // pid → ppid, harvested for free from the same /proc/*/stat batch the CPU
     // sampler reads. Used to protect our own shell subtree (see ProcessClassifier
     // .ancestryProtectedPids). Touched only on the serialized background thread.
-    private Map<Integer, Integer> mPpid = Collections.emptyMap();
+    private volatile Map<Integer, Integer> mPpid = Collections.emptyMap();
     // pid → process start time (clock ticks since boot, /proc stat field 22),
     // from the same batch. Used for the optional leak min-age filter.
-    private Map<Integer, Long> mStart = Collections.emptyMap();
+    private volatile Map<Integer, Long> mStart = Collections.emptyMap();
     // Foreground/top app + foreground-service packages, refreshed at most every
     // ACTIVE_TTL_MS (the dumpsys parse is comparatively heavy vs. the /proc tick
     // read, and foreground state changes slowly). Touched only on the serialized
@@ -150,21 +159,70 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
         mRows.postValue(filterRows(mAllRows));
     }
 
+    /** Category filter: killMask over {@code F_KILLABLE/F_PROTECTED}, typeMask over {@code F_USER/SYSTEM/SHELL/LEAK}. */
+    public void setFilter(int killMask, int typeMask) {
+        mFilterKill = killMask;
+        mFilterType = typeMask;
+        mRows.postValue(filterRows(mAllRows));
+    }
+
+    public int getFilterKill() {
+        return mFilterKill;
+    }
+
+    public int getFilterType() {
+        return mFilterType;
+    }
+
     @NonNull
     private List<Row> filterRows(@NonNull List<Row> rows) {
         String q = mQuery;
-        if (q.isEmpty()) return rows;
+        boolean hasQuery = !q.isEmpty();
+        boolean hasFilter = mFilterKill != 0 || mFilterType != 0;
+        if (!hasQuery && !hasFilter) return rows;
         List<Row> out = new ArrayList<>(rows.size());
         for (Row r : rows) {
-            String pkg = (r.item instanceof AppProcessItem)
-                    ? ((AppProcessItem) r.item).packageInfo.packageName : null;
-            if ((r.title != null && r.title.toLowerCase(Locale.ROOT).contains(q))
-                    || (r.subtitle != null && r.subtitle.toLowerCase(Locale.ROOT).contains(q))
-                    || (pkg != null && pkg.toLowerCase(Locale.ROOT).contains(q))) {
-                out.add(r);
+            if (hasQuery) {
+                String pkg = (r.item instanceof AppProcessItem)
+                        ? ((AppProcessItem) r.item).packageInfo.packageName : null;
+                boolean m = (r.title != null && r.title.toLowerCase(Locale.ROOT).contains(q))
+                        || (r.subtitle != null && r.subtitle.toLowerCase(Locale.ROOT).contains(q))
+                        || (pkg != null && pkg.toLowerCase(Locale.ROOT).contains(q));
+                if (!m) continue;
             }
+            if (mFilterKill != 0 && (mFilterKill & killBits(r)) == 0) continue;
+            if (mFilterType != 0 && (mFilterType & typeOf(r)) == 0) continue;
+            out.add(r);
         }
         return out;
+    }
+
+    /** The row's killability facets — {@code F_KILLABLE}, or {@code F_PROTECTED} (+ {@code F_TOGGLABLE} when flippable). */
+    private static int killBits(@NonNull Row r) {
+        if (r.cls.killable) return F_KILLABLE;
+        int bits = F_PROTECTED;
+        if (isTogglable(r)) bits |= F_TOGGLABLE;
+        return bits;
+    }
+
+    /** Protected now, but the user can flip it to killable: a "you" mark or an overridable denylist app. */
+    private static boolean isTogglable(@NonNull Row r) {
+        if (r.cls.killable) return false;
+        if ("you".equals(r.cls.reason)) return true;
+        String pkg = (r.item instanceof AppProcessItem)
+                ? ((AppProcessItem) r.item).packageInfo.packageName : null;
+        return ProcessClassifier.isOverridableDenylist(pkg);
+    }
+
+    /** The row's type facet — one of {@code F_USER/F_SYSTEM/F_SHELL/F_LEAK}. */
+    private static int typeOf(@NonNull Row r) {
+        if (r.isLeak) return F_LEAK;
+        if (r.cls.method == ProcessClassifier.METHOD_SIGKILL) return F_SHELL;  // shell-owned (uid 2000)
+        if (r.item.uid < Process.FIRST_APPLICATION_UID) return F_SYSTEM;       // system/native
+        ApplicationInfo ai = (r.item instanceof AppProcessItem)
+                ? ((AppProcessItem) r.item).packageInfo.applicationInfo : null;
+        if (ai != null && (ai.flags & ApplicationInfo.FLAG_SYSTEM) != 0) return F_SYSTEM;  // system app
+        return F_USER;
     }
 
     public MutableLiveData<Boolean> getLoading() {
@@ -256,6 +314,10 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
                 }
                 List<Row> rows = new ArrayList<>();
                 List<Base> leakCandidates = new ArrayList<>();
+                // App processes grouped by package: a multi-process app (browser main
+                // + :tab/:gpu children, etc.) collapses into ONE row — force-stop kills
+                // the whole package anyway, so N near-identical rows are just noise.
+                LinkedHashMap<String, List<Base>> byPkg = new LinkedHashMap<>();
                 for (List<Base> grp : byPid.values()) {
                     Base rep = grp.get(0);
                     if (grp.size() > 1) {
@@ -266,9 +328,20 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
                         // (uid 2000 == com.android.shell), so gate on the SIGKILL
                         // method (= shell-owned), NOT on the item type.
                         leakCandidates.add(rep);
+                    } else if (isAppGroupable(rep)) {
+                        String pkg = ((AppProcessItem) rep.item).packageInfo.packageName;
+                        List<Base> list = byPkg.get(pkg);
+                        if (list == null) {
+                            list = new ArrayList<>();
+                            byPkg.put(pkg, list);
+                        }
+                        list.add(rep);
                     } else {
                         rows.add(singleRow(ctx, pm, rep));
                     }
+                }
+                for (List<Base> g : byPkg.values()) {
+                    rows.add(g.size() == 1 ? singleRow(ctx, pm, g.get(0)) : appRow(ctx, pm, g));
                 }
 
                 // 3. Leak grouping — cluster identical package-less shell commands.
@@ -358,6 +431,35 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
         return new Row(p, rep.cls, Collections.singletonList(p.pid), grp.size(), false,
                 proc, subtitle, meta(p), Formatter.formatShortFileSize(ctx, mem),
                 cpuStr(rep.cpuPct), rep.cpuPct, mem);
+    }
+
+    /** A real app process (uid ≥ 10000, has a package, not a shell pid) — groupable by package. */
+    private static boolean isAppGroupable(@NonNull Base b) {
+        return b.item instanceof AppProcessItem
+                && b.item.uid >= Process.FIRST_APPLICATION_UID
+                && b.cls.method != ProcessClassifier.METHOD_SIGKILL;
+    }
+
+    /** One row for all of an app's processes (main + children); sums RAM/CPU, kills via force-stop. */
+    @NonNull
+    private Row appRow(@NonNull Context ctx, @NonNull PackageManager pm, @NonNull List<Base> group) {
+        long mem = 0;
+        double cpu = 0;
+        List<Integer> pids = new ArrayList<>(group.size());
+        Base rep = group.get(0);
+        for (Base b : group) {
+            long m = memBytesFor(b.item);
+            mem += m;
+            if (!Double.isNaN(b.cpuPct)) cpu += b.cpuPct;
+            pids.add(b.item.pid);
+            if (m > memBytesFor(rep.item)) rep = b;  // representative = heaviest (usually the main)
+        }
+        PackageInfo pi = ((AppProcessItem) rep.item).packageInfo;
+        String title = labelFor(pi, pm);
+        String subtitle = ctx.getString(io.github.muntashirakon.AppManager.R.string.monitor_n_processes, group.size());
+        return new Row(rep.item, rep.cls, pids, group.size(), false,
+                title, subtitle, meta(rep.item), Formatter.formatShortFileSize(ctx, mem),
+                cpuStr(cpu), cpu, mem);
     }
 
     @NonNull
