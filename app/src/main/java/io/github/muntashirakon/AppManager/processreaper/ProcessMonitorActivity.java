@@ -190,53 +190,21 @@ public class ProcessMonitorActivity extends BaseActivity {
         mHandler.removeCallbacks(mTick);
     }
 
+    /**
+     * Tap opens the dedicated process detail screen — NOT the kill dialog. Killing
+     * is the per-row ✕ button or the "Kill" action inside the detail screen.
+     */
     private void onRowClick(@Nullable ProcessMonitorViewModel.Row row) {
         if (row == null) return;
-        final String pkg = packageOf(row);
-        if (!row.cls.killable) {
-            // Apps you marked protected (reason "you") can be un-protected here;
-            // anything else just explains why it's off-limits.
-            if ("you".equals(row.cls.reason) && pkg != null) {
-                presentWithYellowBorder(themedDialog()
-                        .setTitle(getString(R.string.monitor_unprotect_title, row.title))
-                        .setMessage(R.string.monitor_unprotect_msg)
-                        .setPositiveButton(R.string.monitor_allow_killing, (d, w) -> {
-                            ReaperPrefs.removeProtected(this, pkg);
-                            UIUtils.displayShortToast(getString(R.string.monitor_unprotected, row.title));
-                            mViewModel.load();
-                        })
-                        .setNegativeButton(R.string.cancel, null));
-            } else if (ProcessClassifier.isOverridableDenylist(pkg)) {
-                // Built-in-protected app — point the user at the long-press override.
-                UIUtils.displayShortToast(getString(R.string.monitor_protected_longpress_hint));
-            } else {
-                UIUtils.displayShortToast(getString(R.string.monitor_protected, row.cls.reason));
-            }
-            return;
-        }
-        String method;
-        if (row.cls.method == ProcessClassifier.METHOD_FORCE_STOP) {
-            method = getString(R.string.monitor_kill_method_forcestop);
-        } else if (row.pids.size() > 1) {
-            method = getString(R.string.monitor_kill_method_sigkill_multi, row.pids.size());
-        } else {
-            method = getString(R.string.monitor_kill_method_sigkill, row.item.pid);
-        }
-        MaterialAlertDialogBuilder b = themedDialog()
-                .setTitle(getString(R.string.monitor_kill_confirm_title, row.title))
-                .setMessage(method)
-                .setPositiveButton(R.string.monitor_kill, (d, w) -> mViewModel.kill(row))
-                .setNegativeButton(R.string.cancel, null);
-        // "Protect" only for real apps (force-stop) — shell processes and leak
-        // groups have no package to denylist.
-        if (row.cls.method == ProcessClassifier.METHOD_FORCE_STOP && pkg != null) {
-            b.setNeutralButton(R.string.monitor_protect, (d, w) -> {
-                ReaperPrefs.addProtected(this, pkg);
-                UIUtils.displayShortToast(getString(R.string.monitor_protected_added, row.title));
-                mViewModel.load();
-            });
-        }
-        presentWithYellowBorder(b);
+        int[] pids = new int[row.pids.size()];
+        for (int i = 0; i < pids.length; i++) pids[i] = row.pids.get(i);
+        String pkg = packageOf(row);
+        boolean realApp = pkg != null && row.item instanceof AppProcessItem
+                && row.cls.method != ProcessClassifier.METHOD_SIGKILL;
+        startActivity(ProcessDetailActivity.getIntent(this, row.item.pid, pids,
+                realApp ? pkg : null, row.title, row.cls.killable, row.cls.method,
+                row.item.uid, row.cls.reason, row.item.user, row.cpu, row.memBytes,
+                "in use".equals(row.cls.reason)));
     }
 
     @NonNull
@@ -298,6 +266,49 @@ public class ProcessMonitorActivity extends BaseActivity {
     /** Bottom button — kill, no confirmation (the killResult observer reloads). */
     private void onKillQuick(@NonNull ProcessMonitorViewModel.Row row) {
         if (row.cls.killable) mViewModel.kill(row);
+    }
+
+    /**
+     * Faceted filter: two dimensions (killability × type), AND across them, OR
+     * within. Nothing checked in a dimension leaves it unconstrained. Applies on
+     * top of the live search and survives the auto-refresh.
+     */
+    private void showFilterDialog() {
+        final String[] items = {
+                getString(R.string.monitor_filter_killable),
+                getString(R.string.monitor_filter_protected),
+                getString(R.string.monitor_filter_togglable),
+                getString(R.string.monitor_filter_user),
+                getString(R.string.monitor_filter_system),
+                getString(R.string.monitor_filter_shell),
+                getString(R.string.monitor_filter_leaks),
+        };
+        int fk = mViewModel.getFilterKill(), ft = mViewModel.getFilterType();
+        final boolean[] checked = {
+                (fk & ProcessMonitorViewModel.F_KILLABLE) != 0,
+                (fk & ProcessMonitorViewModel.F_PROTECTED) != 0,
+                (fk & ProcessMonitorViewModel.F_TOGGLABLE) != 0,
+                (ft & ProcessMonitorViewModel.F_USER) != 0,
+                (ft & ProcessMonitorViewModel.F_SYSTEM) != 0,
+                (ft & ProcessMonitorViewModel.F_SHELL) != 0,
+                (ft & ProcessMonitorViewModel.F_LEAK) != 0,
+        };
+        MaterialAlertDialogBuilder b = themedDialog()
+                .setTitle(R.string.monitor_filter)
+                .setMultiChoiceItems(items, checked, (d, which, isChecked) -> checked[which] = isChecked)
+                .setPositiveButton(R.string.monitor_filter_apply, (d, w) -> {
+                    int nfk = (checked[0] ? ProcessMonitorViewModel.F_KILLABLE : 0)
+                            | (checked[1] ? ProcessMonitorViewModel.F_PROTECTED : 0)
+                            | (checked[2] ? ProcessMonitorViewModel.F_TOGGLABLE : 0);
+                    int nft = (checked[3] ? ProcessMonitorViewModel.F_USER : 0)
+                            | (checked[4] ? ProcessMonitorViewModel.F_SYSTEM : 0)
+                            | (checked[5] ? ProcessMonitorViewModel.F_SHELL : 0)
+                            | (checked[6] ? ProcessMonitorViewModel.F_LEAK : 0);
+                    mViewModel.setFilter(nfk, nft);
+                })
+                .setNeutralButton(R.string.monitor_filter_clear, (d, w) -> mViewModel.setFilter(0, 0))
+                .setNegativeButton(R.string.cancel, null);
+        presentWithYellowBorder(b);
     }
 
     @Override
@@ -395,6 +406,7 @@ public class ProcessMonitorActivity extends BaseActivity {
         boolean sel = mInSelection;
         toggle(menu, R.id.action_monitor_kill_selected, sel);
         toggle(menu, R.id.action_monitor_search, !sel);
+        toggle(menu, R.id.action_monitor_filter, !sel);
         toggle(menu, R.id.action_monitor_pause, !sel);
         toggle(menu, R.id.action_monitor_sort, !sel);
         toggle(menu, R.id.action_monitor_columns, !sel);
@@ -427,6 +439,9 @@ public class ProcessMonitorActivity extends BaseActivity {
             mPaused = !mPaused;
             applyPauseItem();
             if (!mPaused) mViewModel.load();  // resume → refresh now
+            return true;
+        } else if (id == R.id.action_monitor_filter) {
+            showFilterDialog();
             return true;
         } else if (id == R.id.action_monitor_sort) {
             int next = mViewModel.getSort() == ProcessMonitorViewModel.SORT_RAM

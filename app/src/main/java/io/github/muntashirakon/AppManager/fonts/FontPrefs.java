@@ -69,6 +69,13 @@ public final class FontPrefs {
     public static final String DETAIL_PACKAGE = "detail_package";
     public static final String DETAIL_VERSION = "detail_version";
 
+    // Process monitor detail page text surfaces.
+    public static final String MONITOR_DETAIL_LABEL = "monitor_detail_label";
+    public static final String MONITOR_DETAIL_ID = "monitor_detail_id";
+    public static final String MONITOR_DETAIL_SECTION = "monitor_detail_section";
+    public static final String MONITOR_DETAIL_ROW_LABEL = "monitor_detail_row_label";
+    public static final String MONITOR_DETAIL_ROW_VALUE = "monitor_detail_row_value";
+
     @NonNull
     private static SharedPreferences sp(@NonNull Context ctx) {
         return ctx.getApplicationContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);

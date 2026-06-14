@@ -188,6 +188,13 @@
             android:exported="false"
             android:label="@string/monitor_title"
             android:theme="@style/AppTheme.YellowOnBlack" />
+        <!-- Fork: process detail / inspector screen -->
+        <activity
+            android:name=".processreaper.ProcessDetailActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:exported="false"
+            android:label="@string/monitor_detail_title"
+            android:theme="@style/AppTheme.YellowOnBlack" />
         <activity
             android:name=".settings.SettingsActivity"
             android:enableOnBackInvokedCallback="true"

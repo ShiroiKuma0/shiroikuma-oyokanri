@@ -38,6 +38,7 @@ import io.github.muntashirakon.AppManager.PerProcessActivity;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.details.AppDetailsActivity;
 import io.github.muntashirakon.AppManager.main.MainActivity;
+import io.github.muntashirakon.AppManager.processreaper.ProcessDetailActivity;
 import io.github.muntashirakon.AppManager.processreaper.ProcessMonitorActivity;
 import io.github.muntashirakon.AppManager.profiles.AppsBaseProfileActivity;
 import io.github.muntashirakon.AppManager.profiles.ProfilesActivity;
@@ -165,6 +166,7 @@ public final class AppearanceUtils {
                     || activity instanceof AppsBaseProfileActivity
                     || activity instanceof AppDetailsActivity
                     || activity instanceof ProcessMonitorActivity
+                    || activity instanceof ProcessDetailActivity
                     || activity instanceof MainActivity;
         }
 

@@ -82,6 +82,13 @@ public final class ColorPrefs {
     public static final String MONITOR_SEPARATOR_H = "monitor_separator_h";   // default dark grey
     public static final String MONITOR_SEPARATOR_V = "monitor_separator_v";   // default dark grey
 
+    // ---- process detail page text colours ----
+    public static final String MONITOR_DETAIL_LABEL = "monitor_detail_label";        // default yellow
+    public static final String MONITOR_DETAIL_ID = "monitor_detail_id";              // default dim yellow
+    public static final String MONITOR_DETAIL_SECTION = "monitor_detail_section";    // default yellow
+    public static final String MONITOR_DETAIL_ROW_LABEL = "monitor_detail_row_label"; // default dim yellow
+    public static final String MONITOR_DETAIL_ROW_VALUE = "monitor_detail_row_value"; // default yellow
+
     // ---- colour-role keys (App details header, Stage 2) ----
     public static final String DETAIL_LABEL = "detail_label";
     public static final String DETAIL_PACKAGE = "detail_package";
@@ -154,7 +161,13 @@ public final class ColorPrefs {
             case SEPARATOR_V:
             case SELECTED_FRAME:
             case MONITOR_KILLABLE:
+            case MONITOR_DETAIL_LABEL:
+            case MONITOR_DETAIL_SECTION:
+            case MONITOR_DETAIL_ROW_VALUE:
                 return ContextCompat.getColor(ctx, R.color.theme_bright_yellow);
+            case MONITOR_DETAIL_ID:
+            case MONITOR_DETAIL_ROW_LABEL:
+                return 0x99FFFF00;  // dim yellow
             case VERSION_INACTIVE:
                 return ContextCompat.getColor(ctx, io.github.muntashirakon.ui.R.color.stopped);
             case APPTYPE_PERSISTENT:
