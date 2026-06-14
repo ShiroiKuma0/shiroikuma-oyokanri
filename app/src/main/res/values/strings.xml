@@ -1738,6 +1738,13 @@
     <string name="monitor_unprotect_msg">You marked this app protected. Remove that protection so it can be killed?</string>
     <string name="monitor_allow_killing">Allow killing</string>
     <string name="monitor_unprotected">Unprotected %s</string>
+    <string name="monitor_allow_title">Allow killing %s?</string>
+    <string name="monitor_allow_msg">This app is protected by a built-in list. Allow it to be killed from the monitor? Long-press it again to restore protection.</string>
+    <string name="monitor_allowed">%s — killing allowed</string>
+    <string name="monitor_restore_title">Restore protection for %s?</string>
+    <string name="monitor_restore_msg">Put this app back under built-in protection so it can\'t be killed from the monitor.</string>
+    <string name="monitor_restore_protection">Restore protection</string>
+    <string name="monitor_protected_longpress_hint">Built-in protected — long-press to allow killing</string>
     <string name="monitor_columns">Columns</string>
     <string name="monitor_columns_n">%d columns</string>
     <string name="monitor_kill">Kill</string>

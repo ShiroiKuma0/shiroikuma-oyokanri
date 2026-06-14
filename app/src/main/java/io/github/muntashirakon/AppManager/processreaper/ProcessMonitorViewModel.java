@@ -97,6 +97,11 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
     }
 
     private final MutableLiveData<List<Row>> mRows = new MutableLiveData<>();
+    // Full (unfiltered) rows from the last load + the live search query. The list
+    // posted to the UI is mAllRows filtered by mQuery; the query survives the 2 s
+    // auto-refresh because every load re-applies it.
+    private volatile List<Row> mAllRows = Collections.emptyList();
+    private volatile String mQuery = "";
     private final MutableLiveData<Boolean> mLoading = new MutableLiveData<>();
     private final MutableLiveData<Pair<Row, Boolean>> mKillResult = new MutableLiveData<>();
     private final MutableLiveData<int[]> mBulkKillResult = new MutableLiveData<>();  // {ok, total}
@@ -139,6 +144,29 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
         return mRows;
     }
 
+    /** Live search filter (matches the app label / process name / package). */
+    public void setQuery(@Nullable String query) {
+        mQuery = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+        mRows.postValue(filterRows(mAllRows));
+    }
+
+    @NonNull
+    private List<Row> filterRows(@NonNull List<Row> rows) {
+        String q = mQuery;
+        if (q.isEmpty()) return rows;
+        List<Row> out = new ArrayList<>(rows.size());
+        for (Row r : rows) {
+            String pkg = (r.item instanceof AppProcessItem)
+                    ? ((AppProcessItem) r.item).packageInfo.packageName : null;
+            if ((r.title != null && r.title.toLowerCase(Locale.ROOT).contains(q))
+                    || (r.subtitle != null && r.subtitle.toLowerCase(Locale.ROOT).contains(q))
+                    || (pkg != null && pkg.toLowerCase(Locale.ROOT).contains(q))) {
+                out.add(r);
+            }
+        }
+        return out;
+    }
+
     public MutableLiveData<Boolean> getLoading() {
         return mLoading;
     }
@@ -172,6 +200,7 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
                 String ime = activeImePackage();
                 boolean root = Ops.isWorkingUidRoot();
                 Set<String> userProtected = ReaperPrefs.getProtectedPackages(ctx);
+                Set<String> allowedOverride = ReaperPrefs.getAllowedPackages(ctx);
                 Set<String> active = activePackages();
                 pssMemory();  // refresh mPss (cached); row builders read it below
 
@@ -208,7 +237,7 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
                 List<Base> base = new ArrayList<>();
                 for (ProcessItem p : procs) {
                     ProcessClassifier.Result cls = ProcessClassifier.classify(
-                            p, selfPkg, ime, root, userProtected, active, ancestryProtected);
+                            p, selfPkg, ime, root, userProtected, active, ancestryProtected, allowedOverride);
                     base.add(new Base(p, cls, cpuPercentFor(p, prev, ticks, dtSec)));
                 }
                 mPrevTicks = ticks;
@@ -281,7 +310,8 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
                 }
 
                 sort(rows);
-                mRows.postValue(rows);
+                mAllRows = rows;
+                mRows.postValue(filterRows(rows));
             } finally {
                 mLoading.postValue(false);
                 mBusy.set(false);

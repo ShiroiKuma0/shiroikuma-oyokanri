@@ -15,6 +15,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.Window;
+import android.widget.EditText;
 import android.widget.ImageView;
 
 import androidx.activity.OnBackPressedCallback;
@@ -22,6 +23,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.widget.SearchView;
 import androidx.core.content.ContextCompat;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.GridLayoutManager;
@@ -103,6 +105,11 @@ public class ProcessMonitorActivity extends BaseActivity {
                     @Override
                     public void onKill(@NonNull ProcessMonitorViewModel.Row row) {
                         onKillQuick(row);
+                    }
+
+                    @Override
+                    public void onOverrideToggle(@NonNull ProcessMonitorViewModel.Row row) {
+                        toggleDenylistOverride(row);
                     }
                 });
         mList.setAdapter(mAdapter);
@@ -199,6 +206,9 @@ public class ProcessMonitorActivity extends BaseActivity {
                             mViewModel.load();
                         })
                         .setNegativeButton(R.string.cancel, null));
+            } else if (ProcessClassifier.isOverridableDenylist(pkg)) {
+                // Built-in-protected app — point the user at the long-press override.
+                UIUtils.displayShortToast(getString(R.string.monitor_protected_longpress_hint));
             } else {
                 UIUtils.displayShortToast(getString(R.string.monitor_protected, row.cls.reason));
             }
@@ -254,6 +264,37 @@ public class ProcessMonitorActivity extends BaseActivity {
         mViewModel.load();
     }
 
+    /**
+     * Long-press a built-in-denylist app (e.g. Huawei Home) — allow killing it
+     * (override the built-in protection) or restore that protection. The privilege
+     * chain is filtered out upstream ({@link ProcessClassifier#isOverridableDenylist}).
+     */
+    private void toggleDenylistOverride(@NonNull ProcessMonitorViewModel.Row row) {
+        String pkg = packageOf(row);
+        if (pkg == null) return;
+        if (ReaperPrefs.isAllowed(this, pkg)) {
+            presentWithYellowBorder(themedDialog()
+                    .setTitle(getString(R.string.monitor_restore_title, row.title))
+                    .setMessage(R.string.monitor_restore_msg)
+                    .setPositiveButton(R.string.monitor_restore_protection, (d, w) -> {
+                        ReaperPrefs.removeAllowed(this, pkg);
+                        UIUtils.displayShortToast(getString(R.string.monitor_protected_added, row.title));
+                        mViewModel.load();
+                    })
+                    .setNegativeButton(R.string.cancel, null));
+        } else {
+            presentWithYellowBorder(themedDialog()
+                    .setTitle(getString(R.string.monitor_allow_title, row.title))
+                    .setMessage(R.string.monitor_allow_msg)
+                    .setPositiveButton(R.string.monitor_allow_killing, (d, w) -> {
+                        ReaperPrefs.addAllowed(this, pkg);
+                        UIUtils.displayShortToast(getString(R.string.monitor_allowed, row.title));
+                        mViewModel.load();
+                    })
+                    .setNegativeButton(R.string.cancel, null));
+        }
+    }
+
     /** Bottom button — kill, no confirmation (the killResult observer reloads). */
     private void onKillQuick(@NonNull ProcessMonitorViewModel.Row row) {
         if (row.cls.killable) mViewModel.kill(row);
@@ -276,6 +317,45 @@ public class ProcessMonitorActivity extends BaseActivity {
                 span.setSpan(new ForegroundColorSpan(yellow), 0, span.length(), Spanned.SPAN_INCLUSIVE_INCLUSIVE);
                 item.setTitle(span);
             }
+        }
+        // Fork: search — filter the live list by app label / process name. Themed
+        // yellow-on-black to match the toolbar; query survives the auto-refresh.
+        MenuItem searchItem = menu.findItem(R.id.action_monitor_search);
+        if (searchItem != null && searchItem.getActionView() instanceof SearchView) {
+            SearchView sv = (SearchView) searchItem.getActionView();
+            sv.setQueryHint(getString(R.string.search));
+            EditText et = sv.findViewById(androidx.appcompat.R.id.search_src_text);
+            if (et != null) {
+                et.setTextColor(yellow);
+                et.setHintTextColor(0x80FFFF00);  // dim yellow
+            }
+            tintSearchIcon(sv, androidx.appcompat.R.id.search_mag_icon, yellow);
+            tintSearchIcon(sv, androidx.appcompat.R.id.search_close_btn, yellow);
+            tintSearchIcon(sv, androidx.appcompat.R.id.search_button, yellow);
+            sv.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+                @Override
+                public boolean onQueryTextSubmit(String query) {
+                    return false;
+                }
+
+                @Override
+                public boolean onQueryTextChange(String newText) {
+                    if (mViewModel != null) mViewModel.setQuery(newText);
+                    return true;
+                }
+            });
+            searchItem.setOnActionExpandListener(new MenuItem.OnActionExpandListener() {
+                @Override
+                public boolean onMenuItemActionExpand(@NonNull MenuItem item) {
+                    return true;
+                }
+
+                @Override
+                public boolean onMenuItemActionCollapse(@NonNull MenuItem item) {
+                    if (mViewModel != null) mViewModel.setQuery("");
+                    return true;
+                }
+            });
         }
         MaterialToolbar toolbar = findViewById(R.id.toolbar);
         if (toolbar != null && toolbar.getOverflowIcon() != null) {
@@ -314,6 +394,7 @@ public class ProcessMonitorActivity extends BaseActivity {
         // In selection mode show only "Kill selected"; otherwise the live controls.
         boolean sel = mInSelection;
         toggle(menu, R.id.action_monitor_kill_selected, sel);
+        toggle(menu, R.id.action_monitor_search, !sel);
         toggle(menu, R.id.action_monitor_pause, !sel);
         toggle(menu, R.id.action_monitor_sort, !sel);
         toggle(menu, R.id.action_monitor_columns, !sel);
@@ -423,6 +504,13 @@ public class ProcessMonitorActivity extends BaseActivity {
             icon.setColorFilter(ContextCompat.getColor(this, R.color.theme_bright_yellow),
                     PorterDuff.Mode.SRC_IN);
             item.setIcon(icon);
+        }
+    }
+
+    private static void tintSearchIcon(@NonNull SearchView sv, int id, int color) {
+        View v = sv.findViewById(id);
+        if (v instanceof ImageView) {
+            ((ImageView) v).setColorFilter(color, PorterDuff.Mode.SRC_IN);
         }
     }
 
