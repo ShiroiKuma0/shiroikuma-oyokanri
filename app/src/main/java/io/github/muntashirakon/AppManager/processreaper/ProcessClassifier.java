@@ -79,14 +79,20 @@ public final class ProcessClassifier {
     public static Result classify(@NonNull ProcessItem item, @Nullable String selfPkg,
                                   @Nullable String activeImePkg, boolean workingUidRoot,
                                   @NonNull Set<String> userProtected, @NonNull Set<String> activePackages,
-                                  @NonNull Set<Integer> ancestryProtected) {
+                                  @NonNull Set<Integer> ancestryProtected, @NonNull Set<String> allowedOverride) {
         String pkg = (item instanceof AppProcessItem) ? ((AppProcessItem) item).packageInfo.packageName : null;
         int uid = item.uid;
         // Package-based hard protections (only match real app packages, uid >= 10000).
         if (pkg != null) {
             if (pkg.equals(selfPkg)) return prot("self");
             if (pkg.equals(activeImePkg)) return prot("keyboard");
-            if (DENYLIST.contains(pkg)) return prot("protected");
+            // Built-in denylist — protected by default, but the user can override
+            // it (long-press → "Allow killing") EXCEPT for the privilege chain
+            // (matches SHELL_PROTECT_SUBSTR), which must stay un-killable.
+            if (DENYLIST.contains(pkg)
+                    && !(allowedOverride.contains(pkg) && !matchesShellProtect(pkg))) {
+                return prot("protected");
+            }
             // User-marked protected apps (reason "you" → offer to un-protect).
             if (userProtected.contains(pkg)) return prot("you");
             // Actively in use: the foreground/top app, or a process with a live
@@ -194,6 +200,24 @@ public final class ProcessClassifier {
             }
         }
         return ours;
+    }
+
+    /** True if the package/name carries a privilege-chain marker (never overridable). */
+    private static boolean matchesShellProtect(@NonNull String pkgOrName) {
+        String low = lower(pkgOrName);
+        for (String s : SHELL_PROTECT_SUBSTR) {
+            if (low.contains(s)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * True if {@code pkg} is on the built-in denylist AND not the privilege chain —
+     * i.e. the user is allowed to override its protection (long-press → Allow).
+     * The UI uses this to decide whether long-press toggles the override.
+     */
+    public static boolean isOverridableDenylist(@Nullable String pkg) {
+        return pkg != null && DENYLIST.contains(pkg) && !matchesShellProtect(pkg);
     }
 
     @NonNull

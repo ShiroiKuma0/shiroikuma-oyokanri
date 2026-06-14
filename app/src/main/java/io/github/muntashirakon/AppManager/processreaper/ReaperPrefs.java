@@ -23,6 +23,7 @@ public final class ReaperPrefs {
 
     private static final String PREFS_NAME = "shiroikuma_reaper";
     private static final String KEY_PROTECTED = "protected_packages";
+    private static final String KEY_ALLOWED = "allowed_packages";
 
     @NonNull
     private static SharedPreferences sp(@NonNull Context ctx) {
@@ -47,5 +48,29 @@ public final class ReaperPrefs {
     public static void removeProtected(@NonNull Context ctx, @NonNull String pkg) {
         Set<String> set = getProtectedPackages(ctx);
         if (set.remove(pkg)) sp(ctx).edit().putStringSet(KEY_PROTECTED, set).apply();
+    }
+
+    // Allowed set: packages the user has explicitly un-protected from the
+    // built-in denylist (long-press → "Allow killing"). Overrides ProcessClassifier
+    // .DENYLIST, EXCEPT the privilege chain, which the classifier keeps hard.
+
+    /** A defensive copy of the user-allowed (denylist-override) package set. */
+    @NonNull
+    public static Set<String> getAllowedPackages(@NonNull Context ctx) {
+        return new HashSet<>(sp(ctx).getStringSet(KEY_ALLOWED, Collections.emptySet()));
+    }
+
+    public static boolean isAllowed(@NonNull Context ctx, @NonNull String pkg) {
+        return sp(ctx).getStringSet(KEY_ALLOWED, Collections.emptySet()).contains(pkg);
+    }
+
+    public static void addAllowed(@NonNull Context ctx, @NonNull String pkg) {
+        Set<String> set = getAllowedPackages(ctx);
+        if (set.add(pkg)) sp(ctx).edit().putStringSet(KEY_ALLOWED, set).apply();
+    }
+
+    public static void removeAllowed(@NonNull Context ctx, @NonNull String pkg) {
+        Set<String> set = getAllowedPackages(ctx);
+        if (set.remove(pkg)) sp(ctx).edit().putStringSet(KEY_ALLOWED, set).apply();
     }
 }

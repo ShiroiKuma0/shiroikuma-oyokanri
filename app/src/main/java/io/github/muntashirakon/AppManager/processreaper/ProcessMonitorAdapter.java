@@ -49,6 +49,9 @@ public class ProcessMonitorAdapter extends RecyclerView.Adapter<ProcessMonitorAd
         void onProtect(@NonNull ProcessMonitorViewModel.Row row);
 
         void onKill(@NonNull ProcessMonitorViewModel.Row row);
+
+        /** Long-press on a built-in-denylist app — toggle the user override. */
+        void onOverrideToggle(@NonNull ProcessMonitorViewModel.Row row);
     }
 
     private final Context mCtx;
@@ -183,15 +186,27 @@ public class ProcessMonitorAdapter extends RecyclerView.Adapter<ProcessMonitorAd
         });
         h.itemView.setOnLongClickListener(v -> {
             int pos = h.getBindingAdapterPosition();
-            if (pos == RecyclerView.NO_POSITION || !mRows.get(pos).cls.killable) return false;
+            if (pos == RecyclerView.NO_POSITION) return false;
+            ProcessMonitorViewModel.Row r = mRows.get(pos);
+            // Built-in-denylist apps (e.g. Huawei Home): long-press toggles the
+            // user override (Allow killing / Restore protection) instead of
+            // multi-selecting — they're special and not bulk-killable.
+            if (ProcessClassifier.isOverridableDenylist(packageOf(r))) {
+                mActions.onOverrideToggle(r);
+                return true;
+            }
+            if (!r.cls.killable) return false;
             toggleSelect(pos);
             return true;
         });
 
         // Quick-action buttons. Protect only for real apps (has a package to
         // denylist) or already user-protected rows; Kill for any killable row.
+        // Built-in-denylist apps are controlled by the long-press override, not
+        // the protect button, so they don't show it.
         String pkg = packageOf(row);
-        boolean showProtect = pkg != null
+        boolean overridable = ProcessClassifier.isOverridableDenylist(pkg);
+        boolean showProtect = pkg != null && !overridable
                 && ((killable && row.cls.method == ProcessClassifier.METHOD_FORCE_STOP) || userProt);
         h.btnProtect.setVisibility(showProtect ? View.VISIBLE : View.INVISIBLE);
         h.btnProtect.setImageResource(userProt ? R.drawable.ic_lock : R.drawable.ic_unlock);
