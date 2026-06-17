@@ -1,14 +1,13 @@
 name: Bug report
-description: Create a report to help us improve App Manager
+description: Create a report to help us improve 白い熊 応用管理
 labels: [Bug]
 
 body:
   - type: checkboxes
     attributes:
        label: Please check before submitting an issue
-       description: Checking the <a href="https://muntashir.dev/AppManager/">docs</a> before submitting an issue may solve your problem.
        options:
-          - label: I know what my device, OS and App Manager versions are
+          - label: I know what my device, OS and 白い熊 応用管理 versions are
             required: true
           - label: I know how to take logs
             required: true
@@ -61,7 +60,7 @@ body:
         value: |
           - Device:
           - OS Version:
-          - App Manager Version:
+          - App Version:
           - Mode: Root/ADB/NonRoot
     validations:
         required: true
