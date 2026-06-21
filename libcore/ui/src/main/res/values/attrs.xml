@@ -8,6 +8,13 @@
     <attr name="listItemCornerRadiusInner" format="dimension" />
     <attr name="listItemIndicatorWidth" format="dimension" />
 
+    <!-- Fork: optional window-background drawable (a shape with a coloured
+         border) applied to libcore AlertDialog builders after the dialog is
+         built, via UiUtils.applyForkDialogBorder(). Unset on every non-fork
+         theme, so those dialogs are left untouched; the fork's yellow-on-black
+         dialog overlay points it at a black/yellow-bordered shape. -->
+    <attr name="forkDialogBorderDrawable" format="reference" />
+
     <attr name="materialAlertViewStyle" format="reference" />
     <attr name="materialAlertDialogListItemTextStyle" format="reference" />
     <attr name="materialFullScreenAlertDialogTheme" format="reference" />

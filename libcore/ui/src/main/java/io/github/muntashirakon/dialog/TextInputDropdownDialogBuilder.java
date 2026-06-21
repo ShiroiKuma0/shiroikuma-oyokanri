@@ -23,6 +23,7 @@ import com.google.android.material.textfield.TextInputLayout;
 import java.util.List;
 
 import io.github.muntashirakon.ui.R;
+import io.github.muntashirakon.util.UiUtils;
 import io.github.muntashirakon.adapters.AnyFilterArrayAdapter;
 import io.github.muntashirakon.adapters.NoFilterArrayAdapter;
 
@@ -263,7 +264,9 @@ public class TextInputDropdownDialogBuilder {
     }
 
     public AlertDialog create() {
-        return mBuilder.create();
+        AlertDialog dialog = mBuilder.create();
+        UiUtils.applyForkDialogBorder(dialog);
+        return dialog;
     }
 
     public void show() {

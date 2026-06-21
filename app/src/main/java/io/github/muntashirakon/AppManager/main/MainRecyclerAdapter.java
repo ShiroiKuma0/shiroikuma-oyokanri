@@ -65,6 +65,7 @@ import io.github.muntashirakon.AppManager.apk.installer.PackageInstallerActivity
 import io.github.muntashirakon.AppManager.fonts.ColorPrefs;
 import io.github.muntashirakon.AppManager.fonts.FontPrefs;
 import io.github.muntashirakon.AppManager.fonts.FontUtil;
+import io.github.muntashirakon.AppManager.fonts.MainIconPrefs;
 import io.github.muntashirakon.AppManager.fonts.RunningBoxPrefs;
 import io.github.muntashirakon.AppManager.fonts.SelectionFramePrefs;
 import io.github.muntashirakon.AppManager.apk.installer.PackageInstallerCompat;
@@ -506,6 +507,22 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                 cardView.setStrokeWidth(0);
             }
         }
+        // Fork: force-stop ✕ in the row under the icon, to the right of the
+        // freeze snowflake. Shown only for running apps (installed, not frozen,
+        // not stopped — the same condition as the running box) and never for
+        // our own package; a single tap force-stops the app with no
+        // confirmation. Rendered as a plain yellow cross, sized to match the
+        // snowflake (see item_main.xml).
+        boolean running = item.isInstalled && !item.isFrozen && !item.isStopped
+                && !BuildConfig.APPLICATION_ID.equals(item.packageName);
+        if (running) {
+            holder.killBadge.setColorFilter(mColorYellow);
+            holder.killBadge.setVisibility(View.VISIBLE);
+            holder.killBadge.setOnClickListener(v -> forceStopApp(item));
+        } else {
+            holder.killBadge.setVisibility(View.GONE);
+            holder.killBadge.setOnClickListener(null);
+        }
         // Display yellow star if the app is in debug mode
         holder.debugIcon.setVisibility(item.debuggable ? View.VISIBLE : View.INVISIBLE);
         // Set date and (if available,) days between first installation and last update
@@ -542,6 +559,11 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         FontUtil.apply(holder.sha, FontPrefs.SIGNATURE);
         // Signature had no explicit colour originally; only override if set.
         if (mcSignatureSet) holder.sha.setTextColor(mcSignature);
+        // Fork: configurable main-list icon size. Size the icon and widen the
+        // icon column to match, and scale the snowflake + ✕ glyphs under it
+        // proportionally (so the pair always fits with a gap). Read at bind
+        // time; a change triggers a re-bind via MainIconPrefs.consumeChanged().
+        applyMainIconSize(holder);
         // Load app icon
         // Fork: version-aware cache key — fold lastUpdateTime in so a reinstall (which bumps
         // lastUpdateTime) busts the stale in-memory + on-disk icon cache instead of showing
@@ -1123,10 +1145,66 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         });
     }
 
+    // Fork: apply the configurable main-list icon size. Sizes the icon square,
+    // widens the icon column to match, and scales the snowflake + force-stop ✕
+    // glyphs to ~0.43× the icon (so at the 60dp default they stay 26dp, and the
+    // two glyphs always fit under the icon with a gap between them). Idempotent —
+    // only writes LayoutParams when a dimension actually changed.
+    private void applyMainIconSize(@NonNull ViewHolder holder) {
+        float density = mActivity.getResources().getDisplayMetrics().density;
+        int sizeDp = MainIconPrefs.getSizeDp(mActivity);
+        int iconPx = Math.round(sizeDp * density);
+        int glyphPx = Math.round(sizeDp * density * 0.43f);
+        setViewWidth(holder.iconColumn, iconPx);
+        setViewSize(holder.icon, iconPx, iconPx);
+        setViewSize(holder.freezeIndicator, glyphPx, glyphPx);
+        setViewSize(holder.killBadge, glyphPx, glyphPx);
+    }
+
+    private static void setViewWidth(@NonNull View v, int w) {
+        ViewGroup.LayoutParams lp = v.getLayoutParams();
+        if (lp.width != w) {
+            lp.width = w;
+            v.setLayoutParams(lp);
+        }
+    }
+
+    private static void setViewSize(@NonNull View v, int w, int h) {
+        ViewGroup.LayoutParams lp = v.getLayoutParams();
+        if (lp.width != w || lp.height != h) {
+            lp.width = w;
+            lp.height = h;
+            v.setLayoutParams(lp);
+        }
+    }
+
+    // Fork: one-tap force-stop from the running app's icon ✕ badge. Mirrors the
+    // app-details / process-monitor force-stop — a direct privileged call on a
+    // background thread, then a package-altered broadcast so the row re-reads
+    // its (now stopped) state and the running box + badge drop. Toast on
+    // failure (e.g. no FORCE_STOP_PACKAGES privilege).
+    private void forceStopApp(@NonNull ApplicationItem item) {
+        final Context ctx = mActivity.getApplicationContext();
+        final int userId = (item.userIds != null && item.userIds.length > 0)
+                ? item.userIds[0]
+                : UserHandleHidden.myUserId();
+        ThreadUtils.postOnBackgroundThread(() -> {
+            try {
+                PackageManagerCompat.forceStopPackage(item.packageName, userId);
+                BroadcastUtils.sendPackageAltered(ctx, new String[]{item.packageName});
+            } catch (Throwable th) {
+                Log.e(TAG, "Force-stop failed for " + item.packageName, th);
+                ThreadUtils.postOnMainThread(() -> displayLongToast(
+                        R.string.failed_to_stop, item.label));
+            }
+        });
+    }
+
     public static class ViewHolder extends MultiSelectionView.ViewHolder {
         MaterialCardView itemView;
         View iconColumn;
         AppCompatImageView icon;
+        AppCompatImageView killBadge;   // Fork: force-stop ✕ on the icon corner.
         AppCompatImageView debugIcon;
         AppCompatImageView freezeIndicator;
         TextView label;
@@ -1151,6 +1229,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             this.itemView = (MaterialCardView) itemView;
             iconColumn = itemView.findViewById(R.id.icon_column);
             icon = itemView.findViewById(R.id.icon);
+            killBadge = itemView.findViewById(R.id.kill_badge);
             debugIcon = itemView.findViewById(R.id.favorite_icon);
             freezeIndicator = itemView.findViewById(R.id.freeze_indicator);
             label = itemView.findViewById(R.id.label);

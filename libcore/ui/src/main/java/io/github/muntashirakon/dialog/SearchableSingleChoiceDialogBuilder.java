@@ -37,6 +37,7 @@ import java.util.Objects;
 
 import io.github.muntashirakon.ui.R;
 import io.github.muntashirakon.util.AdapterUtils;
+import io.github.muntashirakon.util.UiUtils;
 import io.github.muntashirakon.widget.RecyclerView;
 import io.github.muntashirakon.widget.SearchView;
 
@@ -258,12 +259,16 @@ public class SearchableSingleChoiceDialogBuilder<T> {
 
     @NonNull
     public AlertDialog create() {
-        return mDialog = mBuilder.create();
+        mDialog = mBuilder.create();
+        UiUtils.applyForkDialogBorder(mDialog);
+        return mDialog;
     }
 
     @NonNull
     public AlertDialog show() {
-        return mDialog = mBuilder.show();
+        create();
+        mDialog.show();
+        return mDialog;
     }
 
     private void triggerSingleChoiceClickListener(int index, boolean isChecked) {

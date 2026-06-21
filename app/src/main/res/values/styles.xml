@@ -154,10 +154,34 @@
         <item name="colorControlActivated">@color/theme_bright_yellow</item>
         <item name="android:colorControlActivated">@color/theme_bright_yellow</item>
         <item name="colorAccent">@color/theme_bright_yellow</item>
+        <!-- Fork: give every dialog action button (OK / Cancel / Neutral) a
+             yellow hairline border to match the dialog frame. The button bar
+             reads these three theme attrs, so this themes the buttons of every
+             dialog that uses this overlay - no per-dialog code needed. -->
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.AppTheme.Button.Dialog.YellowOutlined</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Widget.AppTheme.Button.Dialog.YellowOutlined</item>
+        <item name="buttonBarNeutralButtonStyle">@style/Widget.AppTheme.Button.Dialog.YellowOutlined</item>
+        <!-- Fork: the bordered window-background drawable, exposed as the libcore
+             attr forkDialogBorderDrawable so UiUtils.applyForkDialogBorder() can
+             paint the yellow dialog frame after show() (M3 rebuilds the window
+             background as a stroke-less MaterialShapeDrawable in create(), so the
+             border can only be applied programmatically). Unset on every non-fork
+             theme, so those dialogs are left untouched. -->
+        <item name="forkDialogBorderDrawable">@drawable/alert_dialog_bg_yellow_on_black</item>
     </style>
 
     <style name="MaterialAlertDialog.AppTheme.YellowOnBlack" parent="MaterialAlertDialog.Material3">
         <item name="background">@drawable/alert_dialog_bg_yellow_on_black</item>
+    </style>
+
+    <!-- Fork: dialog action buttons rendered with a yellow hairline border on
+         the yellow-on-black dialog overlay. Parented from the M3 dialog text
+         button so the button-bar sizing/insets are preserved; only the stroke
+         and text colour are layered on top. -->
+    <style name="Widget.AppTheme.Button.Dialog.YellowOutlined" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="strokeColor">@color/theme_bright_yellow</item>
+        <item name="strokeWidth">1.5dp</item>
+        <item name="android:textColor">@color/theme_bright_yellow</item>
     </style>
 
     <!-- Shadows libcore's Widget.AppTheme.MultiSelectionActionsView. The
