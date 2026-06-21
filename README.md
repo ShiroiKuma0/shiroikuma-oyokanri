@@ -1,122 +1,130 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later OR CC-BY-SA-4.0 -->
 
-<p align="center">
-  <img src="docs/raw/images/icon.png" alt="App Manager Logo" height="150dp">
-</p>
+<div align="center">
 
-<h1 align="center">App Manager</h1>
+<img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="120" alt="白い熊 応用管理 app icon" />
 
-<p align=center>
-  <a href="https://muntashirakon.github.io/AppManager">Docs</a> ·
-  <a href="https://github.com/MuntashirAkon/AppManager/releases">Releases</a> ·
-  <a href="https://t.me/AppManagerChannel">Telegram Channel</a>
-</p>
+# 白い熊 応用管理
+
+**Android app manager & control panel — themed and tooled to taste.**
+
+A fork of [AppManager](https://github.com/MuntashirAkon/AppManager) with **major additions**: a
+configurable **yellow-on-black UI** with a deep customization page, a hard-blocking **protected
+profile**, a from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-tap
+**main-list quick actions**, readable **per-app backups**, and the **AM Debug** toolset unlocked in a
+normal release build.
+
+**📥 Latest release: [`4.0.5+124`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+
+</div>
 
 ---
 
-## Features
+## Installs side-by-side with official App Manager
 
-### General features
-- Fully reproducible, copylefted libre software (GPLv3+)
-- Material 3 with dynamic colours
-- Display as much information as possible in the main page
-- List activities, broadcast receivers, services, providers, app ops, permissions, signatures, shared libraries, etc. of an application
-- Launch activities and services
-- Create shortcuts of activities
-- [Intercept activities](https://muntashirakon.github.io/AppManager/#sec:interceptor-page)
-- Scan for trackers and libraries in apps and list (all or only) tracking classes (and their code dump)
-- View/save the manifest of an app
-- Display app usage, data usage (mobile and Wi-Fi), and app storage info (requires “Usage Access” permission)
-- Install/uninstall APK files (including APKS, APKM and XAPK with OBB files)
-- Share APK files
-- Back up/restore APK files
-- Batch operations
-- Single-click operations
-- Logcat viewer, manager and exporter
-- [Profiles](https://muntashirakon.github.io/AppManager/#sec:profiles-page)
-- Debloater
-- Code editor
-- File manager
-- Simple terminal emulator
-- Open an app in Aurora Store or in your favourite F-Droid client
-- Sign APK files with custom signatures before installing
-- Backup encryption: OpenPGP via OpenKeychain, RSA, ECC (hybrid encryption with AES) and AES.
-- Track foreground UI components
+This fork ships as **`shiroikuma.oyokanri`** (label **白い熊 応用管理**), so it installs **right next to**
+the official `io.github.muntashirakon.AppManager` from F-Droid — two apps, no conflict. It's signed
+with its own key, so it never installs *over* official App Manager (Android refuses mismatched keys);
+grab the APK from the [releases page](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases) and
+install it as its own app. (The package was renamed from the earlier `shiroikuma.appmanager`, so it's
+a fresh install rather than an update.)
 
-### Root/ADB-only features
+Built for **arm64-v8a**. App Manager itself is unchanged underneath — same component browser, same
+root/ADB/Shizuku backends, same backup engine — this fork adds a thick layer of personalization plus a
+few control-panel tools on top.
 
-- Revoke runtime (AKA dangerous) and development permissions
-- Change the mode of an app op
-- Display/kill/force-stop running apps or processes
-- Clear app data or app cache
-- View/change net policy
-- Control battery optimization
-- Freeze/unfreeze apps
+## 🎨 Configurable yellow-on-black UI
 
-### Root-only features
+The fork's signature look: pure-black backgrounds with a bright `#FFFF00` foreground, applied across
+the main list, app-details, profiles, settings, overflow menu, the installer banner, dialogs (with
+yellow borders and yellow-outlined buttons), and the launcher / file-manager / TV-banner icons. Toasts
+are restyled as a black box with yellow text and border, and even the splash screen renders the app
+name, status and version in yellow.
 
-- Block any activities, broadcast receivers, services, or providers of an app with native import/export as well as Watt and Blocker import support
-- View/edit/delete shared preferences of any app
-- Back up/restore apps with data, rules and extras (such as permissions, battery optimization, SSAID, etc.)
-- View system configurations including blacklisted or whitelisted apps, permissions, etc.
-- View/change SSAID.
+None of it is hard-coded. A dedicated **白い熊 応用管理 UI** page (long-press the toolbar overflow, or open
+it from Settings) lets you tune, per element:
 
-…and many more! This single app combines the features of 5 or 6 apps any tech-savvy person needs!
+- **Fonts** — family, weight and size for the app label, package id, version, app-type, dates, UID,
+  SDK, signature and the app-details header, with **`.ttf` / `.otf` import** from storage.
+- **Colours** — per-element text/fill/border colours for labels, indicators, chips, the running box,
+  the selected-card frame, separators and the process-monitor rows.
+- **Main-list layout** — adaptive or a fixed **2 / 3 / 4-column** grid, an **edge-to-edge separator
+  grid** (configurable widths and colours), the **running-app box** (border width/roundness, yellow
+  for user apps / orange for system), the **selected-card frame**, and the **app-icon size and
+  roundness** (square → circle).
 
-### Upcoming features
-- Finder: Find app components, permissions etc. in all apps
-- Basic APK editing
-- Routine operations
-- Enable/disable app actions such as launch on boot
-- Crash monitor
-- Systemless disabling/uninstalling of the system apps
-- Import app list exported by App Manager
-- More advance terminal emulator
-- Database viewer and editor, etc.
+Changes apply live the moment you leave the screen, and a reference **legend** explains what every
+colour and style means. A four-state main list — installed, frozen (snowflake + cool film), stopped,
+uninstalled (dimmed + mauve film) — reads at a glance, with type-coloured italic labels.
 
-[<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png"
-alt="Get it on F-Droid"
-height="80" />](https://f-droid.org/packages/io.github.muntashirakon.AppManager)
+## 🛡️ Protected profile (`必要`)
 
-## Translations
+Put any app into an apps-profile named **`必要`** ("necessary") and it becomes **hard-blocked from
+being frozen or uninstalled**. Enforcement sits at the two lowest-level chokepoints (freeze and
+uninstall), so **no** UI path — single-app, batch, profile-apply, or anything added later — can bypass
+it. Attempts are refused with a clear message that names the protected apps. It's the safety net that
+lets you batch-freeze aggressively without ever clobbering something you depend on.
 
-Help translate [the app strings](https://hosted.weblate.org/engage/app-manager/) and
-[the docs](https://hosted.weblate.org/projects/app-manager/docs/) at Hosted Weblate.
+## 📊 Process monitor / reaper
 
+A from-scratch replacement for the legacy "Running apps" screen, built for actually reaping memory:
 
-[![Translation status](https://hosted.weblate.org/widgets/app-manager/-/multi-auto.svg)](https://hosted.weblate.org/engage/app-manager/)
+- **PSS-ranked** memory (not RSS — PSS reflects what killing a process actually frees) and **live
+  instantaneous CPU%** sampled from `/proc` ticks.
+- A **smart kill router** — app packages get force-stopped, orphaned shell processes get a signal —
+  with a built-in denylist (Shizuku, the privilege chain, IMEs, the launcher…) plus a **user-editable
+  protected set** (tap to Protect/Allow, long-press to override even the built-ins).
+- **Leak detection & grouping** — clusters of identical orphaned shells collapse into one "comm ×N"
+  row with a configurable threshold and optional minimum age; multi-process apps collapse by package.
+- **Actively-in-use protection** so you can't one-tap kill the foreground app or something playing
+  media, a **per-process detail page** (memory / CPU / scheduling / lifecycle / security / app
+  metadata), a **faceted filter** (killability × type) and a **toolbar search**.
 
+## ⏯️ Batch-op progress dialog
 
-## Mirrors
+Long batch operations get an in-app pop-up that mirrors the notification, with **Pause / Continue**
+and **Cancel** — so you can hold a freeze/backup mid-run or stop it cleanly. On completion the main
+list **snaps to its final state in one pass** instead of repainting row-by-row over several seconds.
 
-[Codeberg](https://codeberg.org/muntashir/AppManager) ·
-[GitLab](https://gitlab.com/muntashir/AppManager) ·
-[Riseup](https://0xacab.org/muntashir/AppManager) ·
-[sourcehut](https://git.sr.ht/~muntashir/AppManager)
+## ❌ Main-list quick actions
 
-## Screenshots
+The app list does more without a trip into details:
 
-<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" height="500dp" /><img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" height="500dp" /><img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" height="500dp" /><img src="fastlane/metadata/android/en-US/images/phoneScreenshots/4.png" height="500dp" /><img src="fastlane/metadata/android/en-US/images/phoneScreenshots/5.png" height="500dp" /><img src="fastlane/metadata/android/en-US/images/phoneScreenshots/6.png" height="500dp" /><img src="fastlane/metadata/android/en-US/images/phoneScreenshots/7.png" height="500dp" /><img src="fastlane/metadata/android/en-US/images/phoneScreenshots/8.png" height="500dp" /><img src="fastlane/metadata/android/en-US/images/phoneScreenshots/9.png" height="500dp" />
+- A one-tap **force-stop ✕** on every running app (next to the freeze snowflake under the icon).
+- A freeze/unfreeze toggle on the whole icon column, with an at-a-glance snowflake indicator.
+- Free-text **per-app notes** (on the list and in app-details; included in settings export/import).
+- Per-row **profile pills** — tap to filter, long-press to remove, "+" to add to a profile.
+- A **copy-all-displayed-IDs** toolbar action, a **multi-profile include/exclude filter** with a
+  tri-state picker, and a fully **customisable bottom selection toolbar** (reorder/hide actions;
+  long-press any button to open the editor).
 
-## Build Instructions
-See [BUILDING.rst](BUILDING.rst)
+## 💾 Backups & settings portability
 
-## Contributing
+- **Readable per-app backup folders** instead of the opaque `backups/<uuid>` layout, plus a **Backup
+  directory** option that points the engine at a fast filesystem path (bypassing slow SAF volumes).
+- Inline backup details in the main list (version / date / time), with **tap = new backup** and
+  **long-press = restore/delete**, and a tap-to-back-up affordance for apps that have none.
+- **Settings export/import** that bundles App Manager's settings together with the fork's profiles,
+  colours and fonts, so a new install comes up looking and behaving exactly like the old one.
 
-See [CONTRIBUTING.rst](CONTRIBUTING.rst)
+## 🔧 AM Debug features in a release build
 
-## Donation and Funding
+The fork exposes App Manager's debug-only toolset in a normal signed release: **Finder** (find app
+components/permissions across all apps), the **Crazy Logger**, the scanner's **missing-classes** view,
+**historical operations**, and the **Unfrozen** filter — and it **neuters the upstream build-expiry
+checker**, so the release never "expires".
 
-As of September 2024, App Manager is not accepting any financial support until further notice. But
-you may still be able to send gifts (e.g., gift cards, subscriptions, food and drink, flowers, or
-even cash). Please contact the maintainer at muntashirakon [at] riseup [dot] net for further
-assistance.
+## 🇯🇵 Japanese label & de-brand
 
-In addition, the maintainers and contributors of this project DO NOT consent to the creation, sale,
-or promotion of tokens, cryptocurrencies, NFTs, or any other financial instruments that claim to
-represent this project, its code, or its community. Any such attempts are unauthorized and not
-affiliated with this project in any way.
+The app is labelled **白い熊 応用管理** with Japanese strings for the freeze/unfreeze/stopped surfaces, and
+it's fully de-branded to this fork — package, label, launcher icon, and the new-issue/report links all
+point here rather than at upstream.
 
-## Credits and Libraries
+---
 
-A list of credits and libraries are available in the **About** section of the app.
+## Built on App Manager
+
+This is a downstream personalization of [App Manager](https://github.com/MuntashirAkon/AppManager) by
+Muntashir Al-Islam. All credit for App Manager — the component browser, the backup engine, the
+root/ADB/Shizuku backends and the rest — goes to its author and contributors. Like upstream, this fork
+is licensed under the **GNU General Public License v3.0** (see [`COPYING`](COPYING)).
