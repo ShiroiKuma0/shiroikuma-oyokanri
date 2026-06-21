@@ -236,6 +236,12 @@ public class FontsPreferences extends Fragment {
         sepContent.addView(buildSeparatorElement(inflater, sepContent, true));
         sepContent.addView(buildSeparatorElement(inflater, sepContent, false));
         container.addView(sepGroup);
+        // Fork: the main app list (app-icon size).
+        View mainGroup = inflater.inflate(R.layout.view_font_group, container, false);
+        ((AppCompatTextView) mainGroup.findViewById(R.id.group_header)).setText(R.string.pref_mainlist_group);
+        LinearLayoutCompat mainContent = mainGroup.findViewById(R.id.group_content);
+        mainContent.addView(buildMainIconElement(inflater, mainContent));
+        container.addView(mainGroup);
         // Fork: the running/active app box (border width + user/system colours).
         View boxGroup = inflater.inflate(R.layout.view_font_group, container, false);
         ((AppCompatTextView) boxGroup.findViewById(R.id.group_header)).setText(R.string.pref_runbox_group);
@@ -445,6 +451,35 @@ public class FontsPreferences extends Fragment {
             public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
                 if (!fromUser) return;
                 MonitorPrefs.setDetailRowPadDp(requireContext(), progress);
+                render.run();
+            }
+            @Override public void onStartTrackingTouch(SeekBar sb) {}
+            @Override public void onStopTrackingTouch(SeekBar sb) {}
+        });
+        return element;
+    }
+
+    /** Fork: the main app list app-icon size slider. */
+    @NonNull
+    private View buildMainIconElement(@NonNull LayoutInflater inflater, @NonNull LinearLayoutCompat parent) {
+        View element = inflater.inflate(R.layout.view_separator_element, parent, false);
+        ((AppCompatTextView) element.findViewById(R.id.element_label)).setText(R.string.pref_mainlist_icon_size);
+        ((AppCompatTextView) element.findViewById(R.id.sep_sublabel)).setText(R.string.pref_mainlist_icon_size_hint);
+        final AppCompatTextView valueView = element.findViewById(R.id.sep_width_value);
+        final AppCompatSeekBar seek = element.findViewById(R.id.sep_width_seek);
+        final int min = MainIconPrefs.MIN_SIZE_DP;
+        seek.setMax(MainIconPrefs.MAX_SIZE_DP - min);
+        final Runnable render = () -> {
+            int dp = MainIconPrefs.getSizeDp(requireContext());
+            valueView.setText(String.format(Locale.US, "%d dp", dp));
+            seek.setProgress(dp - min);
+        };
+        render.run();
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                MainIconPrefs.setSizeDp(requireContext(), min + progress);
                 render.run();
             }
             @Override public void onStartTrackingTouch(SeekBar sb) {}

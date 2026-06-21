@@ -9,6 +9,7 @@ import android.content.res.Resources;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.InsetDrawable;
 import android.os.Build;
 import android.text.Spannable;
 import android.text.SpannableString;
@@ -29,6 +30,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.Px;
 import androidx.annotation.StyleRes;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
@@ -42,6 +44,7 @@ import com.google.android.material.shape.ShapeAppearanceModel;
 import java.util.Locale;
 
 import io.github.muntashirakon.text.style.ListSpan;
+import io.github.muntashirakon.ui.R;
 
 public final class UiUtils {
     private UiUtils() {
@@ -80,6 +83,39 @@ public final class UiUtils {
         TypedValue typedValue = new TypedValue();
         context.getTheme().resolveAttribute(resId, typedValue, true);
         return ContextCompat.getDrawable(context, typedValue.resourceId);
+    }
+
+    /**
+     * Fork: if the dialog's theme defines {@code forkDialogBorderDrawable},
+     * replace the dialog's window background with that drawable, inset to match
+     * the M3 dialog margin, so a coloured border is painted around the dialog.
+     * <p>
+     * {@code MaterialAlertDialogBuilder.create()} rebuilds the window background
+     * as a stroke-less {@code MaterialShapeDrawable}, so a border can only be
+     * applied after the dialog has been built - a pure-theme window background
+     * never survives. This is a no-op when the attribute is unset (i.e. every
+     * non-fork theme), so it is safe to call from shared dialog builders.
+     */
+    public static void applyForkDialogBorder(@Nullable AlertDialog dialog) {
+        if (dialog == null) {
+            return;
+        }
+        Window window = dialog.getWindow();
+        if (window == null) {
+            return;
+        }
+        Context context = dialog.getContext();
+        TypedValue typedValue = new TypedValue();
+        if (!context.getTheme().resolveAttribute(R.attr.forkDialogBorderDrawable, typedValue, true)
+                || typedValue.resourceId == 0) {
+            // No fork border configured on this theme; leave the dialog untouched.
+            return;
+        }
+        Drawable background = ContextCompat.getDrawable(context, typedValue.resourceId);
+        if (background != null) {
+            int inset = dpToPx(context, 16);
+            window.setBackgroundDrawable(new InsetDrawable(background, inset));
+        }
     }
 
     public static int getColumnCount(@NonNull View v, @Dimension(unit = Dimension.DP) int columnWidth, int defaultCount) {

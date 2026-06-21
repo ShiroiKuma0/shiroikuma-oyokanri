@@ -47,7 +47,6 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.checkbox.MaterialCheckBox;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
 import com.google.android.material.snackbar.Snackbar;
 
@@ -74,6 +73,7 @@ import io.github.muntashirakon.AppManager.apk.list.ListExporter;
 import io.github.muntashirakon.AppManager.fonts.ColorPrefs;
 import io.github.muntashirakon.AppManager.fonts.FontPrefs;
 import io.github.muntashirakon.AppManager.fonts.FontUtil;
+import io.github.muntashirakon.AppManager.fonts.MainIconPrefs;
 import io.github.muntashirakon.AppManager.fonts.RunningBoxPrefs;
 import io.github.muntashirakon.AppManager.fonts.SelectionFramePrefs;
 import io.github.muntashirakon.AppManager.fonts.SeparatorPrefs;
@@ -110,6 +110,7 @@ import io.github.muntashirakon.AppManager.usage.AppUsageActivity;
 import io.github.muntashirakon.AppManager.users.Users;
 import io.github.muntashirakon.AppManager.utils.AppPref;
 import io.github.muntashirakon.AppManager.utils.DateUtils;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.ForkThemeUtils;
 import io.github.muntashirakon.AppManager.utils.StoragePermission;
 import io.github.muntashirakon.AppManager.utils.ClipboardUtils;
@@ -397,7 +398,7 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             // Disclaimer will only be shown the first time it is loaded.
             SHOW_DISCLAIMER = false;
             View view = View.inflate(this, R.layout.dialog_disclaimer, null);
-            new MaterialAlertDialogBuilder(this)
+            ForkDialog.present(ForkDialog.builder(this)
                     .setView(view)
                     .setCancelable(false)
                     .setPositiveButton(R.string.disclaimer_agree, (dialog, which) -> {
@@ -406,8 +407,7 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                         }
                         displayChangelogIfRequired();
                     })
-                    .setNegativeButton(R.string.disclaimer_exit, (dialog, which) -> finishAndRemoveTask())
-                    .show();
+                    .setNegativeButton(R.string.disclaimer_exit, (dialog, which) -> finishAndRemoveTask()));
         } else {
             displayChangelogIfRequired();
         }
@@ -651,7 +651,9 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         // Fork: the running-app box width is read at bind time, so a change
         // just needs a re-bind (same as the frame).
         boolean runBoxChanged = RunningBoxPrefs.consumeChanged();
-        if (mAdapter != null && (fontsChanged || colorsChanged || framesChanged || runBoxChanged)) {
+        // Fork: the main-list icon size is also read at bind time.
+        boolean iconSizeChanged = MainIconPrefs.consumeChanged();
+        if (mAdapter != null && (fontsChanged || colorsChanged || framesChanged || runBoxChanged || iconSizeChanged)) {
             if (fontsChanged) FontUtil.clearCache();
             if (colorsChanged) mAdapter.reloadColors();
             mAdapter.notifyDataSetChanged();
@@ -700,7 +702,7 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                 getString(R.string.layout_4_columns)};
         int columns = MainLayoutPrefs.getColumns(this);
         int checked = (columns >= 2 && columns <= 4) ? columns - 1 : 0;
-        new MaterialAlertDialogBuilder(this)
+        ForkDialog.present(ForkDialog.builder(this)
                 .setTitle(R.string.list_layout)
                 .setSingleChoiceItems(choices, checked, (dialog, which) -> {
                     int newColumns = which == 0 ? MainLayoutPrefs.COLUMNS_ADAPTIVE : which + 1;
@@ -708,8 +710,7 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                     applyListLayout();
                     dialog.dismiss();
                 })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                .setNegativeButton(R.string.cancel, null));
     }
 
     /**
@@ -759,25 +760,23 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                 if (granted) handleBatchOp(BatchOpsManager.OP_BACKUP_APK);
             });
         } else if (id == R.id.action_block_unblock_trackers) {
-            new MaterialAlertDialogBuilder(this)
+            ForkDialog.present(ForkDialog.builder(this)
                     .setTitle(R.string.block_unblock_trackers)
                     .setMessage(R.string.choose_what_to_do)
                     .setPositiveButton(R.string.block, (dialog, which) ->
                             handleBatchOp(BatchOpsManager.OP_BLOCK_TRACKERS))
                     .setNegativeButton(R.string.cancel, null)
                     .setNeutralButton(R.string.unblock, (dialog, which) ->
-                            handleBatchOp(BatchOpsManager.OP_UNBLOCK_TRACKERS))
-                    .show();
+                            handleBatchOp(BatchOpsManager.OP_UNBLOCK_TRACKERS)));
         } else if (id == R.id.action_clear_data_cache) {
-            new MaterialAlertDialogBuilder(this)
+            ForkDialog.present(ForkDialog.builder(this)
                     .setTitle(R.string.clear)
                     .setMessage(R.string.choose_what_to_do)
                     .setPositiveButton(R.string.clear_cache, (dialog, which) ->
                             handleBatchOp(BatchOpsManager.OP_CLEAR_CACHE))
                     .setNegativeButton(R.string.cancel, null)
                     .setNeutralButton(R.string.clear_data, (dialog, which) ->
-                            handleBatchOp(BatchOpsManager.OP_CLEAR_DATA))
-                    .show();
+                            handleBatchOp(BatchOpsManager.OP_CLEAR_DATA)));
         } else if (id == R.id.action_freeze_unfreeze) {
             warnIfSelectionHasProtectedApps();
             int freezeType = Prefs.Blocking.getDefaultFreezingMethod();
@@ -795,13 +794,12 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                 showFreezeUnfreezeDialog(freezeType);
             }
         } else if (id == R.id.action_disable_background) {
-            new MaterialAlertDialogBuilder(this)
+            ForkDialog.present(ForkDialog.builder(this)
                     .setTitle(R.string.are_you_sure)
                     .setMessage(R.string.disable_background_run_description)
                     .setPositiveButton(R.string.yes, (dialog, which) ->
                             handleBatchOp(BatchOpsManager.OP_DISABLE_BACKGROUND))
-                    .setNegativeButton(R.string.no, null)
-                    .show();
+                    .setNegativeButton(R.string.no, null));
         } else if (id == R.id.action_net_policy) {
             ArrayMap<Integer, String> netPolicyMap = NetworkPolicyManagerCompat.getAllReadablePolicies(this);
             Integer[] polices = new Integer[netPolicyMap.size()];

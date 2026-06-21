@@ -30,11 +30,14 @@
         android:title="@string/clear_all_filters"
         app:showAsAction="ifRoom" />
 
+    <!-- Fork: copy-displayed-app-IDs moved off the top toolbar into the
+         overflow (was ifRoom with ic_content_copy); the 3x3 layout icon
+         takes its toolbar slot. Feature stays reachable from the overflow. -->
     <item
         android:id="@+id/action_export_displayed_ids"
         android:icon="@drawable/ic_content_copy"
         android:title="@string/copy_displayed_app_ids"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="never" />
 
     <!-- Fork: main-list layout picker (adaptive / 2 / 3 / 4 columns). Last
          ifRoom item, so it sits immediately left of the overflow button. -->

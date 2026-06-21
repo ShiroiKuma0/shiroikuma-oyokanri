@@ -201,6 +201,7 @@ public class TextInputDialogBuilder {
                 UiUtils.showKeyboard(mEditText);
             }, 200);
         });
+        UiUtils.applyForkDialogBorder(dialog);
         return dialog;
     }
 
