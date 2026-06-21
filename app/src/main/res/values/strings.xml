@@ -1791,10 +1791,11 @@
     <!-- Fork: running/active app box (border width + user/system colours) -->
     <string name="pref_runbox_group">Running app box</string>
     <string name="pref_runbox_cat">Box</string>
-    <!-- Fork: main app list (app-icon size) -->
-    <string name="pref_mainlist_group">Main app list</string>
+    <!-- Fork: main app list app-icon controls (size + roundness) -->
     <string name="pref_mainlist_icon_size">App icon size</string>
     <string name="pref_mainlist_icon_size_hint">Size of the app icons in the list</string>
+    <string name="pref_mainlist_icon_roundness">App icon roundness</string>
+    <string name="pref_mainlist_icon_roundness_hint">Corner roundness (0 = square, 50 = circle)</string>
     <!-- Fork: process monitor settings (colours + app-icon size) -->
     <string name="pref_monitor_group">Process monitor</string>
     <string name="pref_monitor_icon_size">App icon</string>

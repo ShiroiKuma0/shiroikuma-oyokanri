@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.view.MenuItem;
 import android.view.View;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -67,6 +68,19 @@ public class SettingsActivity extends BaseActivity implements PreferenceFragment
     @Nullable
     private MaterialToolbar mSecondaryToolbar;
 
+    // Fork: when this activity was launched straight into a sub-page via a
+    // deep-link path (e.g. the 白い熊 応用管理 UI page opened by long-pressing the
+    // toolbar overflow → "fonts_prefs"), Back from that page should return to
+    // the caller (the Main view / process monitor) instead of revealing the
+    // settings root the user never navigated through. Enabled only while we're
+    // sitting on the directly-launched page (see updateFinishOnBackState()).
+    private final OnBackPressedCallback mFinishOnBackAtRoot = new OnBackPressedCallback(false) {
+        @Override
+        public void handleOnBackPressed() {
+            finish();
+        }
+    };
+
     @Override
     protected void onAuthenticated(Bundle savedInstanceState) {
         int mainPrefSize = UiUtils.dpToPx(this, 450);
@@ -109,7 +123,12 @@ public class SettingsActivity extends BaseActivity implements PreferenceFragment
             if (mLevel <= size - 1) {
                 mSavedKeys.subList(mLevel, size).clear();
             }
+            updateFinishOnBackState();
         });
+        // Added after the FragmentManager's own back callback (set up in
+        // super.onCreate) so this one wins while enabled.
+        getOnBackPressedDispatcher().addCallback(this, mFinishOnBackAtRoot);
+        updateFinishOnBackState();
 
         String defaultPref = getKey(mLevel);
         if (defaultPref == null && mDualPaneMode) {
@@ -139,7 +158,20 @@ public class SettingsActivity extends BaseActivity implements PreferenceFragment
                 ((MainPreferences) fragment).setPrefKey(getKey(mLevel = 0));
                 Log.d(TAG, "Selected pref: %s", fragment.getClass().getName());
             }
+            updateFinishOnBackState();
         }
+    }
+
+    /**
+     * Fork: keep {@link #mFinishOnBackAtRoot} enabled exactly while the user is
+     * sitting on a page this activity was deep-linked straight into (a path was
+     * supplied, so the settings root was never a real destination), i.e. the
+     * sub-page is at the bottom of the back stack. Then Back exits to the caller
+     * rather than popping to the settings root.
+     */
+    private void updateFinishOnBackState() {
+        mFinishOnBackAtRoot.setEnabled(!mKeys.isEmpty()
+                && getSupportFragmentManager().getBackStackEntryCount() <= 1);
     }
 
     @Override
