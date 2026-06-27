@@ -654,7 +654,7 @@ if [[ "$ans" =~ ^[Yy]$ ]]; then
   echo -e "\033[1;36m>>> unzip -l \"\$UNSIGNED_APK\" | grep -E 'am\\.jar|main\\.jar'\033[0m"
   r bash -c "unzip -l \"$UNSIGNED_APK\" | grep -E 'am\\.jar|main\\.jar' || echo '  STILL NOT IN APK — commit 5 wiring is broken'"
 
-  read -p $'\033[1;33m>>> APK badging looks right, sign and deploy to phone? (y/n) \033[0m' ans2
+  read -p $'\033[1;33m>>> APK badging looks right, sign? (y/n) \033[0m' ans2
   if [[ "$ans2" =~ ^[Yy]$ ]]; then
     echo -e '\033[1;36m>>> zipalign -p -f 4 "$UNSIGNED_APK" /tmp/am-aligned.apk\033[0m'
     r zipalign -p -f 4 "$UNSIGNED_APK" /tmp/am-aligned.apk
@@ -668,11 +668,10 @@ if [[ "$ans" =~ ^[Yy]$ ]]; then
     echo -e "\033[1;36m>>> cp /tmp/am-signed.apk ~/tmp/$apk_name\033[0m"
     r cp /tmp/am-signed.apk ~/tmp/"$apk_name"
 
-    echo -e "\033[1;36m>>> adb push /tmp/am-signed.apk /sdcard/tmp/$apk_name\033[0m"
-    r adb push /tmp/am-signed.apk "/sdcard/tmp/$apk_name"
-
     echo -e "\033[1;36m>>> ls -lh ~/tmp/$apk_name\033[0m"
     r ls -lh ~/tmp/"$apk_name"
+
+    echo -e '\033[1;36m>>> Signed APK in ~/tmp/. Deliver with /after-build (adb-check UNSANDBOXED -> adb-push if the phone is connected, else scp to skhw). No prompt.\033[0m'
   else
     echo "Aborted before signing."
   fi
@@ -681,7 +680,7 @@ else
 fi
 ```
 
-Two gates: one before the clean+build (long), one after the APK is built and badging is shown (verify versionName/versionCode match expectations before signing+pushing). The `./gradlew clean` is always present — incremental builds have caused stale APKs that pass at the filename layer but fail at the manifest content layer (see "Recovery / lessons learned" below). On the rare iteration where you're certain the source hasn't changed since the last successful build and you just want a re-sign or re-push, you can drop `clean` manually.
+Two gates: one before the clean+build (long), one after the APK is built and badging is shown (verify versionName/versionCode match expectations before signing). Delivery is not gated — after signing, the APK lands in `~/tmp/` and is delivered automatically via `/after-build` (no prompt). The `./gradlew clean` is always present — incremental builds have caused stale APKs that pass at the filename layer but fail at the manifest content layer (see "Recovery / lessons learned" below). On the rare iteration where you're certain the source hasn't changed since the last successful build and you just want a re-sign or re-push, you can drop `clean` manually.
 
 Upstream's release build has **no `signingConfig`** (only `debug` has one, with a public dev keystore committed in-repo). So `assembleRelease` produces an unsigned APK and we sign post-build with `apksigner` — same pattern as SimpleX. No need to add a signingConfig to build.gradle.
 
@@ -689,7 +688,7 @@ First build with no NDK installed takes 15–30 minutes (NDK download + Gradle d
 
 ## Deploy
 
-**Always ask how to deliver, after every build (never automatic).** After every successful build, summarise what was built and ask 白い熊 **via the `AskUserQuestion` tool** how to deliver the signed APK, offering two options in this order: **scp to skhw** (the first / recommended choice → run the `scp` skill) and **adb push to the device** (`adb push /tmp/am-signed.apk /sdcard/tmp/<apk_name>`). The tool also offers "Other" (e.g. neither). Never deliver without asking, and never silently skip the question; deliver only the chosen way, only once 白い熊 answers. (The build itself — bump, assemble, sign, verify, copy to `~/tmp/` — still runs automatically; only the delivery waits on the answer.)
+**Always deliver automatically via `/after-build`, after every build (never ask).** After every successful build, summarise what was built, then invoke the global `/after-build` skill to deliver the signed APK: it runs `/adb-check` UNSANDBOXED, then `/adb-push` to `/sdcard/tmp/` if the phone is connected, else `/scp` to skhw, announcing the filename. Never prompt how to deliver and never prompt "is the phone connected?" — `/adb-check` decides phone-vs-skhw itself. (The build — bump, assemble, sign, verify, copy to `~/tmp/` — runs automatically as before; delivery now runs automatically too, no `AskUserQuestion`.)
 
 Build output goes to `~/tmp/shiroikuma-appmanager_<versionName>_arm64-v8a.apk` (where `versionName` = `<customBaseVersionName>+<customBuildNumber>`, e.g. `shiroikuma-appmanager_4.0.5+21_arm64-v8a.apk` — no datetime, no git sha; read `customBaseVersionName` and the post-bump `customBuildNumber` from `gradle.properties`) and is `adb push`ed to `/sdcard/tmp/` — the pipeline does **not** `adb install` anymore. Install on device via file manager from `/sdcard/tmp/`. Each `cp`/`adb` line in the pipeline is preceded by a bright-white (`\e[1;37m`) `>>>` echo showing the full command with complete source+destination paths. If `adb push` fails (no device connected, USB debugging off), the local `~/tmp/` copy is the fallback — transfer via KDE Connect, Bluetooth, file copy. The pipeline must also **abort if `git apply` fails** (the `r()` helper does not stop on error, so a failed apply otherwise silently builds the unpatched tree — this bit us once, producing a clean APK missing the just-added feature); gate the build behind an explicit apply check.
 
