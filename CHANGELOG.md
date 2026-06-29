@@ -6,6 +6,42 @@ All notable fork changes are recorded here. Versions use the fork's
 `customBaseVersionName+customBuildNumber` scheme (the base mirrors the upstream App Manager release
 this fork is built on).
 
+## 4.1.0+1 — 2026-06-29
+
+Rebased the entire fork onto upstream **App Manager 4.1.0** (the previous release was built on a
+4.0.5-development master snapshot). **Every fork feature listed under 4.0.5+124 below is carried
+forward unchanged** — this release is the fork rebuilt on the newer upstream, so it also picks up all
+of upstream's improvements since. The fork's 94-commit stack was re-anchored onto upstream's
+refactors — a `ListAdapter` / `DiffUtil` rewrite of the main list, a Material 3 rework of the settings
+screens, and a rewrite of the profile-filter pipeline — with no loss of functionality.
+
+### Upstream improvements you get with 4.1.0
+
+- **Main list** migrated to `ListAdapter` / `DiffUtil` for smoother, diff-based updates; fixes for
+  checking inactive apps under non-default users, filtering by a filter-based profile with a custom
+  expression, the on-screen-keyboard logic, RecyclerView position restore after filtering, and the
+  highlighting of filtered items; realtime search/filter is now debounced.
+- **Material 3 preference screens** across Settings (App info, Profile configurations, and the rest).
+- **Privileged server**: `run_server` is now a native executable and `main.jar` is copied via it; ADB
+  connections use **HMAC-based mutual challenge-response authentication**, and agent mode inserts the
+  password just once.
+- **Scanner**: the Pithus scanner and its pinned certificates were removed.
+- **Log viewer** scrolling/filtering fixes; **Finder / Debloater** navigation fixes; Debloater now
+  lists uninstalled system apps; the **code editor** no longer crops symbols at large system font sizes.
+- Hidden API updated from **Android 16**; assorted NPE / crash fixes (path parsing, `AppDb#findUsage`,
+  APKS compiling, external cache creation in root mode); many translation updates.
+- Upstream version bumped to **4.1.0** (versionCode 450) — the fork's `versionCode` is now
+  `4500000 + buildNumber` (this build: `4500001`).
+
+### Fork tooling
+
+- New **`/upstream-new-version`** skill — one-command upstream sync: fetch-first detection against
+  `upstream/master`, a pre-rebase summary to approve, a rebase that carefully re-implements every fork
+  feature (stopping for approval on anything lossy or uncertain), the `+1` build-counter reset on a
+  base bump, then build and deliver.
+- Builds now **auto-deliver via `/after-build`** (adb-push to the phone if connected, else scp to the
+  remote) instead of prompting how to deliver.
+
 ## 4.0.5+124 — 2026-06-21
 
 First public release of **白い熊 応用管理**, 白い熊's downstream-renamed fork of
