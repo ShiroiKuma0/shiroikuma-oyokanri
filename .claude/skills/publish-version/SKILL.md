@@ -9,7 +9,7 @@ Ship the **latest already-built** APK as a GitHub release, with a polished fork-
 exhaustive CHANGELOG, landing the repo homepage on our fork work (`custom`).
 
 This is **shiroikuma-oyokanri** — 白い熊's downstream-renamed fork of
-[AppManager](https://github.com/MuntashirAkon/AppManager) (upstream base **4.0.5**), package
+[AppManager](https://github.com/MuntashirAkon/AppManager) (upstream base **4.1.0**), package
 `shiroikuma.oyokanri`, label **白い熊 応用管理**, installable side-by-side with the official
 `io.github.muntashirakon.AppManager` from F-Droid. The build / sign / deploy facts live in the
 **`appmanager-fork`** and **`build`** skills — this skill is **only** about cutting a GitHub release of
