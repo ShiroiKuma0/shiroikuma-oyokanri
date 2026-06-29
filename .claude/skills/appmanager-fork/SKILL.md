@@ -22,7 +22,7 @@ The user maintains a downstream-patched build of [AppManager](https://github.com
 | Java/Kotlin namespace (unchanged) | `io.github.muntashirakon.AppManager` |
 | Custom signing keystore | `~/.android-keystores/appmanager-custom.jks` (alias `appmanager`, passphrase `appmanager123`) |
 | Output APK directory | `~/tmp/` |
-| Output APK name | `shiroikuma-oyokanri_<versionName>_arm64-v8a.apk` where versionName is `<customBaseVersionName>+<customBuildNumber>`, e.g. `shiroikuma-oyokanri_4.0.5+21_arm64-v8a.apk` (renamed from the former `shiroikuma-appmanager_…`). No datetime, no git sha. |
+| Output APK name | `shiroikuma-oyokanri_<versionName>_arm64-v8a.apk` where versionName is `<customBaseVersionName>+<customBuildNumber>`, e.g. `shiroikuma-oyokanri_4.1.0+1_arm64-v8a.apk` (renamed from the former `shiroikuma-appmanager_…`). No datetime, no git sha. |
 | On-device deploy path | `/sdcard/tmp/` |
 | Build host | Tuxedo OS |
 | Target ABI | `arm64-v8a` only (skip `armeabi-v7a`, `x86`, `x86_64`; `universalApk false`) |
@@ -305,14 +305,14 @@ Ten files. Two logically distinct features bundled into one commit because they 
 
 ### Versioning system
 
-Adds a custom build-number suffix that appears in both `versionName` (`4.0.5+N`) and `versionCode` (4450000+N) so each rebuild is identifiable and registered by Android's update-detection as an upgrade over the previous custom build.
+Adds a custom build-number suffix that appears in both `versionName` (`4.1.0+N`) and `versionCode` (4500000+N) so each rebuild is identifiable and registered by Android's update-detection as an upgrade over the previous custom build.
 
 **`gradle.properties` additions:**
 
 ```properties
 customBuildNumber=1
-customBaseVersionName=4.0.5
-customBaseVersionCode=445
+customBaseVersionName=4.1.0
+customBaseVersionCode=450
 ```
 
 `customBuildNumber` advances on every dev build via `tools/bump-build.sh`. `customBaseVersion*` mirror the current upstream `defaultConfig` values — update them by hand when adopting a new upstream base (e.g. when MuntashirAkon ships 4.0.6 / versionCode 446).

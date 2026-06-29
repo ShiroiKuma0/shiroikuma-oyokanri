@@ -8,7 +8,7 @@ consult that for the "why" behind anything in here.
 
 ## Project
 
-- Fork of [AppManager](https://github.com/MuntashirAkon/AppManager) (upstream base **4.0.5**, minSdk 21, AGP 8.13.2).
+- Fork of [AppManager](https://github.com/MuntashirAkon/AppManager) (upstream base **4.1.0**, minSdk 21, AGP 8.13.2).
 - `applicationId`: `shiroikuma.oyokanri` (installs side-by-side with the official build; renamed from the former `shiroikuma.appmanager`, so it is a fresh install rather than an update).
 - Java package (unchanged from upstream): `io.github.muntashirakon.AppManager`.
 - Display label: 白い熊 応用管理.
