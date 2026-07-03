@@ -14,7 +14,7 @@ profile**, a from-scratch **process monitor / reaper**, a **pausable batch-op di
 **main-list quick actions**, readable **per-app backups**, and the **AM Debug** toolset unlocked in a
 normal release build.
 
-**📥 Latest release: [`4.1.0+1`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+2`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
 </div>
 
