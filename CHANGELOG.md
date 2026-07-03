@@ -6,6 +6,33 @@ All notable fork changes are recorded here. Versions use the fork's
 `customBaseVersionName+customBuildNumber` scheme (the base mirrors the upstream App Manager release
 this fork is built on).
 
+## 4.1.0+2 — 2026-07-03
+
+A **rolling upstream sync** on top of 4.1.0+1: the fork's 97-commit stack was rebased onto the latest
+upstream App Manager master (`fc1e70074`, three commits past the 4.1.0+1 base). **No fork feature
+changed** — every customization is carried forward unchanged — but the build absorbs three upstream
+commits and re-implements the fork's server-JAR handling on top of upstream's reworked build pipeline.
+
+### Upstream improvements you get
+
+- **Android 17 support** — fixes retrieving the installed-application list on Android 17 (new
+  `IPackageManagerV37` / `PackageInfoList` hidden-API shims and a `PackageManagerCompat` branch).
+- **Reworked `am.jar` / `main.jar` creation** — upstream rebuilt the server-JAR build task with proper
+  Gradle input/output wiring, provider-based class directories, per-variant output, and a cleaner `d8`
+  invocation (`--min-api` / `--lib`, deterministic sorted inputs).
+- **Native build** — consistent C compiler and linker flags across ABIs.
+
+### Fork re-implementation notes
+
+- The fork's two server-JAR guards were **re-layered onto upstream's new task**: the
+  configuration-cache-safe capture of SDK / build-tool / class-directory references (upstream reads
+  them at execution time, which the fork's enabled configuration cache forbids), and the **atomic
+  temp-then-move** of each JAR into `assets/` that stops a racing `mergeAssets` from packaging a 0-byte
+  JAR (the ADB-mode landmine). The fork's single `tasks.matching` merge-ordering edge is kept as the
+  source of truth; upstream's parallel `applicationVariants` edge was dropped as redundant.
+- Build counter advanced to **`+2`** (versionCode `4500002`) so it installs over `4.1.0+1` as an
+  upgrade.
+
 ## 4.1.0+1 — 2026-06-29
 
 Rebased the entire fork onto upstream **App Manager 4.1.0** (the previous release was built on a
