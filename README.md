@@ -14,7 +14,7 @@ profile**, a from-scratch **process monitor / reaper**, a **pausable batch-op di
 **main-list quick actions**, readable **per-app backups**, and the **AM Debug** toolset unlocked in a
 normal release build.
 
-**📥 Latest release: [`4.1.0+2`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+3`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
 </div>
 
@@ -104,8 +104,10 @@ The app list does more without a trip into details:
   directory** option that points the engine at a fast filesystem path (bypassing slow SAF volumes).
 - Inline backup details in the main list (version / date / time), with **tap = new backup** and
   **long-press = restore/delete**, and a tap-to-back-up affordance for apps that have none.
-- **Settings export/import** that bundles App Manager's settings together with the fork's profiles,
-  colours and fonts, so a new install comes up looking and behaving exactly like the old one.
+- **Category-based settings Export/Import** at the top of the UI page: pick a directory once, see the
+  latest export at a glance, then export or restore any mix of six categories (general settings,
+  colours & fonts, monitor, toolbar & filters, notes, profiles) — so a new install comes up looking
+  and behaving exactly like the old one.
 
 ## 🔧 AM Debug features in a release build
 
