@@ -14,12 +14,12 @@
     android:layout_marginTop="16dp">
 
     <!-- Sub-heading with a text-width underline (wrap_content wrapper, so
-         the match_parent rule below spans only the text). Level-2 indent:
-         32dp; each lower level doubles (controls below sit at 64dp). -->
+         the match_parent rule below spans only the text). kxkb ladder:
+         sub-heading 54dp, controls below at 72dp. -->
     <androidx.appcompat.widget.LinearLayoutCompat
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="32dp"
+        android:layout_marginStart="54dp"
         android:orientation="vertical">
 
         <androidx.appcompat.widget.AppCompatTextView
@@ -28,13 +28,13 @@
             android:layout_height="wrap_content"
             android:textColor="@color/theme_bright_yellow"
             android:textStyle="bold"
-            android:textSize="18sp"
+            android:textSize="17sp"
             tools:text="Article text" />
 
         <View
             android:layout_width="match_parent"
-            android:layout_height="2dp"
-            android:layout_marginTop="3dp"
+            android:layout_height="1.5dp"
+            android:layout_marginTop="2dp"
             android:background="@color/theme_bright_yellow" />
 
     </androidx.appcompat.widget.LinearLayoutCompat>
@@ -45,8 +45,8 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:layout_marginTop="8dp"
-        android:paddingStart="64dp"
-        android:paddingEnd="0dp">
+        android:paddingStart="72dp"
+        android:paddingEnd="16dp">
 
         <androidx.appcompat.widget.LinearLayoutCompat
             android:id="@+id/font_controls"

@@ -4,8 +4,8 @@
     Fork: one row of the main-list colour/style legend on the 白い熊 応用管理 UI
     page. A fixed-width "sample" chip (styled in code to mirror the real list —
     coloured text, a stroked box, or a shaded background) followed by a plain
-    description of what that styling signifies. Indented to 32dp like the other
-    level-2 elements.
+    description of what that styling signifies. Indented to 72dp (kxkb
+    ladder: rows under a 54dp sub-heading).
 -->
 <androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
@@ -14,8 +14,8 @@
     android:orientation="horizontal"
     android:gravity="center_vertical"
     android:layout_marginTop="8dp"
-    android:paddingStart="32dp"
-    android:paddingEnd="8dp">
+    android:paddingStart="72dp"
+    android:paddingEnd="16dp">
 
     <androidx.appcompat.widget.AppCompatTextView
         android:id="@+id/legend_sample"

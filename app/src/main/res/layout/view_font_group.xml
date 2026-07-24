@@ -1,32 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!--
-    A font-settings group: a bold header with a full-width underline rule
-    beneath it (HandyRSS treatment), then the element views added into
-    group_content at runtime.
+    A settings section (kxkb treatment): a FULL-WIDTH 1px yellow hairline
+    separating this section from the previous one (hidden on the first
+    section by FontsPreferences), then a big bold yellow heading with a
+    TEXT-WIDTH yellow underline. The underline is a match_parent View inside
+    a wrap_content vertical LinearLayout, so it sizes to the text, not the
+    screen. Section content is added into group_content at runtime.
+    Indent ladder (kxkb): heading 36dp, sub-heading 54dp, controls 72dp.
 -->
 <androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:layout_marginTop="20dp"
-    android:layout_marginBottom="6dp">
-
-    <androidx.appcompat.widget.AppCompatTextView
-        android:id="@+id/group_header"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:textColor="@color/theme_bright_yellow"
-        android:textStyle="bold"
-        android:textSize="22sp"
-        tools:text="Reading view" />
+    android:paddingTop="10dp"
+    android:paddingBottom="2dp">
 
     <View
+        android:id="@+id/group_hairline"
         android:layout_width="match_parent"
-        android:layout_height="2dp"
-        android:layout_marginTop="4dp"
+        android:layout_height="1px"
         android:background="@color/theme_bright_yellow" />
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="36dp"
+        android:paddingEnd="0dp"
+        android:paddingTop="8dp">
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/group_header"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/theme_bright_yellow"
+            android:textStyle="bold"
+            android:textSize="20sp"
+            tools:text="Reading view" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="2.5dp"
+            android:layout_marginTop="2dp"
+            android:background="@color/theme_bright_yellow" />
+
+    </androidx.appcompat.widget.LinearLayoutCompat>
 
     <androidx.appcompat.widget.LinearLayoutCompat
         android:id="@+id/group_content"
