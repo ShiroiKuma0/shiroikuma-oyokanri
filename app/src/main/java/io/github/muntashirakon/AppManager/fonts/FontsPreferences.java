@@ -46,6 +46,9 @@ import java.util.Locale;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.processreaper.MonitorPrefs;
 import io.github.muntashirakon.AppManager.processreaper.MonitorSeparatorPrefs;
+import io.github.muntashirakon.AppManager.settings.Prefs;
+import io.github.muntashirakon.AppManager.settings.SettingsExportImportPanel;
+import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 
 /**
  * Settings → Appearance → Fonts. Lets each text surface pick family, weight
@@ -294,6 +297,75 @@ public class FontsPreferences extends Fragment {
         LinearLayoutCompat legendContent = legendGroup.findViewById(R.id.group_content);
         buildLegend(inflater, legendContent);
         container.addView(legendGroup, 0);
+        // Fork: Export/Import — the FIRST separated section of the page
+        // (Kōjiki flow): heading + one tappable row that opens the category
+        // panel; the row summary shows the directory and the latest export.
+        View eimGroup = inflater.inflate(R.layout.view_font_group, container, false);
+        ((AppCompatTextView) eimGroup.findViewById(R.id.group_header)).setText(R.string.settings_eim_title);
+        LinearLayoutCompat eimContent = eimGroup.findViewById(R.id.group_content);
+        eimContent.addView(buildEimRow());
+        container.addView(eimGroup, 0);
+        // kxkb rhythm: every section except the first is preceded by a
+        // full-width 1px hairline (part of view_font_group; hidden on the
+        // first section so the page starts flush).
+        for (int i = 0; i < container.getChildCount(); i++) {
+            View hairline = container.getChildAt(i).findViewById(R.id.group_hairline);
+            if (hairline != null) hairline.setVisibility(i == 0 ? View.GONE : View.VISIBLE);
+        }
+    }
+
+    /**
+     * Fork: the Export/Import row (kxkb item style: 16sp title over a 13sp dim
+     * summary, 72dp indent, ripple). Tapping opens the category panel; the
+     * summary is re-queried from the export directory on every page open and
+     * whenever the panel closes.
+     */
+    @NonNull
+    private View buildEimRow() {
+        final float density = getResources().getDisplayMetrics().density;
+        LinearLayoutCompat row = new LinearLayoutCompat(requireContext());
+        row.setOrientation(LinearLayoutCompat.VERTICAL);
+        row.setPaddingRelative(Math.round(72 * density), Math.round(5 * density),
+                Math.round(16 * density), Math.round(5 * density));
+        TypedValue ripple = new TypedValue();
+        requireContext().getTheme().resolveAttribute(android.R.attr.selectableItemBackground, ripple, true);
+        row.setBackgroundResource(ripple.resourceId);
+        row.setClickable(true);
+        row.setFocusable(true);
+
+        AppCompatTextView title = new AppCompatTextView(requireContext());
+        title.setText(R.string.settings_eim_title);
+        title.setTextColor(ContextCompat.getColor(requireContext(), R.color.theme_bright_yellow));
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        row.addView(title);
+        AppCompatTextView summary = new AppCompatTextView(requireContext());
+        summary.setTextColor(0xFFC8C800);
+        summary.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        summary.setText(R.string.settings_eim_desc);
+        row.addView(summary);
+        refreshEimSummary(summary);
+
+        row.setOnClickListener(v -> SettingsExportImportPanel.show(requireActivity(),
+                () -> refreshEimSummary(summary),
+                () -> requireActivity().getOnBackPressedDispatcher().onBackPressed()));
+        return row;
+    }
+
+    /** Query the export directory for the latest export off the UI thread. */
+    private void refreshEimSummary(@NonNull AppCompatTextView summary) {
+        final Context appContext = requireContext().getApplicationContext();
+        ThreadUtils.postOnBackgroundThread(() -> {
+            String dir = Prefs.Storage.getSettingsExportDirectory();
+            androidx.core.util.Pair<String, Boolean> status =
+                    SettingsExportImportPanel.lastExportStatus(appContext);
+            String text = dir.isEmpty() ? status.first : dir + "\n" + status.first;
+            boolean warn = Boolean.TRUE.equals(status.second);
+            ThreadUtils.postOnMainThread(() -> {
+                if (!isAdded()) return;
+                summary.setText(text);
+                summary.setTextColor(warn ? 0xFFFF5252 : 0xFFC8C800);
+            });
+        });
     }
 
     /** Fork: applies the sample-chip styling for one legend row. */
@@ -357,18 +429,34 @@ public class FontsPreferences extends Fragment {
                 tv -> tv.setTextColor(ColorPrefs.getColor(ctx, ColorPrefs.FREEZE_THAWED)));
     }
 
+    /**
+     * kxkb sub-heading: 17sp bold yellow with a 1.5dp TEXT-WIDTH underline
+     * (match_parent View inside a wrap_content vertical box), at the 54dp
+     * sub-heading indent.
+     */
     private void addLegendHeader(@NonNull LinearLayoutCompat content, int textRes, float density) {
+        int yellow = ContextCompat.getColor(requireContext(), R.color.theme_bright_yellow);
         AppCompatTextView h = new AppCompatTextView(requireContext());
         h.setText(textRes);
-        h.setTextColor(ContextCompat.getColor(requireContext(), R.color.theme_bright_yellow));
+        h.setTextColor(yellow);
         h.setTypeface(h.getTypeface(), Typeface.BOLD);
-        h.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        h.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
+        View underline = new View(requireContext());
+        LinearLayoutCompat.LayoutParams ulp = new LinearLayoutCompat.LayoutParams(
+                LinearLayoutCompat.LayoutParams.MATCH_PARENT, Math.round(1.5f * density));
+        ulp.topMargin = Math.round(2 * density);
+        underline.setLayoutParams(ulp);
+        underline.setBackgroundColor(yellow);
+        LinearLayoutCompat box = new LinearLayoutCompat(requireContext());
+        box.setOrientation(LinearLayoutCompat.VERTICAL);
         LinearLayoutCompat.LayoutParams lp = new LinearLayoutCompat.LayoutParams(
                 LinearLayoutCompat.LayoutParams.WRAP_CONTENT, LinearLayoutCompat.LayoutParams.WRAP_CONTENT);
-        lp.topMargin = Math.round(14 * density);
-        lp.setMarginStart(Math.round(16 * density));
-        h.setLayoutParams(lp);
-        content.addView(h);
+        lp.topMargin = Math.round(10 * density);
+        lp.setMarginStart(Math.round(54 * density));
+        box.setLayoutParams(lp);
+        box.addView(h);
+        box.addView(underline);
+        content.addView(box);
     }
 
     private void addLegendRow(@NonNull LayoutInflater inflater, @NonNull LinearLayoutCompat parent,

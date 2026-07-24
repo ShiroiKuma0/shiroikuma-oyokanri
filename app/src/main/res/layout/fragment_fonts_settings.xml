@@ -10,12 +10,14 @@
     android:layout_height="match_parent"
     android:fillViewport="true">
 
+    <!-- No horizontal padding: the kxkb section hairlines must run
+         edge-to-edge; all indents live inside the section layouts. -->
     <androidx.appcompat.widget.LinearLayoutCompat
         android:id="@+id/fonts_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingHorizontal="12dp"
-        android:paddingVertical="8dp" />
+        android:paddingTop="8dp"
+        android:paddingBottom="24dp" />
 
 </ScrollView>

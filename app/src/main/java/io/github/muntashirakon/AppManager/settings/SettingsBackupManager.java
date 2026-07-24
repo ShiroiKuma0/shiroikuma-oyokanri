@@ -16,12 +16,18 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
+import androidx.annotation.StringRes;
+
+import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.io.Path;
 
 /**
@@ -53,16 +59,67 @@ public final class SettingsBackupManager {
     private static final String FONTS_DIR = "fonts";
     private static final FileFilter XML_FILTER = f -> f.isFile() && f.getName().endsWith(".xml");
 
+    /**
+     * A selectable export/import category (Kōjiki flow). The zip layout is
+     * unchanged ({@code shared_prefs/} + {@code profiles/} + {@code fonts/}),
+     * so archives made before categories existed still import — every entry
+     * is classified by {@link #classify} on both export and import, and only
+     * entries whose category is selected pass the filter.
+     */
+    public enum Category {
+        GENERAL(R.string.settings_eim_cat_general),
+        APPEARANCE(R.string.settings_eim_cat_appearance),
+        MONITOR(R.string.settings_eim_cat_monitor),
+        TOOLBAR(R.string.settings_eim_cat_toolbar),
+        NOTES(R.string.settings_eim_cat_notes),
+        PROFILES(R.string.settings_eim_cat_profiles);
+
+        @StringRes
+        public final int labelRes;
+
+        Category(@StringRes int labelRes) {
+            this.labelRes = labelRes;
+        }
+    }
+
+    // Shared-prefs stores per category; anything unlisted falls into GENERAL
+    // (the main "preferences" store, backup dirs/options, and any future
+    // prefs file we forget to classify — better over-carried than dropped).
+    private static final Set<String> APPEARANCE_PREFS = new HashSet<>(Arrays.asList(
+            "shiroikuma_colors", "shiroikuma_fonts", "shiroikuma_main_icon",
+            "shiroikuma_main_layout", "shiroikuma_selection_frame",
+            "shiroikuma_separators", "shiroikuma_running_box"));
+    private static final Set<String> MONITOR_PREFS = new HashSet<>(Arrays.asList(
+            "shiroikuma_monitor", "shiroikuma_monitor_sep", "shiroikuma_reaper"));
+    private static final Set<String> TOOLBAR_PREFS = new HashSet<>(Arrays.asList(
+            "am_main_toolbar", "am_main_page_profile_filter"));
+    private static final String NOTES_PREFS = "shiroikuma_notes";
+
+    /** Category of one zip-entry name (also used to gate what export writes). */
+    @NonNull
+    private static Category classify(@NonNull String entryName) {
+        if (entryName.startsWith(PROFILES_DIR + "/")) return Category.PROFILES;
+        if (entryName.startsWith(FONTS_DIR + "/")) return Category.APPEARANCE;
+        String base = entryName.startsWith(SP_DIR + "/") ? entryName.substring(SP_DIR.length() + 1) : entryName;
+        if (base.endsWith(".xml")) base = base.substring(0, base.length() - 4);
+        if (APPEARANCE_PREFS.contains(base)) return Category.APPEARANCE;
+        if (MONITOR_PREFS.contains(base)) return Category.MONITOR;
+        if (TOOLBAR_PREFS.contains(base)) return Category.TOOLBAR;
+        if (NOTES_PREFS.equals(base)) return Category.NOTES;
+        return Category.GENERAL;
+    }
+
     private SettingsBackupManager() {
     }
 
     /**
-     * Zip the current settings into {@code destDir}.
+     * Zip the selected categories of the current settings into {@code destDir}.
      *
      * @return the display name of the created archive.
      */
     @NonNull
-    public static String export(@NonNull Context context, @NonNull Path destDir) throws IOException {
+    public static String export(@NonNull Context context, @NonNull Path destDir,
+                                @NonNull Set<Category> categories) throws IOException {
         String ts = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.ROOT).format(new Date());
         String fileName = EXPORT_PREFIX + ts + EXPORT_EXT;
         // The name already carries the .zip extension, so pass a null mime
@@ -76,19 +133,26 @@ public final class SettingsBackupManager {
             File[] prefFiles = sharedPrefs.isDirectory() ? sharedPrefs.listFiles(XML_FILTER) : null;
             if (prefFiles != null) {
                 for (File f : prefFiles) {
-                    addEntry(zos, f, SP_DIR + "/" + f.getName());
+                    String entry = SP_DIR + "/" + f.getName();
+                    if (categories.contains(classify(entry))) {
+                        addEntry(zos, f, entry);
+                    }
                 }
             }
-            File[] profileFiles = profiles.isDirectory() ? profiles.listFiles(File::isFile) : null;
-            if (profileFiles != null) {
-                for (File f : profileFiles) {
-                    addEntry(zos, f, PROFILES_DIR + "/" + f.getName());
+            if (categories.contains(Category.PROFILES)) {
+                File[] profileFiles = profiles.isDirectory() ? profiles.listFiles(File::isFile) : null;
+                if (profileFiles != null) {
+                    for (File f : profileFiles) {
+                        addEntry(zos, f, PROFILES_DIR + "/" + f.getName());
+                    }
                 }
             }
-            File[] fontFiles = fonts.isDirectory() ? fonts.listFiles(File::isFile) : null;
-            if (fontFiles != null) {
-                for (File f : fontFiles) {
-                    addEntry(zos, f, FONTS_DIR + "/" + f.getName());
+            if (categories.contains(Category.APPEARANCE)) {
+                File[] fontFiles = fonts.isDirectory() ? fonts.listFiles(File::isFile) : null;
+                if (fontFiles != null) {
+                    for (File f : fontFiles) {
+                        addEntry(zos, f, FONTS_DIR + "/" + f.getName());
+                    }
                 }
             }
         }
@@ -96,13 +160,14 @@ public final class SettingsBackupManager {
     }
 
     /**
-     * Restore settings from a previously exported archive. Only rewrites the
-     * on-disk files; the caller must restart the process for the changes to
-     * take effect.
+     * Restore the selected categories from a previously exported archive.
+     * Only rewrites the on-disk files; the caller must restart the process
+     * for the changes to take effect.
      *
      * @return the number of files restored.
      */
-    public static int importFrom(@NonNull Context context, @NonNull Path zipFile) throws IOException {
+    public static int importFrom(@NonNull Context context, @NonNull Path zipFile,
+                                 @NonNull Set<Category> categories) throws IOException {
         File sharedPrefs = new File(context.getApplicationInfo().dataDir, SP_DIR);
         File profiles = new File(context.getFilesDir(), PROFILES_DIR);
         File fonts = new File(context.getFilesDir(), FONTS_DIR);
@@ -120,6 +185,9 @@ public final class SettingsBackupManager {
                     continue;
                 }
                 String name = entry.getName();
+                if (!categories.contains(classify(name))) {
+                    continue;
+                }
                 File target = null;
                 if (name.startsWith(SP_DIR + "/")) {
                     String base = safeBaseName(name.substring(SP_DIR.length() + 1));
