@@ -6,6 +6,51 @@ All notable fork changes are recorded here. Versions use the fork's
 `customBaseVersionName+customBuildNumber` scheme (the base mirrors the upstream App Manager release
 this fork is built on).
 
+## 4.1.0+3 — 2026-07-25
+
+A fork-feature release: the settings Export/Import is rebuilt as a **category-based panel at the top
+of the 白い熊 応用管理 UI page**, the UI page itself is restyled to the kxkb section idiom, and popup
+menus gain the yellow frame.
+
+### Settings Export/Import — category-based, on the UI page
+
+- **Moved** from Settings → Backup/restore (the "Settings export / import" category there is gone) to
+  a new **Export / Import section at the very top of the 白い熊 応用管理 UI page**: a heading plus one
+  tappable row whose summary is **re-queried on every page open** — the export directory and
+  "Last export: <timestamp>" of the newest export archive (warn-red when no directory is set or the
+  directory has no exports yet).
+- The row opens a bordered black/yellow **Export/Import panel**: a tappable **export-directory box**
+  (built-in filesystem browser, no SAF), the last-export line, a **Select all** master checkbox over
+  **six categories** — General settings · UI colours, fonts & layout · Process monitor & reaper ·
+  Toolbar & filters · App notes · Profiles — and a pill button row with **Cancel alone on the left**
+  and **Import / Export on the right** (black pills, yellow outline and ripple).
+- One checklist drives both directions: **Export** zips only the ticked categories; **Import** applies
+  only the ticked categories a chosen archive contains. Every zip entry is classified by prefs-file
+  name; unrecognized files fall into *General settings*, so nothing is ever silently dropped. The
+  archive layout is unchanged, so **exports made before categories existed still import**.
+- **Success dialogs with a yellow border**: "✓ Export finished" (OK) and "✓ Import finished"
+  (Later / Restart now). Acknowledging (OK, or Later on import) **auto-closes the whole chain** —
+  the info dialog, the Export/Import panel beneath it, and the UI settings page itself. **Restart
+  now** hard-restarts the process (SIGKILL, so cached SharedPreferences can't clobber the imported
+  files). Failures ("Export failed…", "No categories selected.") are toasts and **leave the panel
+  open**.
+- The minimal directory browser was extracted into a shared, **yellow-bordered** chooser dialog, also
+  used by the Backup-directory preference.
+
+### UI page — kxkb restyle
+
+- The whole 白い熊 応用管理 UI page now follows the kxkb section idiom: section headings 20 sp bold with
+  a **text-width** 2.5 dp yellow underline, sub-headings 17 sp with a 1.5 dp text-width underline,
+  and sections separated by **full-bleed 1 px yellow hairlines** (none above the first section).
+- Indent ladder standardized to **36 dp headings / 54 dp sub-headings / 72 dp controls & rows**; the
+  legend headers get the same underlined sub-heading treatment; the page container's horizontal
+  padding was removed so the hairlines run edge-to-edge.
+
+### Theming
+
+- **Popup menus** (the toolbar overflow menu and every other popup) now draw with a **2 dp yellow
+  border** on their black rounded background, so they read as panels against the equally-black screen.
+
 ## 4.1.0+2 — 2026-07-03
 
 A **rolling upstream sync** on top of 4.1.0+1: the fork's 97-commit stack was rebased onto the latest
