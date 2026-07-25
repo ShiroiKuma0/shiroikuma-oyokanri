@@ -870,7 +870,18 @@
     <string name="settings_no_exports_found">No settings exports found in the selected directory.</string>
     <string name="settings_importing">Importing settings…</string>
     <string name="settings_import_empty">No settings found in the selected file.</string>
-    <string name="settings_import_failed">Settings import failed: %1$s</string>    <string name="no_volumes_found">Could not find any volumes with write permission.</string>
+    <string name="settings_import_failed">Settings import failed: %1$s</string>
+    <!-- Fork: automation export (保存復元 contract) — rows inside the Export/Import section. -->
+    <string name="settings_automation_switch">Automation export</string>
+    <string name="settings_automation_switch_desc">Let sister-app tasks trigger this app\'s export headlessly, via a token-gated intent. Off by default.</string>
+    <string name="settings_automation_token">Automation token</string>
+    <string name="settings_automation_token_desc">Tap to copy the full token to the clipboard.</string>
+    <string name="settings_automation_token_copied">Automation token copied.</string>
+    <string name="settings_automation_regenerate">Regenerate</string>
+    <string name="settings_automation_regenerate_title">Regenerate the automation token?</string>
+    <string name="settings_automation_regenerate_msg">The current token stops working immediately. Every place it has been pasted — 自由作業盤\'s 「保存復元の設定」 above all — must be updated with the new one.</string>
+    <string name="settings_automation_regenerated">New automation token generated.</string>
+    <string name="no_volumes_found">Could not find any volumes with write permission.</string>
     <string name="unencrypted">Unencrypted</string>
     <string name="encrypted">Encrypted</string>
     <string name="bootloader">Bootloader</string>
