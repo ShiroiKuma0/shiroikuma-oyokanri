@@ -11,10 +11,10 @@
 A fork of [AppManager](https://github.com/MuntashirAkon/AppManager) with **major additions**: a
 configurable **yellow-on-black UI** with a deep customization page, a hard-blocking **protected
 profile**, a from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-tap
-**main-list quick actions**, readable **per-app backups**, and the **AM Debug** toolset unlocked in a
-normal release build.
+**main-list quick actions**, readable **per-app backups**, a **remote-triggerable settings export**,
+and the **AM Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+3`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+5`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
 </div>
 
@@ -108,6 +108,14 @@ The app list does more without a trip into details:
   latest export at a glance, then export or restore any mix of six categories (general settings,
   colours & fonts, monitor, toolbar & filters, notes, profiles) — so a new install comes up looking
   and behaving exactly like the old one.
+
+## 🤖 Remote-triggerable export
+
+The same export runs **headlessly** on request, so an automation app can back this app up without any
+UI: a token-gated broadcast lists the exportable categories, then writes **exactly one** archive to a
+requested directory and reports back its real path and byte size. Progress arrives as **real counts,
+never a percentage**. The gate is an **Automation export** switch — **off by default** — plus a
+24-byte token that is compared constant-time and deliberately kept **out of every backup archive**.
 
 ## 🔧 AM Debug features in a release build
 
