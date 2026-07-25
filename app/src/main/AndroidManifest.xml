@@ -1640,6 +1640,17 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+        <!-- Fork: the 保存復元 state-export automation contract (白い熊 自由作業盤
+             fires these at every sister app). No android:permission — the
+             caller cannot hold one; the automation token is the gate. -->
+        <receiver
+            android:name=".settings.StateExportReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="${applicationId}.action.EXPORT_STATE" />
+                <action android:name="${applicationId}.action.LIST_CATEGORIES" />
+            </intent-filter>
+        </receiver>
 
         <provider
             android:name=".fm.FmProvider"

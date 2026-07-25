@@ -107,8 +107,11 @@ public final class SettingsExportImportPanel {
             for (Path p : all) {
                 if (p.isDirectory()) continue;
                 String name = p.getName();
+                // Accept the legacy prefix too, so archives written before the
+                // family naming convention stay recognised as "last export".
                 if (!name.startsWith(SettingsBackupManager.EXPORT_PREFIX)
-                        || !name.endsWith(SettingsBackupManager.EXPORT_EXT)) continue;
+                        && !name.startsWith(SettingsBackupManager.LEGACY_EXPORT_PREFIX)) continue;
+                if (!name.endsWith(SettingsBackupManager.EXPORT_EXT)) continue;
                 if (newest == null || p.lastModified() > newest.lastModified()) newest = p;
             }
         }

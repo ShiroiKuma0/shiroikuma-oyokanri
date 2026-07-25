@@ -3,6 +3,7 @@
 package io.github.muntashirakon.AppManager.fonts;
 
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -27,6 +28,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
 import androidx.appcompat.widget.AppCompatSeekBar;
 import androidx.appcompat.widget.AppCompatTextView;
 import androidx.appcompat.widget.LinearLayoutCompat;
@@ -35,6 +37,7 @@ import androidx.core.graphics.ColorUtils;
 import androidx.fragment.app.Fragment;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.materialswitch.MaterialSwitch;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -46,8 +49,10 @@ import java.util.Locale;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.processreaper.MonitorPrefs;
 import io.github.muntashirakon.AppManager.processreaper.MonitorSeparatorPrefs;
+import io.github.muntashirakon.AppManager.settings.AutomationAuth;
 import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.settings.SettingsExportImportPanel;
+import io.github.muntashirakon.AppManager.utils.ClipboardUtils;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 
 /**
@@ -304,6 +309,12 @@ public class FontsPreferences extends Fragment {
         ((AppCompatTextView) eimGroup.findViewById(R.id.group_header)).setText(R.string.settings_eim_title);
         LinearLayoutCompat eimContent = eimGroup.findViewById(R.id.group_content);
         eimContent.addView(buildEimRow());
+        // Fork: the 保存復元 automation contract's two rows live INSIDE this
+        // section, directly below the Export/Import row — automation is a
+        // backup feature, so it belongs where backup lives (never a section
+        // of its own; every sister app looks the same here).
+        eimContent.addView(buildAutomationSwitchRow());
+        eimContent.addView(buildAutomationTokenRow());
         container.addView(eimGroup, 0);
         // kxkb rhythm: every section except the first is preceded by a
         // full-width 1px hairline (part of view_font_group; hidden on the
@@ -348,6 +359,128 @@ public class FontsPreferences extends Fragment {
         row.setOnClickListener(v -> SettingsExportImportPanel.show(requireActivity(),
                 () -> refreshEimSummary(summary),
                 () -> requireActivity().getOnBackPressedDispatcher().onBackPressed()));
+        return row;
+    }
+
+    /**
+     * Fork: an Export/Import section row in the kxkb item style — a vertical
+     * text block (16sp title over a 13sp dim summary, 72dp indent, ripple)
+     * with room for a trailing control.
+     */
+    @NonNull
+    private LinearLayoutCompat automationRow(@NonNull LinearLayoutCompat texts) {
+        final float density = getResources().getDisplayMetrics().density;
+        LinearLayoutCompat row = new LinearLayoutCompat(requireContext());
+        row.setOrientation(LinearLayoutCompat.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setPaddingRelative(Math.round(72 * density), Math.round(5 * density),
+                Math.round(16 * density), Math.round(5 * density));
+        TypedValue ripple = new TypedValue();
+        requireContext().getTheme().resolveAttribute(android.R.attr.selectableItemBackground, ripple, true);
+        row.setBackgroundResource(ripple.resourceId);
+        row.setClickable(true);
+        row.setFocusable(true);
+        texts.setOrientation(LinearLayoutCompat.VERTICAL);
+        row.addView(texts, new LinearLayoutCompat.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        return row;
+    }
+
+    @NonNull
+    private AppCompatTextView rowTitle(@StringRes int textRes) {
+        AppCompatTextView tv = new AppCompatTextView(requireContext());
+        tv.setText(textRes);
+        tv.setTextColor(ContextCompat.getColor(requireContext(), R.color.theme_bright_yellow));
+        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        return tv;
+    }
+
+    @NonNull
+    private AppCompatTextView rowSummary(@StringRes int textRes) {
+        AppCompatTextView tv = new AppCompatTextView(requireContext());
+        tv.setText(textRes);
+        tv.setTextColor(0xFFC8C800);
+        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        return tv;
+    }
+
+    /**
+     * Fork: the automation master switch (保存復元 contract). Default OFF —
+     * nothing in {@code StateExportReceiver} is reachable until this is on.
+     */
+    @NonNull
+    private View buildAutomationSwitchRow() {
+        final Context appContext = requireContext().getApplicationContext();
+        final int yellow = ContextCompat.getColor(requireContext(), R.color.theme_bright_yellow);
+        LinearLayoutCompat texts = new LinearLayoutCompat(requireContext());
+        texts.addView(rowTitle(R.string.settings_automation_switch));
+        texts.addView(rowSummary(R.string.settings_automation_switch_desc));
+        LinearLayoutCompat row = automationRow(texts);
+
+        MaterialSwitch sw = (MaterialSwitch) View.inflate(requireContext(), R.layout.item_switch, null);
+        sw.setLayoutParams(new LinearLayoutCompat.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        int[][] states = {{android.R.attr.state_checked}, {}};
+        sw.setThumbTintList(new ColorStateList(states, new int[]{0xFF000000, 0xFF808000}));
+        sw.setTrackTintList(new ColorStateList(states,
+                new int[]{yellow, ColorUtils.setAlphaComponent(yellow, 0x33)}));
+        sw.setChecked(AutomationAuth.isEnabled(appContext));
+        sw.setOnCheckedChangeListener((v, checked) -> AutomationAuth.setEnabled(appContext, checked));
+        row.addView(sw);
+        row.setOnClickListener(v -> sw.toggle());
+        return row;
+    }
+
+    /**
+     * Fork: the automation token row — shows it abbreviated, copies the full
+     * value on tap, and carries a Regenerate action that warns pasted copies
+     * (自由作業盤's 「保存復元の設定」) go stale.
+     */
+    @NonNull
+    private View buildAutomationTokenRow() {
+        final Context appContext = requireContext().getApplicationContext();
+        final float density = getResources().getDisplayMetrics().density;
+        final int yellow = ContextCompat.getColor(requireContext(), R.color.theme_bright_yellow);
+        LinearLayoutCompat texts = new LinearLayoutCompat(requireContext());
+        texts.addView(rowTitle(R.string.settings_automation_token));
+        AppCompatTextView value = new AppCompatTextView(requireContext());
+        value.setTextColor(yellow);
+        value.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        value.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        value.setText(AutomationAuth.abbreviate(AutomationAuth.getToken(appContext)));
+        texts.addView(value);
+        texts.addView(rowSummary(R.string.settings_automation_token_desc));
+        LinearLayoutCompat row = automationRow(texts);
+        row.setOnClickListener(v -> {
+            ClipboardUtils.copyToClipboard(requireContext(),
+                    getString(R.string.settings_automation_token),
+                    AutomationAuth.getToken(appContext));
+            UIUtils.displayShortToast(R.string.settings_automation_token_copied);
+        });
+
+        AppCompatTextView regenerate = new AppCompatTextView(requireContext());
+        regenerate.setText(R.string.settings_automation_regenerate);
+        regenerate.setTextColor(yellow);
+        regenerate.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        regenerate.setTypeface(null, Typeface.BOLD);
+        regenerate.setAllCaps(false);
+        regenerate.setPadding(Math.round(12 * density), Math.round(10 * density),
+                Math.round(4 * density), Math.round(10 * density));
+        TypedValue ripple = new TypedValue();
+        requireContext().getTheme().resolveAttribute(android.R.attr.selectableItemBackground, ripple, true);
+        regenerate.setBackgroundResource(ripple.resourceId);
+        regenerate.setClickable(true);
+        regenerate.setFocusable(true);
+        regenerate.setOnClickListener(v -> new MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.settings_automation_regenerate_title)
+                .setMessage(R.string.settings_automation_regenerate_msg)
+                .setPositiveButton(R.string.settings_automation_regenerate, (d, w) -> {
+                    value.setText(AutomationAuth.abbreviate(AutomationAuth.regenerate(appContext)));
+                    UIUtils.displayShortToast(R.string.settings_automation_regenerated);
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show());
+        row.addView(regenerate);
         return row;
     }
 

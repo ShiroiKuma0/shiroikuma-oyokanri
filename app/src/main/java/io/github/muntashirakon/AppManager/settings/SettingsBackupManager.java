@@ -16,15 +16,19 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
+import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 
 import io.github.muntashirakon.AppManager.R;
@@ -48,7 +52,15 @@ import io.github.muntashirakon.io.Path;
  * process afterwards so SharedPreferences are re-read from the new files.
  */
 public final class SettingsBackupManager {
-    public static final String EXPORT_PREFIX = "AppManager-settings_";
+    /**
+     * Fork: the family-wide backup file-name convention (白い熊, 2026-07-25) —
+     * {@code <english-dash-separated-app-name>_<yyyy-MM-dd_HH-mm-ss>.zip}, no
+     * version, no infix, no suffix. Every sister app writes into one shared
+     * directory, so the names must sort and read uniformly.
+     */
+    public static final String EXPORT_PREFIX = "shiroikuma-oyokanri_";
+    /** Pre-convention name, still recognised so older archives stay listed. */
+    public static final String LEGACY_EXPORT_PREFIX = "AppManager-settings_";
     public static final String EXPORT_EXT = ".zip";
 
     private static final String SP_DIR = "shared_prefs";
@@ -67,20 +79,55 @@ public final class SettingsBackupManager {
      * entries whose category is selected pass the filter.
      */
     public enum Category {
-        GENERAL(R.string.settings_eim_cat_general),
-        APPEARANCE(R.string.settings_eim_cat_appearance),
-        MONITOR(R.string.settings_eim_cat_monitor),
-        TOOLBAR(R.string.settings_eim_cat_toolbar),
-        NOTES(R.string.settings_eim_cat_notes),
-        PROFILES(R.string.settings_eim_cat_profiles);
+        GENERAL("general", R.string.settings_eim_cat_general),
+        APPEARANCE("appearance", R.string.settings_eim_cat_appearance),
+        MONITOR("monitor", R.string.settings_eim_cat_monitor),
+        TOOLBAR("toolbar", R.string.settings_eim_cat_toolbar),
+        NOTES("notes", R.string.settings_eim_cat_notes),
+        PROFILES("profiles", R.string.settings_eim_cat_profiles);
 
+        /**
+         * Stable wire id — what the automation contract's {@code items} extra
+         * accepts and what {@code LIST_CATEGORIES} reports. Never rename these:
+         * 自由作業盤's saved selections are keyed by them.
+         */
+        @NonNull
+        public final String id;
         @StringRes
         public final int labelRes;
 
-        Category(@StringRes int labelRes) {
+        Category(@NonNull String id, @StringRes int labelRes) {
+            this.id = id;
             this.labelRes = labelRes;
         }
+
+        /** The category with this wire id, or null if unknown. */
+        @Nullable
+        public static Category byId(@NonNull String id) {
+            for (Category c : values()) {
+                if (c.id.equals(id)) return c;
+            }
+            return null;
+        }
     }
+
+    /** Progress sink for the headless export path (real counts, never a %). */
+    public interface ProgressListener {
+        /**
+         * @param current 1-based index of the category about to be written
+         * @param total   number of selected categories
+         * @param label   that category's human label
+         */
+        void onCategory(int current, int total, @NonNull String label);
+    }
+
+    /**
+     * Prefs files that must never enter (or be restored from) an archive.
+     * The automation token is a device-local secret; a backup that carried it
+     * would hand out the gate key with the archive.
+     */
+    private static final Set<String> EXCLUDED_PREFS = new HashSet<>(
+            java.util.Collections.singletonList(AutomationAuth.PREF_FILE));
 
     // Shared-prefs stores per category; anything unlisted falls into GENERAL
     // (the main "preferences" store, backup dirs/options, and any future
@@ -94,6 +141,13 @@ public final class SettingsBackupManager {
     private static final Set<String> TOOLBAR_PREFS = new HashSet<>(Arrays.asList(
             "am_main_toolbar", "am_main_page_profile_filter"));
     private static final String NOTES_PREFS = "shiroikuma_notes";
+
+    /** True for prefs files that are device-local and never travel in an archive. */
+    private static boolean isExcluded(@NonNull String entryName) {
+        String base = entryName.startsWith(SP_DIR + "/") ? entryName.substring(SP_DIR.length() + 1) : entryName;
+        if (base.endsWith(".xml")) base = base.substring(0, base.length() - 4);
+        return EXCLUDED_PREFS.contains(base);
+    }
 
     /** Category of one zip-entry name (also used to gate what export writes). */
     @NonNull
@@ -112,6 +166,95 @@ public final class SettingsBackupManager {
     private SettingsBackupManager() {
     }
 
+    /** The archive name for an export made now, per the family convention. */
+    @NonNull
+    public static String newFileName() {
+        String ts = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.ROOT).format(new Date());
+        return EXPORT_PREFIX + ts + EXPORT_EXT;
+    }
+
+    /** One file that would go into the archive, with the category it belongs to. */
+    private static final class Source {
+        final String entry;
+        final File file;
+        final Category category;
+
+        Source(@NonNull String entry, @NonNull File file, @NonNull Category category) {
+            this.entry = entry;
+            this.file = file;
+            this.category = category;
+        }
+    }
+
+    /** Everything exportable right now, in no particular order. */
+    @NonNull
+    private static List<Source> collectSources(@NonNull Context context) {
+        List<Source> sources = new ArrayList<>();
+        File sharedPrefs = new File(context.getApplicationInfo().dataDir, SP_DIR);
+        File[] prefFiles = sharedPrefs.isDirectory() ? sharedPrefs.listFiles(XML_FILTER) : null;
+        if (prefFiles != null) {
+            for (File f : prefFiles) {
+                String entry = SP_DIR + "/" + f.getName();
+                if (isExcluded(entry)) continue;
+                sources.add(new Source(entry, f, classify(entry)));
+            }
+        }
+        File profiles = new File(context.getFilesDir(), PROFILES_DIR);
+        File[] profileFiles = profiles.isDirectory() ? profiles.listFiles(File::isFile) : null;
+        if (profileFiles != null) {
+            for (File f : profileFiles) {
+                sources.add(new Source(PROFILES_DIR + "/" + f.getName(), f, Category.PROFILES));
+            }
+        }
+        // The font *choice* lives in shiroikuma_fonts.xml (an APPEARANCE prefs
+        // file); the referenced file must travel with it or the setting points
+        // at nothing — so imported font files are APPEARANCE too.
+        File fonts = new File(context.getFilesDir(), FONTS_DIR);
+        File[] fontFiles = fonts.isDirectory() ? fonts.listFiles(File::isFile) : null;
+        if (fontFiles != null) {
+            for (File f : fontFiles) {
+                sources.add(new Source(FONTS_DIR + "/" + f.getName(), f, Category.APPEARANCE));
+            }
+        }
+        return sources;
+    }
+
+    /**
+     * Fork: the headless export core — the single implementation both the
+     * Export/Import panel and the automation receiver
+     * ({@link StateExportReceiver}) call. Writes ONE zip covering the selected
+     * categories into {@code out} (which the caller owns and closes),
+     * reporting category-granular progress as it goes.
+     *
+     * @return the number of files written into the archive.
+     */
+    public static int writeExport(@NonNull Context context, @NonNull Set<Category> categories,
+                                  @NonNull OutputStream out, @Nullable ProgressListener listener)
+            throws IOException {
+        List<Source> sources = collectSources(context);
+        // Walk the categories in enum order so progress reads in a stable
+        // sequence and the archive groups by category.
+        List<Category> ordered = new ArrayList<>();
+        for (Category c : Category.values()) {
+            if (categories.contains(c)) ordered.add(c);
+        }
+        int written = 0;
+        try (ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(out))) {
+            for (int i = 0; i < ordered.size(); i++) {
+                Category cat = ordered.get(i);
+                if (listener != null) {
+                    listener.onCategory(i + 1, ordered.size(), context.getString(cat.labelRes));
+                }
+                for (Source s : sources) {
+                    if (s.category != cat) continue;
+                    addEntry(zos, s.file, s.entry);
+                    ++written;
+                }
+            }
+        }
+        return written;
+    }
+
     /**
      * Zip the selected categories of the current settings into {@code destDir}.
      *
@@ -120,43 +263,19 @@ public final class SettingsBackupManager {
     @NonNull
     public static String export(@NonNull Context context, @NonNull Path destDir,
                                 @NonNull Set<Category> categories) throws IOException {
-        String ts = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.ROOT).format(new Date());
-        String fileName = EXPORT_PREFIX + ts + EXPORT_EXT;
+        String fileName = newFileName();
         // The name already carries the .zip extension, so pass a null mime
         // type — otherwise findOrCreateFile appends another ".zip" (the Path
         // API adds an extension from the mime type when one is given).
         Path outFile = destDir.findOrCreateFile(fileName, null);
-        File sharedPrefs = new File(context.getApplicationInfo().dataDir, SP_DIR);
-        File profiles = new File(context.getFilesDir(), PROFILES_DIR);
-        File fonts = new File(context.getFilesDir(), FONTS_DIR);
-        try (ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(outFile.openOutputStream()))) {
-            File[] prefFiles = sharedPrefs.isDirectory() ? sharedPrefs.listFiles(XML_FILTER) : null;
-            if (prefFiles != null) {
-                for (File f : prefFiles) {
-                    String entry = SP_DIR + "/" + f.getName();
-                    if (categories.contains(classify(entry))) {
-                        addEntry(zos, f, entry);
-                    }
-                }
-            }
-            if (categories.contains(Category.PROFILES)) {
-                File[] profileFiles = profiles.isDirectory() ? profiles.listFiles(File::isFile) : null;
-                if (profileFiles != null) {
-                    for (File f : profileFiles) {
-                        addEntry(zos, f, PROFILES_DIR + "/" + f.getName());
-                    }
-                }
-            }
-            if (categories.contains(Category.APPEARANCE)) {
-                File[] fontFiles = fonts.isDirectory() ? fonts.listFiles(File::isFile) : null;
-                if (fontFiles != null) {
-                    for (File f : fontFiles) {
-                        addEntry(zos, f, FONTS_DIR + "/" + f.getName());
-                    }
-                }
-            }
-        }
+        writeExport(context, categories, outFile.openOutputStream(), null);
         return fileName;
+    }
+
+    /** All categories — what an automation request with no {@code items} means. */
+    @NonNull
+    public static Set<Category> allCategories() {
+        return EnumSet.allOf(Category.class);
     }
 
     /**
@@ -185,7 +304,8 @@ public final class SettingsBackupManager {
                     continue;
                 }
                 String name = entry.getName();
-                if (!categories.contains(classify(name))) {
+                // Never let an archive plant an automation token on this device.
+                if (isExcluded(name) || !categories.contains(classify(name))) {
                     continue;
                 }
                 File target = null;
