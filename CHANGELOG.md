@@ -6,6 +6,56 @@ All notable fork changes are recorded here. Versions use the fork's
 `customBaseVersionName+customBuildNumber` scheme (the base mirrors the upstream App Manager release
 this fork is built on).
 
+## 4.1.0+5 — 2026-07-25
+
+A fork-feature release: the settings export becomes **remote-triggerable**, so an external automation
+app can back this app up headlessly — with a token gate, real-count progress, and no UI at all.
+
+### 保存復元 automation contract — headless, token-gated state export
+
+- A new **exported broadcast receiver** answers two actions, both gated by the automation token:
+  - `shiroikuma.oyokanri.action.LIST_CATEGORIES` — replies instantly with `OK:` plus one
+    `id<TAB>label` line per exportable category, so the caller can render a picker. The six ids are
+    `general`, `appearance`, `monitor`, `toolbar`, `notes`, `profiles`; they are **stable wire ids**
+    and will not be renamed.
+  - `shiroikuma.oyokanri.action.EXPORT_STATE` — runs the **very same export** the Export/Import panel
+    runs, headlessly, into **exactly one** zip, and replies
+    `OK:<absolute path>|<bytes>|<human size>|<n> categories`.
+- **Directory precedence**: the request's `path` extra (created if missing) → the app's configured
+  export directory → `ERROR:no-directory`. Both are plain absolute paths and the app holds
+  All-Files-Access, so the archive is written directly with `java.io.File`.
+- **Category subsets**: an `items` extra takes a comma-separated list of category ids; absent or empty
+  means everything. An unknown id fails the request (`ERROR:unknown category in items: …`) and writes
+  nothing, rather than silently exporting a partial set.
+- **Progress is real counts, never a percentage** — while exporting, the app broadcasts
+  `区分 i/N — <category>` along with structured `current` / `total` / `unit` extras, throttled to at
+  most one every 500 ms plus a mandatory final one carrying the finished archive size.
+- Distinct, debuggable errors: **`ERROR:automation disabled`** and **`ERROR:bad token`** are separate
+  results, and exactly one terminal reply is ever sent per request.
+- The export logic is **not duplicated**: it was refactored into a headless core
+  (`writeExport(categories, OutputStream, progress)`) that the Export/Import panel and the receiver
+  both call.
+
+### Automation token
+
+- New **Automation export** master switch — **off by default**; nothing above is reachable until it is
+  turned on — plus a **24-byte `SecureRandom` token**, generated lazily so the row always shows a
+  value and compared **constant-time** on every request.
+- Both rows live **inside the existing Export / Import section** of the 白い熊 応用管理 UI page, directly
+  below the Export/Import row. The token row shows the value abbreviated (`80922d8c…4c49a87c`),
+  **copies the full token on tap**, and carries a **Regenerate** action that warns pasted copies go
+  stale.
+- The token lives in its **own preferences file, excluded from both export and import** — so it can
+  never travel inside a backup archive, nor be planted on this device by one.
+
+### Backup file naming
+
+- Every archive this app writes — from the automation path **and** from the Export/Import page — is now
+  named **`shiroikuma-oyokanri_<yyyy-MM-dd_HH-mm-ss>.zip`**: no version, no infix, no suffix. All of
+  白い熊's apps keep their backups in one directory, so the names must sort and read uniformly.
+- The previous `AppManager-settings_…` prefix is still recognised, so older archives remain listed and
+  still count as the "last export".
+
 ## 4.1.0+3 — 2026-07-25
 
 A fork-feature release: the settings Export/Import is rebuilt as a **category-based panel at the top
