@@ -32,6 +32,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 
 import io.github.muntashirakon.AppManager.R;
+import io.github.muntashirakon.AppManager.snooping.SnoopingImmovable;
 import io.github.muntashirakon.AppManager.snooping.SnoopingPrefs;
 import io.github.muntashirakon.io.Path;
 
@@ -126,10 +127,13 @@ public final class SettingsBackupManager {
     /**
      * Prefs files that must never enter (or be restored from) an archive.
      * The automation token is a device-local secret; a backup that carried it
-     * would hand out the gate key with the archive.
+     * would hand out the gate key with the archive. The snooping "cannot be
+     * turned on here" marks are a fact about <em>this</em> phone's app-ops
+     * behaviour, not a decision, so carrying them to another phone could hide a
+     * capability that is perfectly movable there.
      */
     private static final Set<String> EXCLUDED_PREFS = new HashSet<>(
-            java.util.Collections.singletonList(AutomationAuth.PREF_FILE));
+            Arrays.asList(AutomationAuth.PREF_FILE, SnoopingImmovable.PREF_FILE));
 
     // Shared-prefs stores per category; anything unlisted falls into GENERAL
     // (the main "preferences" store, backup dirs/options, and any future

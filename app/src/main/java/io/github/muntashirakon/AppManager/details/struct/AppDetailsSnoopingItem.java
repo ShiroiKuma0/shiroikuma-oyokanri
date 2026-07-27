@@ -158,6 +158,101 @@ public class AppDetailsSnoopingItem extends AppDetailsItem<String> {
     }
 
     /**
+     * Whether this capability is allowed when nobody has touched it — the state a
+     * fresh install lands in — or {@code null} when the platform's answer is not
+     * unambiguous.
+     * <p>
+     * Callers must treat {@code null} as "assume nothing": it is better to store a
+     * redundant decision, or to leave a row unmarked, than to drop a real one.
+     */
+    @Nullable
+    public Boolean defaultAllowed() {
+        if (opItem != null) {
+            int mode;
+            try {
+                mode = AppOpsManagerCompat.opToDefaultMode(opItem.getOp());
+            } catch (Throwable th) {
+                return null;
+            }
+            if (mode == AppOpsManager.MODE_ALLOWED
+                    || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && mode == AppOpsManager.MODE_FOREGROUND)) {
+                return Boolean.TRUE;
+            }
+            if (mode == AppOpsManager.MODE_IGNORED || mode == AppOpsManager.MODE_ERRORED) {
+                return Boolean.FALSE;
+            }
+            // MODE_DEFAULT: the linked permission decides. A dangerous permission
+            // starts out denied; for anything else we cannot say.
+            return opItem.isDangerous ? Boolean.FALSE : null;
+        }
+        if (permissionItem != null) {
+            return permissionItem.isDangerous ? Boolean.FALSE : null;
+        }
+        return null;
+    }
+
+    /**
+     * Whether {@code allowed} is simply the untouched state. Nothing worth
+     * storing: a decision that matches the default would only re-assert what a
+     * fresh install does anyway, and would travel in an export as noise.
+     */
+    public boolean isDefaultState(boolean allowed) {
+        Boolean defaultAllowed = defaultAllowed();
+        return defaultAllowed != null && defaultAllowed == allowed;
+    }
+
+    /**
+     * Whether the live state is a deliberate departure from the default — what
+     * the row's highlight marks, so a capability that is off <em>because you
+     * turned it off</em> is distinguishable at a glance from one that was never
+     * on.
+     */
+    public boolean isChangedFromDefault() {
+        Boolean defaultAllowed = defaultAllowed();
+        return defaultAllowed != null && defaultAllowed != isAllowed();
+    }
+
+    /**
+     * Whether the platform now enforces what {@link #setAllowed} was asked for.
+     * <p>
+     * Callers use this to decide whether a decision is worth recording: a stored
+     * decision that never took is worse than none, because the row then reads
+     * "Blocked · saved: allow" and the user has no way to tell a refused write
+     * from a working one. Returns {@code true} whenever we <em>cannot</em> tell —
+     * only a positive contradiction counts as failure.
+     */
+    public boolean matchesRequestedState(boolean requested) {
+        if (opItem == null || !mHasEffectiveMode) {
+            // Permission-only row, or the platform would not answer: no evidence
+            // either way, so do not call a possibly-good write a failure.
+            return true;
+        }
+        return isAllowed() == requested;
+    }
+
+    /**
+     * Last resort after a write that did not move the enforced mode: force the
+     * package-level entry to the target and re-read. The permission path
+     * (grant/revoke, which may legitimately land on {@code MODE_FOREGROUND}) is
+     * left alone unless it demonstrably failed, so nothing nuanced is clobbered.
+     */
+    @WorkerThread
+    private void repairIfUnchanged(@NonNull PackageInfo packageInfo, @NonNull AppOpsManagerCompat appOpsManager,
+                                   boolean allowed) {
+        if (opItem == null || packageInfo.applicationInfo == null || matchesRequestedState(allowed)) {
+            return;
+        }
+        try {
+            appOpsManager.setPackageMode(opItem.getOp(), packageInfo.applicationInfo.uid, packageInfo.packageName,
+                    allowed ? AppOpsManager.MODE_ALLOWED : AppOpsManager.MODE_IGNORED);
+            opItem.invalidate(appOpsManager, packageInfo);
+            refreshEffectiveMode(appOpsManager, packageInfo);
+        } catch (Throwable ignore) {
+            // Nothing more to try; the caller reports the failure to the user.
+        }
+    }
+
+    /**
      * Allow or block the capability, moving the op and its linked permission
      * together. Callers persist the decision separately — this only touches the
      * live system state.
@@ -192,11 +287,16 @@ public class AppDetailsSnoopingItem extends AppDetailsItem<String> {
                 // left PHONE_CALL_MICROPHONE and PHONE_CALL_CAMERA stuck on
                 // 4.1.0+6. A redundant write costs nothing; a skipped one looks
                 // like a broken switch.
-                appOpsManager.setMode(opItem.getOp(), packageInfo.applicationInfo.uid, packageInfo.packageName,
-                        allowed ? AppOpsManager.MODE_ALLOWED : AppOpsManager.MODE_IGNORED);
+                //
+                // Both levels, not just the uid one — see
+                // AppOpsManagerCompat#setModeBothLevels for why a uid-only write
+                // cannot lift a package-level block (4.1.0+8).
+                appOpsManager.setModeBothLevels(opItem.getOp(), packageInfo.applicationInfo.uid,
+                        packageInfo.packageName, allowed ? AppOpsManager.MODE_ALLOWED : AppOpsManager.MODE_IGNORED);
                 opItem.invalidate(appOpsManager, packageInfo);
             }
             refreshEffectiveMode(appOpsManager, packageInfo);
+            repairIfUnchanged(packageInfo, appOpsManager, allowed);
             return;
         }
         if (permissionItem == null) {

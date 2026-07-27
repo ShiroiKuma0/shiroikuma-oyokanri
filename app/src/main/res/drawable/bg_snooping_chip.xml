@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fork: chip background behind the two descriptive lines of a Snooping row.
+     Drawn white and tinted at bind time (View.setBackgroundTintList mutates the
+     drawable, so the shared ConstantState is not affected). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+
+    <corners android:radius="6dp" />
+
+    <solid android:color="@android:color/white" />
+
+</shape>

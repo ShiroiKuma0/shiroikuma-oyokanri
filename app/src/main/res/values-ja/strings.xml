@@ -1142,13 +1142,12 @@
     <string name="snooping_forget_confirm">このアプリに保存された %1$d 件の設定を破棄しますか？ 現在の状態はそのままで、保存された判断のみが消えます。</string>
     <string name="snooping_nothing_saved">このアプリには何も保存されていません。</string>
     <string name="snooping_toggle_failed">この項目を変更できませんでした。</string>
+    <string name="snooping_cannot_enable_removed">これはここでは有効にできません。システムが遮断したままなので安全です。この頁から削除しました（「すべての項目を表示」には残ります）。</string>
     <string name="snooping_state_allowed">許可</string>
     <string name="snooping_state_blocked">遮断</string>
-    <string name="snooping_saved_allow">保存：許可</string>
-    <string name="snooping_saved_block">保存：遮断</string>
     <string name="snooping_tier_ungated">権限不要</string>
     <string name="snooping_tier_not_requested">未要求</string>
-    <string name="snooping_app_op_only">App op %1$s（権限不要）</string>
+    <string name="snooping_app_op_only">App op %1$s</string>
     <string name="snooping_not_saved_explanation">この項目はまだ保存されていません。ｽｲｯﾁを切り替えると判断が記録され、再ｲﾝｽﾄｰﾙしても残り、設定のｴｸｽﾎﾟｰﾄに含まれ、別の端末にこのアプリが現れたときに再適用されます。</string>
     <string name="snooping_saved_allowed_explanation">「許可」として保存済み。ｲﾝｽﾄｰﾙ時と更新時に再適用され、設定のｴｸｽﾎﾟｰﾄに含まれます。</string>
     <string name="snooping_saved_blocked_explanation">「遮断」として保存済み。ｲﾝｽﾄｰﾙ時と更新時に再適用され、設定のｴｸｽﾎﾟｰﾄに含まれます。</string>

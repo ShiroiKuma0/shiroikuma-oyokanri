@@ -109,6 +109,7 @@ import io.github.muntashirakon.AppManager.self.SelfPermissions;
 import io.github.muntashirakon.AppManager.settings.Ops;
 import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.snooping.SnoopingEnforcer;
+import io.github.muntashirakon.AppManager.snooping.SnoopingImmovable;
 import io.github.muntashirakon.AppManager.snooping.SnoopingPrefs;
 import io.github.muntashirakon.AppManager.snooping.SnoopingResolver;
 import io.github.muntashirakon.AppManager.types.PackageChangeReceiver;
@@ -1610,8 +1611,31 @@ public class AppDetailsViewModel extends AndroidViewModel {
             Log.w(TAG, "Could not set snooping capability %s", e, item.capability.entry.id);
             return false;
         }
-        SnoopingPrefs.setSetting(mPackageName, item.capability.entry.id, allowed);
-        item.storedDecision = allowed;
+        // Fork: a write that the platform discarded throws nothing, so ask what is
+        // actually enforced now before recording anything. Saving a decision that
+        // never landed is what produced "Blocked · saved: allow" on 4.1.0+8.
+        if (!item.matchesRequestedState(allowed)) {
+            Log.w(TAG, "Snooping capability %s did not move to %s", item.capability.entry.id,
+                    allowed ? "allowed" : "blocked");
+            if (allowed) {
+                // It will not turn on here, so it can never snoop: remember that
+                // and the row leaves the page — see SnoopingImmovable.
+                SnoopingImmovable.mark(mPackageName, item.capability.entry.id);
+            }
+            return false;
+        }
+        SnoopingImmovable.clear(mPackageName, item.capability.entry.id);
+        if (item.isDefaultState(allowed)) {
+            // Back at the untouched state: there is nothing to remember. Storing
+            // it would only re-assert what a fresh install does anyway and would
+            // travel in an export as noise — and any earlier decision must go,
+            // or the enforcer would keep re-applying it. (白い熊, +13.)
+            SnoopingPrefs.clearSetting(mPackageName, item.capability.entry.id);
+            item.storedDecision = null;
+        } else {
+            SnoopingPrefs.setSetting(mPackageName, item.capability.entry.id, allowed);
+            item.storedDecision = allowed;
+        }
         return true;
     }
 
@@ -1627,18 +1651,36 @@ public class AppDetailsViewModel extends AndroidViewModel {
         PackageInfo packageInfo = getPackageInfoInternal();
         if (packageInfo == null) return -1;
         Map<String, Boolean> decisions = new LinkedHashMap<>();
+        // Capabilities that end up blocked by default anyway: nothing to store,
+        // and any decision left over from before must be dropped rather than
+        // merged past (setSettings only adds).
+        List<String> unmanage = new ArrayList<>();
         int blocked = 0;
         synchronized (mSnoopingItems) {
             for (AppDetailsSnoopingItem item : mSnoopingItems) {
                 if (!item.isAllowed()) {
-                    // Already blocked, but still record the decision so it is
-                    // re-asserted after a reinstall or on another phone.
-                    decisions.put(item.capability.entry.id, false);
+                    // Already blocked: record it so it is re-asserted after a
+                    // reinstall or on another phone — unless blocked is simply
+                    // what this capability defaults to.
+                    if (item.isDefaultState(false)) {
+                        unmanage.add(item.capability.entry.id);
+                    } else {
+                        decisions.put(item.capability.entry.id, false);
+                    }
                     continue;
                 }
                 try {
                     item.setAllowed(packageInfo, mAppOpsManager, false);
-                    decisions.put(item.capability.entry.id, false);
+                    // Record only what the platform really enforces now.
+                    if (!item.matchesRequestedState(false)) {
+                        Log.w(TAG, "Could not block %s: mode unchanged", item.capability.entry.id);
+                        continue;
+                    }
+                    if (item.isDefaultState(false)) {
+                        unmanage.add(item.capability.entry.id);
+                    } else {
+                        decisions.put(item.capability.entry.id, false);
+                    }
                     ++blocked;
                 } catch (RemoteException | PermissionException e) {
                     Log.w(TAG, "Could not block %s", e, item.capability.entry.id);
@@ -1647,6 +1689,9 @@ public class AppDetailsViewModel extends AndroidViewModel {
         }
         if (!decisions.isEmpty()) {
             SnoopingPrefs.setSettings(mPackageName, decisions);
+        }
+        for (String capabilityId : unmanage) {
+            SnoopingPrefs.clearSetting(mPackageName, capabilityId);
         }
         return blocked;
     }

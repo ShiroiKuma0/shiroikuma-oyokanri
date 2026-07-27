@@ -37,7 +37,11 @@ public class SnoopingInstallReceiver extends BroadcastReceiver {
         }
         if (Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
             // We were updated: re-assert everything, since anything could have
-            // drifted while this build was not installed.
+            // drifted while this build was not installed. Also forget every
+            // "cannot be turned on" mark — a new build may write app-ops
+            // differently from the one that recorded them (4.1.0+9 did), so they
+            // are re-tested rather than trusted.
+            SnoopingImmovable.clearAll();
             SnoopingEnforcer.enforceAllAsync(context);
             return;
         }
@@ -45,6 +49,8 @@ public class SnoopingInstallReceiver extends BroadcastReceiver {
         if (packageName == null) {
             return;
         }
+        // A new version of the app may well behave differently, so its marks go.
+        SnoopingImmovable.clearPackage(packageName);
         int userId = userIdOf(intent);
         SnoopingEnforcer.enforcePackageAsync(context, packageName, userId);
     }
