@@ -48,6 +48,10 @@ import io.github.muntashirakon.AppManager.self.SelfPermissions;
  *       always show. Permission-gated capabilities the app never requested are
  *       held back behind "show all", where they act as pre-sets that land if a
  *       future update of the app starts asking for them.</li>
+ *   <li><b>Can it still snoop?</b> A capability that is blocked <em>and</em> has
+ *       proven it cannot be turned on here ({@link SnoopingImmovable}) is
+ *       permanently safe — neither snooping nor able to be made to — so it is
+ *       dropped as well.</li>
  * </ol>
  */
 public final class SnoopingResolver {
@@ -58,7 +62,8 @@ public final class SnoopingResolver {
      * Build the rows for a package.
      *
      * @param includeNotRequested whether to include permission-gated capabilities
-     *                            the app does not request ("show all")
+     *                            the app does not request, and capabilities known
+     *                            to be stuck off ("show all")
      */
     @WorkerThread
     @NonNull
@@ -90,8 +95,18 @@ public final class SnoopingResolver {
         }
 
         Map<String, Boolean> stored = SnoopingPrefs.getSettings(packageName);
+        SnoopingReachability reachability = SnoopingReachability.forPackage(packageInfo, userId);
 
         for (SnoopingCatalog.Resolved capability : SnoopingCatalog.resolved()) {
+            if (!includeNotRequested && !reachability.canEverUse(capability)) {
+                // The app's own manifest rules this capability out — no
+                // permission, no bound service, or privileged-only — so it is
+                // neither snooping nor able to be made to, whatever the op says.
+                // Cheaper and more honest than SnoopingImmovable: no failed write
+                // to learn from, and an update that adds the missing declaration
+                // brings the row back on the next load, by itself.
+                continue;
+            }
             AppDetailsSnoopingItem item = build(capability, packageInfo, userId, requestedPermissions,
                     configuredOps, canGetGrantRevoke);
             if (item == null || !item.isModifiable()) {
@@ -105,6 +120,15 @@ public final class SnoopingResolver {
             // the stored op entry — see AppDetailsSnoopingItem#refreshEffectiveMode.
             item.refreshEffectiveMode(appOpsManager, packageInfo);
             item.storedDecision = stored.get(capability.entry.id);
+            if (!includeNotRequested && !item.isAllowed()
+                    && SnoopingImmovable.isMarked(packageName, capability.entry.id)) {
+                // Blocked, and a previous attempt proved it cannot be turned on
+                // here: it can neither snoop nor be made to, so it is not this
+                // page's business. Note the isAllowed() guard — a mark never
+                // hides a capability that is currently allowed, so a stale one
+                // can never conceal actual snooping. "Show all" reveals them.
+                continue;
+            }
             items.add(item);
         }
         return items;

@@ -714,6 +714,44 @@ public class AppOpsManagerCompat {
         }
     }
 
+    /**
+     * Fork: write the mode at the <b>package</b> level, i.e. what
+     * {@code adb shell appops set <pkg> <op> <mode>} does. {@link #setMode} writes
+     * the <i>uid</i> mode on Android M+, which is a different slot entirely.
+     */
+    @RequiresPermission("android.permission.MANAGE_APP_OPS_MODES")
+    public void setPackageMode(int op, int uid, String packageName, @AppOpsManagerCompat.Mode int mode)
+            throws RemoteException {
+        mAppOpsService.setMode(op, uid, packageName, mode);
+    }
+
+    /**
+     * Fork: set the mode at <b>both</b> levels — uid and package.
+     * <p>
+     * <b>Landmine, measured on the Mate XT 2026-07-27.</b> {@link #setMode} writes
+     * only the uid mode on M+, and {@code AppOpsService} <em>deletes</em> a uid
+     * entry whose mode equals {@link #opToDefaultMode}, storing nothing. So
+     * un-blocking an op whose default is {@code MODE_ALLOWED} clears a uid mode
+     * that was never there while a package-level {@code ignore} — where a block
+     * from any other tool, or from an earlier build of this app, actually lives —
+     * keeps winning. The write reports success (nothing throws for a discarded
+     * write) and the capability stays blocked. Writing both levels is correct in
+     * every combination: a value equal to the op's default removes the entry at
+     * that level, any other value is stored there, so the two levels always agree
+     * afterwards. The package write is best-effort — a platform that refuses it
+     * must not cost us the uid write that already landed.
+     */
+    @RequiresPermission("android.permission.MANAGE_APP_OPS_MODES")
+    public void setModeBothLevels(int op, int uid, String packageName, @AppOpsManagerCompat.Mode int mode)
+            throws RemoteException {
+        setMode(op, uid, packageName, mode);
+        try {
+            setPackageMode(op, uid, packageName, mode);
+        } catch (Throwable ignore) {
+            // Already written at uid level; a rejected package write is not fatal.
+        }
+    }
+
     @RequiresPermission("android.permission.MANAGE_APP_OPS_MODES")
     public void resetAllModes(@UserIdInt int reqUserId, @NonNull String reqPackageName) throws RemoteException {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {

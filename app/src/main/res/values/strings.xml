@@ -1990,13 +1990,12 @@
     <string name="snooping_forget_confirm">Forget the %1$d saved setting(s) for this app? The current state is left as it is; only the saved decisions go away.</string>
     <string name="snooping_nothing_saved">Nothing is saved for this app.</string>
     <string name="snooping_toggle_failed">Could not change this capability.</string>
+    <string name="snooping_cannot_enable_removed">This cannot be turned on here — the system keeps it blocked, so it is safe. Removed from this page; “Show all capabilities” still lists it.</string>
     <string name="snooping_state_allowed">Allowed</string>
     <string name="snooping_state_blocked">Blocked</string>
-    <string name="snooping_saved_allow">saved: allow</string>
-    <string name="snooping_saved_block">saved: block</string>
     <string name="snooping_tier_ungated">needs no permission</string>
     <string name="snooping_tier_not_requested">not requested</string>
-    <string name="snooping_app_op_only">App op %1$s (no permission needed)</string>
+    <string name="snooping_app_op_only">App op %1$s</string>
     <string name="snooping_not_saved_explanation">This capability is not saved. Flip its switch to record the decision — it will then survive a reinstall, travel in a settings export, and be re-applied when this app turns up on another phone.</string>
     <string name="snooping_saved_allowed_explanation">Saved as allowed. This is re-applied when the app is installed or updated, and it travels in a settings export.</string>
     <string name="snooping_saved_blocked_explanation">Saved as blocked. This is re-applied when the app is installed or updated, and it travels in a settings export.</string>

@@ -32,19 +32,33 @@
                 android:textAppearance="?android:attr/textAppearanceListItem"
                 tools:text="Precise location" />
 
+            <!-- Fork: both descriptive lines sit on a tinted chip rather than
+                 bare on the pure-black page — small coloured text (especially the
+                 red "Allowed" state) was barely legible without it. -->
             <androidx.appcompat.widget.AppCompatTextView
                 android:id="@+id/snooping_status"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_snooping_chip"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="3dp"
                 android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textSize="13sp"
+                android:textStyle="bold"
                 tools:text="Blocked · saved" />
 
             <androidx.appcompat.widget.AppCompatTextView
                 android:id="@+id/snooping_detail"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_snooping_chip"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="3dp"
                 android:textAppearance="?attr/textAppearanceBodySmall"
                 android:textIsSelectable="true"
+                android:textSize="13sp"
                 tools:text="ACCESS_FINE_LOCATION" />
 
         </androidx.appcompat.widget.LinearLayoutCompat>
