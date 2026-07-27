@@ -8,13 +8,14 @@
 
 **Android app manager & control panel — themed and tooled to taste.**
 
-A fork of [AppManager](https://github.com/MuntashirAkon/AppManager) with **major additions**: a
-configurable **yellow-on-black UI** with a deep customization page, a hard-blocking **protected
-profile**, a from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-tap
-**main-list quick actions**, readable **per-app backups**, a **remote-triggerable settings export**,
-and the **AM Debug** toolset unlocked in a normal release build.
+A fork of [AppManager](https://github.com/MuntashirAkon/AppManager) with **major additions**: a per-app
+**anti-snooping page**, a configurable **yellow-on-black UI** with a deep customization page, a
+hard-blocking **protected profile**, a from-scratch **process monitor / reaper**, a **pausable
+batch-op dialog**, one-tap **main-list quick actions**, readable **per-app backups**, a
+**remote-triggerable settings export**, and the **AM Debug** toolset unlocked in a normal release
+build.
 
-**📥 Latest release: [`4.1.0+5`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+7`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
 </div>
 
@@ -32,6 +33,31 @@ a fresh install rather than an update.)
 Built for **arm64-v8a**. App Manager itself is unchanged underneath — same component browser, same
 root/ADB/Shizuku backends, same backup engine — this fork adds a thick layer of personalization plus a
 few control-panel tools on top.
+
+## 🕵️ Anti-snooping page (盗み見)
+
+Every app-details page gets a **Snooping** tab, second in the strip, gathering the privacy-invasive
+capabilities that are otherwise scattered across the App Ops and Permissions tabs — among hundreds of
+rows that mostly cannot be moved — into eight readable groups: location, microphone & camera, messages
+& calls, personal data, files & media, watching the screen, nearby & network, background activity.
+
+**Nothing on the page is decorative.** A row appears only if this phone will really let it move: ops
+that don't exist on this Android version are dropped, ops the platform redirects to a *different*
+controlling op are dropped (they have no slot of their own and can never change — not for this app,
+not for `adb`, not for root), and without ADB or Shizuku the list is simply empty with a note saying
+why. Rows report the mode the system **actually enforces**, not the stored one, so a switch never
+claims *Allowed* for something already being denied.
+
+It also lists what an app can reach **without asking for anything** — screen capture, clipboard reads,
+assistant screen reads, VPN, accessibility, background activity — because "never requested" is not the
+same as "cannot use". Behind *Show all capabilities* sit the permission-gated ones the app hasn't
+requested, usable as **pre-sets**: block the microphone today on an app that has none, and the block
+lands the day an update starts asking for one.
+
+**Decisions are remembered, not just applied.** They're keyed by package name, so they outlive
+uninstalling the app, ride along in a settings export, and are re-applied automatically when that
+package appears on another phone — on install, on update, and on every startup once privileges are
+up. Set an app up once; it stays that way, everywhere.
 
 ## 🎨 Configurable yellow-on-black UI
 
@@ -105,8 +131,8 @@ The app list does more without a trip into details:
 - Inline backup details in the main list (version / date / time), with **tap = new backup** and
   **long-press = restore/delete**, and a tap-to-back-up affordance for apps that have none.
 - **Category-based settings Export/Import** at the top of the UI page: pick a directory once, see the
-  latest export at a glance, then export or restore any mix of six categories (general settings,
-  colours & fonts, monitor, toolbar & filters, notes, profiles) — so a new install comes up looking
+  latest export at a glance, then export or restore any mix of seven categories (general settings,
+  colours & fonts, monitor, toolbar & filters, notes, anti-snooping settings, profiles) — so a new install comes up looking
   and behaving exactly like the old one.
 
 ## 🤖 Remote-triggerable export
