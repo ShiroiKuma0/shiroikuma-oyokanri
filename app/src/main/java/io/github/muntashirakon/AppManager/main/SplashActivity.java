@@ -52,6 +52,11 @@ public class SplashActivity extends AppCompatActivity {
     private TextView mStateNameView;
     private SecurityAndOpsViewModel mViewModel;
     private BiometricPrompt mBiometricPrompt;
+    /**
+     * Fork: true when the launcher dropped us <b>onto a task that already
+     * exists</b> — see {@link #handOff()}.
+     */
+    private boolean mLaunchedOntoExistingTask;
 
     private final ActivityResultLauncher<Intent> mKeyStoreActivity = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(), result -> {
@@ -67,6 +72,31 @@ public class SplashActivity extends AppCompatActivity {
 
     @Override
     protected final void onCreate(@Nullable Bundle savedInstanceState) {
+        // Fork: this activity is a trampoline — it starts MainActivity and
+        // finishes, so the task it leaves behind is rooted at MainActivity and
+        // no longer contains this activity. Tapping the launcher icon while that
+        // task exists therefore drops a *fresh* SplashActivity on top of it,
+        // which used to stack a *fresh* MainActivity over whatever the user was
+        // on (an app's details page, mid-tab). The task was never damaged — just
+        // buried. Detect that case first thing: getIntent() and isTaskRoot() are
+        // both valid from attach(), i.e. before super.onCreate().
+        Intent intent = getIntent();
+        mLaunchedOntoExistingTask = !isTaskRoot()
+                && intent != null
+                && Intent.ACTION_MAIN.equals(intent.getAction())
+                && intent.hasCategory(Intent.CATEGORY_LAUNCHER);
+        if (mLaunchedOntoExistingTask && Ops.isAuthenticated()) {
+            // The app is already running and set up: the screen the user left is
+            // directly underneath, so go straight back to it. Bail out before the
+            // theme, the splash screen and the layout — nothing of ours is ever
+            // drawn, so there is no flash to sit through. super.onCreate() first,
+            // or the framework throws SuperNotCalledException.
+            Log.d(TAG, "Already running: resuming the existing task.");
+            super.onCreate(savedInstanceState);
+            finish();
+            overridePendingTransition(0, 0);
+            return;
+        }
         setTheme(Prefs.Appearance.isPureBlackTheme() ? R.style.AppTheme_Splash_Black : R.style.AppTheme_Splash);
         SplashScreen.installSplashScreen(this);
         EdgeToEdge.enable(this);
@@ -78,8 +108,7 @@ public class SplashActivity extends AppCompatActivity {
         mStateNameView = findViewById(R.id.state_name);
         if (Ops.isAuthenticated()) {
             Log.d(TAG, "Already authenticated.");
-            startActivity(new Intent(this, MainActivity.class));
-            finish();
+            handOff();
             return;
         }
         if (Boolean.TRUE.equals(BuildExpiryChecker.buildExpired())) {
@@ -200,6 +229,25 @@ public class SplashActivity extends AppCompatActivity {
         mStateNameView.setText(R.string.launching);
         mViewModel.setAuthenticating(false);
         Ops.setAuthenticated(this, true);
+        handOff();
+    }
+
+    /**
+     * Fork: hand control to the app proper.
+     * <p>
+     * Normally that means starting {@link MainActivity}. But when the launcher
+     * dropped us onto a task that already exists, the user's own screen is right
+     * underneath — starting a new main window would bury it, which is exactly the
+     * bug this replaces. Reached with authentication already done, including the
+     * case where the process had been killed and the task restored around us: the
+     * privileges are up by the time the restored screen is resumed.
+     */
+    private void handOff() {
+        if (mLaunchedOntoExistingTask) {
+            finish();
+            overridePendingTransition(0, 0);
+            return;
+        }
         startActivity(new Intent(this, MainActivity.class));
         finish();
     }
