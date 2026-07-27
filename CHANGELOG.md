@@ -6,6 +6,98 @@ All notable fork changes are recorded here. Versions use the fork's
 `customBaseVersionName+customBuildNumber` scheme (the base mirrors the upstream App Manager release
 this fork is built on).
 
+## 4.1.0+7 — 2026-07-27
+
+A fork-feature release: a per-app **anti-snooping page** that gathers every privacy-invasive
+capability the phone will actually let us switch off, remembers each decision against the package
+name, and re-applies it wherever that package turns up next.
+
+### 盗み見 — the Snooping tab
+
+- A new **second tab** on every app-details page, immediately after *App info*. It collects the
+  privacy-relevant capabilities that are otherwise scattered across the **App Ops** and
+  **Permissions** tabs — among hundreds of rows that mostly cannot be moved — into eight groups:
+  **location**, **microphone & camera**, **messages & calls**, **personal data**, **files & media**,
+  **watching the screen**, **nearby & network**, and **background activity**.
+- Switch sense matches the rest of the app: **on = the app is allowed**, off = blocked. The state
+  line is red when a capability is allowed and green when it is blocked, so a locked-down app reads
+  as a page of green at a glance.
+- Every flip is **recorded**, not just applied. Each row shows its live state, whether a decision is
+  saved for it, and why it is listed; long-press explains what the saved decision means and offers to
+  forget it.
+- Overflow actions: **Block everything** (with confirmation), **Show all capabilities**,
+  **Re-apply on install**, **Forget saved settings**, and a refresh.
+- Group headings span the full width when the list goes multi-column, so the tab reads correctly
+  unfolded on the tri-fold.
+
+### No decorative switches
+
+The tab's one promise is that nothing on it is for show. That is enforced structurally rather than by
+a hand-maintained list:
+
+- Capabilities name their app-op by **AOSP name**, never by numeric code — codes are renumbered
+  between Android releases, names are not. The catalogue resolves names against the running platform
+  and silently drops anything that does not exist there.
+- A row survives only if we hold the privileges to change it. **Without ADB or Shizuku the list is
+  empty** and a warning says why, rather than showing switches that would do nothing.
+- Ops that Android redirects to a **different controlling op** are dropped, because they have no
+  storage slot of their own and can never move — for this app, for `adb`, or for root. This removed
+  **GPS** and **Continuous location tracking**, both in fact governed by the *Precise* and
+  *Approximate location* rows, which remain. The rule is expressed as the platform's own
+  (`opToSwitch(op) != op`) rather than as a list of names, so a capability that Android merges on one
+  version and splits on another needs no maintenance.
+- Rows report the mode the system **actually enforces**, not the stored per-op entry — the latter
+  stays absent until something writes it, so a row built on it can claim *Allowed* for a capability
+  already being denied.
+
+### Three tiers, decided on the device
+
+- **Requested** — the app declares the permission, or its app-op already carries a non-default mode.
+- **Reachable without asking** — no manifest permission gates the op, so the app can use it without
+  declaring anything: **screen capture**, **clipboard reads**, **assistant screen reads and
+  screenshots**, **VPN**, **accessibility**, **background activity**. Shown by default, because "not
+  requested" does not mean "cannot use".
+- **Not requested** — permission-gated and never asked for. Hidden behind **Show all capabilities**,
+  where it acts as a **pre-set**: because decisions are re-applied on install and update, blocking the
+  microphone today on an app that has no microphone permission means the block lands the moment a
+  future update starts asking for one.
+
+Which tier a capability falls into is computed on the device, from what the platform reports — not
+hardcoded per app or per capability.
+
+### Saved decisions travel
+
+- Decisions live in their own preferences file keyed by **package name**, so they survive uninstalling
+  the app entirely, and an archive imported onto a phone that has never seen the app is kept verbatim
+  until that package finally appears.
+- A capability with **no** saved decision is a real third state: nothing is written for it, so an
+  import never disturbs a switch you never touched. Unknown ids are preserved through a
+  read-modify-write, so a file written by a newer build survives a round-trip through an older one.
+- The store joins settings **Export/Import** as a seventh category, **Anti-snooping settings** (wire
+  id `snooping`) — which also means the 保存復元 automation contract can request it by name.
+
+### Re-applying
+
+- A **manifest-registered receiver** re-applies stored decisions when a package is installed or
+  updated. Updates count too: an app update can quietly reset an op that was blocked.
+- A **sweep at startup**, at the point where privileges are known to be settled, covers importing an
+  archive onto a phone that already has the apps, and any install that happened while ADB/Shizuku was
+  unavailable. Nothing is ever dropped — only deferred to the next launch.
+- Both paths share the **same resolver** the tab itself uses, so the replay can never disagree with
+  what the page offered.
+
+### Fixes
+
+- **Call microphone / call camera would not switch off.** The shared app-op helper returns early when
+  the current mode already equals the target, comparing the *enforced* mode while the row displays the
+  *stored* one; where the two disagreed the write was silently swallowed and the switch snapped back.
+  Ungated and pre-set rows now write the mode unconditionally. Rows carrying a real runtime permission
+  still go through the full grant/revoke path, which moves the permission, the op and the permission
+  flags together.
+- A **not-requested** row moves the app-op **alone**. Asking the platform to grant or revoke a
+  permission the app never declared throws, which would have failed the toggle and lost the very
+  pre-set it was recording.
+
 ## 4.1.0+5 — 2026-07-25
 
 A fork-feature release: the settings export becomes **remote-triggerable**, so an external automation
