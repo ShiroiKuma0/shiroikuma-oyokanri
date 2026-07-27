@@ -48,6 +48,7 @@ public abstract class AppDetailsFragment extends Fragment implements SwipeRefres
             SIGNATURES,
             SHARED_LIBRARIES,
             OVERLAYS,
+            SNOOPING,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface Property {
@@ -66,6 +67,14 @@ public abstract class AppDetailsFragment extends Fragment implements SwipeRefres
     public static final int SIGNATURES = 10;
     public static final int SHARED_LIBRARIES = 11;
     public static final int OVERLAYS = 12;
+    /**
+     * Fork: the anti-snooping tab. Appended at the end rather than inserted at
+     * its display position (1, right after App info) on purpose — these constants
+     * index the view model's per-property state, so renumbering them would
+     * silently repoint every existing switch. Display order is decoupled by
+     * {@code AppDetailsActivity.TAB_PROPERTIES}.
+     */
+    public static final int SNOOPING = 13;
 
     @IntDef(value = {
             SORT_BY_NAME,

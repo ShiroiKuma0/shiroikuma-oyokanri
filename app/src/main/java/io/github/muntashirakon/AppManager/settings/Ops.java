@@ -60,6 +60,7 @@ import io.github.muntashirakon.AppManager.servermanager.ServerConnectionFailure;
 import io.github.muntashirakon.AppManager.servermanager.ServerStatusChangeReceiver;
 import io.github.muntashirakon.AppManager.servermanager.WifiWaitService;
 import io.github.muntashirakon.AppManager.session.SessionMonitoringService;
+import io.github.muntashirakon.AppManager.snooping.SnoopingEnforcer;
 import io.github.muntashirakon.AppManager.users.Owners;
 import io.github.muntashirakon.AppManager.users.Users;
 import io.github.muntashirakon.AppManager.utils.AppPref;
@@ -227,6 +228,14 @@ public class Ops {
                     context.stopService(service);
                 }
             }
+        }
+        if (authenticated) {
+            // Fork: the one point where privileges are known to be settled, so
+            // the one place worth sweeping the stored anti-snooping decisions
+            // from. Covers an archive imported onto a phone that already has the
+            // apps, and any install we could not act on at the time because the
+            // ADB/Shizuku server was not up. Runs off the main thread.
+            SnoopingEnforcer.enforceAllAsync(context);
         }
     }
 

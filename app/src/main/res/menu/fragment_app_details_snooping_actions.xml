@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Fork: overflow for the app-details Snooping tab. -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_refresh_details"
+        android:icon="@drawable/ic_refresh"
+        android:title="@string/refresh"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_snooping_block_all"
+        android:icon="@drawable/ic_block"
+        android:title="@string/snooping_block_all"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_snooping_show_all"
+        android:checkable="true"
+        android:title="@string/snooping_show_all"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_snooping_auto_apply"
+        android:checkable="true"
+        android:title="@string/snooping_auto_apply"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_snooping_forget"
+        android:title="@string/snooping_forget"
+        app:showAsAction="never" />
+
+</menu>

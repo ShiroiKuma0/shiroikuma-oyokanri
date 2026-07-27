@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fork: group heading of the app-details Snooping tab (Location, Microphone
+     & camera, …). Spans the full width even when the list is multi-column. -->
+<androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="?attr/listItemPaddingHorizontal"
+    android:paddingTop="16dp"
+    android:paddingBottom="4dp">
+
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/snooping_group_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?attr/textAppearanceTitleSmall"
+        android:textStyle="bold"
+        tools:text="Location" />
+
+</androidx.appcompat.widget.LinearLayoutCompat>

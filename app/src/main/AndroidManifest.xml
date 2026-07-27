@@ -1640,6 +1640,23 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+        <!-- Fork: re-applies the stored anti-snooping decisions when a package
+             appears. Manifest-registered on purpose: PACKAGE_ADDED is one of the
+             implicit broadcasts still delivered to manifest receivers on O+, and
+             the whole point is to catch installs that happen while 応用管理 is
+             not running. -->
+        <receiver
+            android:name=".snooping.SnoopingInstallReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_ADDED" />
+
+                <data android:scheme="package" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
         <!-- Fork: the 保存復元 state-export automation contract (白い熊 自由作業盤
              fires these at every sister app). No android:permission — the
              caller cannot hold one; the automation token is the gate. -->

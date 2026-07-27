@@ -15,6 +15,8 @@ import io.github.muntashirakon.AppManager.R;
 public final class AppDetailsTabs {
     private static final List<AppDetailsTab> DEFAULT_TABS = Collections.unmodifiableList(Arrays.asList(
             new AppDetailsTab(AppDetailsFragment.APP_INFO, R.string.app_info),
+            // Fork: anti-snooping tab — displayed second, right after App info.
+            new AppDetailsTab(AppDetailsFragment.SNOOPING, R.string.snooping),
             new AppDetailsTab(AppDetailsFragment.ACTIVITIES, R.string.activities),
             new AppDetailsTab(AppDetailsFragment.SERVICES, R.string.service),
             new AppDetailsTab(AppDetailsFragment.RECEIVERS, R.string.receivers),

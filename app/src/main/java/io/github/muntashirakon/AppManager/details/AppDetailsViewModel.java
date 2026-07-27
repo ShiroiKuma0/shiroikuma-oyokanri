@@ -53,8 +53,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -83,6 +85,7 @@ import io.github.muntashirakon.AppManager.details.struct.AppDetailsLibraryItem;
 import io.github.muntashirakon.AppManager.details.struct.AppDetailsOverlayItem;
 import io.github.muntashirakon.AppManager.details.struct.AppDetailsPermissionItem;
 import io.github.muntashirakon.AppManager.details.struct.AppDetailsServiceItem;
+import io.github.muntashirakon.AppManager.details.struct.AppDetailsSnoopingItem;
 import io.github.muntashirakon.AppManager.logs.Log;
 import io.github.muntashirakon.AppManager.misc.AdvancedSearchView;
 import io.github.muntashirakon.AppManager.misc.AdvancedSearchView.ChoiceGenerator;
@@ -105,6 +108,9 @@ import io.github.muntashirakon.AppManager.scanner.NativeLibraries;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
 import io.github.muntashirakon.AppManager.settings.Ops;
 import io.github.muntashirakon.AppManager.settings.Prefs;
+import io.github.muntashirakon.AppManager.snooping.SnoopingEnforcer;
+import io.github.muntashirakon.AppManager.snooping.SnoopingPrefs;
+import io.github.muntashirakon.AppManager.snooping.SnoopingResolver;
 import io.github.muntashirakon.AppManager.types.PackageChangeReceiver;
 import io.github.muntashirakon.AppManager.users.UserInfo;
 import io.github.muntashirakon.AppManager.users.Users;
@@ -475,6 +481,14 @@ public class AppDetailsViewModel extends AndroidViewModel {
                 mOverlays.postValue(new ArrayList<>(appDetailsItems));
                 break;
             }
+            case AppDetailsFragment.SNOOPING:
+                // Fork: the snooping tab is a fixed, grouped catalogue — neither
+                // sorted nor searched, so re-posting the current list is all a
+                // "filter and sort" means here.
+                synchronized (mSnoopingItems) {
+                    mSnooping.postValue(new ArrayList<>(mSnoopingItems));
+                }
+                break;
             case AppDetailsFragment.APP_INFO:
             case AppDetailsFragment.CONFIGURATIONS:
             case AppDetailsFragment.FEATURES:
@@ -943,6 +957,8 @@ public class AppDetailsViewModel extends AndroidViewModel {
                 return observeInternal(mOverlays);
             case AppDetailsFragment.APP_INFO:
                 return observeInternal(mAppInfo);
+            case AppDetailsFragment.SNOOPING:
+                return observeInternal(mSnooping);
             default:
                 throw new IllegalArgumentException("Invalid property: " + property);
         }
@@ -998,6 +1014,9 @@ public class AppDetailsViewModel extends AndroidViewModel {
                     break;
                 case AppDetailsFragment.APP_INFO:
                     loadAppInfo();
+                    break;
+                case AppDetailsFragment.SNOOPING:
+                    loadSnooping();
                     break;
             }
             Optional.ofNullable(mReceiver).ifPresent(PackageIntentReceiver::resumeWatcher);
@@ -1548,6 +1567,111 @@ public class AppDetailsViewModel extends AndroidViewModel {
             }
         }
         filterAndSortItemsInternal(AppDetailsFragment.APP_OPS);
+    }
+
+    // ── Fork: anti-snooping tab ────────────────────────────────────────────────
+
+    @NonNull
+    private final MutableLiveData<List<AppDetailsSnoopingItem>> mSnooping = new MutableLiveData<>();
+    @NonNull
+    private final List<AppDetailsSnoopingItem> mSnoopingItems = new ArrayList<>();
+
+    @WorkerThread
+    private void loadSnooping() {
+        PackageInfo packageInfo = getPackageInfoInternal();
+        synchronized (mSnoopingItems) {
+            mSnoopingItems.clear();
+            if (packageInfo != null && packageInfo.applicationInfo != null && !mExternalApk) {
+                mSnoopingItems.addAll(SnoopingResolver.resolve(packageInfo, mUserId, mAppOpsManager,
+                        SnoopingPrefs.isShowAllEnabled()));
+            }
+        }
+        filterAndSortItemsInternal(AppDetailsFragment.SNOOPING);
+    }
+
+    /**
+     * Fork: allow or block one snooping capability, and <b>record the decision</b>.
+     * <p>
+     * The recording is the durable half: it is keyed by package name in
+     * {@link SnoopingPrefs}, so it survives uninstalling the app, travels in a
+     * settings export, and is replayed by {@link SnoopingEnforcer} when the
+     * package turns up on another phone.
+     *
+     * @return whether the live system state was changed successfully.
+     */
+    @WorkerThread
+    public boolean setSnoopingAllowed(@NonNull AppDetailsSnoopingItem item, boolean allowed) {
+        if (mExternalApk || mPackageName == null) return false;
+        PackageInfo packageInfo = getPackageInfoInternal();
+        if (packageInfo == null) return false;
+        try {
+            item.setAllowed(packageInfo, mAppOpsManager, allowed);
+        } catch (RemoteException | PermissionException e) {
+            Log.w(TAG, "Could not set snooping capability %s", e, item.capability.entry.id);
+            return false;
+        }
+        SnoopingPrefs.setSetting(mPackageName, item.capability.entry.id, allowed);
+        item.storedDecision = allowed;
+        return true;
+    }
+
+    /**
+     * Fork: block every capability currently listed on the snooping tab that is
+     * not already blocked, recording each decision.
+     *
+     * @return the number of capabilities blocked, or {@code -1} on failure.
+     */
+    @WorkerThread
+    public int blockAllSnooping() {
+        if (mExternalApk || mPackageName == null) return -1;
+        PackageInfo packageInfo = getPackageInfoInternal();
+        if (packageInfo == null) return -1;
+        Map<String, Boolean> decisions = new LinkedHashMap<>();
+        int blocked = 0;
+        synchronized (mSnoopingItems) {
+            for (AppDetailsSnoopingItem item : mSnoopingItems) {
+                if (!item.isAllowed()) {
+                    // Already blocked, but still record the decision so it is
+                    // re-asserted after a reinstall or on another phone.
+                    decisions.put(item.capability.entry.id, false);
+                    continue;
+                }
+                try {
+                    item.setAllowed(packageInfo, mAppOpsManager, false);
+                    decisions.put(item.capability.entry.id, false);
+                    ++blocked;
+                } catch (RemoteException | PermissionException e) {
+                    Log.w(TAG, "Could not block %s", e, item.capability.entry.id);
+                }
+            }
+        }
+        if (!decisions.isEmpty()) {
+            SnoopingPrefs.setSettings(mPackageName, decisions);
+        }
+        return blocked;
+    }
+
+    /** Fork: forget one recorded snooping decision (live state untouched). */
+    @AnyThread
+    public void forgetSnoopingSetting(@NonNull AppDetailsSnoopingItem item) {
+        if (mPackageName != null) {
+            SnoopingPrefs.clearSetting(mPackageName, item.capability.entry.id);
+            item.storedDecision = null;
+        }
+    }
+
+    /** Fork: forget every recorded snooping decision for this package (live state untouched). */
+    @AnyThread
+    public void forgetSnoopingSettings() {
+        if (mPackageName != null) {
+            SnoopingPrefs.clearPackage(mPackageName);
+        }
+    }
+
+    /** Fork: how many snooping decisions are currently stored for this package. */
+    @AnyThread
+    public int getStoredSnoopingCount() {
+        return mPackageName != null ? SnoopingPrefs.getSettings(mPackageName).size() : 0;
     }
 
     @NonNull

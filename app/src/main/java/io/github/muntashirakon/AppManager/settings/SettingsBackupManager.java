@@ -32,6 +32,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 
 import io.github.muntashirakon.AppManager.R;
+import io.github.muntashirakon.AppManager.snooping.SnoopingPrefs;
 import io.github.muntashirakon.io.Path;
 
 /**
@@ -84,6 +85,7 @@ public final class SettingsBackupManager {
         MONITOR("monitor", R.string.settings_eim_cat_monitor),
         TOOLBAR("toolbar", R.string.settings_eim_cat_toolbar),
         NOTES("notes", R.string.settings_eim_cat_notes),
+        SNOOPING("snooping", R.string.settings_eim_cat_snooping),
         PROFILES("profiles", R.string.settings_eim_cat_profiles);
 
         /**
@@ -141,6 +143,10 @@ public final class SettingsBackupManager {
     private static final Set<String> TOOLBAR_PREFS = new HashSet<>(Arrays.asList(
             "am_main_toolbar", "am_main_page_profile_filter"));
     private static final String NOTES_PREFS = "shiroikuma_notes";
+    // Fork: the per-package anti-snooping decisions. Keyed by package name, so the
+    // file is meaningful on a phone that does not (yet) have those apps — that is
+    // the whole point of carrying it across.
+    private static final String SNOOPING_PREFS = SnoopingPrefs.PREF_FILE;
 
     /** True for prefs files that are device-local and never travel in an archive. */
     private static boolean isExcluded(@NonNull String entryName) {
@@ -160,6 +166,7 @@ public final class SettingsBackupManager {
         if (MONITOR_PREFS.contains(base)) return Category.MONITOR;
         if (TOOLBAR_PREFS.contains(base)) return Category.TOOLBAR;
         if (NOTES_PREFS.equals(base)) return Category.NOTES;
+        if (SNOOPING_PREFS.equals(base)) return Category.SNOOPING;
         return Category.GENERAL;
     }
 
