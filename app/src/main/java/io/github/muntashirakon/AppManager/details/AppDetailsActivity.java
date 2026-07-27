@@ -351,6 +351,14 @@ public class AppDetailsActivity extends BaseActivity {
             switch (id) {
                 case AppDetailsFragment.APP_INFO:
                     return putFragment(id, new AppInfoFragment());
+                // Fork: anti-snooping tab.
+                case AppDetailsFragment.SNOOPING: {
+                    AppDetailsSnoopingFragment fragment = new AppDetailsSnoopingFragment();
+                    Bundle args = new Bundle();
+                    args.putInt(AppDetailsFragment.ARG_TYPE, id);
+                    fragment.setArguments(args);
+                    return putFragment(id, fragment);
+                }
                 case AppDetailsFragment.ACTIVITIES:
                 case AppDetailsFragment.SERVICES:
                 case AppDetailsFragment.RECEIVERS:
