@@ -6,6 +6,80 @@ All notable fork changes are recorded here. Versions use the fork's
 `customBaseVersionName+customBuildNumber` scheme (the base mirrors the upstream App Manager release
 this fork is built on).
 
+## 4.1.0+16 — 2026-07-28
+
+A hardening release for the anti-snooping page. It now shows **only what can actually snoop**, its
+writes land where the block really lives, and it never records a decision the phone did not honour.
+The launcher icon also stops burying the screen you were on.
+
+### 盗み見 — only what can snoop, or be made to
+
+- **Capabilities the app could never use are gone from the page.** Each one now carries a
+  prerequisite read from the app's own manifest, and a row is dropped when that prerequisite is
+  missing beyond doubt: media reads without a `READ_MEDIA_*`/storage permission, hotword and in-call
+  microphone without `RECORD_AUDIO`, in-call camera without `CAMERA`, Write SMS without a single SMS
+  permission (so the app can never hold the default-SMS role), device identifiers for any app that
+  is not privileged (signature-only since Android 10), and accessibility, VPN and the two assistant
+  rows without a `<service>` bound with the matching `BIND_*` permission — the assistant also accepts
+  an `ACTION_ASSIST` activity. **A zero-permission app drops from sixteen rows to four**: screen
+  capture, clipboard, and the two background ops, which no manifest gates and which therefore can
+  never be hidden this way.
+- Nothing is learned from a failed attempt: the check is recomputed **on every load**, so an update
+  that adds the missing permission or service brings the row back by itself. It fails open on
+  anything ambiguous, and *Show all capabilities* still lists everything it filtered.
+- **A capability that refuses to turn on is permanently safe, so it leaves the page.** Android cannot
+  be asked this in advance — it accepts a write and silently discards it — so it is learnt the only
+  way it can be: a "turn it on" write that leaves the enforced mode unchanged marks that capability
+  and the row disappears, with a toast saying why. The mark is device-local (it never travels in a
+  settings export, since it says nothing about another phone), it only ever hides a row that is
+  currently **blocked** — a stale mark can never conceal actual snooping — and it is cleared when the
+  app is installed or updated, and when 応用管理 itself is updated.
+
+### Writes that actually land
+
+- **Every write now goes to both the uid and the package slot.** `AppOpsService` *deletes* an entry
+  whose mode equals the op's default instead of storing it, so un-blocking a capability whose default
+  is *allow* cleared a uid entry that had never existed while a package-level `ignore` — where a block
+  from `adb`, another tool, or an earlier build of this app actually lives — kept winning. Nothing
+  threw, the switch stayed off, and the decision was saved anyway. Both levels are written now, which
+  is correct in every combination: a value equal to the default removes the entry at that level, any
+  other value is stored there, so the two always agree afterwards.
+- A **repair pass** forces the package entry when the enforced mode still hasn't moved, leaving the
+  permission path's `MODE_FOREGROUND` nuance alone unless it demonstrably failed.
+- **A decision is recorded only after the phone confirms it.** The enforced mode is re-read after
+  every write, and neither a single toggle nor *Block everything* stores anything the platform did not
+  honour — a refused toggle now reports failure instead of leaving a row that claims one thing while
+  the switch says another.
+- **Only departures from the default are stored.** A toggle back to the untouched state clears the
+  record rather than writing one, so set-then-unset leaves nothing to export or re-apply, and
+  *Block everything* clears such entries explicitly instead of merging past them.
+
+### Reading a row at a glance
+
+- **One accent colour drives the whole row.** Red when the capability is allowed — the app can do it
+  right now; yellow when it is blocked against a permissive default — you closed it; grey when it is
+  blocked and blocked is simply the default. The colour lands on the switch's dot and outline as well
+  as the card, and a **thick frame marks a state you chose**, which is the only tell for the case that
+  has none: a capability that is on by default and is off only because you turned it off.
+- The **Allowed pill is filled blood red** with near-white text; both descriptive lines now sit on
+  tinted chips, because the shared success/failure colours (`#1b8654` / `#ff0028`) were close to
+  illegible at body-small size on a pure-black page.
+- The status line no longer mentions the stored decision. It would only restate the switch, and the
+  store now holds nothing that isn't a real departure from the default.
+- **"needs no permission" now keys off the capability, not the row's internal tier** — blocking a row
+  used to make the label vanish, so the page silently changed what it claimed about itself. The app-op
+  line dropped its duplicate parenthetical and simply names the op.
+
+### Fixes
+
+- **The launcher icon stops burying the screen you were on.** The splash activity is a trampoline: it
+  starts the main window and finishes, so tapping the icon while the app was already open could run a
+  fresh splash on top of the existing task and stack a fresh main window over the app-details page you
+  had left — measured on-device, every such main window carried `launchedFromPackage=shiroikuma.oyokanri`,
+  i.e. the app had started it itself. It now detects that case before the theme, the splash screen and
+  the layout are touched, and simply finishes: no splash, no animation, straight back to where you
+  were. A genuinely cold start is unchanged.
+
 ## 4.1.0+7 — 2026-07-27
 
 A fork-feature release: a per-app **anti-snooping page** that gathers every privacy-invasive

@@ -15,7 +15,7 @@ batch-op dialog**, one-tap **main-list quick actions**, readable **per-app backu
 **remote-triggerable settings export**, and the **AM Debug** toolset unlocked in a normal release
 build.
 
-**📥 Latest release: [`4.1.0+7`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+16`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
 </div>
 
@@ -41,23 +41,37 @@ capabilities that are otherwise scattered across the App Ops and Permissions tab
 rows that mostly cannot be moved — into eight readable groups: location, microphone & camera, messages
 & calls, personal data, files & media, watching the screen, nearby & network, background activity.
 
-**Nothing on the page is decorative.** A row appears only if this phone will really let it move: ops
-that don't exist on this Android version are dropped, ops the platform redirects to a *different*
-controlling op are dropped (they have no slot of their own and can never change — not for this app,
-not for `adb`, not for root), and without ADB or Shizuku the list is simply empty with a note saying
-why. Rows report the mode the system **actually enforces**, not the stored one, so a switch never
-claims *Allowed* for something already being denied.
+**The page shows only what is snooping, or what can be made to.** A row survives three questions: can
+this phone move it, could this app ever use it, and is it still worth showing? Ops that don't exist on
+this Android version are dropped, ops the platform redirects to a *different* controlling op are
+dropped (they have no slot of their own and can never change — not for this app, not for `adb`, not
+for root), and capabilities the app's own manifest rules out are dropped too: no `RECORD_AUDIO`, no
+in-call microphone; no service bound with `BIND_VPN_SERVICE`, no VPN; device identifiers are
+signature-only, so no ordinary app can reach them. A zero-permission app goes from sixteen rows to
+**four**. Nothing is learned from a failed attempt here — it is read from the manifest on every load,
+so an update that adds the missing permission or service brings the row straight back.
+
+**Rows report the system, not our bookkeeping.** They show the mode Android *actually enforces*, so a
+switch never claims *Allowed* for something already being denied; every write goes to **both** the uid
+and the package slot, because a block can live in either and clearing only one silently leaves it
+standing; and a decision is recorded **only after the phone is asked whether it took**. If a
+capability refuses to turn on at all, it is permanently safe — the row says so and leaves the page.
+
+**Colour tells the story at a glance.** Red means the app can do this *right now*. A thick frame marks
+a state you chose — red where you opened something the platform keeps shut, yellow where you closed
+something it leaves open. Grey means off, and off is simply what a fresh install gives you.
 
 It also lists what an app can reach **without asking for anything** — screen capture, clipboard reads,
 assistant screen reads, VPN, accessibility, background activity — because "never requested" is not the
-same as "cannot use". Behind *Show all capabilities* sit the permission-gated ones the app hasn't
-requested, usable as **pre-sets**: block the microphone today on an app that has none, and the block
-lands the day an update starts asking for one.
+same as "cannot use". Behind *Show all capabilities* sit everything filtered out, usable as
+**pre-sets**: block the microphone today on an app that has none, and the block lands the day an
+update starts asking for one.
 
-**Decisions are remembered, not just applied.** They're keyed by package name, so they outlive
-uninstalling the app, ride along in a settings export, and are re-applied automatically when that
-package appears on another phone — on install, on update, and on every startup once privileges are
-up. Set an app up once; it stays that way, everywhere.
+**Decisions are remembered, not just applied** — and only the ones that mean something. A setting that
+matches the platform default is not stored at all, so set-then-unset leaves nothing behind. What is
+stored is keyed by package name, so it outlives uninstalling the app, rides along in a settings export,
+and is re-applied automatically when that package appears on another phone — on install, on update, and
+on every startup once privileges are up. Set an app up once; it stays that way, everywhere.
 
 ## 🎨 Configurable yellow-on-black UI
 
