@@ -9,13 +9,13 @@
 **Android app manager & control panel — themed and tooled to taste.**
 
 A fork of [AppManager](https://github.com/MuntashirAkon/AppManager) with **major additions**: a per-app
-**anti-snooping page**, a configurable **yellow-on-black UI** with a deep customization page, a
-hard-blocking **protected profile**, a from-scratch **process monitor / reaper**, a **pausable
-batch-op dialog**, one-tap **main-list quick actions**, readable **per-app backups**, a
-**remote-triggerable settings export**, and the **AM Debug** toolset unlocked in a normal release
-build.
+**anti-snooping page** that can cut an app off the network entirely, a configurable
+**yellow-on-black UI** with a deep customization page, a hard-blocking **protected profile**, a
+from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-tap **main-list quick
+actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
+Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+16`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+23`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
 </div>
 
@@ -38,18 +38,33 @@ few control-panel tools on top.
 
 Every app-details page gets a **Snooping** tab, second in the strip, gathering the privacy-invasive
 capabilities that are otherwise scattered across the App Ops and Permissions tabs — among hundreds of
-rows that mostly cannot be moved — into eight readable groups: location, microphone & camera, messages
-& calls, personal data, files & media, watching the screen, nearby & network, background activity.
+rows that mostly cannot be moved — into ten groups ordered by **consequence, not by subsystem**:
+sending data out, accessibility & notifications, watching the screen, location, microphone & camera,
+messages & calls, personal data, files & media, nearby, running in the background.
 
-**The page shows only what is snooping, or what can be made to.** A row survives three questions: can
-this phone move it, could this app ever use it, and is it still worth showing? Ops that don't exist on
-this Android version are dropped, ops the platform redirects to a *different* controlling op are
-dropped (they have no slot of their own and can never change — not for this app, not for `adb`, not
-for root), and capabilities the app's own manifest rules out are dropped too: no `RECORD_AUDIO`, no
-in-call microphone; no service bound with `BIND_VPN_SERVICE`, no VPN; device identifiers are
-signature-only, so no ordinary app can reach them. A zero-permission app goes from sixteen rows to
-**four**. Nothing is learned from a failed attempt here — it is read from the manifest on every load,
-so an update that adds the missing permission or service brings the row straight back.
+**Network first, because nothing an app collects can hurt you until it can leave the phone.**
+`INTERNET` is not a permission anyone can revoke — it is baked into the app's uid at install — so the
+row is a firewall instead: allowed, *no background mobile data* (the per-uid network policy, with the
+row naming the exact policy it got so it never claims more than it does), or **blocked on every
+interface, foreground included**, using the same per-uid firewall chains a root firewall uses.
+
+**App-ops are only half of it.** The capabilities that matter most on a modern phone are gated
+somewhere else entirely, so a row drives whichever mechanism actually governs it: an app-op, a runtime
+permission, or a **lever** — the `Settings.Secure` list that really decides whether an accessibility
+service or a notification listener is running, the assistant role holder, the doze whitelist. The
+accessibility and notification-listener rows switch off the two most invasive things an unprivileged
+app can hold: one sees every window and keystroke, the other the content of every notification.
+
+**The page shows only what is snooping, or what can be made to.** A row survives four questions: can
+this phone move it, can the write land on *this* app, could the app ever use it, and is it still worth
+showing? Ops that don't exist here are dropped; ops the platform redirects to a *different*
+controlling op are dropped (they have no slot of their own and can never change — not for this app,
+not for `adb`, not for root); permission-only rows are dropped where the platform would silently
+re-grant what you revoked; and capabilities the app's own manifest rules out are dropped too — no
+`RECORD_AUDIO`, no in-call microphone; no service bound with `BIND_VPN_SERVICE`, no VPN. A
+zero-permission app goes from sixteen rows to **four**. Nothing is learned from a failed attempt here:
+it is read from the manifest on every load, so an update that adds the missing permission or service
+brings the row straight back.
 
 **Rows report the system, not our bookkeeping.** They show the mode Android *actually enforces*, so a
 switch never claims *Allowed* for something already being denied; every write goes to **both** the uid
@@ -65,7 +80,8 @@ It also lists what an app can reach **without asking for anything** — screen c
 assistant screen reads, VPN, accessibility, background activity — because "never requested" is not the
 same as "cannot use". Behind *Show all capabilities* sit everything filtered out, usable as
 **pre-sets**: block the microphone today on an app that has none, and the block lands the day an
-update starts asking for one.
+update starts asking for one. And because a hand-written catalogue of platform constants rots quietly,
+⋮ → *Ops not in the catalogue* asks the phone itself what it has that the page does not yet cover.
 
 **Decisions are remembered, not just applied** — and only the ones that mean something. A setting that
 matches the platform default is not stored at all, so set-then-unset leaves nothing behind. What is
