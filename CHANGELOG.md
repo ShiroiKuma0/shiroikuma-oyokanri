@@ -6,6 +6,112 @@ All notable fork changes are recorded here. Versions use the fork's
 `customBaseVersionName+customBuildNumber` scheme (the base mirrors the upstream App Manager release
 this fork is built on).
 
+## 4.1.0+23 — 2026-07-28
+
+The anti-snooping page stops being an app-ops page. The capabilities that matter most on a modern
+phone are not app-ops at all, so a row now drives whichever mechanism actually governs it — and the
+most consequential one, whether an app can reach the network, gets a real firewall behind it. Several
+things were also measured against the phone and then **removed**, because they could never have
+worked; those findings are listed too.
+
+### 🌐 Sending data out — the new first group
+
+- **"Use the internet" is now a row, and it is the first one on the page.** Nothing an app collects
+  can hurt you until it can leave the phone, so the ordering of the whole tab was changed to put it
+  there: network, accessibility & notifications, watching the screen, location, microphone & camera,
+  messages & calls, personal data, files & media, nearby, background. Groups are ordered by
+  consequence rather than by subsystem.
+- `INTERNET` cannot be revoked by anyone — not by this app, not by `adb`, not by root. It is not
+  enforced by a permission check at all: an app that declares it is put into the `inet` group (gid
+  3003) when its uid is created at install, and a live uid cannot be taken out of a group. So the row
+  is a **firewall**, with three positions:
+  - **Allowed** — nothing set.
+  - **No background mobile data** — the per-uid network policy. The strongest rung the ROM actually
+    declares is discovered rather than assumed (LineageOS and some OEM builds can reject whole
+    transports; stock Android offers only metered-background), and **the row names the rung it got**,
+    so the switch never claims more than it does.
+  - **Blocked** — a per-uid firewall DENY on **every interface, foreground included**, using the
+    per-uid firewall chains Android 13 exposes. This is the same mechanism a root firewall uses.
+- The chain is chosen deliberately: the chains AOSP drives itself are rewritten whenever an app
+  changes standby bucket, which would silently undo the rule. The rule is written to a chain the
+  platform reserves for exactly this and never touches.
+- The rule cannot be read back before Android 14, so what we wrote is recorded locally — **including
+  the uid**, because a reinstall changes it and a stale rule must not outlive the app onto whichever
+  uid the system recycles next. Unblocking clears the rule for the old uid as well as the current one.
+  That record is device-local and never travels in a settings export; the decision itself still does.
+
+### 🔊 Four more capabilities that were never app-ops
+
+A row can now be driven by a **lever** — a system list, a network policy, a role holder, the doze
+whitelist — instead of an app-op or a permission:
+
+- **"Accessibility service enabled"** and **"Reads all notifications"** drive the `Settings.Secure`
+  component lists that actually gate them. These are the two most invasive things an unprivileged app
+  can hold — one sees every window, every text field and every keystroke of every other app; the other
+  sees the content of every notification, including the one-time codes banks put there — and neither
+  is stopped by the app-op the page used to show for it. Those ops remain as separate rows, since they
+  are separately settable, but the list is the real gate.
+- **"Is the device assistant"** clears the assistant role. `ASSIST_STRUCTURE` and `ASSIST_SCREENSHOT`
+  describe what the assistant is handed; this decides whether the app is the assistant at all. Both
+  mechanisms are read and cleared — the role holder and the older secure-settings pair — because an
+  app left in either one keeps the job.
+- **"Exempt from battery optimisation"** takes an app off the doze whitelist. Not a capability of its
+  own; it is what turns every other capability into a continuous one.
+
+### 🧭 The catalogue now asks the phone what it missed
+
+- **⋮ → "Ops not in the catalogue"** walks every app-op the device has, drops the ones that can never
+  hold a mode of their own and the ones already listed, and reports the rest with this app's current
+  mode. A hand-written list of platform constants rots quietly; this turns "what did we forget" into
+  something you read rather than remember.
+- It found fifty on Android 13. Thirteen are now on the page: **recording incoming call audio**,
+  **capturing played-back audio**, binding as an accessibility service, activating a platform VPN,
+  managing IPsec tunnels, seeing every installed app, reaching across work/personal profiles,
+  bypassing storage isolation, reading financial SMS, SIM authentication with the device identifier,
+  placing calls, the usage-stats loader, and turning Wi-Fi on and off (which is how an app forces a
+  scan, and a scan list is a location fix by another name).
+- Also added: reading SMS on the SIM, ambient audio triggers, bypassing scoped storage,
+  user-selected photo reads, user-initiated jobs, and the two Android 14 sandboxed camera/microphone
+  ops, which simply stay hidden until the phone has them.
+
+### 🩹 Honesty fixes
+
+- **A switch that could not move is gone.** "Location in the background" is the one capability with no
+  app-op behind it, so the permission itself is the lever — and for an app predating runtime
+  permissions the platform's revoke path can only act *through* an app-op, does nothing when there is
+  none, and then re-grants what you asked it to revoke. Such a row is now dropped, using the platform's
+  own rule, so a modern app keeps its working switch and an app that raises its target SDK gets the
+  row back with no maintenance.
+- **A refused write is never recorded as a decision** on permission-only and lever rows either. The
+  grant is re-read from the platform after the write — and where the permission has an app-op, the op
+  has the last word, because a legacy app's permission is revoked "compat" style: the grant stays and
+  the op is what actually stops it.
+- **The state a row reports is the state the platform stores.** `checkOperation` resolves a
+  foreground mode against the app's process state at that instant, so it is the right answer to "can
+  it do this right now" and the wrong one to "what did we set".
+- **A refused narrowing no longer deletes a row.** Asking for *less* access says nothing about whether
+  a capability can be turned on; treating it as "will not turn on" was removing rows that worked.
+- **Every dialog on the tab now carries the fork's yellow border**, through one shared presenter.
+
+### 🧪 Measured, then removed
+
+Two features shipped during this cycle and were taken out again once the phone was asked directly.
+Both removals are the page's own rule applied to itself: nothing that cannot act.
+
+- **Disabling the component behind a capability.** Since Android O the platform refuses component
+  state changes from a shell-privileged caller for anything that is not a test-only app —
+  `pm disable` answers *"Shell cannot change component state"*. The row action, and the fourth state
+  built on it, are gone. (Even where it works it is not a lock: an app can re-enable its own
+  components.)
+- **"Only while in use" on app-op rows.** A permission-backed op's mode is not independently settable
+  at all: the platform re-derives it from the permission grant and re-asserts it, so the write is
+  accepted and thrown away — a foreground write to `READ_EXTERNAL_STORAGE` came back as `ignore`.
+  This is also *why blocking works*, since blocking revokes the permission and the platform then
+  agrees. The platform's real "only while in use" is a permission distinction — an app granted
+  foreground location but not background location — which already has its own row on this page.
+  Camera and microphone have no such pair at all. The network row keeps its middle position, because
+  that one is a genuinely different mechanism and it demonstrably works.
+
 ## 4.1.0+16 — 2026-07-28
 
 A hardening release for the anti-snooping page. It now shows **only what can actually snoop**, its
