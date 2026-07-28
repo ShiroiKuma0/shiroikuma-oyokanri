@@ -51,9 +51,17 @@ public final class SnoopingEnforcer {
     private SnoopingEnforcer() {
     }
 
-    /** True when we currently hold enough privilege to change anything at all. */
+    /**
+     * True when we currently hold enough privilege to change anything at all.
+     * <p>
+     * App-ops and permissions cover the great majority of rows; the lever rows
+     * each carry their own, narrower privilege check
+     * ({@code SnoopingLever.isModifiable}), so a phone that can do one and not
+     * the other still gets the rows it can move.
+     */
     public static boolean canEnforce() {
-        return SelfPermissions.canModifyAppOpMode() || SelfPermissions.canModifyPermissions();
+        return SelfPermissions.canModifyAppOpMode() || SelfPermissions.canModifyPermissions()
+                || SelfPermissions.checkSelfOrRemotePermission(android.Manifest.permission.WRITE_SECURE_SETTINGS);
     }
 
     /**
@@ -126,7 +134,7 @@ public final class SnoopingEnforcer {
 
     @WorkerThread
     private static int enforceInternal(@NonNull String packageName, @UserIdInt int userId) {
-        Map<String, Boolean> stored = SnoopingPrefs.getSettings(packageName);
+        Map<String, Integer> stored = SnoopingPrefs.getSettings(packageName);
         if (stored.isEmpty()) {
             return 0;
         }
@@ -143,15 +151,14 @@ public final class SnoopingEnforcer {
         List<AppDetailsSnoopingItem> items = SnoopingResolver.resolve(packageInfo, userId, appOpsManager, true);
         int changed = 0;
         for (AppDetailsSnoopingItem item : items) {
-            Boolean desired = stored.get(item.capability.entry.id);
-            if (desired == null || desired == item.isAllowed()) {
+            Integer desired = stored.get(item.capability.entry.id);
+            if (desired == null || desired == item.getState()) {
                 continue;
             }
             try {
-                item.setAllowed(packageInfo, appOpsManager, desired);
+                item.setState(packageInfo, appOpsManager, desired);
                 ++changed;
-                Log.d(TAG, "%s: %s → %s", packageName, item.capability.entry.id,
-                        desired ? "allowed" : "blocked");
+                Log.d(TAG, "%s: %s → %d", packageName, item.capability.entry.id, desired);
             } catch (Throwable th) {
                 Log.w(TAG, "%s: could not apply %s", th, packageName, item.capability.entry.id);
             }

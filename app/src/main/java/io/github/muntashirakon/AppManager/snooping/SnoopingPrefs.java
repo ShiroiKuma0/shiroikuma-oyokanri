@@ -34,9 +34,9 @@ import io.github.muntashirakon.AppManager.utils.ContextUtils;
  * own — the file <i>is</i> the wire format.
  * <p>
  * Value encoding, per package: {@code "id=0,id2=1"} where the key is a
- * {@link SnoopingCatalog.Entry#id} and the value is {@code 1} for allowed,
- * {@code 0} for blocked. Absence is a third state — <i>not managed</i> — and is
- * never written; only capabilities you actually decided on are stored, so an
+ * {@link SnoopingCatalog.Entry#id} and the value is a {@link SnoopingState} —
+ * {@code 1} allowed, {@code 0} blocked, {@code 2} only-while-in-use. Absence is
+ * a further state — <i>not managed</i> — and is never written; only capabilities you actually decided on are stored, so an
  * import never disturbs anything you did not choose. Unknown ids are preserved
  * on read-modify-write so a settings file authored by a newer build (or on a
  * newer Android version, where more ops exist) survives a round-trip through an
@@ -83,25 +83,26 @@ public final class SnoopingPrefs {
     }
 
     /**
-     * The stored decisions for a package: capability id → {@code true} allowed /
-     * {@code false} blocked. Capabilities with no stored decision are absent.
-     * Insertion order follows the stored string, which keeps unknown ids stable.
+     * The stored decisions for a package: capability id → {@link SnoopingState}.
+     * Capabilities with no stored decision are absent. Insertion order follows the
+     * stored string, which keeps unknown ids stable.
      */
     @NonNull
-    public static Map<String, Boolean> getSettings(@NonNull String packageName) {
+    public static Map<String, Integer> getSettings(@NonNull String packageName) {
         return decode(prefs().getString(PKG_KEY_PREFIX + packageName, null));
     }
 
     /** Record one decision, leaving every other capability of the package untouched. */
-    public static void setSetting(@NonNull String packageName, @NonNull String capabilityId, boolean allowed) {
-        Map<String, Boolean> settings = getSettings(packageName);
-        settings.put(capabilityId, allowed);
+    public static void setSetting(@NonNull String packageName, @NonNull String capabilityId,
+                                  @SnoopingState.State int state) {
+        Map<String, Integer> settings = getSettings(packageName);
+        settings.put(capabilityId, state);
         write(packageName, settings);
     }
 
     /** Forget one decision — the capability goes back to being unmanaged. */
     public static void clearSetting(@NonNull String packageName, @NonNull String capabilityId) {
-        Map<String, Boolean> settings = getSettings(packageName);
+        Map<String, Integer> settings = getSettings(packageName);
         if (settings.remove(capabilityId) != null) {
             write(packageName, settings);
         }
@@ -113,8 +114,8 @@ public final class SnoopingPrefs {
     }
 
     /** Record several decisions at once (one commit). */
-    public static void setSettings(@NonNull String packageName, @NonNull Map<String, Boolean> newSettings) {
-        Map<String, Boolean> settings = getSettings(packageName);
+    public static void setSettings(@NonNull String packageName, @NonNull Map<String, Integer> newSettings) {
+        Map<String, Integer> settings = getSettings(packageName);
         settings.putAll(newSettings);
         write(packageName, settings);
     }
@@ -134,7 +135,7 @@ public final class SnoopingPrefs {
         return new ArrayList<>(packages);
     }
 
-    private static void write(@NonNull String packageName, @NonNull Map<String, Boolean> settings) {
+    private static void write(@NonNull String packageName, @NonNull Map<String, Integer> settings) {
         SharedPreferences.Editor editor = prefs().edit();
         String key = PKG_KEY_PREFIX + packageName;
         if (settings.isEmpty()) {
@@ -146,8 +147,8 @@ public final class SnoopingPrefs {
     }
 
     @NonNull
-    private static Map<String, Boolean> decode(@Nullable String encoded) {
-        Map<String, Boolean> settings = new LinkedHashMap<>();
+    private static Map<String, Integer> decode(@Nullable String encoded) {
+        Map<String, Integer> settings = new LinkedHashMap<>();
         if (encoded == null || encoded.isEmpty()) {
             return settings;
         }
@@ -156,27 +157,35 @@ public final class SnoopingPrefs {
             if (eq <= 0 || eq == pair.length() - 1) {
                 continue;
             }
-            settings.put(pair.substring(0, eq), "1".equals(pair.substring(eq + 1)));
+            int raw;
+            try {
+                raw = Integer.parseInt(pair.substring(eq + 1).trim());
+            } catch (NumberFormatException e) {
+                // Not a number at all: the pre-4.1.0+18 encoding only ever wrote
+                // 0 or 1, so anything else is corruption. Blocked is the safe read.
+                raw = SnoopingState.BLOCKED;
+            }
+            settings.put(pair.substring(0, eq), SnoopingState.parse(raw));
         }
         return settings;
     }
 
     @NonNull
-    private static String encode(@NonNull Map<String, Boolean> settings) {
+    private static String encode(@NonNull Map<String, Integer> settings) {
         StringBuilder sb = new StringBuilder();
-        for (Map.Entry<String, Boolean> e : settings.entrySet()) {
+        for (Map.Entry<String, Integer> e : settings.entrySet()) {
             if (sb.length() > 0) {
                 sb.append(',');
             }
-            sb.append(e.getKey()).append('=').append(e.getValue() ? '1' : '0');
+            sb.append(e.getKey()).append('=').append(SnoopingState.parse(e.getValue()));
         }
         return sb.toString();
     }
 
     /** Read-only view of everything stored, for diagnostics. */
     @NonNull
-    public static Map<String, Map<String, Boolean>> dumpAll() {
-        Map<String, Map<String, Boolean>> all = new LinkedHashMap<>();
+    public static Map<String, Map<String, Integer>> dumpAll() {
+        Map<String, Map<String, Integer>> all = new LinkedHashMap<>();
         for (String pkg : getManagedPackages()) {
             all.put(pkg, getSettings(pkg));
         }

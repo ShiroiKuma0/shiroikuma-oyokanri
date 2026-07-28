@@ -2001,6 +2001,8 @@
     <string name="snooping_saved_blocked_explanation">Saved as blocked. This is re-applied when the app is installed or updated, and it travels in a settings export.</string>
 
     <!-- Fork: anti-snooping groups -->
+    <string name="snooping_group_network">Sending data out</string>
+    <string name="snooping_group_accessibility">Accessibility &amp; notifications</string>
     <string name="snooping_group_location">Location</string>
     <string name="snooping_group_mic_camera">Microphone &amp; camera</string>
     <string name="snooping_group_messaging_calls">Messages &amp; calls</string>
@@ -2071,4 +2073,57 @@
     <string name="snooping_run_in_background">Run in the background</string>
     <string name="snooping_run_any_in_background">Any background activity</string>
     <string name="snooping_start_foreground">Start foreground services</string>
+
+    <!-- Fork: 4.1.0+18 — levers, the third state, and the new ops -->
+    <string name="snooping_network_internet">Use the internet</string>
+    <string name="snooping_vpn_establish">Establish a VPN (service)</string>
+    <string name="snooping_vpn_establish_manager">Establish a VPN (manager)</string>
+    <string name="snooping_accessibility_service">Accessibility service enabled</string>
+    <string name="snooping_notification_listener">Reads all notifications</string>
+    <string name="snooping_restricted_settings">Use restricted settings</string>
+    <string name="snooping_assistant_role">Is the device assistant</string>
+    <string name="snooping_battery_exemption">Exempt from battery optimisation</string>
+    <string name="snooping_microphone_ambient_trigger">Ambient audio triggers</string>
+    <string name="snooping_microphone_sandboxed">Microphone (sandboxed SDK)</string>
+    <string name="snooping_camera_sandboxed">Camera (sandboxed SDK)</string>
+    <string name="snooping_sms_icc_read">Read SMS on the SIM</string>
+    <string name="snooping_body_sensors_wrist">Wrist temperature</string>
+    <string name="snooping_health_data">Read and write health data</string>
+    <string name="snooping_storage_legacy">Bypass scoped storage</string>
+    <string name="snooping_media_visual_user_selected">Read user-selected photos</string>
+    <string name="snooping_user_initiated_jobs">Run user-initiated jobs</string>
+
+    <!-- Fork: found by the on-device "ops not in the catalogue" report, +19 -->
+    <string name="snooping_vpn_platform">Activate a platform VPN</string>
+    <string name="snooping_ipsec_tunnels">Manage IPsec tunnels</string>
+    <string name="snooping_accessibility_bind">Bind as an accessibility service</string>
+    <string name="snooping_usage_stats_loader">Read app usage (loader)</string>
+    <string name="snooping_microphone_incoming_call">Record incoming call audio</string>
+    <string name="snooping_audio_output_capture">Capture played-back audio</string>
+    <string name="snooping_sms_financial">Read financial SMS</string>
+    <string name="snooping_icc_auth_identifier">SIM authentication with device ID</string>
+    <string name="snooping_calls_place">Place calls</string>
+    <string name="snooping_query_all_packages">See every installed app</string>
+    <string name="snooping_cross_profile">Reach across work/personal profiles</string>
+    <string name="snooping_storage_no_isolation">Bypass storage isolation</string>
+    <string name="snooping_wifi_state_change">Turn Wi-Fi on and off</string>
+
+    <string name="snooping_state_foreground">Only while in use</string>
+    <string name="snooping_action_allow">Allow</string>
+    <string name="snooping_action_foreground">Allow only while in use</string>
+    <string name="snooping_action_block">Block</string>
+    <string name="snooping_explain_saved_state">What is saved here?</string>
+
+    <string name="snooping_detail_secure_setting">System setting %1$s</string>
+    <string name="snooping_detail_net_policy">Network policy %1$s</string>
+    <string name="snooping_detail_net_firewall">Firewall, every network</string>
+    <string name="snooping_detail_net_firewall_policy">Firewall, every network · %1$s</string>
+    <string name="snooping_state_no_background_data">No background mobile data</string>
+    <string name="snooping_detail_role">Role %1$s</string>
+    <string name="snooping_detail_battery_whitelist">Doze whitelist</string>
+
+
+    <string name="snooping_missing_ops">Ops not in the catalogue</string>
+    <string name="snooping_missing_ops_count">%1$d op(s) not catalogued</string>
+    <string name="snooping_missing_ops_none">Every app op this device has that can hold a mode of its own is already on this page.</string>
 </resources>

@@ -3,6 +3,7 @@
 package io.github.muntashirakon.AppManager.permission;
 
 import android.app.AppOpsManager;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.os.Build;
 import android.os.UserHandleHidden;
@@ -106,6 +107,14 @@ public class PermUtils {
         return AppOpPermissionController
                 .getInstance()
                 .setAppOpMode(appOpsManager, appOp, packageName, uid, mode);
+    }
+
+    // Fork: made public so the Snooping tab can ask the same question this class
+    // asks before choosing its grant/revoke branch — see SnoopingResolver.
+    // Upstream 4.1.1 moved its own copy into PermissionMutation as a private method;
+    // ours stays here because SnoopingResolver.canWritePermission needs it.
+    public static boolean supportsRuntimePermissions(@NonNull ApplicationInfo applicationInfo) {
+        return applicationInfo.targetSdkVersion > Build.VERSION_CODES.LOLLIPOP_MR1;
     }
 
     public static boolean systemSupportsRuntimePermissions() {
