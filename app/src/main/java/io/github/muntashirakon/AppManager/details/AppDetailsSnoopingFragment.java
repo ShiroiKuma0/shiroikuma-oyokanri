@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -18,12 +19,12 @@ import android.widget.TextView;
 import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
 import androidx.annotation.UiThread;
 import androidx.core.graphics.ColorUtils;
 import androidx.recyclerview.widget.GridLayoutManager;
 
 import com.google.android.material.card.MaterialCardView;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
 import java.util.ArrayList;
@@ -32,9 +33,11 @@ import java.util.List;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.details.struct.AppDetailsItem;
 import io.github.muntashirakon.AppManager.details.struct.AppDetailsSnoopingItem;
+import io.github.muntashirakon.AppManager.logs.Log;
 import io.github.muntashirakon.AppManager.snooping.SnoopingCatalog;
 import io.github.muntashirakon.AppManager.snooping.SnoopingEnforcer;
 import io.github.muntashirakon.AppManager.snooping.SnoopingPrefs;
+import io.github.muntashirakon.AppManager.snooping.SnoopingState;
 import io.github.muntashirakon.AppManager.utils.ForkThemeUtils;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
@@ -71,6 +74,13 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
     private static final int STATUS_TEXT_ALLOWED = 0xFFFFD9DC;
     @ColorInt
     private static final int STATUS_COLOR_BLOCKED = 0xFF7FE3A5;
+    /**
+     * "Only while in use" is neither of the other two and must not be mistaken
+     * for either: amber, between the blood red of unrestricted access and the
+     * green of none.
+     */
+    @ColorInt
+    private static final int STATUS_COLOR_FOREGROUND = 0xFFFFC24B;
     @ColorInt
     private static final int DETAIL_COLOR = 0xFFD0D6DC;
     /** Blocked chip fill = its text colour at this alpha, i.e. a wash of its own hue. */
@@ -174,12 +184,16 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             confirmForget();
             return true;
         }
+        if (id == R.id.action_snooping_missing_ops) {
+            showMissingOps();
+            return true;
+        }
         return false;
     }
 
     private void confirmBlockAll() {
         if (viewModel == null) return;
-        new MaterialAlertDialogBuilder(activity)
+        UIUtils.presentWithYellowBorder(activity, UIUtils.yellowOnBlackDialog(activity)
                 .setTitle(R.string.snooping_block_all)
                 .setMessage(R.string.snooping_block_all_confirm)
                 .setNegativeButton(R.string.cancel, null)
@@ -197,8 +211,7 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                             refreshDetails();
                         });
                     });
-                })
-                .show();
+                }));
     }
 
     private void confirmForget() {
@@ -208,15 +221,42 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             UIUtils.displayShortToast(R.string.snooping_nothing_saved);
             return;
         }
-        new MaterialAlertDialogBuilder(activity)
+        UIUtils.presentWithYellowBorder(activity, UIUtils.yellowOnBlackDialog(activity)
                 .setTitle(R.string.snooping_forget)
                 .setMessage(getString(R.string.snooping_forget_confirm, stored))
                 .setNegativeButton(R.string.cancel, null)
                 .setPositiveButton(R.string.snooping_forget, (dialog, which) -> {
                     viewModel.forgetSnoopingSettings();
                     refreshDetails();
-                })
-                .show();
+                }));
+    }
+
+    /**
+     * Fork: what this device has that the catalogue does not.
+     * <p>
+     * The catalogue is hand-written and platform constants rot quietly, so rather
+     * than re-deriving "what did we forget" from memory, the platform is asked:
+     * every op that can hold a mode of its own and is not already listed, with
+     * the mode this package is at. Also logged, so it can be harvested over adb
+     * and turned into catalogue entries.
+     */
+    private void showMissingOps() {
+        if (viewModel == null) return;
+        ProgressIndicatorCompat.setVisibility(progressIndicator, true);
+        ThreadUtils.postOnBackgroundThread(() -> {
+            List<String> ops = viewModel.getUncataloguedOps();
+            Log.d("Snooping", "Ops not in the catalogue (%d): %s", ops.size(), TextUtils.join(", ", ops));
+            ThreadUtils.postOnMainThread(() -> {
+                if (isDetached()) return;
+                ProgressIndicatorCompat.setVisibility(progressIndicator, false);
+                UIUtils.presentWithYellowBorder(activity, UIUtils.yellowOnBlackDialog(activity)
+                        .setTitle(getString(R.string.snooping_missing_ops_count, ops.size()))
+                        .setMessage(ops.isEmpty()
+                                ? getString(R.string.snooping_missing_ops_none)
+                                : TextUtils.join("\n", ops))
+                        .setPositiveButton(R.string.ok, null));
+            });
+        });
     }
 
     private void refreshDetails() {
@@ -351,13 +391,21 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             void bind(@NonNull AppDetailsSnoopingItem item) {
                 Context context = itemView.getContext();
                 label.setText(item.capability.entry.labelRes);
-                boolean allowed = item.isAllowed();
+                int state = item.getState();
+                boolean allowed = SnoopingState.isAllowed(state);
+                // The switch is on for both allowed states; which one it is comes
+                // from the colour and from the pill, since a switch has only two
+                // positions and this row has up to three.
                 toggle.setChecked(allowed);
-                status.setText(statusText(context, item, allowed));
-                status.setTextColor(allowed ? STATUS_TEXT_ALLOWED : STATUS_COLOR_BLOCKED);
-                status.setBackgroundTintList(ColorStateList.valueOf(allowed
-                        ? STATUS_CHIP_ALLOWED
-                        : ColorUtils.setAlphaComponent(STATUS_COLOR_BLOCKED, STATUS_CHIP_ALPHA)));
+                status.setText(statusText(context, item, state));
+                int statusColor = state == SnoopingState.FOREGROUND
+                        ? STATUS_COLOR_FOREGROUND
+                        : (allowed ? STATUS_TEXT_ALLOWED : STATUS_COLOR_BLOCKED);
+                status.setTextColor(statusColor);
+                status.setBackgroundTintList(ColorStateList.valueOf(
+                        state == SnoopingState.ALLOWED
+                                ? STATUS_CHIP_ALLOWED
+                                : ColorUtils.setAlphaComponent(statusColor, STATUS_CHIP_ALPHA)));
                 CharSequence detailLine = detailText(context, item);
                 detail.setText(detailLine);
                 // An empty detail would otherwise render as a stray chip.
@@ -372,7 +420,10 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 //            there is nothing here to look at
                 boolean changed = item.isChangedFromDefault();
                 int accent;
-                if (allowed) {
+                if (state == SnoopingState.FOREGROUND) {
+                    // Narrowed on purpose — its own colour, in both directions.
+                    accent = STATUS_COLOR_FOREGROUND;
+                } else if (allowed) {
                     accent = CHANGED_STROKE_ALLOWED;
                 } else if (changed) {
                     accent = ForkThemeUtils.getTextColor();
@@ -396,21 +447,23 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 toggle.setThumbTintList(accentTint);
                 toggle.setTrackDecorationTintList(accentTint);
                 toggle.setTrackTintList(ColorStateList.valueOf(Color.TRANSPARENT));
-                card.setOnClickListener(v -> onToggle(item, !item.isAllowed()));
+                // A tap advances to the next state this row supports — two for
+                // nearly everything, three for the network row.
+                card.setOnClickListener(v -> applyState(item, item.nextState()));
                 card.setOnLongClickListener(v -> {
                     showRowMenu(item);
                     return true;
                 });
             }
 
-            void onToggle(@NonNull AppDetailsSnoopingItem item, boolean allowed) {
+            void onToggle(@NonNull AppDetailsSnoopingItem item, @SnoopingState.State int state) {
                 if (viewModel == null) return;
                 ProgressIndicatorCompat.setVisibility(progressIndicator, true);
                 ThreadUtils.postOnBackgroundThread(() -> {
-                    boolean ok = viewModel.setSnoopingAllowed(item, allowed);
+                    boolean ok = viewModel.setSnoopingState(item, state);
                     ThreadUtils.postOnMainThread(() -> {
                         if (isDetached()) return;
-                        if (!ok && allowed) {
+                        if (!ok && state == SnoopingState.ALLOWED && !item.isAllowed() && item.lever == null) {
                             // It refused to turn on, so it can never snoop: the
                             // view model has marked it and a reload drops the row
                             // from the page entirely (SnoopingImmovable).
@@ -431,40 +484,121 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             }
         }
 
+        /**
+         * The row's long-press menu: every state this capability supports, the
+         * component behind it where there is one, and the saved decision.
+         * Built as a list rather than a stack of dialogs because the useful
+         * actions differ per row and a fixed layout would be mostly disabled.
+         */
         private void showRowMenu(@NonNull AppDetailsSnoopingItem item) {
             if (viewModel == null) return;
             CharSequence title = getString(item.capability.entry.labelRes);
-            if (item.storedDecision == null) {
-                new MaterialAlertDialogBuilder(activity)
-                        .setTitle(title)
-                        .setMessage(R.string.snooping_not_saved_explanation)
-                        .setPositiveButton(R.string.ok, null)
-                        .show();
-                return;
+            List<CharSequence> labels = new ArrayList<>();
+            List<Runnable> actions = new ArrayList<>();
+            int current = item.getState();
+            for (int state : item.supportedStates()) {
+                if (state == current) {
+                    // Offering the state it is already in would just be a no-op
+                    // write, and a menu of one useful entry among three reads badly.
+                    continue;
+                }
+                int custom = item.stateLabelRes(state);
+                labels.add(custom != 0 ? getString(custom) : getString(stateActionRes(state)));
+                actions.add(() -> applyState(item, state));
             }
-            new MaterialAlertDialogBuilder(activity)
+            if (item.storedState != null) {
+                labels.add(getString(R.string.snooping_forget_one));
+                actions.add(() -> {
+                    viewModel.forgetSnoopingSetting(item);
+                    refreshDetails();
+                });
+            }
+            labels.add(getString(R.string.snooping_explain_saved_state));
+            actions.add(() -> explainSavedState(item));
+            UIUtils.presentWithYellowBorder(activity, UIUtils.yellowOnBlackDialog(activity)
                     .setTitle(title)
-                    .setMessage(item.storedDecision
-                            ? R.string.snooping_saved_allowed_explanation
-                            : R.string.snooping_saved_blocked_explanation)
-                    .setNegativeButton(R.string.cancel, null)
-                    .setPositiveButton(R.string.snooping_forget_one, (dialog, which) -> {
-                        viewModel.forgetSnoopingSetting(item);
-                        refreshDetails();
-                    })
-                    .show();
+                    .setItems(labels.toArray(new CharSequence[0]),
+                            (dialog, which) -> actions.get(which).run())
+                    .setNegativeButton(R.string.cancel, null));
+        }
+
+        private int findPosition(@NonNull AppDetailsSnoopingItem item) {
+            for (int i = 0; i < mRows.size(); ++i) {
+                if (mRows.get(i).item == item) {
+                    return i;
+                }
+            }
+            return RecyclerView.NO_POSITION;
+        }
+
+        private void applyState(@NonNull AppDetailsSnoopingItem item, @SnoopingState.State int state) {
+            if (viewModel == null) return;
+            ProgressIndicatorCompat.setVisibility(progressIndicator, true);
+            ThreadUtils.postOnBackgroundThread(() -> {
+                boolean ok = viewModel.setSnoopingState(item, state);
+                ThreadUtils.postOnMainThread(() -> {
+                    if (isDetached()) return;
+                    ProgressIndicatorCompat.setVisibility(progressIndicator, false);
+                    if (!ok) {
+                        UIUtils.displayShortToast(R.string.snooping_toggle_failed);
+                    }
+                    int pos = findPosition(item);
+                    if (pos != RecyclerView.NO_POSITION) {
+                        notifyItemChanged(pos);
+                    }
+                });
+            });
+        }
+
+        private void explainSavedState(@NonNull AppDetailsSnoopingItem item) {
+            CharSequence title = getString(item.capability.entry.labelRes);
+            int message;
+            if (item.storedState == null) {
+                message = R.string.snooping_not_saved_explanation;
+            } else if (item.storedState == SnoopingState.BLOCKED) {
+                message = R.string.snooping_saved_blocked_explanation;
+            } else {
+                message = R.string.snooping_saved_allowed_explanation;
+            }
+            UIUtils.presentWithYellowBorder(activity, UIUtils.yellowOnBlackDialog(activity)
+                    .setTitle(title)
+                    .setMessage(message)
+                    .setPositiveButton(R.string.ok, null));
+        }
+    }
+
+    @StringRes
+    private static int stateActionRes(@SnoopingState.State int state) {
+        switch (state) {
+            case SnoopingState.ALLOWED:
+                return R.string.snooping_action_allow;
+            case SnoopingState.FOREGROUND:
+                return R.string.snooping_action_foreground;
+            case SnoopingState.BLOCKED:
+            default:
+                return R.string.snooping_action_block;
         }
     }
 
     @NonNull
-    private CharSequence statusText(@NonNull Context context, @NonNull AppDetailsSnoopingItem item, boolean allowed) {
+    private CharSequence statusText(@NonNull Context context, @NonNull AppDetailsSnoopingItem item,
+                                    @SnoopingState.State int state) {
         // Deliberately says nothing about the stored decision (白い熊, +13): the
         // store now holds only departures from the default, so "saved" would
         // merely restate the switch. What the eye needs instead is which rows
         // were changed at all — that is the card's highlight, in bind().
-        StringBuilder sb = new StringBuilder(context.getString(allowed
-                ? R.string.snooping_state_allowed
-                : R.string.snooping_state_blocked));
+        // A row may name its own states — see AppDetailsSnoopingItem#stateLabelRes.
+        int stateRes = item.stateLabelRes(state);
+        if (stateRes == 0) {
+            if (state == SnoopingState.FOREGROUND) {
+                stateRes = R.string.snooping_state_foreground;
+            } else if (state == SnoopingState.ALLOWED) {
+                stateRes = R.string.snooping_state_allowed;
+            } else {
+                stateRes = R.string.snooping_state_blocked;
+            }
+        }
+        StringBuilder sb = new StringBuilder(context.getString(stateRes));
         // "Needs no permission" is a property of the capability, NOT of the row's
         // tier: keying it off TIER_UNGATED made the label vanish the moment an op
         // was given an explicit non-default mode (which promotes the row to
@@ -480,6 +614,10 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
 
     @NonNull
     private CharSequence detailText(@NonNull Context context, @NonNull AppDetailsSnoopingItem item) {
+        if (item.lever != null) {
+            CharSequence detail = item.lever.detail(context);
+            return detail != null ? detail : "";
+        }
         String permission = item.getPermissionName();
         if (permission != null) {
             return permission;

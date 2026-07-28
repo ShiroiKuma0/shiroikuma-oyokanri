@@ -14,6 +14,7 @@ import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.InsetDrawable;
 import android.os.Build;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
@@ -30,6 +31,7 @@ import android.text.style.TypefaceSpan;
 import android.text.style.UnderlineSpan;
 import android.util.TypedValue;
 import android.view.ContextThemeWrapper;
+import android.view.Window;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -48,6 +50,7 @@ import androidx.annotation.StringRes;
 import androidx.annotation.UiThread;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.FragmentActivity;
 
 import com.google.android.material.color.MaterialColors;
@@ -63,6 +66,41 @@ import io.github.muntashirakon.view.AutoFitGridLayoutManager;
 import io.github.muntashirakon.widget.SearchView;
 
 public class UIUtils {
+    // Fork: the yellow-on-black dialog, in one place.
+    /**
+     * Show a dialog with the fork's yellow border.
+     * <p>
+     * <b>Landmine.</b> Two separate things fight the border and both must be
+     * answered here. {@code DynamicColors.applyToActivityIfAvailable} (run from
+     * {@code AppearanceUtils} after {@code setTheme}) clobbers the activity's
+     * {@code materialAlertDialogTheme}, so the overlay has to be passed to the
+     * builder explicitly rather than inherited — that is
+     * {@link #yellowOnBlackDialog}. And {@code MaterialAlertDialogBuilder.create()}
+     * then overrides the window background with its own borderless
+     * {@code MaterialShapeDrawable}, so the bordered drawable can only be set
+     * <em>after</em> {@code show()}. Theme attributes alone will not paint it.
+     */
+    public static AlertDialog presentWithYellowBorder(@NonNull Context context,
+                                                      @NonNull MaterialAlertDialogBuilder builder) {
+        AlertDialog dialog = builder.create();
+        dialog.show();
+        Window window = dialog.getWindow();
+        if (window != null) {
+            Drawable background = ContextCompat.getDrawable(context, R.drawable.alert_dialog_bg_yellow_on_black);
+            if (background != null) {
+                int inset = Math.round(context.getResources().getDisplayMetrics().density * 16);
+                window.setBackgroundDrawable(new InsetDrawable(background, inset));
+            }
+        }
+        return dialog;
+    }
+
+    /** A builder carrying the yellow-on-black overlay explicitly — see above. */
+    @NonNull
+    public static MaterialAlertDialogBuilder yellowOnBlackDialog(@NonNull Context context) {
+        return new MaterialAlertDialogBuilder(context, R.style.ThemeOverlay_AppTheme_MaterialAlertDialog_YellowOnBlack);
+    }
+
     static final Spannable.Factory sSpannableFactory = Spannable.Factory.getInstance();
 
     @NonNull

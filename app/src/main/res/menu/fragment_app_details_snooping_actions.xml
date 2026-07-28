@@ -33,4 +33,9 @@
         android:title="@string/snooping_forget"
         app:showAsAction="never" />
 
+    <item
+        android:id="@+id/action_snooping_missing_ops"
+        android:title="@string/snooping_missing_ops"
+        app:showAsAction="never" />
+
 </menu>

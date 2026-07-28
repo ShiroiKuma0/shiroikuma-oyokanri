@@ -31,6 +31,8 @@ import io.github.muntashirakon.AppManager.permission.Permission;
 import io.github.muntashirakon.AppManager.permission.ReadOnlyPermission;
 import io.github.muntashirakon.AppManager.permission.RuntimePermission;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
+import io.github.muntashirakon.AppManager.snooping.lever.SnoopingLever;
+import io.github.muntashirakon.AppManager.snooping.lever.SnoopingLevers;
 
 /**
  * Fork: turns the {@link SnoopingCatalog} into concrete, togglable rows for one
@@ -38,11 +40,17 @@ import io.github.muntashirakon.AppManager.self.SelfPermissions;
  * shows</em>, shared by the tab itself and by {@link SnoopingEnforcer} so the
  * on-install replay can never disagree with what the UI offered.
  * <p>
- * Two filters run here, in this order:
+ * Four filters run here, in this order:
  * <ol>
  *   <li><b>Can we move it?</b> A row survives only if we hold the privileges to
- *       actually change it ({@link AppDetailsSnoopingItem#isModifiable()}).
- *       This is the whole point of the tab — no decorative switches.</li>
+ *       actually change it ({@link AppDetailsSnoopingItem#isModifiable()}) and,
+ *       for a permission-only row, only if the write can land on this particular
+ *       app at all ({@link #canWritePermission}) — privileges are not the same
+ *       question as whether the platform will act on them. This is the whole
+ *       point of the tab — no decorative switches.</li>
+ *   <li><b>Does it exist for this app?</b> A lever row (network policy,
+ *       accessibility service, notification listener, assistant role, doze
+ *       exemption) is dropped when the app has nothing for it to act on.</li>
  *   <li><b>Is it worth showing?</b> Capabilities the app requests, and
  *       capabilities no permission gates (so the app can use them without asking),
  *       always show. Permission-gated capabilities the app never requested are
@@ -94,7 +102,7 @@ public final class SnoopingResolver {
             // No app-ops visibility; op rows fall back to their default modes.
         }
 
-        Map<String, Boolean> stored = SnoopingPrefs.getSettings(packageName);
+        Map<String, Integer> stored = SnoopingPrefs.getSettings(packageName);
         SnoopingReachability reachability = SnoopingReachability.forPackage(packageInfo, userId);
 
         for (SnoopingCatalog.Resolved capability : SnoopingCatalog.resolved()) {
@@ -119,7 +127,9 @@ public final class SnoopingResolver {
             // Ask the platform what it actually enforces, rather than trusting
             // the stored op entry — see AppDetailsSnoopingItem#refreshEffectiveMode.
             item.refreshEffectiveMode(appOpsManager, packageInfo);
-            item.storedDecision = stored.get(capability.entry.id);
+            item.refreshEffectivePermission(appOpsManager, packageInfo);
+            item.refreshLeverState(packageInfo, userId);
+            item.storedState = stored.get(capability.entry.id);
             if (!includeNotRequested && !item.isAllowed()
                     && SnoopingImmovable.isMarked(packageName, capability.entry.id)) {
                 // Blocked, and a previous attempt proved it cannot be turned on
@@ -143,6 +153,19 @@ public final class SnoopingResolver {
                                                 boolean canGetGrantRevoke) {
         String permissionName = capability.permission;
         boolean requested = permissionName != null && requestedPermissions.contains(permissionName);
+
+        if (capability.entry.lever) {
+            // A capability with no op and no permission: a system list, a network
+            // policy, a role, the doze whitelist. The lever answers for itself
+            // whether it means anything for this app — an app with no
+            // accessibility service can never have one enabled, and a row for it
+            // would be a switch with nothing behind it.
+            SnoopingLever lever = SnoopingLevers.byId(capability.entry.id);
+            if (lever == null || !lever.isApplicable(packageInfo, userId)) {
+                return null;
+            }
+            return new AppDetailsSnoopingItem(capability, AppDetailsSnoopingItem.TIER_REQUESTED, null, null, lever);
+        }
 
         if (capability.op != AppOpsManagerCompat.OP_NONE) {
             AppOpsManagerCompat.OpEntry opEntry = configuredOps.get(capability.op);
@@ -177,7 +200,43 @@ public final class SnoopingResolver {
         if (permissionItem == null) {
             return null;
         }
+        if (!canWritePermission(packageInfo, permissionItem)) {
+            return null;
+        }
         return new AppDetailsSnoopingItem(capability, AppDetailsSnoopingItem.TIER_REQUESTED, null, permissionItem);
+    }
+
+    /**
+     * Whether granting or revoking this permission can actually take on <em>this</em>
+     * app, as opposed to merely being something we hold the privileges for.
+     * <p>
+     * <b>Landmine — measured on-device 2026-07-28.</b>
+     * {@link AppDetailsPermissionItem#modifiable} is
+     * {@link PermUtils#isModifiable(Permission)}: a check on our own privileges and
+     * the permission's protection level. It says nothing about the app the write
+     * lands on, and for a legacy app the write can be a guaranteed no-op.
+     * {@link PermUtils#revokePermission} branches on
+     * {@link PermUtils#supportsRuntimePermissions}: an app that predates runtime
+     * permissions (target SDK ≤ 22) takes the compat branch, which can only act
+     * <em>through the app-op</em> — it never clears the grant itself. So for a
+     * permission with no app-op the branch does nothing at all, the permission is
+     * still marked granted when {@code persistChanges} runs, and it is promptly
+     * re-granted. Observed with {@code ACCESS_BACKGROUND_LOCATION} (no op exists
+     * for it on any release) on {@code com.polyclock}, target SDK 22: the switch
+     * could not be moved by us, and there is no lever that could move it.
+     * <p>
+     * Expressed as the platform's own rule rather than a list of ids, so a
+     * permission that gains an op — or an app that raises its target SDK — comes
+     * back on the next load with no maintenance.
+     */
+    private static boolean canWritePermission(@NonNull PackageInfo packageInfo,
+                                              @NonNull AppDetailsPermissionItem permissionItem) {
+        if (packageInfo.applicationInfo == null) {
+            // Cannot tell — keep the row rather than hide a working lever.
+            return true;
+        }
+        return PermUtils.supportsRuntimePermissions(packageInfo.applicationInfo)
+                || permissionItem.permission.affectsAppOp();
     }
 
     @Nullable

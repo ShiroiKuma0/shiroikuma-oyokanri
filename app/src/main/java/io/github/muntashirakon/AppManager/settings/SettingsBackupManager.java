@@ -32,6 +32,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 
 import io.github.muntashirakon.AppManager.R;
+import io.github.muntashirakon.AppManager.snooping.NetBlockState;
 import io.github.muntashirakon.AppManager.snooping.SnoopingImmovable;
 import io.github.muntashirakon.AppManager.snooping.SnoopingPrefs;
 import io.github.muntashirakon.io.Path;
@@ -133,7 +134,7 @@ public final class SettingsBackupManager {
      * capability that is perfectly movable there.
      */
     private static final Set<String> EXCLUDED_PREFS = new HashSet<>(
-            Arrays.asList(AutomationAuth.PREF_FILE, SnoopingImmovable.PREF_FILE));
+            Arrays.asList(AutomationAuth.PREF_FILE, SnoopingImmovable.PREF_FILE, NetBlockState.PREF_FILE));
 
     // Shared-prefs stores per category; anything unlisted falls into GENERAL
     // (the main "preferences" store, backup dirs/options, and any future

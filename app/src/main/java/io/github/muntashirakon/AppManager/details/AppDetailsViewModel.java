@@ -108,10 +108,12 @@ import io.github.muntashirakon.AppManager.scanner.NativeLibraries;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
 import io.github.muntashirakon.AppManager.settings.Ops;
 import io.github.muntashirakon.AppManager.settings.Prefs;
+import io.github.muntashirakon.AppManager.snooping.SnoopingCatalog;
 import io.github.muntashirakon.AppManager.snooping.SnoopingEnforcer;
 import io.github.muntashirakon.AppManager.snooping.SnoopingImmovable;
 import io.github.muntashirakon.AppManager.snooping.SnoopingPrefs;
 import io.github.muntashirakon.AppManager.snooping.SnoopingResolver;
+import io.github.muntashirakon.AppManager.snooping.SnoopingState;
 import io.github.muntashirakon.AppManager.types.PackageChangeReceiver;
 import io.github.muntashirakon.AppManager.users.UserInfo;
 import io.github.muntashirakon.AppManager.users.Users;
@@ -1591,7 +1593,8 @@ public class AppDetailsViewModel extends AndroidViewModel {
     }
 
     /**
-     * Fork: allow or block one snooping capability, and <b>record the decision</b>.
+     * Fork: move one snooping capability to {@code state}, and <b>record the
+     * decision</b>.
      * <p>
      * The recording is the durable half: it is keyed by package name in
      * {@link SnoopingPrefs}, so it survives uninstalling the app, travels in a
@@ -1601,12 +1604,12 @@ public class AppDetailsViewModel extends AndroidViewModel {
      * @return whether the live system state was changed successfully.
      */
     @WorkerThread
-    public boolean setSnoopingAllowed(@NonNull AppDetailsSnoopingItem item, boolean allowed) {
+    public boolean setSnoopingState(@NonNull AppDetailsSnoopingItem item, @SnoopingState.State int state) {
         if (mExternalApk || mPackageName == null) return false;
         PackageInfo packageInfo = getPackageInfoInternal();
         if (packageInfo == null) return false;
         try {
-            item.setAllowed(packageInfo, mAppOpsManager, allowed);
+            item.setState(packageInfo, mAppOpsManager, state);
         } catch (RemoteException | PermissionException e) {
             Log.w(TAG, "Could not set snooping capability %s", e, item.capability.entry.id);
             return false;
@@ -1614,27 +1617,35 @@ public class AppDetailsViewModel extends AndroidViewModel {
         // Fork: a write that the platform discarded throws nothing, so ask what is
         // actually enforced now before recording anything. Saving a decision that
         // never landed is what produced "Blocked · saved: allow" on 4.1.0+8.
-        if (!item.matchesRequestedState(allowed)) {
-            Log.w(TAG, "Snooping capability %s did not move to %s", item.capability.entry.id,
-                    allowed ? "allowed" : "blocked");
-            if (allowed) {
+        if (!item.matchesRequestedState(state)) {
+            Log.w(TAG, "Snooping capability %s did not move to %d", item.capability.entry.id, state);
+            if (state == SnoopingState.ALLOWED && !item.isAllowed() && item.lever == null) {
                 // It will not turn on here, so it can never snoop: remember that
                 // and the row leaves the page — see SnoopingImmovable.
+                //
+                // Both extra conditions were paid for. NOT for a lever row: an
+                // accessibility service or an assistant role we could not restore
+                // is one the user can still restore from Settings, so hiding it
+                // would hide something that may come back. And NOT for a failed
+                // *narrowing* (白い熊, +20): asking for FOREGROUND is asking for
+                // less, not more, so a refusal says nothing about whether the
+                // capability can be turned on — treating it as "will not turn on"
+                // deleted rows that were working perfectly well.
                 SnoopingImmovable.mark(mPackageName, item.capability.entry.id);
             }
             return false;
         }
         SnoopingImmovable.clear(mPackageName, item.capability.entry.id);
-        if (item.isDefaultState(allowed)) {
+        if (item.isDefaultState(state)) {
             // Back at the untouched state: there is nothing to remember. Storing
             // it would only re-assert what a fresh install does anyway and would
             // travel in an export as noise — and any earlier decision must go,
             // or the enforcer would keep re-applying it. (白い熊, +13.)
             SnoopingPrefs.clearSetting(mPackageName, item.capability.entry.id);
-            item.storedDecision = null;
+            item.storedState = null;
         } else {
-            SnoopingPrefs.setSetting(mPackageName, item.capability.entry.id, allowed);
-            item.storedDecision = allowed;
+            SnoopingPrefs.setSetting(mPackageName, item.capability.entry.id, state);
+            item.storedState = state;
         }
         return true;
     }
@@ -1650,7 +1661,7 @@ public class AppDetailsViewModel extends AndroidViewModel {
         if (mExternalApk || mPackageName == null) return -1;
         PackageInfo packageInfo = getPackageInfoInternal();
         if (packageInfo == null) return -1;
-        Map<String, Boolean> decisions = new LinkedHashMap<>();
+        Map<String, Integer> decisions = new LinkedHashMap<>();
         // Capabilities that end up blocked by default anyway: nothing to store,
         // and any decision left over from before must be dropped rather than
         // merged past (setSettings only adds).
@@ -1662,24 +1673,24 @@ public class AppDetailsViewModel extends AndroidViewModel {
                     // Already blocked: record it so it is re-asserted after a
                     // reinstall or on another phone — unless blocked is simply
                     // what this capability defaults to.
-                    if (item.isDefaultState(false)) {
+                    if (item.isDefaultState(SnoopingState.BLOCKED)) {
                         unmanage.add(item.capability.entry.id);
                     } else {
-                        decisions.put(item.capability.entry.id, false);
+                        decisions.put(item.capability.entry.id, SnoopingState.BLOCKED);
                     }
                     continue;
                 }
                 try {
-                    item.setAllowed(packageInfo, mAppOpsManager, false);
+                    item.setState(packageInfo, mAppOpsManager, SnoopingState.BLOCKED);
                     // Record only what the platform really enforces now.
-                    if (!item.matchesRequestedState(false)) {
+                    if (!item.matchesRequestedState(SnoopingState.BLOCKED)) {
                         Log.w(TAG, "Could not block %s: mode unchanged", item.capability.entry.id);
                         continue;
                     }
-                    if (item.isDefaultState(false)) {
+                    if (item.isDefaultState(SnoopingState.BLOCKED)) {
                         unmanage.add(item.capability.entry.id);
                     } else {
-                        decisions.put(item.capability.entry.id, false);
+                        decisions.put(item.capability.entry.id, SnoopingState.BLOCKED);
                     }
                     ++blocked;
                 } catch (RemoteException | PermissionException e) {
@@ -1696,12 +1707,44 @@ public class AppDetailsViewModel extends AndroidViewModel {
         return blocked;
     }
 
+    /**
+     * Fork: every app-op this device has that the catalogue does not cover.
+     * <p>
+     * The catalogue is hand-written, and hand-written lists of platform constants
+     * rot quietly — ops are added every release. This asks the platform instead,
+     * so extending the catalogue is reading a list rather than remembering one.
+     * Each entry carries the mode this package is at, so a missing op that is
+     * already doing something stands out.
+     */
+    @WorkerThread
+    @NonNull
+    public List<String> getUncataloguedOps() {
+        List<String> names = SnoopingCatalog.missingOpNames();
+        List<String> report = new ArrayList<>(names.size());
+        PackageInfo packageInfo = getPackageInfoInternal();
+        for (String name : names) {
+            String line = name;
+            try {
+                int op = SnoopingCatalog.opCodeOf(name);
+                if (packageInfo != null && packageInfo.applicationInfo != null
+                        && op != AppOpsManagerCompat.OP_NONE) {
+                    int mode = mAppOpsManager.checkOperation(op, packageInfo.applicationInfo.uid, mPackageName);
+                    line = name + " — " + AppOpsManagerCompat.modeToName(mode);
+                }
+            } catch (Throwable ignore) {
+                // Mode unavailable; the name alone is still worth listing.
+            }
+            report.add(line);
+        }
+        return report;
+    }
+
     /** Fork: forget one recorded snooping decision (live state untouched). */
     @AnyThread
     public void forgetSnoopingSetting(@NonNull AppDetailsSnoopingItem item) {
         if (mPackageName != null) {
             SnoopingPrefs.clearSetting(mPackageName, item.capability.entry.id);
-            item.storedDecision = null;
+            item.storedState = null;
         }
     }
 

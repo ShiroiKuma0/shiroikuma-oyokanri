@@ -7,7 +7,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
 
@@ -20,7 +19,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import io.github.muntashirakon.AppManager.compat.PackageManagerCompat;
 import io.github.muntashirakon.AppManager.utils.ContextUtils;
 
 /**
@@ -63,9 +61,12 @@ public final class SnoopingReachability {
     private static final String PERM_READ_MEDIA_AUDIO = "android.permission.READ_MEDIA_AUDIO";
     private static final String PERM_READ_PRIVILEGED_PHONE_STATE = "android.permission.READ_PRIVILEGED_PHONE_STATE";
 
-    private static final String BIND_ACCESSIBILITY = "android.permission.BIND_ACCESSIBILITY_SERVICE";
-    private static final String BIND_VPN = "android.permission.BIND_VPN_SERVICE";
-    private static final String BIND_VOICE_INTERACTION = "android.permission.BIND_VOICE_INTERACTION";
+    private static final String PERM_WRITE_EXTERNAL_STORAGE = "android.permission.WRITE_EXTERNAL_STORAGE";
+
+    private static final String BIND_ACCESSIBILITY = SnoopingComponents.BIND_ACCESSIBILITY;
+    private static final String BIND_NOTIFICATION_LISTENER = SnoopingComponents.BIND_NOTIFICATION_LISTENER;
+    private static final String BIND_VPN = SnoopingComponents.BIND_VPN;
+    private static final String BIND_VOICE_INTERACTION = SnoopingComponents.BIND_VOICE_INTERACTION;
 
     /** Any of these makes an app a plausible default-SMS candidate. */
     private static final String[] SMS_PERMISSIONS = {
@@ -114,22 +115,32 @@ public final class SnoopingReachability {
             // ── Reading media needs one of the media permissions, or all-files
             //    access, or (below Android 13) legacy read access.
             case "media_images_read":
+            case "media_visual_user_selected":
                 return hasAny(PERM_READ_MEDIA_IMAGES, PERM_READ_EXTERNAL_STORAGE, PERM_MANAGE_EXTERNAL_STORAGE);
             case "media_video_read":
                 return hasAny(PERM_READ_MEDIA_VIDEO, PERM_READ_EXTERNAL_STORAGE, PERM_MANAGE_EXTERNAL_STORAGE);
             case "media_audio_read":
                 return hasAny(PERM_READ_MEDIA_AUDIO, PERM_READ_EXTERNAL_STORAGE, PERM_MANAGE_EXTERNAL_STORAGE);
 
-            // ── No microphone permission, no recording — hotword or in-call alike.
+            // ── Bypassing scoped storage buys nothing without storage access.
+            case "storage_legacy":
+                return hasAny(PERM_READ_EXTERNAL_STORAGE, PERM_WRITE_EXTERNAL_STORAGE, PERM_MANAGE_EXTERNAL_STORAGE);
+
+            // ── No microphone permission, no recording — hotword, ambient
+            //    trigger, sandboxed or in-call alike.
             case "microphone_hotword":
+            case "microphone_ambient_trigger":
+            case "microphone_sandboxed":
             case "microphone_call":
                 return hasAny(PERM_RECORD_AUDIO);
+            case "camera_sandboxed":
             case "camera_call":
                 return hasAny(PERM_CAMERA);
 
             // ── Writing to the SMS provider is the default-SMS app's privilege;
             //    an app declaring no SMS permission at all cannot hold that role.
             case "sms_write":
+            case "sms_icc_read":
                 return hasAny(SMS_PERMISSIONS);
 
             // ── Device identifiers are signature/privileged-only since Android 10.
@@ -140,7 +151,11 @@ public final class SnoopingReachability {
             //    must declare, and the system binds it by that permission.
             case "accessibility":
                 return hasServiceBoundWith(BIND_ACCESSIBILITY);
+            case "notifications_read":
+                return hasServiceBoundWith(BIND_NOTIFICATION_LISTENER);
             case "vpn":
+            case "vpn_establish":
+            case "vpn_establish_manager":
                 return hasServiceBoundWith(BIND_VPN);
             case "assist_screenshot":
             case "assist_structure":
@@ -189,18 +204,9 @@ public final class SnoopingReachability {
             return mServices;
         }
         mServicesResolved = true;
-        mServices = mPackageInfo.services;
-        if (mServices != null) {
-            return mServices;
-        }
-        try {
-            PackageInfo withServices = PackageManagerCompat.getPackageInfo(mPackageInfo.packageName,
-                    PackageManager.GET_SERVICES | PackageManagerCompat.MATCH_DISABLED_COMPONENTS
-                            | PackageManagerCompat.MATCH_UNINSTALLED_PACKAGES, mUserId);
-            mServices = withServices != null ? withServices.services : null;
-        } catch (Throwable th) {
-            mServicesUnknown = true;
-        }
+        SnoopingComponents.Services services = SnoopingComponents.services(mPackageInfo, mUserId);
+        mServices = services.services;
+        mServicesUnknown = services.unknown;
         return mServices;
     }
 
