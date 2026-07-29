@@ -106,12 +106,9 @@ public final class BatteryPrefs {
         prefs(context).edit().putInt(KEY_RETENTION_DAYS, days).apply();
     }
 
+    /** Whole hours, for callers that cannot express minutes (at least 1). */
     public static int getWindowHours(@NonNull Context context) {
-        return prefs(context).getInt(KEY_WINDOW_HOURS, DEFAULT_WINDOW_HOURS);
-    }
-
-    public static void setWindowHours(@NonNull Context context, int hours) {
-        prefs(context).edit().putInt(KEY_WINDOW_HOURS, hours).apply();
+        return Math.max(1, getWindowMinutes(context) / 60);
     }
 
     public static int getSort(@NonNull Context context) {
@@ -131,15 +128,17 @@ public final class BatteryPrefs {
     }
 
     /**
-     * Window the header's drainer columns cover, in minutes. Two hours was an
-     * arbitrary default for "what is eating it right now"; it is selectable
-     * because that question has no one right span.
+     * The <b>one</b> window the battery screen works in — drainer columns and
+     * per-app rows alike. They used to be separate, which meant the pill said
+     * "last 6 hours" while every row underneath was quietly showing a day; two
+     * numbers for one screen is a bug, not a feature.
      */
-    public static int getDrainerWindowMinutes(@NonNull Context context) {
-        return prefs(context).getInt(KEY_DRAINER_WINDOW_MIN, 120);
+    public static int getWindowMinutes(@NonNull Context context) {
+        return prefs(context).getInt(KEY_DRAINER_WINDOW_MIN,
+                prefs(context).getInt(KEY_WINDOW_HOURS, DEFAULT_WINDOW_HOURS) * 60);
     }
 
-    public static void setDrainerWindowMinutes(@NonNull Context context, int minutes) {
+    public static void setWindowMinutes(@NonNull Context context, int minutes) {
         prefs(context).edit().putInt(KEY_DRAINER_WINDOW_MIN, minutes).apply();
     }
 

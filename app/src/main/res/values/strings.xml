@@ -2161,14 +2161,15 @@
     <string name="battery_row_meta">%1$s · uid %2$d</string>
     <string name="battery_row_meta_uid_only">uid %d</string>
     <string name="battery_metric_packets_per_sec">%d pkt/s</string>
-    <string name="battery_metric_packets">%d packets</string>
+    <string name="battery_metric_packets">%s packets</string>
     <string name="battery_metric_per_hour">%s/h</string>
     <string name="battery_metric_wakelock">%s awake</string>
     <string name="battery_metric_radio">%s radio</string>
     <string name="battery_metric_cpu">%.1f%% cpu</string>
     <string name="battery_metric_sensor">%s sensors</string>
-    <string name="battery_metric_wakeups">%d wakeups</string>
+    <string name="battery_metric_wakeups">%s wakeups</string>
     <string name="battery_metric_none">no measurable activity</string>
+    <string name="battery_metric_over">over %s</string>
     <string name="battery_detail_window">Measured over</string>
     <string name="battery_detail_wifi">Wi-Fi</string>
     <string name="battery_detail_mobile">Mobile</string>
@@ -2257,7 +2258,7 @@
     <string name="battery_history_hint">Pinch to zoom · drag to pan · tap a bar to read it · double-tap to fit</string>
     <!-- Fork: watchlist alerts, before/after comparison, screen-off view (+27) -->
     <string name="battery_screen_off_only">Screen-off only</string>
-    <string name="battery_header_level">Battery %% · last 24 h — drag left for older</string>
+    <string name="battery_header_level">Battery % · last 24 h — drag left for older</string>
     <string name="battery_header_level_at">%1$s · %2$d%% · %3$.2f V · %4$s</string>
     <string name="battery_header_charging">charging</string>
     <string name="battery_header_discharging">on battery</string>

@@ -146,8 +146,8 @@ public class BatteryUsageActivity extends BaseActivity {
                     : headerPanel.findViewById(R.id.battery_header_drainers_caption);
             if (drainersCaption != null) {
                 drainersCaption.setText(getString(R.string.battery_header_drainers_used,
-                        drainerWindowLabel(header.windowMinutes), header.dropPercent));
-                drainersCaption.setOnClickListener(v -> showDrainerWindowPicker());
+                        windowLabel(header.windowMinutes), header.dropPercent));
+                drainersCaption.setOnClickListener(v -> showWindowPicker());
             }
             if (headerPanel != null) {
                 headerPanel.setVisibility(header.points.size() < 2 && header.drainers.isEmpty()
@@ -172,7 +172,7 @@ public class BatteryUsageActivity extends BaseActivity {
     private void renderSummary(@NonNull BatteryUsageViewModel.Summary summary) {
         if (mToolbar == null) return;
         List<String> parts = new ArrayList<>();
-        parts.add(windowLabel(mViewModel.getWindowHours()));
+        parts.add(windowLabel(mViewModel.getWindowMinutes()));
         // A filtered list must say so, or the smaller numbers read as a bug.
         if (mViewModel.isScreenOffOnly()) parts.add(getString(R.string.battery_summary_screen_off));
         if (summary.levelDrop >= 0) {
@@ -195,14 +195,18 @@ public class BatteryUsageActivity extends BaseActivity {
                 : mHeaderPanel.findViewById(R.id.battery_header_list_period);
         if (listPeriod != null) {
             listPeriod.setText(getString(R.string.battery_list_period,
-                    windowLabel(mViewModel.getWindowHours())));
+                    windowLabel(mViewModel.getWindowMinutes())));
         }
     }
 
     @NonNull
-    private String windowLabel(int hours) {
-        if (hours < 24) return getResources().getQuantityString(R.plurals.battery_window_hours, hours, hours);
-        int days = hours / 24;
+    private String windowLabel(int minutes) {
+        if (minutes < 60) return getString(R.string.battery_window_minutes, minutes);
+        if (minutes < 1440) {
+            int hours = minutes / 60;
+            return getResources().getQuantityString(R.plurals.battery_window_hours, hours, hours);
+        }
+        int days = minutes / 1440;
         return getResources().getQuantityString(R.plurals.battery_window_days, days, days);
     }
 
@@ -304,17 +308,23 @@ public class BatteryUsageActivity extends BaseActivity {
         return super.onOptionsItemSelected(item);
     }
 
+    /**
+     * One window picker, reached from the ⋮ entry and from the pill above the
+     * drainers. Both write the same setting — the screen shows one span.
+     */
     private void showWindowPicker() {
-        String[] labels = new String[WINDOW_HOURS.length];
+        final int[] options = {15, 30, 60, 120, 360, 720, 1440, 4320, 10080, 20160};
+        String[] labels = new String[options.length];
         int checked = 0;
-        for (int i = 0; i < WINDOW_HOURS.length; i++) {
-            labels[i] = windowLabel(WINDOW_HOURS[i]);
-            if (WINDOW_HOURS[i] == mViewModel.getWindowHours()) checked = i;
+        int current = mViewModel.getWindowMinutes();
+        for (int i = 0; i < options.length; i++) {
+            labels[i] = windowLabel(options[i]);
+            if (options[i] == current) checked = i;
         }
         MaterialAlertDialogBuilder builder = UIUtils.yellowOnBlackDialog(this)
                 .setTitle(R.string.battery_window)
                 .setSingleChoiceItems(labels, checked, (dialog, which) -> {
-                    mViewModel.setWindowHours(WINDOW_HOURS[which]);
+                    mViewModel.setWindowMinutes(options[which]);
                     dialog.dismiss();
                 })
                 .setNegativeButton(R.string.cancel, null);
@@ -374,27 +384,6 @@ public class BatteryUsageActivity extends BaseActivity {
         if (minutes < 60) return getString(R.string.battery_window_minutes, minutes);
         int hours = minutes / 60;
         return getResources().getQuantityString(R.plurals.battery_window_hours, hours, hours);
-    }
-
-    /** The drainer window is a pill because two hours was only ever a default. */
-    private void showDrainerWindowPicker() {
-        final int[] options = {15, 30, 60, 120, 360, 720, 1440};
-        String[] labels = new String[options.length];
-        int checked = 0;
-        int current = BatteryPrefs.getDrainerWindowMinutes(this);
-        for (int i = 0; i < options.length; i++) {
-            labels[i] = drainerWindowLabel(options[i]);
-            if (options[i] == current) checked = i;
-        }
-        MaterialAlertDialogBuilder builder = UIUtils.yellowOnBlackDialog(this)
-                .setTitle(R.string.battery_header_drainers_window)
-                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
-                    BatteryPrefs.setDrainerWindowMinutes(this, options[which]);
-                    dialog.dismiss();
-                    mViewModel.load();
-                })
-                .setNegativeButton(R.string.cancel, null);
-        UIUtils.presentWithYellowBorder(this, builder);
     }
 
     private void showLayoutPicker() {

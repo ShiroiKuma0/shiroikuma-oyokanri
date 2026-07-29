@@ -7,12 +7,19 @@ import android.content.pm.ApplicationInfo;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.RelativeSizeSpan;
+import android.text.style.StyleSpan;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.widget.LinearLayoutCompat;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.material.card.MaterialCardView;
@@ -53,6 +60,7 @@ public final class MainCardBinder {
                             @Nullable String packageName, int uid, boolean frozen,
                             @NonNull List<String> profileTags,
                             @Nullable BatteryUsageViewModel.Row batteryRow,
+                            @Nullable String windowLabel, boolean allCounters,
                             @NonNull View.OnClickListener onCard,
                             @NonNull View.OnClickListener onFreeze,
                             @NonNull View.OnClickListener onKill) {
@@ -131,26 +139,106 @@ public final class MainCardBinder {
         // Same card, same height, same everything else — only this column差.
         TextView version = card.findViewById(R.id.version);
         TextView isSystem = card.findViewById(R.id.isSystem);
+        // The battery column carries longer strings than version/SDK ever do,
+        // so it takes a larger share here. Applied at bind time, so the main
+        // list keeps the proportions it was tuned with.
+        View centerColumn = card.findViewById(R.id.main_center_column);
+        View rightColumn = card.findViewById(R.id.main_right_column);
+        if (centerColumn != null && rightColumn != null) {
+            LinearLayoutCompat.LayoutParams centerLp =
+                    (LinearLayoutCompat.LayoutParams) centerColumn.getLayoutParams();
+            LinearLayoutCompat.LayoutParams rightLp =
+                    (LinearLayoutCompat.LayoutParams) rightColumn.getLayoutParams();
+            centerLp.width = 0;
+            rightLp.width = 0;
+            centerLp.weight = batteryRow != null ? 1.35f : 1f;
+            rightLp.weight = batteryRow != null ? 1f : 2f;
+            centerColumn.setLayoutParams(centerLp);
+            rightColumn.setLayoutParams(rightLp);
+        }
+
+        View barTrack = card.findViewById(R.id.battery_bar_track);
+        View barFill = card.findViewById(R.id.battery_bar_fill);
         if (batteryRow != null) {
             BatterySampleDao.BatteryAggregate agg = batteryRow.agg;
             String headline = agg.powerModelUsable && agg.powerMah > 0
                     ? context.getString(R.string.battery_mah, agg.powerMah)
                     : String.format(Locale.getDefault(), "%d%%", Math.round(batteryRow.share * 100));
-            version.setText(headline);
-            version.setTextColor(batteryRow.share >= 0.25f ? 0xFFFF0028 : ForkThemeUtils.getTextColor());
-            String[] lines = BatteryUsageAdapter.describeLines(context, agg);
+            int accent = batteryRow.share >= 0.25f ? 0xFFFF0028 : ForkThemeUtils.getTextColor();
+            // The share never needs more than two digits, so the window it is
+            // measured over rides in the space in front of it — grey, so it
+            // reads as a qualifier rather than blending into the number.
+            if (windowLabel != null) {
+                SpannableStringBuilder sb = new SpannableStringBuilder();
+                sb.append(windowLabel).append("  ");
+                // Grey, lighter and smaller — it is a qualifier, and at the
+                // headline's weight it pushed two-digit percentages out of view.
+                sb.setSpan(new ForegroundColorSpan(0xFF9A9A9A), 0, sb.length(),
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                sb.setSpan(new RelativeSizeSpan(0.72f), 0, sb.length(),
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                sb.setSpan(new StyleSpan(Typeface.NORMAL), 0, sb.length(),
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                int from = sb.length();
+                sb.append(headline);
+                sb.setSpan(new ForegroundColorSpan(accent), from, sb.length(),
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                version.setText(sb);
+            } else {
+                version.setText(headline);
+                version.setTextColor(accent);
+            }
+            version.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16);
+            version.setTypeface(null, Typeface.BOLD);
+            version.setGravity(android.view.Gravity.END);
+            // The share bar, as before — item_main keeps it GONE for the list.
+            if (barTrack != null && barFill != null) {
+                barTrack.setVisibility(View.VISIBLE);
+                barFill.setBackgroundColor(accent);
+                barTrack.post(() -> {
+                    ViewGroup.LayoutParams lp = barFill.getLayoutParams();
+                    lp.width = Math.max(batteryRow.share > 0 ? 2 : 0,
+                            Math.round(barTrack.getWidth() * batteryRow.share));
+                    barFill.setLayoutParams(lp);
+                });
+            }
+            // The app's own page lists every counter; a list cell takes three,
+            // which is what the corrected column widths left room for.
+            String[] lines = BatteryUsageAdapter.describeLines(context, agg, allCounters ? 8 : 3);
+            TextView sha = card.findViewById(R.id.sha);
             isSystem.setText(lines.length > 0 ? lines[0] : "");
-            setIfPresent(card, R.id.sha, lines.length > 1 ? lines[1] : "");
+            isSystem.setGravity(android.view.Gravity.END);
+            isSystem.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
+            isSystem.setEllipsize(null);
+            isSystem.setSingleLine(false);
+            isSystem.setMaxLines(allCounters ? 8 : 1);
+            if (sha != null) {
+                StringBuilder rest = new StringBuilder();
+                for (int i = 1; i < lines.length; i++) {
+                    if (rest.length() > 0) rest.append('\n');
+                    rest.append(lines[i]);
+                }
+                sha.setText(rest.toString());
+                sha.setGravity(android.view.Gravity.END);
+                sha.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
+                sha.setEllipsize(null);
+                sha.setSingleLine(false);
+                sha.setMaxLines(allCounters ? 8 : 2);
+            }
         } else {
+            if (barTrack != null) barTrack.setVisibility(View.GONE);
             version.setText(item != null && item.versionName != null ? item.versionName : "");
             version.setTextColor(ForkThemeUtils.getTextColor());
             isSystem.setText(context.getString(system ? R.string.system : R.string.user));
             setIfPresent(card, R.id.sha, "");
         }
-        setIfPresent(card, R.id.backup_version, "");
-        setIfPresent(card, R.id.backup_date, "");
-        setIfPresent(card, R.id.backup_time, "");
-        setIfPresent(card, R.id.size, "");
+        // The right column's third row (size + backup time) has nothing to say
+        // on a battery card. Blanking its text still left the row occupying a
+        // line — an empty gap opposite the date — so it is GONE, not "".
+        goneIfPresent(card, R.id.backup_version);
+        goneIfPresent(card, R.id.backup_date);
+        goneIfPresent(card, R.id.backup_time);
+        goneIfPresent(card, R.id.size);
         View backupIndicator = card.findViewById(R.id.backup_indicator);
         if (backupIndicator != null) backupIndicator.setVisibility(View.GONE);
         // The note "+" and profile pills are part of the card 白い熊 asked for,
@@ -187,5 +275,10 @@ public final class MainCardBinder {
     private static void setIfPresent(@NonNull View card, int id, @NonNull String text) {
         View v = card.findViewById(id);
         if (v instanceof TextView) ((TextView) v).setText(text);
+    }
+
+    private static void goneIfPresent(@NonNull View card, int id) {
+        View v = card.findViewById(id);
+        if (v != null) v.setVisibility(View.GONE);
     }
 }

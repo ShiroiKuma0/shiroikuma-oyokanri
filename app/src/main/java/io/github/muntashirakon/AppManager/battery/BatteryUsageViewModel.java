@@ -46,12 +46,12 @@ public class BatteryUsageViewModel extends AndroidViewModel {
     private final List<Row> mAllRows = new ArrayList<>();
     @Nullable
     private String mQuery;
-    private int mWindowHours;
+    private int mWindowMinutes;
     private int mSort;
 
     public BatteryUsageViewModel(@NonNull Application application) {
         super(application);
-        mWindowHours = BatteryPrefs.getWindowHours(application);
+        mWindowMinutes = BatteryPrefs.getWindowMinutes(application);
         mSort = BatteryPrefs.getSort(application);
     }
 
@@ -80,6 +80,9 @@ public class BatteryUsageViewModel extends AndroidViewModel {
         public ApplicationItem appItem;
         @NonNull
         public List<String> profileTags = Collections.emptyList();
+        /** Short form of the window this row's figures cover, e.g. "6h", "1d". */
+        @Nullable
+        public String windowLabel;
 
         Row(@NonNull BatterySampleDao.BatteryAggregate agg) {
             this.agg = agg;
@@ -134,9 +137,9 @@ public class BatteryUsageViewModel extends AndroidViewModel {
             for (BatterySample s : dao.deviceSamples(0)) {
                 header.points.add(new BatteryLevelView.Point(s.ts, s.batteryLevel, s.voltageMv, s.charging));
             }
-            int drainerMinutes = BatteryPrefs.getDrainerWindowMinutes(getApplication());
-            header.windowMinutes = drainerMinutes;
-            long from = now - drainerMinutes * 60_000L;
+            // Same window as the rows — one screen, one span.
+            header.windowMinutes = mWindowMinutes;
+            long from = now - mWindowMinutes * 60_000L;
             // How much battery the device really lost over the window. Only
             // decreases between two non-charging readings count, so a charge in
             // the middle of the window cannot cancel out the discharge around it.
@@ -174,7 +177,11 @@ public class BatteryUsageViewModel extends AndroidViewModel {
     }
 
     public int getWindowHours() {
-        return mWindowHours;
+        return Math.max(1, mWindowMinutes / 60);
+    }
+
+    public int getWindowMinutes() {
+        return mWindowMinutes;
     }
 
     public int getSort() {
@@ -190,9 +197,9 @@ public class BatteryUsageViewModel extends AndroidViewModel {
         load();
     }
 
-    public void setWindowHours(int hours) {
-        mWindowHours = hours;
-        BatteryPrefs.setWindowHours(getApplication(), hours);
+    public void setWindowMinutes(int minutes) {
+        mWindowMinutes = minutes;
+        BatteryPrefs.setWindowMinutes(getApplication(), minutes);
         load();
     }
 
@@ -229,7 +236,7 @@ public class BatteryUsageViewModel extends AndroidViewModel {
 
     private void loadBlocking() {
         try {
-            long since = System.currentTimeMillis() - mWindowHours * 3_600_000L;
+            long since = System.currentTimeMillis() - mWindowMinutes * 60_000L;
             BatterySampleDao dao = AppsDb.getInstance().batterySampleDao();
             boolean screenOffOnly = BatteryPrefs.isScreenOffOnly(getApplication());
             List<BatterySampleDao.BatteryAggregate> aggregates = screenOffOnly
@@ -255,6 +262,7 @@ public class BatteryUsageViewModel extends AndroidViewModel {
             }
             for (Row row : rows) {
                 row.share = totalImpact > 0 ? (float) row.agg.impactScore() / totalImpact : 0f;
+                row.windowLabel = shortWindowLabel(mWindowMinutes);
             }
             sortRows(rows);
 
@@ -316,6 +324,14 @@ public class BatteryUsageViewModel extends AndroidViewModel {
         return s != null ? s.buckets : 0;
     }
 
+    /** "30m" / "6h" / "1d" — short enough to sit in front of a two-digit percentage. */
+    @NonNull
+    static String shortWindowLabel(int minutes) {
+        if (minutes < 60) return minutes + "m";
+        if (minutes < 1440) return (minutes / 60) + "h";
+        return (minutes / 1440) + "d";
+    }
+
     private void sortRows(@NonNull List<Row> rows) {
         Collections.sort(rows, (a, b) -> Long.compare(metric(b), metric(a)));
     }
@@ -336,7 +352,7 @@ public class BatteryUsageViewModel extends AndroidViewModel {
     @NonNull
     public Map<String, Double> extrasFor(int uid) {
         try {
-            long since = System.currentTimeMillis() - mWindowHours * 3_600_000L;
+            long since = System.currentTimeMillis() - mWindowMinutes * 60_000L;
             return BatterySampler.mergeExtras(AppsDb.getInstance().batterySampleDao()
                     .extrasForUid(uid, since));
         } catch (Throwable th) {
