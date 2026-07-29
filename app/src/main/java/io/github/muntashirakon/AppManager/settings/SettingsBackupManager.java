@@ -100,10 +100,29 @@ public final class SettingsBackupManager {
         public final String id;
         @StringRes
         public final int labelRes;
+        /**
+         * Whether this category starts <b>ticked</b> in a picker — both the
+         * in-app sheet and 自由作業盤's, which redraws from our
+         * {@code LIST_CATEGORIES} reply every time it opens.
+         *
+         * <p>Defaults to {@code true}, so adding a category needs no thought
+         * unless it is one of the things the rule is actually for: large,
+         * derived <em>and</em> re-creatable (downloaded tiles, a regenerable
+         * thumbnail cache). This app exports none of those — every category
+         * here is a decision worth carrying — so all of them are {@code true}.
+         * Stating it is still the point: the app declares the default rather
+         * than the picker assuming one.
+         */
+        public final boolean defaultSelected;
 
         Category(@NonNull String id, @StringRes int labelRes) {
+            this(id, labelRes, true);
+        }
+
+        Category(@NonNull String id, @StringRes int labelRes, boolean defaultSelected) {
             this.id = id;
             this.labelRes = labelRes;
+            this.defaultSelected = defaultSelected;
         }
 
         /** The category with this wire id, or null if unknown. */
@@ -113,6 +132,22 @@ public final class SettingsBackupManager {
                 if (c.id.equals(id)) return c;
             }
             return null;
+        }
+    }
+
+    /**
+     * Asked between entries whether the run should unwind. Cancellation is
+     * cooperative on purpose: the loop stops at the next entry boundary rather
+     * than a thread being interrupted mid-{@code write()}.
+     */
+    public interface CancelSignal {
+        boolean isCancelled();
+    }
+
+    /** Thrown when a {@link CancelSignal} stopped an export. */
+    public static class ExportCancelledException extends IOException {
+        public ExportCancelledException() {
+            super("cancelled");
         }
     }
 
@@ -251,6 +286,13 @@ public final class SettingsBackupManager {
     public static int writeExport(@NonNull Context context, @NonNull Set<Category> categories,
                                   @NonNull OutputStream out, @Nullable ProgressListener listener)
             throws IOException {
+        return writeExport(context, categories, out, listener, null);
+    }
+
+    public static int writeExport(@NonNull Context context, @NonNull Set<Category> categories,
+                                  @NonNull OutputStream out, @Nullable ProgressListener listener,
+                                  @Nullable CancelSignal cancelSignal)
+            throws IOException {
         List<Source> sources = collectSources(context);
         // Walk the categories in enum order so progress reads in a stable
         // sequence and the archive groups by category.
@@ -267,6 +309,9 @@ public final class SettingsBackupManager {
                 }
                 for (Source s : sources) {
                     if (s.category != cat) continue;
+                    if (cancelSignal != null && cancelSignal.isCancelled()) {
+                        throw new ExportCancelledException();
+                    }
                     addEntry(zos, s.file, s.entry);
                     ++written;
                 }

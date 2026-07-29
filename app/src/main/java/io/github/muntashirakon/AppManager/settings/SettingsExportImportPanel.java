@@ -179,11 +179,13 @@ public final class SettingsExportImportPanel {
         root.addView(divider(0));
 
         CheckBox selectAll = checkbox(mActivity.getString(R.string.settings_eim_select_all), true);
-        selectAll.setChecked(true);
+        selectAll.setChecked(allDefaultSelected());
         root.addView(selectAll);
         for (SettingsBackupManager.Category cat : SettingsBackupManager.Category.values()) {
             CheckBox cb = checkbox(mActivity.getString(cat.labelRes), false);
-            cb.setChecked(true);
+            // Same source of truth as the LIST_CATEGORIES reply, so the
+            // in-app sheet and 自由作業盤's picker start from one answer.
+            cb.setChecked(cat.defaultSelected);
             mChecks.put(cat, cb);
             root.addView(cb);
         }
@@ -269,6 +271,14 @@ public final class SettingsExportImportPanel {
     }
 
     @NonNull
+    /** Whether every category starts ticked — drives the Select-all box. */
+    private static boolean allDefaultSelected() {
+        for (SettingsBackupManager.Category cat : SettingsBackupManager.Category.values()) {
+            if (!cat.defaultSelected) return false;
+        }
+        return true;
+    }
+
     private Set<SettingsBackupManager.Category> selected() {
         Set<SettingsBackupManager.Category> cats =
                 EnumSet.noneOf(SettingsBackupManager.Category.class);

@@ -1696,6 +1696,10 @@
             <intent-filter>
                 <action android:name="${applicationId}.action.EXPORT_STATE" />
                 <action android:name="${applicationId}.action.LIST_CATEGORIES" />
+                <!-- Fork: stop a running export. On the exported RECEIVER, not a
+                     service: the service that does the work is exported="false"
+                     and a third-party app could never start it. -->
+                <action android:name="${applicationId}.action.CANCEL_EXPORT" />
             </intent-filter>
         </receiver>
 
