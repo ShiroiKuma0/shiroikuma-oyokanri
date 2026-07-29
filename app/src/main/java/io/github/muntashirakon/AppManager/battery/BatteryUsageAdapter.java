@@ -148,7 +148,7 @@ public class BatteryUsageAdapter extends RecyclerView.Adapter<BatteryUsageAdapte
         // Everything expensive was resolved on the worker thread — see Row.
         MainCardBinder.bind(context, itemView, row.appItem, row.applicationInfo,
                 row.packageName, row.uid, row.frozen, row.profileTags,
-                row, onRow, onFreeze, onKill);
+                row, row.windowLabel, false, onRow, onFreeze, onKill);
     }
 
     /**
@@ -156,17 +156,42 @@ public class BatteryUsageAdapter extends RecyclerView.Adapter<BatteryUsageAdapte
      * shown, strongest first, so a network hog and a wakelock hog do not read
      * as the same kind of problem.
      */
-    /** The metric lines, for the card's right column. */
+    /**
+     * The metric lines for the card's right column, strongest first.
+     *
+     * <p>Different apps show different counters because the two lines carry the
+     * two strongest signals <i>for that app</i> — a messenger's drain is packets,
+     * a map app's is sensor time. Showing "0 packets" on the map app would fill
+     * the slot with a zero and bury the line that matters. The slot is never
+     * left empty though: when an app has fewer signals than lines, the measured
+     * window fills the rest.
+     */
     @NonNull
     static String[] describeLines(@NonNull Context context,
-                                  @NonNull BatterySampleDao.BatteryAggregate agg) {
-        String joined = describe(context, agg);
-        return joined.split("\n");
+                                  @NonNull BatterySampleDao.BatteryAggregate agg, int max) {
+        List<String> parts = metricParts(context, agg);
+        while (parts.size() < max) {
+            parts.add(context.getString(R.string.battery_metric_over,
+                    formatDuration(agg.duration)));
+            break;
+        }
+        List<String> out = new ArrayList<>();
+        for (int i = 0; i < parts.size() && i < max; i++) out.add(parts.get(i));
+        while (out.size() < Math.min(2, max)) out.add("");
+        return out.toArray(new String[0]);
+    }
+
+    /** Compact counts, so "15412 packets" does not overrun a two-column cell. */
+    @NonNull
+    private static String compact(long value) {
+        if (value >= 1_000_000L) return String.format(Locale.getDefault(), "%.1fM", value / 1_000_000d);
+        if (value >= 1_000L) return String.format(Locale.getDefault(), "%.1fk", value / 1_000d);
+        return String.valueOf(value);
     }
 
     @NonNull
-    private static String describe(@NonNull Context mContext,
-                                   @NonNull BatterySampleDao.BatteryAggregate agg) {
+    private static List<String> metricParts(@NonNull Context mContext,
+                                            @NonNull BatterySampleDao.BatteryAggregate agg) {
         List<String> parts = new ArrayList<>();
         double hours = agg.duration > 0 ? agg.duration / 3_600_000d : 0;
         long packets = agg.totalPackets();
@@ -174,7 +199,7 @@ public class BatteryUsageAdapter extends RecyclerView.Adapter<BatteryUsageAdapte
             double perSecond = packets / (agg.duration / 1000d);
             parts.add(perSecond >= 1
                     ? mContext.getString(R.string.battery_metric_packets_per_sec, Math.round(perSecond))
-                    : mContext.getString(R.string.battery_metric_packets, packets));
+                    : mContext.getString(R.string.battery_metric_packets, compact(packets)));
         }
         if (agg.totalBytes() > 0 && hours > 0) {
             String perHour = Formatter.formatShortFileSize(mContext, Math.round(agg.totalBytes() / hours));
@@ -194,15 +219,9 @@ public class BatteryUsageAdapter extends RecyclerView.Adapter<BatteryUsageAdapte
             parts.add(mContext.getString(R.string.battery_metric_sensor, formatDuration(agg.sensorMs)));
         }
         if (agg.wakeupCount > 0) {
-            parts.add(mContext.getString(R.string.battery_metric_wakeups, agg.wakeupCount));
+            parts.add(mContext.getString(R.string.battery_metric_wakeups, compact(agg.wakeupCount)));
         }
-        if (parts.isEmpty()) return mContext.getString(R.string.battery_metric_none);
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < parts.size() && i < 2; i++) {
-            if (i > 0) sb.append('\n');
-            sb.append(parts.get(i));
-        }
-        return sb.toString();
+        return parts;
     }
 
     @NonNull

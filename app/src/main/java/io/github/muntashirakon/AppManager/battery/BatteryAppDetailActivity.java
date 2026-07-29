@@ -98,6 +98,7 @@ public class BatteryAppDetailActivity extends BaseActivity {
     private Map<String, Double> mExtras = Collections.emptyMap();
     private List<BatteryHistoryView.Bar> mHistory = Collections.emptyList();
     private boolean mFrozen;
+    private float mShare;
     @Nullable
     private ApplicationItem mAppItem;
     private List<String> mProfileTags = Collections.emptyList();
@@ -147,12 +148,15 @@ public class BatteryAppDetailActivity extends BaseActivity {
         long since = System.currentTimeMillis() - mWindowHours * 3_600_000L;
         try {
             BatterySampleDao dao = AppsDb.getInstance().batterySampleDao();
+            // The same share the ranking shows, so the header pill carries the
+            // app's real figure rather than a meaningless 100% of itself.
+            long totalImpact = 0;
             for (BatterySampleDao.BatteryAggregate agg : dao.aggregate(since)) {
-                if (agg.uid == mUid) {
-                    mAggregate = agg;
-                    break;
-                }
+                totalImpact += agg.impactScore();
+                if (agg.uid == mUid) mAggregate = agg;
             }
+            mShare = totalImpact > 0 && mAggregate != null
+                    ? (float) mAggregate.impactScore() / totalImpact : 0f;
             mExtras = BatterySampler.mergeExtras(dao.extrasForUid(mUid, since));
             // Before/after: this window against the equally long one before it.
             // After throttling an app the only question that matters is whether
@@ -316,8 +320,13 @@ public class BatteryAppDetailActivity extends BaseActivity {
      */
     private void addHeader(float density, @NonNull CharSequence label) {
         View card = getLayoutInflater().inflate(R.layout.item_main, mContainer, false);
+        BatteryUsageViewModel.Row row = new BatteryUsageViewModel.Row(
+                mAggregate != null ? mAggregate : new BatterySampleDao.BatteryAggregate());
+        row.share = mShare;
         MainCardBinder.bind(this, card, mAppItem, mApplicationInfo, mPackageName, mUid, mFrozen,
-                mProfileTags, null, v -> openAppDetails(), v -> toggleFreeze(), v -> forceStop());
+                mProfileTags, row, BatteryUsageViewModel.shortWindowLabel(
+                        BatteryPrefs.getWindowMinutes(this)), true,
+                v -> openAppDetails(), v -> toggleFreeze(), v -> forceStop());
         mContainer.addView(card);
     }
 

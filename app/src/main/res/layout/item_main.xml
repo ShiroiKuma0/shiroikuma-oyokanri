@@ -86,8 +86,13 @@
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 
+        <!-- Fork: 0dp, not match_parent. With match_parent each child's base
+             width is the whole row, so the weights distribute NEGATIVE leftover
+             space and the heavier column shrinks the most — which is why the
+             right column's text was clipped while the middle kept a wide gap. -->
         <FrameLayout
-            android:layout_width="match_parent"
+            android:id="@+id/main_center_column"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1">
 
@@ -205,7 +210,8 @@
         </FrameLayout>
 
         <androidx.appcompat.widget.LinearLayoutCompat
-            android:layout_width="match_parent"
+            android:id="@+id/main_right_column"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="2"
             android:orientation="vertical"
@@ -256,6 +262,25 @@
                     tools:visibility="visible" />
 
             </androidx.appcompat.widget.LinearLayoutCompat>
+
+            <!-- Fork: share-of-drain bar, used only by the battery screens
+                 (MainCardBinder shows it when a battery row is bound). GONE by
+                 default, so the main list is untouched. -->
+            <FrameLayout
+                android:id="@+id/battery_bar_track"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="2dp"
+                android:background="#2A2A2A"
+                android:visibility="gone">
+
+                <View
+                    android:id="@+id/battery_bar_fill"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent" />
+
+            </FrameLayout>
 
             <androidx.appcompat.widget.LinearLayoutCompat
                 android:layout_width="match_parent"
