@@ -1,0 +1,19 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Fork: "clear all filters" — the same funnel as ic_filter with a cross over
+     its lower right, so it reads as the inverse of the filter icon beside it
+     rather than as an unrelated glyph (it used to be ic_list_status). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="@color/theme_bright_yellow">
+    <!-- Funnel, trimmed on the lower right so the cross sits clear of it -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M3,4h18l-7.2,8.5v3.2l-3.6,2.1v-5.3z" />
+    <!-- Cross -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M16.05,14.64l1.41,-1.41 2.12,2.12 2.12,-2.12 1.41,1.41 -2.12,2.12 2.12,2.12 -1.41,1.41 -2.12,-2.12 -2.12,2.12 -1.41,-1.41 2.12,-2.12z" />
+</vector>
