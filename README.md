@@ -9,13 +9,14 @@
 **Android app manager & control panel — themed and tooled to taste.**
 
 A fork of [AppManager](https://github.com/MuntashirAkon/AppManager) with **major additions**: a per-app
+**battery history** that survives the charge cycle Android wipes it on, a per-app
 **anti-snooping page** that can cut an app off the network entirely, a configurable
 **yellow-on-black UI** with a deep customization page, a hard-blocking **protected profile**, a
 from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-tap **main-list quick
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+23`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+42`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
 </div>
 
@@ -120,6 +121,37 @@ being frozen or uninstalled**. Enforcement sits at the two lowest-level chokepoi
 uninstall), so **no** UI path — single-app, batch, profile-apply, or anything added later — can bypass
 it. Attempts are refused with a clear message that names the protected apps. It's the safety net that
 lets you batch-freeze aggressively without ever clobbering something you depend on.
+
+## 🔋 Battery history (電池)
+
+Android keeps **ten days of daily discharge *rates* and zero days of per-app attribution** — every
+counter that could name a culprit is wiped at the next full charge. So nothing on the phone can
+answer "which app drained the battery last night". This screen can.
+
+- **It samples in the background and keeps the history itself.** `BATTERY_STATS` is
+  `signature|privileged|development` — the same level as `DUMP` — so the app grants it to *itself*
+  the way it already grants `DUMP`. The platform persists that grant, so the counters are read
+  **in-process** and sampling **survives reboots with no shell alive at all**. Readings are stored as
+  *differences*, so the charge-cycle reset ends one bucket and starts the next instead of erasing
+  everything.
+- **It costs nothing to run.** A persisted periodic job every 15 minutes: no wakelock, no foreground
+  service, no exact alarm. The counters are cumulative, so a Doze-deferred reading loses nothing — a
+  monitor that woke the phone to measure why the phone was awake would be its own worst finding.
+- **It refuses to invent numbers.** Where the device's `power_profile.xml` is stubbed — this phone
+  reports a 5.00 mAh battery — no mAh is shown at all; the ranking comes from measured counters and
+  is called *impact*, never power. Where the profile is real, mAh appears and can be sorted on. The
+  drainer columns show **real battery percentage points**, not a share of whatever happened to be
+  measured.
+- **It tells you which lever to pull.** Each app's dominant counter maps to the control that
+  addresses it — packets to the network lever, held wakelocks to `WAKE_LOCK`, background CPU to
+  `RUN_ANY_IN_BACKGROUND`, sensor time to location — with freeze offered last, and only once
+  something already scored high. A map app burning GPS needs a location lever, not removal.
+- **Charts you can actually read**: a device battery/charging trace (charging stretches in red) and a
+  per-app timeline, both placing bars by *real time* rather than index, so Doze gaps stay visibly
+  empty. Pinch to zoom, drag to pan, tap to read, labelled axes.
+- Optional **alerts** when an app crosses a threshold while you're not looking, a **before/after**
+  comparison against the previous equal window, and a **screen-off-only** view for what happens in
+  your pocket.
 
 ## 📊 Process monitor / reaper
 
