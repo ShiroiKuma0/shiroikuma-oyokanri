@@ -16,7 +16,7 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+42`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+43`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
 </div>
 
@@ -204,6 +204,12 @@ UI: a token-gated broadcast lists the exportable categories, then writes **exact
 requested directory and reports back its real path and byte size. Progress arrives as **real counts,
 never a percentage**. The gate is an **Automation export** switch — **off by default** — plus a
 24-byte token that is compared constant-time and deliberately kept **out of every backup archive**.
+
+The category listing states **which items start ticked**, so the caller's picker takes its default
+from this app rather than guessing. And a running export can be **cancelled from outside**: the
+archive is written under a `.part` name and renamed only on success, so a cancelled run leaves the
+backup directory exactly as it found it — no short archive that looks complete, no stray partial —
+and the original request is answered `ERROR:cancelled` rather than quietly finishing.
 
 ## 🔧 AM Debug features in a release build
 

@@ -6,6 +6,45 @@ All notable fork changes are recorded here. Versions use the fork's
 `customBaseVersionName+customBuildNumber` scheme (the base mirrors the upstream App Manager release
 this fork is built on).
 
+## 4.1.0+43 — 2026-07-29
+
+Two contract changes from 白い熊 自由作業盤's backup-automation hand-off, in one build. Nothing else
+moves: no new categories, no renamed ids, no change to `EXPORT_STATE` or to the token and reply
+machinery, and an absent `items` extra still means the default set.
+
+### 🗂️ `LIST_CATEGORIES` states the picker default
+
+- **`Category` carries a `defaultSelected` flag**, added with a constructor overload that defaults it
+  to `true`, so no existing entry had to change.
+- **Every category here stays `on`.** The rule is for things that are large, derived *and*
+  re-creatable — downloaded map tiles, a regenerable thumbnail cache — and this app exports none of
+  those. Sending the field is still the point: the app *states* its default rather than the picker
+  assuming one, and any category added later inherits a field that already exists.
+- **The reply now emits all four positional fields**, `id⇥label⇥parent⇥on|off`. The third is empty —
+  this category list is flat — but it is still sent, because the fields are positional and omitting
+  it would have `on` read as the parent.
+- **The in-app Export/Import sheet seeds its checkboxes from the same flag**, so the sheet and
+  自由作業盤's picker cannot disagree about what starts ticked.
+
+### ⏹️ `CANCEL_EXPORT` — a running export can be stopped
+
+- Declared on the **exported receiver**, not on a service: the service that does the work is
+  `exported="false"` and a third-party app could never reach it.
+- Gated by the same token as the other two actions, and it **answers nothing** — fire-and-forget. The
+  running export sends **`ERROR:cancelled`** for its *own* request through the normal reply channel,
+  guarded by the existing `AtomicBoolean` so it can never double-fire with a success.
+- **Cancellation is cooperative**: a flag the write loop checks between entries, so the run unwinds at
+  the next boundary. No thread interrupt, no `System.exit`, nothing killed mid-`write()`.
+- **The export writes to `<final-name>.part` and renames only on success.** A cancelled or failed run
+  therefore leaves the backup directory exactly as it found it — no short archive that looks
+  complete, no stray partial. Previously it wrote straight to the final name.
+- **Safe to send at any time.** The flag is cleared as each run starts, so a cancel arriving when
+  nothing is running, or after a run has already finished, is a silent no-op — not an error, not a
+  reply, not a crash — and cannot stop the next export.
+
+There is no foreground service or wakelock on this path to unwind (it is `goAsync()` plus a
+background thread), and the in-app panel has no export stop button to route through the same code.
+
 ## 4.1.0+42 — 2026-07-29
 
 The fork learns to answer a question the platform refuses to: **which app drained the battery while
