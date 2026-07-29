@@ -8,6 +8,7 @@ import android.content.Intent;
 
 import androidx.core.content.ContextCompat;
 
+import io.github.muntashirakon.AppManager.battery.BatterySamplerJob;
 import io.github.muntashirakon.AppManager.self.filecache.InternalCacheCleanerService;
 import io.github.muntashirakon.AppManager.servermanager.WifiWaitService;
 import io.github.muntashirakon.AppManager.settings.Ops;
@@ -25,6 +26,10 @@ public class BootReceiver extends BroadcastReceiver {
             }
             // Schedule cache cleaning
             InternalCacheCleanerService.scheduleAlarm(context.getApplicationContext());
+            // Fork: the battery sampler is setPersisted, so the platform should
+            // restore it by itself — re-scheduling here is the second path, for
+            // the case where the job was dropped (app data cleared, OEM job GC).
+            BatterySamplerJob.schedule(context.getApplicationContext());
         }
     }
 }

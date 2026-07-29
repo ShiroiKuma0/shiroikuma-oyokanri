@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 11,
-    "identityHash": "928367bc5e237921fee1870fc7ec08df",
+    "identityHash": "4c6a5daebb7875e191c1ac7b47bae7e2",
     "entities": [
       {
         "tableName": "app",
@@ -492,6 +492,184 @@
         }
       },
       {
+        "tableName": "battery_sample",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `ts` INTEGER NOT NULL, `duration` INTEGER NOT NULL, `uid` INTEGER NOT NULL, `package_name` TEXT, `wifi_bytes` INTEGER NOT NULL, `wifi_packets` INTEGER NOT NULL, `mobile_bytes` INTEGER NOT NULL, `mobile_packets` INTEGER NOT NULL, `radio_active_ms` INTEGER NOT NULL, `wakelock_ms` INTEGER NOT NULL, `wakeup_count` INTEGER NOT NULL, `cpu_ms` INTEGER NOT NULL, `fg_service_ms` INTEGER NOT NULL, `sensor_ms` INTEGER NOT NULL, `screen_on_ms` INTEGER NOT NULL, `deep_idle_ms` INTEGER NOT NULL, `light_idle_ms` INTEGER NOT NULL, `battery_level` INTEGER NOT NULL, `voltage_mv` INTEGER NOT NULL DEFAULT 0, `charging` INTEGER NOT NULL DEFAULT 0, `power_mah` REAL NOT NULL DEFAULT 0, `power_model_usable` INTEGER NOT NULL DEFAULT 0, `extras` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ts",
+            "columnName": "ts",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "duration",
+            "columnName": "duration",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "uid",
+            "columnName": "uid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "packageName",
+            "columnName": "package_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "wifiBytes",
+            "columnName": "wifi_bytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "wifiPackets",
+            "columnName": "wifi_packets",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mobileBytes",
+            "columnName": "mobile_bytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mobilePackets",
+            "columnName": "mobile_packets",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "radioActiveMs",
+            "columnName": "radio_active_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "wakelockMs",
+            "columnName": "wakelock_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "wakeupCount",
+            "columnName": "wakeup_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cpuMs",
+            "columnName": "cpu_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fgServiceMs",
+            "columnName": "fg_service_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sensorMs",
+            "columnName": "sensor_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "screenOnMs",
+            "columnName": "screen_on_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deepIdleMs",
+            "columnName": "deep_idle_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lightIdleMs",
+            "columnName": "light_idle_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "batteryLevel",
+            "columnName": "battery_level",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "voltageMv",
+            "columnName": "voltage_mv",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "charging",
+            "columnName": "charging",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "powerMah",
+            "columnName": "power_mah",
+            "affinity": "REAL",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "powerModelUsable",
+            "columnName": "power_model_usable",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "extras",
+            "columnName": "extras",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_battery_sample_ts",
+            "unique": false,
+            "columnNames": [
+              "ts"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_battery_sample_ts` ON `${TABLE_NAME}` (`ts`)"
+          },
+          {
+            "name": "index_battery_sample_uid",
+            "unique": false,
+            "columnNames": [
+              "uid"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_battery_sample_uid` ON `${TABLE_NAME}` (`uid`)"
+          }
+        ]
+      },
+      {
         "tableName": "permission_override",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`package_name` TEXT NOT NULL, `user_id` INTEGER NOT NULL, `permission_name` TEXT NOT NULL, `desired_granted` INTEGER NOT NULL, `controller` TEXT NOT NULL, `sync_status` INTEGER NOT NULL, `sync_time` INTEGER NOT NULL, PRIMARY KEY(`package_name`, `user_id`, `permission_name`))",
         "fields": [
@@ -546,438 +724,11 @@
             "permission_name"
           ]
         }
-      },
-      {
-        "tableName": "fm_directory_sort",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`directory_key` TEXT NOT NULL, `sort_order` INTEGER NOT NULL, `reverse_sort` INTEGER NOT NULL, `last_used_at` INTEGER NOT NULL, PRIMARY KEY(`directory_key`))",
-        "fields": [
-          {
-            "fieldPath": "directoryKey",
-            "columnName": "directory_key",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "sortOrder",
-            "columnName": "sort_order",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "reverseSort",
-            "columnName": "reverse_sort",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "lastUsedAt",
-            "columnName": "last_used_at",
-            "affinity": "INTEGER",
-            "notNull": true
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": false,
-          "columnNames": [
-            "directory_key"
-          ]
-        }
-      },
-      {
-        "tableName": "fm_directory_size",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`directory_key` TEXT NOT NULL, `size_bytes` INTEGER NOT NULL, `calculated_at` INTEGER NOT NULL, `last_used_at` INTEGER NOT NULL, PRIMARY KEY(`directory_key`))",
-        "fields": [
-          {
-            "fieldPath": "directoryKey",
-            "columnName": "directory_key",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "sizeBytes",
-            "columnName": "size_bytes",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "calculatedAt",
-            "columnName": "calculated_at",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "lastUsedAt",
-            "columnName": "last_used_at",
-            "affinity": "INTEGER",
-            "notNull": true
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": false,
-          "columnNames": [
-            "directory_key"
-          ]
-        }
-      },
-      {
-        "tableName": "vt_file",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sha256` TEXT NOT NULL, `md5` TEXT, `sha1` TEXT, `display_name` TEXT, `mime_type` TEXT, `size_bytes` INTEGER NOT NULL, `latest_report_json` TEXT, `latest_detected` INTEGER, `latest_total` INTEGER, `latest_analysis_id` TEXT, `permalink` TEXT, `latest_analysis_at` INTEGER NOT NULL, `latest_read_at` INTEGER NOT NULL, `local_analysis_json` TEXT, `last_accessed_at` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL)",
-        "fields": [
-          {
-            "fieldPath": "id",
-            "columnName": "id",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "sha256",
-            "columnName": "sha256",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "md5",
-            "columnName": "md5",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "sha1",
-            "columnName": "sha1",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "displayName",
-            "columnName": "display_name",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "mimeType",
-            "columnName": "mime_type",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "sizeBytes",
-            "columnName": "size_bytes",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "latestReportJson",
-            "columnName": "latest_report_json",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "latestDetected",
-            "columnName": "latest_detected",
-            "affinity": "INTEGER"
-          },
-          {
-            "fieldPath": "latestTotal",
-            "columnName": "latest_total",
-            "affinity": "INTEGER"
-          },
-          {
-            "fieldPath": "latestAnalysisId",
-            "columnName": "latest_analysis_id",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "permalink",
-            "columnName": "permalink",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "latestAnalysisAt",
-            "columnName": "latest_analysis_at",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "latestReadAt",
-            "columnName": "latest_read_at",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "localAnalysisJson",
-            "columnName": "local_analysis_json",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "lastAccessedAt",
-            "columnName": "last_accessed_at",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "createdAt",
-            "columnName": "created_at",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "updatedAt",
-            "columnName": "updated_at",
-            "affinity": "INTEGER",
-            "notNull": true
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": true,
-          "columnNames": [
-            "id"
-          ]
-        },
-        "indices": [
-          {
-            "name": "index_vt_file_sha256",
-            "unique": true,
-            "columnNames": [
-              "sha256"
-            ],
-            "orders": [],
-            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_vt_file_sha256` ON `${TABLE_NAME}` (`sha256`)"
-          }
-        ]
-      },
-      {
-        "tableName": "vt_file_source",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `file_id` INTEGER NOT NULL, `source_uri` TEXT NOT NULL, `display_name` TEXT, `mime_type` TEXT, `last_seen_at` INTEGER NOT NULL, `is_readable` INTEGER NOT NULL, `source_type` TEXT, FOREIGN KEY(`file_id`) REFERENCES `vt_file`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
-        "fields": [
-          {
-            "fieldPath": "id",
-            "columnName": "id",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "fileId",
-            "columnName": "file_id",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "sourceUri",
-            "columnName": "source_uri",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "displayName",
-            "columnName": "display_name",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "mimeType",
-            "columnName": "mime_type",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "lastSeenAt",
-            "columnName": "last_seen_at",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "isReadable",
-            "columnName": "is_readable",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "sourceType",
-            "columnName": "source_type",
-            "affinity": "TEXT"
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": true,
-          "columnNames": [
-            "id"
-          ]
-        },
-        "indices": [
-          {
-            "name": "index_vt_file_source_file_id",
-            "unique": false,
-            "columnNames": [
-              "file_id"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_vt_file_source_file_id` ON `${TABLE_NAME}` (`file_id`)"
-          },
-          {
-            "name": "index_vt_file_source_file_uri",
-            "unique": true,
-            "columnNames": [
-              "file_id",
-              "source_uri"
-            ],
-            "orders": [],
-            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_vt_file_source_file_uri` ON `${TABLE_NAME}` (`file_id`, `source_uri`)"
-          }
-        ],
-        "foreignKeys": [
-          {
-            "table": "vt_file",
-            "onDelete": "CASCADE",
-            "onUpdate": "NO ACTION",
-            "columns": [
-              "file_id"
-            ],
-            "referencedColumns": [
-              "id"
-            ]
-          }
-        ]
-      },
-      {
-        "tableName": "vt_scan_attempt",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `file_id` INTEGER NOT NULL, `type` TEXT NOT NULL, `status` TEXT NOT NULL, `analysis_id` TEXT, `permalink` TEXT, `report_json` TEXT, `detected` INTEGER, `total` INTEGER, `error_code` TEXT, `error_message` TEXT, `created_at` INTEGER NOT NULL, `started_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `completed_at` INTEGER NOT NULL, `read_at` INTEGER NOT NULL, FOREIGN KEY(`file_id`) REFERENCES `vt_file`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
-        "fields": [
-          {
-            "fieldPath": "id",
-            "columnName": "id",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "fileId",
-            "columnName": "file_id",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "type",
-            "columnName": "type",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "status",
-            "columnName": "status",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "analysisId",
-            "columnName": "analysis_id",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "permalink",
-            "columnName": "permalink",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "reportJson",
-            "columnName": "report_json",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "detected",
-            "columnName": "detected",
-            "affinity": "INTEGER"
-          },
-          {
-            "fieldPath": "total",
-            "columnName": "total",
-            "affinity": "INTEGER"
-          },
-          {
-            "fieldPath": "errorCode",
-            "columnName": "error_code",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "errorMessage",
-            "columnName": "error_message",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "createdAt",
-            "columnName": "created_at",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "startedAt",
-            "columnName": "started_at",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "updatedAt",
-            "columnName": "updated_at",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "completedAt",
-            "columnName": "completed_at",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "readAt",
-            "columnName": "read_at",
-            "affinity": "INTEGER",
-            "notNull": true
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": true,
-          "columnNames": [
-            "id"
-          ]
-        },
-        "indices": [
-          {
-            "name": "index_vt_scan_attempt_file_id",
-            "unique": false,
-            "columnNames": [
-              "file_id"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_vt_scan_attempt_file_id` ON `${TABLE_NAME}` (`file_id`)"
-          },
-          {
-            "name": "index_vt_scan_attempt_status",
-            "unique": false,
-            "columnNames": [
-              "status"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_vt_scan_attempt_status` ON `${TABLE_NAME}` (`status`)"
-          },
-          {
-            "name": "index_vt_scan_attempt_updated_at",
-            "unique": false,
-            "columnNames": [
-              "updated_at"
-            ],
-            "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_vt_scan_attempt_updated_at` ON `${TABLE_NAME}` (`updated_at`)"
-          }
-        ],
-        "foreignKeys": [
-          {
-            "table": "vt_file",
-            "onDelete": "CASCADE",
-            "onUpdate": "NO ACTION",
-            "columns": [
-              "file_id"
-            ],
-            "referencedColumns": [
-              "id"
-            ]
-          }
-        ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '928367bc5e237921fee1870fc7ec08df')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4c6a5daebb7875e191c1ac7b47bae7e2')"
     ]
   }
 }

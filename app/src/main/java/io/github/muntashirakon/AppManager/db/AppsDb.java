@@ -11,6 +11,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase;
 
 import io.github.muntashirakon.AppManager.db.dao.AppDao;
 import io.github.muntashirakon.AppManager.db.dao.BackupDao;
+import io.github.muntashirakon.AppManager.db.dao.BatterySampleDao;
 import io.github.muntashirakon.AppManager.db.dao.FmFavoriteDao;
 import io.github.muntashirakon.AppManager.db.dao.FmDirectorySizeDao;
 import io.github.muntashirakon.AppManager.db.dao.FmDirectorySortDao;
@@ -23,6 +24,7 @@ import io.github.muntashirakon.AppManager.db.dao.VtFileSourceDao;
 import io.github.muntashirakon.AppManager.db.dao.VtScanAttemptDao;
 import io.github.muntashirakon.AppManager.db.entity.App;
 import io.github.muntashirakon.AppManager.db.entity.Backup;
+import io.github.muntashirakon.AppManager.db.entity.BatterySample;
 import io.github.muntashirakon.AppManager.db.entity.FmFavorite;
 import io.github.muntashirakon.AppManager.db.entity.FmDirectorySize;
 import io.github.muntashirakon.AppManager.db.entity.FmDirectorySort;
@@ -36,8 +38,8 @@ import io.github.muntashirakon.AppManager.db.entity.VtScanAttempt;
 import io.github.muntashirakon.AppManager.utils.ContextUtils;
 
 @Database(entities = {App.class, LogFilter.class, Backup.class, OpHistory.class, FmFavorite.class, FreezeType.class,
-        PermissionOverride.class, FmDirectorySort.class, FmDirectorySize.class, VtFile.class, VtFileSource.class,
-        VtScanAttempt.class}, version = 11)
+        BatterySample.class, PermissionOverride.class, FmDirectorySort.class, FmDirectorySize.class, VtFile.class,
+        VtFileSource.class, VtScanAttempt.class}, version = 12)
 public abstract class AppsDb extends RoomDatabase {
     private static AppsDb sAppsDb;
 
@@ -71,23 +73,81 @@ public abstract class AppsDb extends RoomDatabase {
             db.execSQL("DROP TABLE IF EXISTS `file_hash`");
         }
     };
+    // Fork: battery-history sampler storage. Column order and nullability must
+    // match BatterySample exactly or Room rejects the migration at open time.
     public static final Migration M_7_8 = new Migration(7, 8) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase db) {
+            db.execSQL("CREATE TABLE IF NOT EXISTS `battery_sample` ("
+                    + "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, "
+                    + "`ts` INTEGER NOT NULL, "
+                    + "`duration` INTEGER NOT NULL, "
+                    + "`uid` INTEGER NOT NULL, "
+                    + "`package_name` TEXT, "
+                    + "`wifi_bytes` INTEGER NOT NULL, "
+                    + "`wifi_packets` INTEGER NOT NULL, "
+                    + "`mobile_bytes` INTEGER NOT NULL, "
+                    + "`mobile_packets` INTEGER NOT NULL, "
+                    + "`radio_active_ms` INTEGER NOT NULL, "
+                    + "`wakelock_ms` INTEGER NOT NULL, "
+                    + "`wakeup_count` INTEGER NOT NULL, "
+                    + "`cpu_ms` INTEGER NOT NULL, "
+                    + "`fg_service_ms` INTEGER NOT NULL, "
+                    + "`sensor_ms` INTEGER NOT NULL, "
+                    + "`screen_on_ms` INTEGER NOT NULL, "
+                    + "`deep_idle_ms` INTEGER NOT NULL, "
+                    + "`light_idle_ms` INTEGER NOT NULL, "
+                    + "`battery_level` INTEGER NOT NULL)");
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_battery_sample_ts` ON `battery_sample` (`ts`)");
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_battery_sample_uid` ON `battery_sample` (`uid`)");
+        }
+    };
+
+    // Fork: mAh (where the device's power profile is real) plus the open-ended
+    // extras map. Defaults must match BatterySample's @ColumnInfo defaultValue
+    // exactly — Room compares them and refuses to open the DB on a mismatch.
+    public static final Migration M_8_9 = new Migration(8, 9) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase db) {
+            db.execSQL("ALTER TABLE `battery_sample` ADD COLUMN `power_mah` REAL NOT NULL DEFAULT 0");
+            db.execSQL("ALTER TABLE `battery_sample` ADD COLUMN `power_model_usable` INTEGER NOT NULL DEFAULT 0");
+            db.execSQL("ALTER TABLE `battery_sample` ADD COLUMN `extras` TEXT");
+        }
+    };
+
+    // Fork: battery voltage + charging state on the device row, for the
+    // level/voltage chart at the top of the battery screen.
+    public static final Migration M_9_10 = new Migration(9, 10) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase db) {
+            db.execSQL("ALTER TABLE `battery_sample` ADD COLUMN `voltage_mv` INTEGER NOT NULL DEFAULT 0");
+            db.execSQL("ALTER TABLE `battery_sample` ADD COLUMN `charging` INTEGER NOT NULL DEFAULT 0");
+        }
+    };
+
+    // Upstream 4.1.1 introduced `permission_override` (the controller-based permission
+    // system) as ITS version 8. This fork's v8/v9/v10 are already spent on the battery
+    // sampler and are live on installed devices, so upstream's table is added here as
+    // v11 instead. Do not renumber the battery migrations — existing installs are at
+    // v10 and renumbering would either destroy their history or refuse to open.
+    public static final Migration M_10_11 = new Migration(10, 11) {
         @Override
         public void migrate(@NonNull SupportSQLiteDatabase db) {
             db.execSQL("CREATE TABLE IF NOT EXISTS `permission_override` (`package_name` TEXT NOT NULL, `user_id` INTEGER NOT NULL, `permission_name` TEXT NOT NULL, `desired_granted` INTEGER NOT NULL, `controller` TEXT NOT NULL, `sync_status` INTEGER NOT NULL, `sync_time` INTEGER NOT NULL, PRIMARY KEY(`package_name`, `user_id`, `permission_name`))");
         }
     };
-    public static final Migration M_8_9 = new Migration(8, 9) {
+    // Fork: upstream's file-manager (fm_directory_sort/size) and VirusTotal (vt_*) tables.
+    // Upstream created these at its own v8-v11; the fork's v8-v11 are the battery sampler +
+    // permission_override (live on installed devices), so upstream's tables are appended here
+    // as v12 instead — the fork's "append upstream's new tables at the next free version, never
+    // renumber the live ones" rule. The steps are lifted verbatim (and in order) from upstream
+    // M_8_9/M_9_10/M_10_11, so the resulting schema is byte-identical to what Room validates for
+    // these entities, including the latest_read_at/read_at columns (originally added by ALTER).
+    public static final Migration M_11_12 = new Migration(11, 12) {
         @Override
         public void migrate(@NonNull SupportSQLiteDatabase db) {
             db.execSQL("CREATE TABLE IF NOT EXISTS `fm_directory_sort` (`directory_key` TEXT NOT NULL, `sort_order` INTEGER NOT NULL, `reverse_sort` INTEGER NOT NULL, `last_used_at` INTEGER NOT NULL, PRIMARY KEY(`directory_key`))");
             db.execSQL("CREATE TABLE IF NOT EXISTS `fm_directory_size` (`directory_key` TEXT NOT NULL, `size_bytes` INTEGER NOT NULL, `calculated_at` INTEGER NOT NULL, `last_used_at` INTEGER NOT NULL, PRIMARY KEY(`directory_key`))");
-        }
-    };
-
-    public static final Migration M_9_10 = new Migration(9, 10) {
-        @Override
-        public void migrate(@NonNull SupportSQLiteDatabase db) {
             db.execSQL("CREATE TABLE IF NOT EXISTS `vt_file` (" +
                     "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
                     "`sha256` TEXT NOT NULL, " +
@@ -139,12 +199,6 @@ public abstract class AppsDb extends RoomDatabase {
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_vt_scan_attempt_file_id` ON `vt_scan_attempt` (`file_id`)");
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_vt_scan_attempt_status` ON `vt_scan_attempt` (`status`)");
             db.execSQL("CREATE INDEX IF NOT EXISTS `index_vt_scan_attempt_updated_at` ON `vt_scan_attempt` (`updated_at`)");
-        }
-    };
-
-    public static final Migration M_10_11 = new Migration(10, 11) {
-        @Override
-        public void migrate(@NonNull SupportSQLiteDatabase db) {
             db.execSQL("ALTER TABLE `vt_file` ADD COLUMN `latest_read_at` INTEGER NOT NULL DEFAULT 0");
             db.execSQL("ALTER TABLE `vt_scan_attempt` ADD COLUMN `read_at` INTEGER NOT NULL DEFAULT 0");
         }
@@ -153,7 +207,7 @@ public abstract class AppsDb extends RoomDatabase {
     public static AppsDb getInstance() {
         if (sAppsDb == null) {
             sAppsDb = Room.databaseBuilder(ContextUtils.getContext(), AppsDb.class, "apps.db")
-                    .addMigrations(M_2_3, M_3_4, M_4_5, M_5_6, M_6_7, M_7_8, M_8_9, M_9_10, M_10_11)
+                    .addMigrations(M_2_3, M_3_4, M_4_5, M_5_6, M_6_7, M_7_8, M_8_9, M_9_10, M_10_11, M_11_12)
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .build();
             try {
@@ -180,6 +234,8 @@ public abstract class AppsDb extends RoomDatabase {
     public abstract FmDirectorySizeDao fmDirectorySizeDao();
 
     public abstract FreezeTypeDao freezeTypeDao();
+
+    public abstract BatterySampleDao batterySampleDao();
 
     public abstract PermissionOverrideDao permissionOverrideDao();
 

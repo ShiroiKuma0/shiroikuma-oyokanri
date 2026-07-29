@@ -56,12 +56,25 @@ public class AppDetailsActivity extends BaseActivity {
     private static final String EXTRA_APK_SOURCE = "src";
     private static final String EXTRA_USER_HANDLE = "user";
     private static final String EXTRA_BACK_TO_MAIN = "main";
+    /** Fork: tab (an {@link AppDetailsFragment.Property} id) to open on, so callers can land on 盗み見 directly. */
+    private static final String EXTRA_TAB = "tab";
+    /** The Snooping tab, as an {@link AppDetailsFragment.Property} id — resolved to a position via {@link #getTabPosition(int)}. */
+    public static final int TAB_SNOOPING = AppDetailsFragment.SNOOPING;
 
     @NonNull
     public static Intent getIntent(@NonNull Context context, @NonNull String packageName, @UserIdInt int userId) {
         Intent intent = new Intent(context, AppDetailsActivity.class);
         intent.putExtra(EXTRA_PACKAGE_NAME, packageName);
         intent.putExtra(EXTRA_USER_HANDLE, userId);
+        return intent;
+    }
+
+    /** Fork: opens App details on a specific tab. */
+    @NonNull
+    public static Intent getIntent(@NonNull Context context, @NonNull String packageName,
+                                   @UserIdInt int userId, int tabIndex) {
+        Intent intent = getIntent(context, packageName, userId);
+        intent.putExtra(EXTRA_TAB, tabIndex);
         return intent;
     }
 
@@ -172,10 +185,16 @@ public class AppDetailsActivity extends BaseActivity {
         // Set tabs
         mViewPager.setOffscreenPageLimit(4);
         mViewPager.setAdapter(new AppDetailsFragmentPagerAdapter(this));
+        // Fork: land on the requested tab, carried as an AppDetailsFragment.Property id
+        // (positions are user-configurable now, so resolve the id to a position). Posted,
+        // because setCurrentItem before the mediator has attached is silently dropped.
+        int requestedTab = getIntent().getIntExtra(EXTRA_TAB, -1);
         new TabLayoutMediator(tabLayout, mViewPager,
                 (tab, position) -> tab.setText(mTabs.get(position).getTitleRes()))
                 .attach();
-        if (savedInstanceState == null) {
+        if (requestedTab >= 0) {
+            mViewPager.post(() -> mViewPager.setCurrentItem(getTabPosition(requestedTab), false));
+        } else if (savedInstanceState == null) {
             mViewPager.setCurrentItem(getTabPosition(Prefs.AppDetailsPage.getInitialTab()), false);
         }
         // Load package info

@@ -60,6 +60,7 @@ import io.github.muntashirakon.AppManager.servermanager.ServerConnectionFailure;
 import io.github.muntashirakon.AppManager.servermanager.ServerStatusChangeReceiver;
 import io.github.muntashirakon.AppManager.servermanager.WifiWaitService;
 import io.github.muntashirakon.AppManager.session.SessionMonitoringService;
+import io.github.muntashirakon.AppManager.battery.BatterySamplerJob;
 import io.github.muntashirakon.AppManager.snooping.SnoopingEnforcer;
 import io.github.muntashirakon.AppManager.users.Owners;
 import io.github.muntashirakon.AppManager.users.Users;
@@ -236,6 +237,10 @@ public class Ops {
             // apps, and any install we could not act on at the time because the
             // ADB/Shizuku server was not up. Runs off the main thread.
             SnoopingEnforcer.enforceAllAsync(context);
+            // Fork: same reasoning for the battery sampler. SelfPermissions.init()
+            // has had its chance to grant BATTERY_STATS by now, so this is the
+            // first moment the periodic job can actually read anything.
+            BatterySamplerJob.schedule(context.getApplicationContext());
         }
     }
 

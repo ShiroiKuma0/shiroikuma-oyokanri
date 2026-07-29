@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Fork: battery-history screen actions. -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_battery_search"
+        android:icon="@drawable/ic_search"
+        android:title="@string/search"
+        app:actionViewClass="androidx.appcompat.widget.SearchView"
+        app:showAsAction="ifRoom|collapseActionView" />
+    <item
+        android:id="@+id/action_battery_window"
+        android:icon="@drawable/ic_history"
+        android:title="@string/battery_window"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_battery_sort"
+        android:icon="@drawable/ic_sort"
+        android:title="@string/battery_sort"
+        app:showAsAction="ifRoom" />
+    <!-- Fork: same 3x3 layout picker as the main list, "always" so it never
+         falls into the overflow on a narrow panel. -->
+    <item
+        android:id="@+id/action_battery_columns"
+        android:icon="@drawable/ic_grid_3x3"
+        android:title="@string/list_layout"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_battery_sample_now"
+        android:icon="@drawable/ic_refresh"
+        android:title="@string/battery_sample_now"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_battery_screen_off"
+        android:checkable="true"
+        android:title="@string/battery_screen_off_only"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_battery_alerts"
+        android:title="@string/battery_alerts"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_battery_sampling"
+        android:checkable="true"
+        android:title="@string/battery_sampling"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_battery_retention"
+        android:title="@string/battery_retention"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_battery_status"
+        android:title="@string/battery_status"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_battery_clear"
+        android:title="@string/battery_clear_history"
+        app:showAsAction="never" />
+</menu>

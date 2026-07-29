@@ -42,7 +42,12 @@ public class SelfPermissions {
                 ManifestCompat.permission.GET_APP_OPS_STATS,
                 ManifestCompat.permission.INTERACT_ACROSS_USERS,
                 Manifest.permission.READ_LOGS,
-                Manifest.permission.WRITE_SECURE_SETTINGS
+                Manifest.permission.WRITE_SECURE_SETTINGS,
+                // Fork: per-app battery counters for the battery-history screen.
+                // Same signature|privileged|development level as DUMP above, so
+                // the same grant works — and because the platform persists it,
+                // the sampler survives reboots without any shell connection.
+                Manifest.permission.BATTERY_STATS
         };
         int userId = UserHandleHidden.myUserId();
         for (String permission : permissions) {

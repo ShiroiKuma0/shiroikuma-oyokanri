@@ -101,6 +101,7 @@ import io.github.muntashirakon.AppManager.profiles.RemoveFromProfileDialogFragme
 import io.github.muntashirakon.AppManager.profiles.ProfilesActivity;
 import io.github.muntashirakon.AppManager.profiles.ProtectedAppsProfile;
 import io.github.muntashirakon.AppManager.rules.RulesTypeSelectionDialogFragment;
+import io.github.muntashirakon.AppManager.battery.BatteryUsageActivity;
 import io.github.muntashirakon.AppManager.processreaper.ProcessMonitorActivity;
 import io.github.muntashirakon.AppManager.self.life.FundingCampaignChecker;
 import io.github.muntashirakon.AppManager.settings.FeatureController;
@@ -620,6 +621,9 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             // Fork: fallback — the action view normally handles the tap, but
             // route here too in case it ever surfaces without its action view.
             startActivity(new Intent(this, ProcessMonitorActivity.class));
+        } else if (id == R.id.action_battery_history) {
+            // Fork: per-app battery drain over time.
+            startActivity(new Intent(this, BatteryUsageActivity.class));
         } else if (id == R.id.action_profiles) {
             Intent profilesIntent = new Intent(this, ProfilesActivity.class);
             startActivity(profilesIntent);
