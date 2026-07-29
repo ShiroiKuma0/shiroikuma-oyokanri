@@ -18,6 +18,15 @@
         app:actionLayout="@layout/view_toolbar_monitor"
         app:showAsAction="always" />
 
+    <!-- Fork: battery-history entry, beside the monitor gauge. The monitor
+         answers "what is burning CPU right now"; this answers "what drained
+         the battery while I was not looking". -->
+    <item
+        android:id="@+id/action_battery_history"
+        android:icon="@drawable/ic_battery_history"
+        android:title="@string/battery_title"
+        app:showAsAction="ifRoom" />
+
     <item
         android:id="@+id/action_list_options"
         android:icon="@drawable/ic_filter"
@@ -26,7 +35,7 @@
 
     <item
         android:id="@+id/action_clear_filters"
-        android:icon="@drawable/ic_list_status"
+        android:icon="@drawable/ic_filter_clear"
         android:title="@string/clear_all_filters"
         app:showAsAction="ifRoom" />
 
@@ -39,13 +48,16 @@
         android:title="@string/copy_displayed_app_ids"
         app:showAsAction="never" />
 
-    <!-- Fork: main-list layout picker (adaptive / 2 / 3 / 4 columns). Last
-         ifRoom item, so it sits immediately left of the overflow button. -->
+    <!-- Fork: main-list layout picker (adaptive / 2 / 3 / 4 columns). "always",
+         not "ifRoom": on a narrow/folded panel there was no room left by the
+         time it was reached and it silently fell into the overflow, which is
+         where 白い熊 kept finding it. It is the last item before the overflow,
+         so it renders immediately left of the ⋮ button. -->
     <item
         android:id="@+id/action_layout_columns"
         android:icon="@drawable/ic_grid_3x3"
         android:title="@string/list_layout"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/action_refresh"
