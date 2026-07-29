@@ -6,6 +6,114 @@ All notable fork changes are recorded here. Versions use the fork's
 `customBaseVersionName+customBuildNumber` scheme (the base mirrors the upstream App Manager release
 this fork is built on).
 
+## 4.1.0+42 — 2026-07-29
+
+The fork learns to answer a question the platform refuses to: **which app drained the battery while
+you weren't looking**. Android keeps ten days of daily discharge *rates* and zero days of per-app
+attribution — every counter that could name a culprit is wiped at the next full charge — so this
+build samples those counters itself, stores the differences, and turns the result into something you
+can act on rather than just read.
+
+### 🔋 Battery history (電池) — the new screen
+
+- **A new top-level screen**, entered from a battery icon on the main toolbar beside the process
+  monitor. Ranked per-app list over a selectable window (15 min → 14 days), with search, sort
+  (impact / packets / bytes / wakelock / CPU / mAh where real), an adaptive or fixed 2–4 column grid,
+  and a screen-off-only view for what happens in your pocket.
+- **Self-granting privileges.** `android.permission.BATTERY_STATS` is
+  `signature|privileged|development` — the same protection level as `DUMP`, which the fork already
+  grants itself. `SelfPermissions.init()` now grants it too, the platform persists the grant, and the
+  counters are then dumped **in-process** from the `batterystats` binder. Sampling therefore
+  **survives a reboot with no shell alive at all**; the privileged-shell path remains as the fallback
+  for the window before the grant lands.
+- **A sampler that costs nothing.** A `setPersisted` periodic `JobScheduler` job, 15 minutes by
+  default: no wakelock, no foreground service, no exact alarm. Battery counters are cumulative, so a
+  Doze-deferred reading loses nothing — it only widens a bucket.
+- **Storage is deltas, not absolutes** (`battery_sample`, Room v8 → v10). Reset detection compares
+  the dump's own "Start clock time" plus time-on-battery; on a reset the absolutes are written as one
+  bucket rather than dropped, because the hours around a charge are the ones worth seeing. A dump
+  that fails to parse writes nothing — an all-zero bucket would read back as a quiet hour that never
+  happened. Configurable retention (1–60 days) with automatic pruning.
+- **mAh only where the power model is real.** The gate is the dump's own reported profile capacity
+  (≥ 100 mAh — no phone has a smaller battery); the Mate XT reports **5.00 mAh** and a computed drain
+  of zero, so on that device no mAh is shown anywhere and the ranking is a composite of measured
+  counters, labelled *impact*, never power. The flag is stored **per bucket**, so a history spanning
+  several phones can never make old zero-mAh rows look like "used no power". Where the profile is
+  real, mAh is shown and offered as a sort key.
+- **Real battery percentages for the drainers.** The header's columns show `share × the drop the
+  device actually recorded` — percentage points of battery — instead of a share of whatever was
+  measured, which reads as alarming even when the phone lost three points all day. Only decreases
+  between two consecutive non-charging readings count, so a charge mid-window cannot cancel the
+  discharge either side of it.
+- **Open-ended metrics.** Beyond the fixed columns each bucket carries a JSON map of everything else
+  the platform offered — per-component mAh, job/sync time and counts, process-state times, Wi-Fi
+  running/lock/scan, Bluetooth scan, audio, video, camera, flashlight, vibrator, radio wakeups — and
+  unknown keys still render, so a counter a future Android release starts printing shows up instead
+  of being silently dropped.
+
+### 🎯 Acting on it, not just reading it
+
+- **A per-app control panel** replaces the read-only dialog: recommendations, a zoomable history
+  chart, every control, and the full measurement list.
+- **Recommendations map the dominant counter to the lever that addresses it** — sustained packets to
+  the network lever, held wakelocks to `WAKE_LOCK`, background CPU to `RUN_ANY_IN_BACKGROUND`,
+  foreground-service time to `START_FOREGROUND`, sensor time to location, a Doze exemption on a busy
+  app to dropping it. **Freeze is offered last and only after something already scored high** — a map
+  app burning GPS needs a location lever, not removal. All thresholds are *rates*, so an app measured
+  over four minutes and one over four days are judged alike. Recommendations that map to a switch
+  carry the switch inline.
+- **Controls**: freeze (through the same chokepoint, so the `必要` profile still refuses), the
+  three-state network lever, Doze exemption, `RUN_ANY_IN_BACKGROUND`, `RUN_IN_BACKGROUND`,
+  `START_FOREGROUND`, `WAKE_LOCK`, force-stop. Every op write is **re-read afterwards** and reports
+  whether the platform actually complied — `AppOpsService` accepts writes it silently discards.
+- **Alerts** (off by default) run inside the sampler, since the drain that matters happens in a
+  pocket. Judged over a trailing hour with a coverage gate and a six-hour per-uid cooldown, with a
+  per-app ignore list, opening straight into that app's panel.
+- **Before/after comparison** against the equally long preceding window, in rates rather than totals
+  so a shorter earlier window cannot invent an improvement.
+
+### 📈 Charts
+
+- Bars are placed **and sized by real time**, not by index: Doze makes buckets wildly uneven, and an
+  index axis would erase exactly the idle gaps under investigation. Pinch to zoom (focus-preserving),
+  drag to pan, double-tap to fit, tap to read a bucket.
+- A **device battery trace** over the retained history, opening on the last 24 h and draggable
+  further back, with **charging stretches in red** — a discharge chart that silently merges charging
+  shows a line going *up*, and a reader who sees that stops trusting all of it.
+- Labelled axes on both: battery percent on the device chart, and **awake-equivalent time** on the
+  per-app chart (wakelocks + radio-active + CPU + sensors, plus 2 ms per packet), with a legend
+  saying so and stating that it is not mAh.
+- **Top drainers** panel beside it, horizontally scrollable, colour columns with the window's real
+  percentage points.
+
+### 🎨 Presentation
+
+- Battery rows are **the main list's own card** — same layout, same freeze snowflake and force-stop
+  ✕ in the same places, the note "+", the profile tags, the frozen film and italics, the
+  type-coloured border — with only the right-hand column swapped for drain. The main-list item
+  derivation was lifted to a shared static so the card cannot drift from the list it copies.
+- Frozen apps resolve correctly here: a package frozen by *hiding* is invisible to a plain lookup, so
+  the very apps you froze for draining used to lose their name and icon.
+- The whole page scrolls, header included; the header spans all columns in grid layouts.
+
+### 🔧 Fixes and behaviour
+
+- **`item_main.xml` declared `layout_width="match_parent"` together with a `layout_weight`** on both
+  weighted columns. In a horizontal `LinearLayout` that makes each child's base width the whole row,
+  so the leftover space is negative and the weights distribute *that* — the heavier column shrank
+  most. It is why the right column clipped while the middle kept a wide gap. Both are now `0dp`.
+- **The list layout picker (3×3 grid) moved onto the main toolbar for good** — it was `ifRoom`, so on
+  a narrow or folded panel it silently fell into the overflow.
+- **Clear-all-filters gets a filter-with-cross icon** instead of an unrelated glyph, so it reads as
+  the inverse of the filter button beside it.
+- **App details can be opened on a specific tab**, so "Restrict location / sensors" lands on 盗み見
+  rather than the front page.
+- The network lever is cycled through the states it *actually* supports; it was being asked for a
+  middle rung that does not exist when the firewall path is unavailable, and correctly refused.
+- Controls are **never hidden** because privileges happen to be down — a failed change names
+  ADB/Shizuku instead, since that is the one cause you can act on.
+- Counts are compacted (`15412 packets` → `15.0k packets`) and the metric slot is never left blank.
+
 ## 4.1.0+23 — 2026-07-28
 
 The anti-snooping page stops being an app-ops page. The capabilities that matter most on a modern
