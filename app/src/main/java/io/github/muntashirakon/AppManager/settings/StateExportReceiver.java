@@ -12,6 +12,7 @@ import androidx.annotation.Nullable;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Set;
@@ -61,6 +62,21 @@ public class StateExportReceiver extends BroadcastReceiver {
 
     public static final String ACTION_EXPORT_STATE = BuildConfig.APPLICATION_ID + ".action.EXPORT_STATE";
     public static final String ACTION_LIST_CATEGORIES = BuildConfig.APPLICATION_ID + ".action.LIST_CATEGORIES";
+    /**
+     * Stop the export that is running. Fire-and-forget: it is gated by the same
+     * token as the others but <b>sends no reply of its own</b>, and arriving
+     * when nothing is running — or after the run already finished — is a silent
+     * no-op, never an error.
+     */
+    public static final String ACTION_CANCEL_EXPORT = BuildConfig.APPLICATION_ID + ".action.CANCEL_EXPORT";
+
+    /**
+     * Set by {@link #ACTION_CANCEL_EXPORT}, read between entries by the write
+     * loop. One flag suffices because two concurrent exports are forbidden by
+     * the contract; it is cleared as each run starts, so a cancel that arrives
+     * after a run has ended cannot stop the next one.
+     */
+    private static final AtomicBoolean sCancelRequested = new AtomicBoolean(false);
 
     private static final String EXTRA_TOKEN = "token";
     private static final String EXTRA_PATH = "path";
@@ -107,6 +123,15 @@ public class StateExportReceiver extends BroadcastReceiver {
                 } else if (ACTION_EXPORT_STATE.equals(action)) {
                     result = doExport(appContext, pathExtra, itemsExtra, progressAction,
                             replyPackage, replyId);
+                } else if (ACTION_CANCEL_EXPORT.equals(action)) {
+                    // Raise the flag and say nothing. The running export sends
+                    // ERROR:cancelled for its OWN request through the normal
+                    // channel; answering the cancel too would be a second reply
+                    // for a request nobody made.
+                    sCancelRequested.set(true);
+                    Log.d(TAG, "cancel requested by %s", replyPackage);
+                    pendingResult.finish();
+                    return;
                 } else {
                     result = "ERROR:unknown action " + action;
                 }
@@ -121,7 +146,16 @@ public class StateExportReceiver extends BroadcastReceiver {
     // Actions
     // ------------------------------------------------------------------
 
-    /** {@code OK:} + one {@code id<TAB>label} line per category (flat list). */
+    /**
+     * {@code OK:} + one {@code id<TAB>label<TAB>parent<TAB>on|off} line per
+     * category.
+     *
+     * <p>The category list here is flat, so the third field is always empty —
+     * but it is still <b>sent</b>, because the fields are positional and the
+     * fourth would otherwise be read as the parent. The fourth states whether
+     * the item starts ticked, so 自由作業盤's picker takes the default from this
+     * app rather than assuming one.
+     */
     @NonNull
     private static String listCategories(@NonNull Context context) {
         StringBuilder sb = new StringBuilder("OK:");
@@ -129,7 +163,9 @@ public class StateExportReceiver extends BroadcastReceiver {
         for (SettingsBackupManager.Category cat : SettingsBackupManager.Category.values()) {
             if (!first) sb.append('\n');
             first = false;
-            sb.append(cat.id).append('\t').append(context.getString(cat.labelRes));
+            sb.append(cat.id).append('\t').append(context.getString(cat.labelRes))
+                    .append('\t')                                   // no parent — flat list
+                    .append('\t').append(cat.defaultSelected ? "on" : "off");
         }
         return sb.toString();
     }
@@ -163,14 +199,32 @@ public class StateExportReceiver extends BroadcastReceiver {
             return "ERROR:cannot create directory " + oneLine(dirPath);
         }
         File outFile = new File(dir, SettingsBackupManager.newFileName());
+        // Written under ".part" and renamed only on success, so a cancelled or
+        // failed run leaves the directory exactly as it found it — no short
+        // archive that looks complete, no stray partial.
+        File partFile = new File(dir, outFile.getName() + ".part");
         final ProgressSender progress = new ProgressSender(context, progressAction, replyPackage, replyId);
+        // A cancel that arrived before this run started must not stop it.
+        sCancelRequested.set(false);
         try {
-            SettingsBackupManager.writeExport(context, categories, new FileOutputStream(outFile),
-                    progress::onCategory);
+            SettingsBackupManager.writeExport(context, categories, new FileOutputStream(partFile),
+                    progress::onCategory, sCancelRequested::get);
+            if (!partFile.renameTo(outFile)) {
+                throw new IOException("could not finalise " + outFile.getName());
+            }
+        } catch (SettingsBackupManager.ExportCancelledException cancelled) {
+            //noinspection ResultOfMethodCallIgnored
+            partFile.delete();
+            Log.d(TAG, "export cancelled; %s removed", partFile.getName());
+            return "ERROR:cancelled";
         } catch (Throwable th) {
+            //noinspection ResultOfMethodCallIgnored
+            partFile.delete();
             //noinspection ResultOfMethodCallIgnored
             outFile.delete();
             return "ERROR:export failed: " + oneLine(String.valueOf(th.getMessage()));
+        } finally {
+            sCancelRequested.set(false);
         }
         long bytes = outFile.length();
         String human = humanSize(bytes);
