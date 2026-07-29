@@ -32,6 +32,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 
 import io.github.muntashirakon.AppManager.R;
+import io.github.muntashirakon.AppManager.battery.BatteryPrefs;
 import io.github.muntashirakon.AppManager.snooping.NetBlockState;
 import io.github.muntashirakon.AppManager.snooping.SnoopingImmovable;
 import io.github.muntashirakon.AppManager.snooping.SnoopingPrefs;
@@ -131,10 +132,13 @@ public final class SettingsBackupManager {
      * would hand out the gate key with the archive. The snooping "cannot be
      * turned on here" marks are a fact about <em>this</em> phone's app-ops
      * behaviour, not a decision, so carrying them to another phone could hide a
-     * capability that is perfectly movable there.
+     * capability that is perfectly movable there. The battery sampler's state
+     * is the previous raw counter reading from <em>this</em> phone at one
+     * instant; restoring it elsewhere would make the next delta pure garbage.
      */
     private static final Set<String> EXCLUDED_PREFS = new HashSet<>(
-            Arrays.asList(AutomationAuth.PREF_FILE, SnoopingImmovable.PREF_FILE, NetBlockState.PREF_FILE));
+            Arrays.asList(AutomationAuth.PREF_FILE, SnoopingImmovable.PREF_FILE, NetBlockState.PREF_FILE,
+                    BatteryPrefs.STATE_PREF_FILE));
 
     // Shared-prefs stores per category; anything unlisted falls into GENERAL
     // (the main "preferences" store, backup dirs/options, and any future
@@ -144,7 +148,11 @@ public final class SettingsBackupManager {
             "shiroikuma_main_layout", "shiroikuma_selection_frame",
             "shiroikuma_separators", "shiroikuma_running_box"));
     private static final Set<String> MONITOR_PREFS = new HashSet<>(Arrays.asList(
-            "shiroikuma_monitor", "shiroikuma_monitor_sep", "shiroikuma_reaper"));
+            "shiroikuma_monitor", "shiroikuma_monitor_sep", "shiroikuma_reaper",
+            // Fork: battery-history *decisions* (sample or not, how often, how
+            // long to keep) travel; the sampler's raw state does not — see
+            // EXCLUDED_PREFS above.
+            "shiroikuma_battery"));
     private static final Set<String> TOOLBAR_PREFS = new HashSet<>(Arrays.asList(
             "am_main_toolbar", "am_main_page_profile_filter"));
     private static final String NOTES_PREFS = "shiroikuma_notes";

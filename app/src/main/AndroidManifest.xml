@@ -18,6 +18,15 @@
     <uses-permission
         android:name="android.permission.BACKUP"
         tools:ignore="ProtectedPermissions" />
+    <!-- Fork: per-app battery counters. Protection level is
+         signature|privileged|development (verified on-device 2026-07-29), and
+         the "development" flag is what lets SelfPermissions.init() grant it to
+         us the same way it already grants DUMP. Once granted the platform
+         persists it, so the battery sampler keeps working across reboots with
+         no shell alive — which is the whole point. -->
+    <uses-permission
+        android:name="android.permission.BATTERY_STATS"
+        tools:ignore="ProtectedPermissions" />
     <uses-permission
         android:name="android.permission.CHANGE_COMPONENT_ENABLED_STATE"
         tools:ignore="ProtectedPermissions" />
@@ -195,6 +204,27 @@
             android:exported="false"
             android:label="@string/monitor_detail_title"
             android:theme="@style/AppTheme.YellowOnBlack" />
+        <!-- Fork: battery history screen (black/yellow theme) -->
+        <activity
+            android:name=".battery.BatteryUsageActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:exported="false"
+            android:label="@string/battery_title"
+            android:theme="@style/AppTheme.YellowOnBlack" />
+        <!-- Fork: per-app battery control panel (black/yellow theme) -->
+        <activity
+            android:name=".battery.BatteryAppDetailActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:exported="false"
+            android:label="@string/battery_title"
+            android:theme="@style/AppTheme.YellowOnBlack" />
+        <!-- Fork: the periodic battery sampler. No wakelock, no foreground
+             service — the counters are cumulative, so a late reading only
+             widens a bucket and the OS is free to batch us. -->
+        <service
+            android:name=".battery.BatterySamplerJob"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
         <activity
             android:name=".settings.SettingsActivity"
             android:enableOnBackInvokedCallback="true"

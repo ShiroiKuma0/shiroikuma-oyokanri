@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Fork: the battery screen's header, about two rows tall. Left: the device's
+     own level/voltage history, opening on the last 24 h and draggable further
+     back, charging stretches in red. Right: who drained it over the last two
+     hours, as colour columns. Together they answer "how fast" and "who". -->
+<androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@android:color/black"
+    android:orientation="vertical"
+    android:paddingBottom="2dp">
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+    android:paddingHorizontal="8dp"
+    android:paddingTop="6dp"
+    android:paddingBottom="2dp">
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/battery_header_level_caption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:singleLine="true"
+            android:textColor="@color/theme_bright_yellow"
+            android:textSize="16sp" />
+
+        <io.github.muntashirakon.AppManager.battery.BatteryLevelView
+            android:id="@+id/battery_header_level"
+            android:layout_width="match_parent"
+            android:layout_height="330dp" />
+
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <!-- Clickable pill: the two-hour window was an arbitrary default, so it
+             is selectable rather than baked in. -->
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/battery_header_drainers_caption"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_battery_pill"
+            android:clickable="true"
+            android:ellipsize="end"
+            android:focusable="true"
+            android:singleLine="true"
+            android:text="@string/battery_header_drainers"
+            android:textColor="@color/theme_bright_yellow"
+            android:textSize="16sp" />
+
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:scrollbars="none">
+
+            <io.github.muntashirakon.AppManager.battery.BatteryTopDrainersView
+                android:id="@+id/battery_header_drainers"
+                android:layout_width="wrap_content"
+                android:layout_height="330dp" />
+
+        </HorizontalScrollView>
+
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
+</androidx.appcompat.widget.LinearLayoutCompat>
+
+    <!-- Which period the per-app rows below cover. The panels above use their
+         own spans (24 h chart, selectable drainer window), so leaving this
+         implicit made three different periods look like one. -->
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/battery_header_list_period"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="12dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="2dp"
+        android:textColor="@color/theme_bright_yellow"
+        android:textSize="15sp" />
+
+</androidx.appcompat.widget.LinearLayoutCompat>

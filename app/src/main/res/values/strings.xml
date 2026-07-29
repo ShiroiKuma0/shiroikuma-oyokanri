@@ -2126,4 +2126,179 @@
     <string name="snooping_missing_ops">Ops not in the catalogue</string>
     <string name="snooping_missing_ops_count">%1$d op(s) not catalogued</string>
     <string name="snooping_missing_ops_none">Every app op this device has that can hold a mode of its own is already on this page.</string>
+
+    <!-- Fork: battery history (電池) — per-app drain over time, sampled and
+         stored by us because the platform wipes per-app counters at every full
+         charge. Deliberately no "mAh" anywhere: this device's power profile
+         reports Capacity 5.00 / Computed drain 0, so a milliamp-hour figure
+         here would be invented. -->
+    <string name="battery_title">Battery history</string>
+    <string name="battery_empty">No samples yet.\n\nReadings are taken every few minutes; leave it running and come back. Use ⋮ → Status to check that the counters can be read at all.</string>
+    <string name="battery_window">Time window</string>
+    <string name="battery_sort">Rank by</string>
+    <string name="battery_sort_impact">Impact (combined)</string>
+    <string name="battery_sort_packets">Network packets</string>
+    <string name="battery_sort_bytes">Network bytes</string>
+    <string name="battery_sort_wakelock">Wakelock time</string>
+    <string name="battery_sort_cpu">CPU time</string>
+    <string name="battery_sample_now">Sample now</string>
+    <string name="battery_sampling">Keep sampling</string>
+    <string name="battery_sampling_now">Taking a reading…</string>
+    <string name="battery_retention">Keep history for</string>
+    <string name="battery_status">Status</string>
+    <string name="battery_status_direct">Reading the counters directly, in-process. The BATTERY_STATS grant is in place, so sampling keeps working after a reboot with no shell connection.</string>
+    <string name="battery_status_shell">Reading the counters through the privileged shell. Grant BATTERY_STATS (it happens automatically once privileges are up) and sampling will survive reboots on its own.</string>
+    <string name="battery_status_last_sample">Last reading: %s</string>
+    <string name="battery_status_never">never</string>
+    <string name="battery_status_interval">Interval: every %d min</string>
+    <string name="battery_status_retention">Retention: %d day(s)</string>
+    <string name="battery_clear_history">Clear history</string>
+    <string name="battery_clear_history_confirm">Delete every stored sample? The ranking starts again from the next reading.</string>
+    <string name="battery_summary_drop">%d%% used</string>
+    <string name="battery_summary_deep_doze">deep doze %s</string>
+    <string name="battery_summary_paused">sampling off</string>
+    <string name="battery_summary_collecting">collecting…</string>
+    <string name="battery_row_meta">%1$s · uid %2$d</string>
+    <string name="battery_row_meta_uid_only">uid %d</string>
+    <string name="battery_metric_packets_per_sec">%d pkt/s</string>
+    <string name="battery_metric_packets">%d packets</string>
+    <string name="battery_metric_per_hour">%s/h</string>
+    <string name="battery_metric_wakelock">%s awake</string>
+    <string name="battery_metric_radio">%s radio</string>
+    <string name="battery_metric_cpu">%.1f%% cpu</string>
+    <string name="battery_metric_sensor">%s sensors</string>
+    <string name="battery_metric_wakeups">%d wakeups</string>
+    <string name="battery_metric_none">no measurable activity</string>
+    <string name="battery_detail_window">Measured over</string>
+    <string name="battery_detail_wifi">Wi-Fi</string>
+    <string name="battery_detail_mobile">Mobile</string>
+    <string name="battery_detail_packet_rate">Packet rate</string>
+    <string name="battery_detail_radio">Radio active</string>
+    <string name="battery_detail_wakelock">Wakelock held</string>
+    <string name="battery_detail_wakeups">Wakeup alarms</string>
+    <string name="battery_detail_cpu">CPU time</string>
+    <string name="battery_detail_sensors">Sensors</string>
+    <string name="battery_detail_fg_service">Foreground service</string>
+    <string name="battery_detail_uid">uid</string>
+    <string name="battery_detail_power">Estimated power</string>
+    <string name="battery_detail_more">— everything else this device reported —</string>
+    <string name="battery_mah">%.1f mAh</string>
+    <string name="battery_sort_mah">Estimated power (mAh)</string>
+    <string name="battery_metric_mah_component">mAh · %s</string>
+    <string name="battery_metric_foreground_activity">Foreground activity</string>
+    <string name="battery_metric_top">Top (on screen)</string>
+    <string name="battery_metric_fg_service_state">Foreground-service state</string>
+    <string name="battery_metric_background">Background</string>
+    <string name="battery_metric_cached">Cached</string>
+    <string name="battery_metric_wifi_running">Wi-Fi running</string>
+    <string name="battery_metric_wifi_lock">Wi-Fi lock held</string>
+    <string name="battery_metric_wifi_scan">Wi-Fi scans</string>
+    <string name="battery_metric_bluetooth_scan">Bluetooth scans</string>
+    <string name="battery_metric_audio">Audio</string>
+    <string name="battery_metric_video">Video</string>
+    <string name="battery_metric_camera">Camera</string>
+    <string name="battery_metric_flashlight">Flashlight</string>
+    <string name="battery_metric_vibrator">Vibrator</string>
+    <string name="battery_metric_job_time">Job time</string>
+    <string name="battery_metric_job_count">Jobs run</string>
+    <string name="battery_metric_sync_time">Sync time</string>
+    <string name="battery_metric_sync_count">Syncs run</string>
+    <string name="battery_metric_radio_count">Radio wakeups</string>
+    <string name="battery_metric_profile_capacity">Power-profile capacity</string>
+    <string name="battery_metric_computed_drain">Computed drain</string>
+    <!-- Fork: per-app battery control panel (+26). Pairs each measurement with
+         the lever that addresses it, so a heavy app gets a targeted fix rather
+         than a guess. -->
+    <string name="battery_state_frozen">Frozen</string>
+    <string name="battery_section_recommended">Recommended</string>
+    <string name="battery_section_history">History</string>
+    <string name="battery_section_controls">Controls</string>
+    <string name="battery_section_stats">Measurements</string>
+    <string name="battery_advice_network">Restrict background network</string>
+    <string name="battery_advice_network_reason">Sustained %d packets/second — a steady packet rate is what keeps the phone out of deep Doze.</string>
+    <string name="battery_advice_radio_reason">Mobile radio held active %s per hour.</string>
+    <string name="battery_advice_wakelock">Block wake locks</string>
+    <string name="battery_advice_wakelock_reason">Holds a wake lock %s per hour — the app is explicitly preventing sleep.</string>
+    <string name="battery_advice_background">Stop background execution</string>
+    <string name="battery_advice_cpu_reason">Using %.1f%% of a CPU core continuously, in the background.</string>
+    <string name="battery_advice_location">Restrict location / sensors</string>
+    <string name="battery_advice_sensor_reason">Sensors active %s per hour — usually GPS. A location lever is better targeted than freezing the app.</string>
+    <string name="battery_advice_foreground">Block foreground services</string>
+    <string name="battery_advice_foreground_reason">Runs a foreground service %s per hour, which is what lets it ignore Doze.</string>
+    <string name="battery_advice_exemption">Remove battery-optimisation exemption</string>
+    <string name="battery_advice_exemption_reason">This app is exempt from Doze while also being one of the heavier apps here.</string>
+    <string name="battery_advice_freeze">Freeze the app</string>
+    <string name="battery_advice_freeze_reason">The blunt instrument — try a targeted lever above first.</string>
+    <string name="battery_control_freeze">Freeze</string>
+    <string name="battery_control_freeze_summary">Disable, suspend or hide the app entirely.</string>
+    <string name="battery_control_network">Network access</string>
+    <string name="battery_control_doze_exemption">Exempt from battery optimisation</string>
+    <string name="battery_control_doze_exemption_summary">On = the app is on the Doze whitelist and keeps running when the phone idles.</string>
+    <string name="battery_control_run_any_background">Run in background (any)</string>
+    <string name="battery_control_run_any_background_summary">The broad switch for background execution.</string>
+    <string name="battery_control_run_background">Run in background</string>
+    <string name="battery_control_run_background_summary">The narrower legacy background-execution op.</string>
+    <string name="battery_control_start_foreground">Start foreground services</string>
+    <string name="battery_control_start_foreground_summary">Off = the app cannot promote itself to a foreground service.</string>
+    <string name="battery_control_wake_lock">Hold wake locks</string>
+    <string name="battery_control_wake_lock_summary">Off = the app cannot keep the CPU awake.</string>
+    <string name="battery_control_force_stop">Force stop</string>
+    <string name="battery_control_force_stop_summary">Kill it now. It can be started again by anything that wakes it.</string>
+    <string name="battery_control_snooping">Open 盗み見</string>
+    <string name="battery_control_snooping_summary">The full capability list for this app.</string>
+    <string name="battery_control_refused">The platform refused that change.</string>
+    <string name="battery_control_needs_adb">That needs privileges. Enable ADB over TCP (or Shizuku) and reopen 応用管理 — the control stays here either way.</string>
+    <string name="battery_force_stop_confirm">Force stop %s?</string>
+    <string name="battery_force_stopped">Force stopped.</string>
+    <string name="battery_force_stop_failed">Could not force stop.</string>
+    <string name="battery_history_range">%1$s · %2$d samples</string>
+    <string name="battery_history_selected">%1$s · bucket %2$s · %3$s awake-equivalent (%4$.0f%% of the bucket)</string>
+    <string name="battery_history_legend">Bar height = awake-equivalent time: wake locks + radio-active + CPU + sensors, plus 2 ms per network packet. Not mAh — this device cannot supply that.</string>
+    <string name="battery_history_hint">Pinch to zoom · drag to pan · tap a bar to read it · double-tap to fit</string>
+    <!-- Fork: watchlist alerts, before/after comparison, screen-off view (+27) -->
+    <string name="battery_screen_off_only">Screen-off only</string>
+    <string name="battery_header_level">Battery %% · last 24 h — drag left for older</string>
+    <string name="battery_header_level_at">%1$s · %2$d%% · %3$.2f V · %4$s</string>
+    <string name="battery_header_charging">charging</string>
+    <string name="battery_header_discharging">on battery</string>
+    <string name="battery_header_drainers">Top drainers · last 2 h</string>
+    <string name="battery_header_drainers_used">Top drainers · %1$s · %2$.1f%% used</string>
+    <string name="battery_header_drainers_window">Drainer window</string>
+    <string name="battery_list_period">Per app · %s — tap ⋮ to change</string>
+    <string name="battery_window_minutes">last %d min</string>
+    <string name="battery_summary_screen_off">screen off only</string>
+    <string name="battery_alerts">Alerts</string>
+    <string name="battery_alerts_summary">Warn when an app crosses a threshold, judged over a trailing hour so a single busy stretch doesn\'t fire it. Tapping an alert opens that app\'s control panel.</string>
+    <string name="battery_alerts_on">Alerts: on — tap to turn off</string>
+    <string name="battery_alerts_off_row">Alerts: off — tap to turn on</string>
+    <string name="battery_alerts_packets">Network: %d packets/second…</string>
+    <string name="battery_alerts_wakelock">Wake lock: %d%% of the hour…</string>
+    <string name="battery_alerts_cpu">CPU: %d%% of a core…</string>
+    <string name="battery_alerts_packets_title">Alert above</string>
+    <string name="battery_alerts_wakelock_title">Alert above (wake lock)</string>
+    <string name="battery_alerts_cpu_title">Alert above (CPU)</string>
+    <string name="battery_alerts_off">Off</string>
+    <string name="battery_alert_channel">Battery alerts</string>
+    <string name="battery_alert_title">%s is draining the battery</string>
+    <string name="battery_alert_reason_packets">%d packets/second</string>
+    <string name="battery_alert_reason_wakelock">wake lock %.0f%% of the hour</string>
+    <string name="battery_alert_reason_cpu">%.1f%% of a CPU core</string>
+    <string name="battery_alert_ignore">Never alert about this app</string>
+    <string name="battery_alert_unignore">Alert about this app again</string>
+    <string name="battery_section_comparison">Compared with the window before</string>
+    <string name="battery_compare_packets">Packets/second</string>
+    <string name="battery_compare_wakelock">Wake lock</string>
+    <string name="battery_compare_cpu">CPU</string>
+    <string name="battery_compare_sensors">Sensors</string>
+    <string name="battery_compare_caption">now ← before, over %s of earlier history. Green is an improvement.</string>
+    <string name="battery_status_power_model_ok">Power model: usable — mAh figures come from this device\'s own power profile.</string>
+    <string name="battery_status_power_model_broken">Power model: unusable on this device (profile capacity reads %.2f mAh). Ranking falls back to measured counters; no mAh is shown rather than showing a fabricated one.</string>
+    <plurals name="battery_window_hours">
+        <item quantity="one">last %d hour</item>
+        <item quantity="other">last %d hours</item>
+    </plurals>
+    <plurals name="battery_window_days">
+        <item quantity="one">last %d day</item>
+        <item quantity="other">last %d days</item>
+    </plurals>
 </resources>

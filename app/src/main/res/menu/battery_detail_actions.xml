@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Fork: per-app battery control panel actions. -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_battery_detail_freeze"
+        android:icon="@drawable/ic_snowflake_outline_24dp"
+        android:title="@string/freeze"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_battery_detail_kill"
+        android:icon="@drawable/ic_close_24dp"
+        android:title="@string/battery_control_force_stop"
+        app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_battery_detail_app_info"
+        android:title="@string/app_info"
+        app:showAsAction="never" />
+</menu>

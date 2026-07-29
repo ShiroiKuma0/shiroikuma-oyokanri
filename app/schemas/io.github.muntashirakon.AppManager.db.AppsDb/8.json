@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 8,
-    "identityHash": "26c244593446b694c63a4031bff94e4e",
+    "identityHash": "cc60e51ebaa1369ebe834f9fda7d7b94",
     "entities": [
       {
         "tableName": "app",
@@ -492,65 +492,154 @@
         }
       },
       {
-        "tableName": "permission_override",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`package_name` TEXT NOT NULL, `user_id` INTEGER NOT NULL, `permission_name` TEXT NOT NULL, `desired_granted` INTEGER NOT NULL, `controller` TEXT NOT NULL, `sync_status` INTEGER NOT NULL, `sync_time` INTEGER NOT NULL, PRIMARY KEY(`package_name`, `user_id`, `permission_name`))",
+        "tableName": "battery_sample",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `ts` INTEGER NOT NULL, `duration` INTEGER NOT NULL, `uid` INTEGER NOT NULL, `package_name` TEXT, `wifi_bytes` INTEGER NOT NULL, `wifi_packets` INTEGER NOT NULL, `mobile_bytes` INTEGER NOT NULL, `mobile_packets` INTEGER NOT NULL, `radio_active_ms` INTEGER NOT NULL, `wakelock_ms` INTEGER NOT NULL, `wakeup_count` INTEGER NOT NULL, `cpu_ms` INTEGER NOT NULL, `fg_service_ms` INTEGER NOT NULL, `sensor_ms` INTEGER NOT NULL, `screen_on_ms` INTEGER NOT NULL, `deep_idle_ms` INTEGER NOT NULL, `light_idle_ms` INTEGER NOT NULL, `battery_level` INTEGER NOT NULL)",
         "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ts",
+            "columnName": "ts",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "duration",
+            "columnName": "duration",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "uid",
+            "columnName": "uid",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
           {
             "fieldPath": "packageName",
             "columnName": "package_name",
-            "affinity": "TEXT",
-            "notNull": true
+            "affinity": "TEXT"
           },
           {
-            "fieldPath": "userId",
-            "columnName": "user_id",
+            "fieldPath": "wifiBytes",
+            "columnName": "wifi_bytes",
             "affinity": "INTEGER",
             "notNull": true
           },
           {
-            "fieldPath": "permissionName",
-            "columnName": "permission_name",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "desiredGranted",
-            "columnName": "desired_granted",
+            "fieldPath": "wifiPackets",
+            "columnName": "wifi_packets",
             "affinity": "INTEGER",
             "notNull": true
           },
           {
-            "fieldPath": "controller",
-            "columnName": "controller",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "syncStatus",
-            "columnName": "sync_status",
+            "fieldPath": "mobileBytes",
+            "columnName": "mobile_bytes",
             "affinity": "INTEGER",
             "notNull": true
           },
           {
-            "fieldPath": "syncTime",
-            "columnName": "sync_time",
+            "fieldPath": "mobilePackets",
+            "columnName": "mobile_packets",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "radioActiveMs",
+            "columnName": "radio_active_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "wakelockMs",
+            "columnName": "wakelock_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "wakeupCount",
+            "columnName": "wakeup_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cpuMs",
+            "columnName": "cpu_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fgServiceMs",
+            "columnName": "fg_service_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sensorMs",
+            "columnName": "sensor_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "screenOnMs",
+            "columnName": "screen_on_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deepIdleMs",
+            "columnName": "deep_idle_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lightIdleMs",
+            "columnName": "light_idle_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "batteryLevel",
+            "columnName": "battery_level",
             "affinity": "INTEGER",
             "notNull": true
           }
         ],
         "primaryKey": {
-          "autoGenerate": false,
+          "autoGenerate": true,
           "columnNames": [
-            "package_name",
-            "user_id",
-            "permission_name"
+            "id"
           ]
-        }
+        },
+        "indices": [
+          {
+            "name": "index_battery_sample_ts",
+            "unique": false,
+            "columnNames": [
+              "ts"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_battery_sample_ts` ON `${TABLE_NAME}` (`ts`)"
+          },
+          {
+            "name": "index_battery_sample_uid",
+            "unique": false,
+            "columnNames": [
+              "uid"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_battery_sample_uid` ON `${TABLE_NAME}` (`uid`)"
+          }
+        ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '26c244593446b694c63a4031bff94e4e')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'cc60e51ebaa1369ebe834f9fda7d7b94')"
     ]
   }
 }

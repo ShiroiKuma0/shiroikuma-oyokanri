@@ -5,6 +5,7 @@ package io.github.muntashirakon.AppManager.main;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.Application;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
@@ -1106,6 +1107,21 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
     @WorkerThread
     @Nullable
     private ApplicationItem getNewApplicationItem(@NonNull String packageName, @NonNull List<App> apps) {
+        return buildApplicationItem(getApplication(), packageName, apps);
+    }
+
+    /**
+     * Fork: the same derivation, callable from outside the main list.
+     *
+     * <p>Lifted to a static so the battery panel can render <b>the real
+     * main-list card</b> for one app instead of an approximation of it — a
+     * second copy of this logic would drift the moment either changed. The only
+     * instance dependency was a {@link Context}, so it is now a parameter.
+     */
+    @Nullable
+    public static ApplicationItem buildApplicationItem(@NonNull Context appContext,
+                                                       @NonNull String packageName,
+                                                       @NonNull List<App> apps) {
         ApplicationItem item = new ApplicationItem();
         int thisUser = UserHandleHidden.myUserId();
         for (App app : apps) {
@@ -1169,7 +1185,7 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
             // in one query, replacing the former getApplicationInfo call at no extra cost.
             long liveLastUpdateTime = app.lastUpdateTime;
             try {
-                PackageInfo livePi = getApplication().getPackageManager().getPackageInfo(packageName,
+                PackageInfo livePi = appContext.getPackageManager().getPackageInfo(packageName,
                         PackageManager.MATCH_DISABLED_COMPONENTS | PackageManager.MATCH_UNINSTALLED_PACKAGES);
                 ApplicationInfo liveAi = livePi.applicationInfo;
                 item.isDisabled = !liveAi.enabled;
