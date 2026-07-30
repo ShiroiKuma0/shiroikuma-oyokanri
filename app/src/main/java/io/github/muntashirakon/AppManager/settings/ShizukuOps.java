@@ -6,6 +6,8 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.os.Process;
 
@@ -20,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import io.github.muntashirakon.AppManager.BuildConfig;
+import io.github.muntashirakon.AppManager.compat.PackageManagerCompat;
 import io.github.muntashirakon.AppManager.logs.Log;
 import io.github.muntashirakon.AppManager.misc.NoOps;
 import rikka.shizuku.Shizuku;
@@ -74,24 +77,54 @@ public final class ShizukuOps {
     private static final long BINDER_TIMEOUT_MS = 10_000L;
     /** How long to wait for 白い熊 to answer the server's authorization prompt. */
     private static final long PERMISSION_TIMEOUT_MS = 120_000L;
+    /**
+     * How long auto-detection waits for the binder. Shorter than {@link #BINDER_TIMEOUT_MS} because
+     * this one is paid at every cold start: the server pushes its binder <i>asynchronously</i> once
+     * it notices our process, so a bare {@link #isServerRunning()} at that moment is a coin toss —
+     * but a manager that is installed with no server running would otherwise stall the splash for
+     * ten seconds on every launch.
+     */
+    private static final long AUTO_BINDER_TIMEOUT_MS = 3_000L;
+    /** How long auto-detection waits for the authorization answer. The prompt is on screen by then. */
+    private static final long AUTO_PERMISSION_TIMEOUT_MS = 60_000L;
 
     private ShizukuOps() {
     }
 
     /**
-     * The installed manager, ours first. {@code null} when no Shizuku-family app is installed at
-     * all, which is the one case where this mode can never work.
+     * The installed manager, <b>ours first</b> ({@link #MANAGER_FORK}, then {@link #MANAGER_STOCK}),
+     * so one build works against either. {@code null} when no Shizuku-family app is installed at
+     * all.
+     * <p>
+     * <b>The match flags are load-bearing in this app of all apps.</b> A plain
+     * {@code getPackageInfo(pkg, 0)} answers {@code NameNotFound} for a package that is
+     * <i>frozen</i> — which is precisely what 応用管理 does to apps — and for a disabled one. But a
+     * Shizuku <i>server</i> is a shell process started outside the manager: freezing the manager
+     * does not stop it, so "manager frozen, server alive and willing to authorise us" is a real,
+     * reachable state that the plain lookup reports as "Shizuku is not installed".
+     * {@code FLAG_INSTALLED} is then still required, because {@code MATCH_UNINSTALLED_PACKAGES}
+     * also matches a package that was uninstalled with its data kept — a ghost that can never serve
+     * us, and one we must not wait on at every launch.
      */
     @AnyThread
     @NoOps
     @Nullable
     public static String getManagerPackage(@NonNull Context context) {
         PackageManager pm = context.getPackageManager();
+        int flags = PackageManagerCompat.MATCH_UNINSTALLED_PACKAGES | PackageManagerCompat.MATCH_DISABLED_COMPONENTS;
         for (String pkg : new String[]{MANAGER_FORK, MANAGER_STOCK}) {
             try {
-                pm.getPackageInfo(pkg, 0);
+                PackageInfo pi = pm.getPackageInfo(pkg, flags);
+                if (pi.applicationInfo != null
+                        && (pi.applicationInfo.flags & ApplicationInfo.FLAG_INSTALLED) == 0) {
+                    // Uninstalled with data kept: the record survives, the app does not.
+                    continue;
+                }
                 return pkg;
             } catch (PackageManager.NameNotFoundException ignore) {
+            } catch (Throwable th) {
+                // Never let a package-manager hiccup decide that Shizuku is unavailable.
+                Log.w(TAG, "Could not look up " + pkg, th);
             }
         }
         return null;
@@ -101,6 +134,21 @@ public final class ShizukuOps {
     @NoOps
     public static boolean isInstalled(@NonNull Context context) {
         return getManagerPackage(context) != null;
+    }
+
+    /**
+     * Whether looking for a server is worth anything at all — the gate auto-detection uses before
+     * spending any time on this mode.
+     * <p>
+     * A live binder wins outright and without a package lookup: if a server is already talking to
+     * us then a server exists, whatever the manager's install state says (see
+     * {@link #getManagerPackage(Context)} — it may have been frozen, or be a build we do not know
+     * the id of). Otherwise an installed manager is what makes waiting for a push worthwhile.
+     */
+    @AnyThread
+    @NoOps
+    public static boolean isPresent(@NonNull Context context) {
+        return isServerRunning() || isInstalled(context);
     }
 
     /** Whether a server is up and has handed us a live binder. */
@@ -186,6 +234,12 @@ public final class ShizukuOps {
     @WorkerThread
     @NoOps
     public static boolean requestPermissionBlocking() {
+        return requestPermissionBlocking(PERMISSION_TIMEOUT_MS);
+    }
+
+    @WorkerThread
+    @NoOps
+    public static boolean requestPermissionBlocking(long timeoutMs) {
         if (isAuthorized()) {
             return true;
         }
@@ -216,7 +270,7 @@ public final class ShizukuOps {
         Shizuku.addRequestPermissionResultListener(listener);
         try {
             Shizuku.requestPermission(PERMISSION_REQUEST_CODE);
-            if (!latch.await(PERMISSION_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+            if (!latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
                 Log.w(TAG, "Timed out waiting for the Shizuku authorization prompt");
                 return false;
             }
@@ -260,21 +314,48 @@ public final class ShizukuOps {
     @WorkerThread
     @NoOps
     public static int prepare(@NonNull Context context, boolean interactive) {
-        if (!isInstalled(context)) {
+        return prepare(context, interactive, BINDER_TIMEOUT_MS, PERMISSION_TIMEOUT_MS);
+    }
+
+    @WorkerThread
+    @NoOps
+    public static int prepare(@NonNull Context context, boolean interactive, long binderTimeoutMs,
+                              long permissionTimeoutMs) {
+        if (!isPresent(context)) {
             Log.w(TAG, "No Shizuku-family manager is installed");
             return NOT_INSTALLED;
         }
-        if (!awaitBinder(BINDER_TIMEOUT_MS)) {
+        if (!awaitBinder(binderTimeoutMs)) {
             Log.w(TAG, "Shizuku server did not send a binder; is it running?");
             return NOT_RUNNING;
         }
         if (isAuthorized()) {
             return READY;
         }
-        if (interactive && requestPermissionBlocking()) {
+        if (interactive && requestPermissionBlocking(permissionTimeoutMs)) {
             return READY;
         }
         return Shizuku.isLegacyAttach() ? NOT_AUTHORISED_MANAGER_REQUIRED : NOT_AUTHORISED;
+    }
+
+    /**
+     * {@link #prepare(Context, boolean)} as auto-detection wants it: a real hunt for a server,
+     * <i>including</i> the authorization prompt, on shorter timeouts.
+     * <p>
+     * <b>This is a deliberate reversal of the +49 policy</b> ("auto mode may use an authorisation
+     * 白い熊 has already given, but must never raise a prompt of its own"). That rule meant a fresh
+     * install could never reach Shizuku on its own: nothing has authorised us yet, so the
+     * non-interactive check always failed and auto-detection walked straight into ADB — the mode
+     * this fork added Shizuku to get away from. Asking once at first start is the whole point;
+     * the server remembers a refusal, so a "no" is not re-asked on the next launch.
+     * <p>
+     * Cheap when no Shizuku-family app is installed at all: that is one {@code getPackageInfo}, and
+     * nothing waits.
+     */
+    @WorkerThread
+    @NoOps
+    public static int prepareForAutoDetection(@NonNull Context context) {
+        return prepare(context, true, AUTO_BINDER_TIMEOUT_MS, AUTO_PERMISSION_TIMEOUT_MS);
     }
 
     /**

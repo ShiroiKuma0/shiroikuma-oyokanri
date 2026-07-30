@@ -74,6 +74,9 @@ public class SecurityAndOpsViewModel extends AndroidViewModel implements Ops.Adb
                 AppPref.set(AppPref.PrefKey.PREF_LAST_VERSION_CODE_LONG, (long) BuildConfig.VERSION_CODE);
                 Log.d(TAG, "End migration");
             }
+            // Fork: the app-start path is the only place the stored mode may be rewound, and it has
+            // to happen before Ops::init reads it. See Ops.rewindAutoDetectedAdbModeOnce.
+            Ops.rewindAutoDetectedAdbModeOnce(getApplication());
             // Ops
             Log.d(TAG, "Before Ops::init");
             int status = Ops.init(getApplication(), false);
