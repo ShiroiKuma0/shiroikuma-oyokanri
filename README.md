@@ -8,7 +8,8 @@
 
 **Android app manager & control panel — themed and tooled to taste.**
 
-A fork of [AppManager](https://github.com/MuntashirAkon/AppManager) with **major additions**: a per-app
+A fork of [AppManager](https://github.com/MuntashirAkon/AppManager) with **major additions**: a
+**Shizuku mode of operation** that needs no listening `adbd`, a per-app
 **battery history** that survives the charge cycle Android wipes it on, a per-app
 **anti-snooping page** that can cut an app off the network entirely, a configurable
 **yellow-on-black UI** with a deep customization page, a hard-blocking **protected profile**, a
@@ -16,7 +17,7 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+43`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+49`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
 </div>
 
@@ -211,6 +212,25 @@ archive is written under a `.part` name and renamed only on success, so a cancel
 backup directory exactly as it found it — no short archive that looks complete, no stray partial —
 and the original request is answered `ERROR:cancelled` rather than quietly finishing.
 
+## 🔌 Shizuku mode of operation
+
+Upstream offers root and ADB-over-TCP. This fork adds a third: **take the privileges from a running
+Shizuku server instead.** The capabilities are identical — uid 2000 either way, same app-ops
+behaviour, same per-uid firewall access — but nothing has to listen on a TCP port for them. No
+`adbd` in TCP mode, no port scan, no pairing keys, and the `INTERNET` permission leaves the privilege
+path entirely.
+
+It prefers 白い熊's own Shizuku fork, **白い熊 雫** (`shiroikuma.shizuku`), and falls back to stock
+Shizuku when that isn't installed. Auto-detection tries it **ahead of ADB** — an already-authorised
+server costs one bind, where ADB costs a port scan and a handshake — but never raises a prompt of its
+own; a mode chosen for you should not put a dialog on screen. Choosing it explicitly shuts the ADB
+path down, because leaving a TCP listener up would defeat the point.
+
+When it can't connect it says which of the three things is actually wrong — *not installed*, *not
+running*, *not authorised* — since those send you to three different places.
+
+---
+
 ## 🔧 AM Debug features in a release build
 
 The fork exposes App Manager's debug-only toolset in a normal signed release: **Finder** (find app
@@ -230,5 +250,6 @@ point here rather than at upstream.
 
 This is a downstream personalization of [App Manager](https://github.com/MuntashirAkon/AppManager) by
 Muntashir Al-Islam. All credit for App Manager — the component browser, the backup engine, the
-root/ADB/Shizuku backends and the rest — goes to its author and contributors. Like upstream, this fork
+root and ADB backends and the rest — goes to its author and contributors (the Shizuku
+backend is this fork’s own addition; upstream deliberately does not ship one). Like upstream, this fork
 is licensed under the **GNU General Public License v3.0** (see [`COPYING`](COPYING)).
