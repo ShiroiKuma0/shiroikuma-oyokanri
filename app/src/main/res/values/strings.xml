@@ -2302,4 +2302,13 @@
         <item quantity="one">last %d day</item>
         <item quantity="other">last %d days</item>
     </plurals>
+    <!-- Fork: Shizuku mode of operation -->
+    <string name="shizuku">Shizuku</string>
+    <string name="shizuku_not_installed">No Shizuku server is installed. Install 白い熊 雫 (or Shizuku), start its server, then pick this mode again.</string>
+    <string name="shizuku_not_running">The Shizuku server is not running. Start it from 白い熊 雫 (or Shizuku), then pick this mode again.</string>
+    <string name="shizuku_authorise_in_manager">This Shizuku server cannot show its own request. Allow 白い熊 応用管理 in the manager\'s app list, then pick this mode again.</string>
+    <string name="working_on_shizuku_mode">Working on Shizuku mode</string>
+    <string name="warning_working_on_root_mode_shizuku">Warning: Working on root instead of Shizuku mode.</string>
+    <string name="warning_working_on_system_mode_shizuku">Warning: Working on system instead of Shizuku mode.</string>
+    <string name="shizuku_not_authorised">Shizuku did not authorise App Manager. Make sure the server is running, then allow the request when it appears.</string>
 </resources>

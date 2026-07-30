@@ -163,6 +163,28 @@
     <uses-permission android:name="com.android.launcher.permission.INSTALL_SHORTCUT" />
     <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
 
+    <!-- Fork: Shizuku mode. BOTH names are declared on purpose. A Shizuku server decides which
+         installed packages are its clients by scanning requestedPermissions, so declaring a name it
+         looks for is what makes the binder arrive at all — and the two servers look for different
+         ones: 白い熊 雫 (shiroikuma.shizuku) accepts af.shizuku.plus.* and defines it itself, while
+         stock Shizuku accepts only moe.shizuku.manager.*. A <uses-permission> naming a permission
+         that no installed package defines is inert — it is never granted and changes nothing — but
+         it still appears in requestedPermissions, which is all the server's filter reads. So
+         declaring both is what lets one build work against either server, and costs nothing when
+         only one (or neither) is installed.
+         NOTE the OS-level grant of these is not the authorisation check; Shizuku.checkSelfPermission()
+         is, and it is answered by the server. See settings/ShizukuOps. -->
+    <uses-permission android:name="af.shizuku.plus.permission.API_V23" />
+    <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+
+    <!-- Fork: package visibility (Android 11+). ShizukuOps resolves these by name to decide which
+         manager is installed — ours first — and without a <queries> entry getPackageInfo() answers
+         NameNotFound for both, so the mode would look permanently unavailable. -->
+    <queries>
+        <package android:name="shiroikuma.shizuku" />
+        <package android:name="moe.shizuku.privileged.api" />
+    </queries>
+
     <application
         android:name=".AppManager"
         android:allowBackup="true"
@@ -1708,6 +1730,21 @@
             android:authorities="${applicationId}.file"
             android:exported="false"
             android:grantUriPermissions="true" />
+
+        <!-- Fork: the mailbox a Shizuku server pushes its binder into. The authority suffix
+             ".shizuku" is the wire contract (the server resolves clients by
+             "<packageName>.shizuku"), exported must be true so a server running as shell can reach
+             it, multiprocess must be false because the server records the uid of the process that
+             answered, and the guarding permission has to be one shell holds but ordinary apps do
+             not — which makes the provider effectively private while still reachable from the
+             server. See rikka.shizuku.ShizukuProvider and settings/ShizukuOps. -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:enabled="true"
+            android:exported="true"
+            android:multiprocess="false"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
 
         <meta-data
             android:name="android.permission.INTERNET.mode"

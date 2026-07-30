@@ -27,6 +27,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.StringDef;
+import androidx.annotation.StringRes;
 import androidx.annotation.UiThread;
 import androidx.annotation.WorkerThread;
 import androidx.appcompat.app.AlertDialog;
@@ -82,13 +83,19 @@ import io.github.muntashirakon.dialog.TextInputDialogBuilder;
 public class Ops {
     public static final String TAG = Ops.class.getSimpleName();
 
-    @StringDef({MODE_AUTO, MODE_ROOT, MODE_ADB_OVER_TCP, MODE_ADB_WIFI, MODE_NO_ROOT})
+    @StringDef({MODE_AUTO, MODE_ROOT, MODE_SHIZUKU, MODE_ADB_OVER_TCP, MODE_ADB_WIFI, MODE_NO_ROOT})
     @Retention(RetentionPolicy.SOURCE)
     public @interface Mode {
     }
 
     public static final String MODE_AUTO = "auto";
     public static final String MODE_ROOT = "root";
+    /**
+     * Fork: privileges taken from a running Shizuku server (白い熊 雫 by preference, stock Shizuku
+     * otherwise) instead of from AM's own ADB-over-TCP bootstrap. The privilege level is identical —
+     * uid 2000 either way — but nothing has to listen on a TCP port for it. See {@link ShizukuOps}.
+     */
+    public static final String MODE_SHIZUKU = "shizuku";
     public static final String MODE_ADB_OVER_TCP = "adb_tcp";
     public static final String MODE_ADB_WIFI = "adb_wifi";
     public static final String MODE_NO_ROOT = "no-root";
@@ -133,6 +140,11 @@ public class Ops {
     private static boolean sIsSystem = false; // UID = 1000
     private static boolean sIsRoot = false; // UID = 0
     private static final ReentrantLock sTransitionLock = new ReentrantLock(true);
+    // Fork: privileges are being taken from a Shizuku server. Orthogonal to the three flags above —
+    // those record WHAT uid we ended up with, this records HOW we got there, which is the only
+    // thing the binding path needs to know. Volatile because ServiceConnectionWrapper reads it from
+    // the main thread while Ops.init sets it on a worker.
+    private static volatile boolean sIsShizuku = false;
 
     // Security
     private static final Object sSecurityLock = new Object();
@@ -202,6 +214,20 @@ public class Ops {
     }
 
     /**
+     * Fork: whether the privileged services are to be (or already are) launched through a Shizuku
+     * server rather than through AM's own ADB bootstrap.
+     * <p>
+     * This is deliberately about the <i>route</i>, not the resulting privilege: a Shizuku server
+     * started from wireless debugging leaves us at uid 2000, so {@link #isAdb()} is true at the same
+     * time and every capability check in the app keeps working unchanged.
+     */
+    @AnyThread
+    @NoOps
+    public static boolean isShizuku() {
+        return sIsShizuku;
+    }
+
+    /**
      * Whether the current App Manager session is authenticated by the user. It does two things:
      * <ol>
      *     <li>If security is enabled, it marks that the user has got passed the security challenge.
@@ -251,7 +277,9 @@ public class Ops {
             return context.getString(R.string.root);
         }
         if (uid == SHELL_UID) {
-            return "ADB";
+            // Fork: same uid, different route — say which one, or the status line claims ADB is in
+            // use while adbd is not even running.
+            return sIsShizuku ? context.getString(R.string.shizuku) : "ADB";
         }
         if (uid != Process.myUid()) {
             String uidStr = Owners.getUidOwnerMap(false).get(uid);
@@ -357,6 +385,7 @@ public class Ops {
                             LocalServer.getInstance().closeBgServer();
                         }
                     });
+                    sIsShizuku = false;
                     sIsSystem = sIsAdb = false;
                     sIsRoot = true;
                     LocalServices.bindServicesIfNotAlready();
@@ -364,6 +393,61 @@ public class Ops {
                         throw new RemoteException("Root service did not start as root.");
                     }
                     return initPermissionsWithSuccess();
+                case MODE_SHIZUKU:
+                    // Fork: no ADB anywhere on this path — no adbd, no port scan, no pairing keys.
+                    // Shizuku launches the user services itself and hands us the binders, after
+                    // which every privileged call in the app runs through the exact same
+                    // IAMService it always did.
+                    int shizukuStatus = ShizukuOps.prepare(context, true);
+                    if (shizukuStatus != ShizukuOps.READY) {
+                        sIsShizuku = false;
+                        sIsAdb = sIsSystem = sIsRoot = false;
+                        @StringRes int message;
+                        switch (shizukuStatus) {
+                            case ShizukuOps.NOT_INSTALLED:
+                                message = R.string.shizuku_not_installed;
+                                break;
+                            case ShizukuOps.NOT_RUNNING:
+                                message = R.string.shizuku_not_running;
+                                break;
+                            case ShizukuOps.NOT_AUTHORISED_MANAGER_REQUIRED:
+                                message = R.string.shizuku_authorise_in_manager;
+                                break;
+                            default:
+                                message = R.string.shizuku_not_authorised;
+                                break;
+                        }
+                        ThreadUtils.postOnMainThread(() -> UIUtils.displayLongToast(message));
+                        if (shizukuStatus == ShizukuOps.NOT_AUTHORISED_MANAGER_REQUIRED) {
+                            // No prompt is coming from this server, so open the one screen where the
+                            // decision can actually be made rather than leaving 白い熊 to find it.
+                            ThreadUtils.postOnMainThread(() -> ShizukuOps.openManager(context));
+                        }
+                        return STATUS_FAILURE;
+                    }
+                    // Drop services bound the old way — bindServicesIfNotAlready() would otherwise
+                    // keep an ADB-launched one and this mode would be a no-op — and shut the ADB
+                    // server down, because leaving a TCP listener up is exactly what this mode
+                    // exists to avoid. Both run before the flag is set; the wrapper tears each
+                    // service down by how it was actually bound, so the order is not load-bearing,
+                    // but reading it in mode order is.
+                    if (LocalServices.alive() && !sIsShizuku) {
+                        LocalServices.stopServices();
+                    }
+                    ExUtils.exceptionAsIgnored(() -> {
+                        if (LocalServer.alive(context)) {
+                            LocalServer.getInstance().closeBgServer();
+                        }
+                    });
+                    sIsShizuku = true;
+                    sIsRoot = sIsSystem = false;
+                    sIsAdb = true;
+                    LocalServices.bindServicesIfNotAlready();
+                    // Reuse the ADB post-bind check verbatim: it reads the uid the service actually
+                    // came up as and corrects the flags, which is exactly right here — a Shizuku
+                    // server started by root gives us uid 0, one started from wireless debugging
+                    // gives 2000.
+                    return checkRootOrIncompleteUsbDebuggingInAdb();
                 case MODE_ADB_WIFI:
                     sDirectRoot = false;
                     sIsRoot = sIsSystem = false;
@@ -386,6 +470,7 @@ public class Ops {
                     } // else fallback to ADB over TCP
                 case MODE_ADB_OVER_TCP:
                     sDirectRoot = false;
+                    sIsShizuku = false;
                     sIsRoot = sIsSystem = false;
                     sIsAdb = true;
                     if (reuseRunningAdbServer(context)) {
@@ -480,22 +565,27 @@ public class Ops {
         }
         // Root was not working/granted, but check for AM service just in case
         if (LocalServices.alive()) {
+            // Fork: a live service bound through Shizuku must be recorded as MODE_SHIZUKU, not
+            // MODE_ADB_OVER_TCP — same uid, different route, and the binding path reads the mode
+            // back. Upstream 4.1.1 moved setMode() out of the top of this block and into the
+            // individual uid branches, so the fork's choice is applied per branch instead.
+            String aliveMode = sIsShizuku ? MODE_SHIZUKU : MODE_ADB_OVER_TCP;
             int uid = Users.getSelfOrRemoteUid();
             if (uid == ROOT_UID) {
                 sIsSystem = sIsAdb = false;
                 sIsRoot = true;
-                setMode(MODE_ADB_OVER_TCP);
+                setMode(aliveMode);
                 return;
             }
             if (uid == SYSTEM_UID) {
                 sIsRoot = sIsAdb = false;
                 sIsSystem = true;
-                setMode(MODE_ADB_OVER_TCP);
+                setMode(aliveMode);
                 return;
             }
             if (uid == SHELL_UID) {
                 if (checkRootOrIncompleteUsbDebuggingInAdb(context) == STATUS_SUCCESS) {
-                    setMode(MODE_ADB_OVER_TCP);
+                    setMode(aliveMode);
                     return;
                 }
                 // A live shell service without the required permission is not a usable ADB session
@@ -503,6 +593,29 @@ public class Ops {
                 return;
             }
             LocalServices.stopServices();
+        }
+        // Fork: Shizuku is tried ahead of ADB because it is strictly cheaper — an already-running,
+        // already-authorised server costs one bind, where ADB costs a port scan, a TLS handshake
+        // and a listening adbd. Strictly non-interactive: auto mode may use an authorisation 白い熊
+        // has already given, but must never raise a prompt of its own, so an unauthorised server is
+        // simply passed over here and stays available as an explicit mode.
+        if (ShizukuOps.isReady()) {
+            sIsShizuku = true;
+            sIsRoot = sIsSystem = false;
+            sIsAdb = true;
+            try {
+                LocalServices.bindServicesIfNotAlready();
+            } catch (Throwable e) {
+                Log.e(TAG, "Could not bind services through Shizuku.", e);
+            }
+            if (LocalServices.alive()) {
+                setMode(MODE_SHIZUKU);
+                checkRootOrIncompleteUsbDebuggingInAdb();
+                return;
+            }
+            Log.w(TAG, "Shizuku was ready but the services did not come up; trying ADB.");
+            sIsShizuku = false;
+            sIsAdb = false;
         }
         // Root not granted
         if (!SelfPermissions.checkSelfPermission(Manifest.permission.INTERNET)) {
@@ -1035,6 +1148,23 @@ public class Ops {
                 .show();
     }
 
+    /**
+     * Fork: which "we are up" toast to flash.
+     * <p>
+     * uid 2000 is reached by two different routes and the message has to name the one actually
+     * taken — announcing "Working on ADB mode" after a Shizuku hand-off is simply false, and on this
+     * fork it is false in a way that matters: no {@code adbd}, no TCP port and no pairing key are
+     * involved. Resolve the id at the call site and pass it into the post, rather than reading the
+     * flag inside the lambda, so the message cannot be decided by whatever the mode happens to be by
+     * the time the main thread runs it.
+     */
+    @StringRes
+    @AnyThread
+    @NoOps
+    private static int workingModeToast() {
+        return sIsShizuku ? R.string.working_on_shizuku_mode : R.string.working_on_adb_mode;
+    }
+
     private static int initPermissionsWithSuccess() {
         SelfPermissions.init();
         return STATUS_SUCCESS;
@@ -1046,12 +1176,32 @@ public class Ops {
     @WorkerThread
     @NoOps // Although we've used Ops checks, its overall usage does not affect anything
     private static boolean isAMServiceUpAndRunning(@NonNull Context context, @Mode @NonNull String mode) {
+        // Fork: retained because the Shizuku early-return below restores the pre-call state so
+        // the caller can fall through to the regular init path.
+        boolean lastAdb = sIsAdb;
+        boolean lastSystem = sIsSystem;
+        boolean lastRoot = sIsRoot;
+        boolean lastShizuku = sIsShizuku;
         // At this point, we have already checked MODE_AUTO, and MODE_NO_ROOT has lower priority.
         sIsRoot = MODE_ROOT.equals(mode);
         sIsAdb = !sIsRoot; // Because the rests are ADB
         sIsSystem = false;
-        if (LocalServer.checkServerHealth(context)) {
-            // A healthy authenticated server can be reused after an app relaunch.
+        // Fork: set before any bind below, because a rebind of a dropped service has to take the
+        // same route the mode asks for.
+        sIsShizuku = MODE_SHIZUKU.equals(mode);
+        if (sIsShizuku && !ShizukuOps.isReady()) {
+            // No live, authorised server: there is nothing to rebind to. Fall through to the
+            // regular init path, which will prompt.
+            sIsAdb = lastAdb;
+            sIsSystem = lastSystem;
+            sIsRoot = lastRoot;
+            sIsShizuku = lastShizuku;
+            return false;
+        }
+        // Fork: the Shizuku route has no remote LocalServer, so this reuse-check is for ADB/root
+        // only. Upstream 4.1.1 replaced LocalServer.alive with checkServerHealth here — a healthy
+        // authenticated server can be reused after an app relaunch.
+        if (!sIsShizuku && LocalServer.checkServerHealth(context)) {
             try {
                 LocalServer.getInstance();
                 LocalServices.bindServicesIfNotAlready();
@@ -1081,8 +1231,11 @@ public class Ops {
             // All checks are failed, stop services
             LocalServices.stopServices();
         }
-        // Checks failed
+        // Checks failed. Upstream 4.1.1 replaced the previous "revert to the last values" with a
+        // hard clear (part of its mode-of-operation validation work); the fork follows it and
+        // clears the Shizuku route flag alongside.
         sIsAdb = sIsSystem = sIsRoot = false;
+        sIsShizuku = false;
         return false;
     }
 
@@ -1094,19 +1247,26 @@ public class Ops {
             // AM service is being run as root
             sIsRoot = true;
             sIsSystem = sIsAdb = false;
-            ThreadUtils.postOnMainThread(() -> UIUtils.displayLongToast(R.string.warning_working_on_root_mode));
+            @StringRes int res = sIsShizuku
+                    ? R.string.warning_working_on_root_mode_shizuku
+                    : R.string.warning_working_on_root_mode;
+            ThreadUtils.postOnMainThread(() -> UIUtils.displayLongToast(res));
         } else if (uid == SYSTEM_UID) {
             // AM service is being run as system
             sIsSystem = true;
             sIsRoot = sIsAdb = false;
-            ThreadUtils.postOnMainThread(() -> UIUtils.displayLongToast(R.string.warning_working_on_system_mode));
-        } else if (uid == SHELL_UID) { // ADB mode
+            @StringRes int res = sIsShizuku
+                    ? R.string.warning_working_on_system_mode_shizuku
+                    : R.string.warning_working_on_system_mode;
+            ThreadUtils.postOnMainThread(() -> UIUtils.displayLongToast(res));
+        } else if (uid == SHELL_UID) { // ADB or Shizuku — same uid, different route
             if (!SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.GRANT_RUNTIME_PERMISSIONS)) {
                 // USB debugging is incomplete, revert back to no-root
                 fallbackToNoRoot(context);
                 return STATUS_FAILURE_ADB_NEED_MORE_PERMS;
             }
-            ThreadUtils.postOnMainThread(() -> UIUtils.displayShortToast(R.string.working_on_adb_mode));
+            @StringRes int res = workingModeToast();
+            ThreadUtils.postOnMainThread(() -> UIUtils.displayShortToast(res));
         } else {
             // No-root mode
             fallbackToNoRoot(context);
@@ -1128,6 +1288,11 @@ public class Ops {
             // Do not stop the remote server here.
             sDirectRoot = false;
             sIsAdb = sIsSystem = sIsRoot = false;
+            // Fork: cleared only AFTER the teardown above — the wrapper remembers how it was bound,
+            // but leaving a stale flag set would send the next bind down the Shizuku path.
+            // Upstream 4.1.1 extracted this teardown into a helper used by 12 call sites, so
+            // clearing here covers every one of them (the fork's inline version covered one).
+            sIsShizuku = false;
             setWorkingUid(Process.myUid());
         } finally {
             sTransitionLock.unlock();

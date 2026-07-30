@@ -1,14 +1,49 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <resources>
 
+    <!-- Fork: the splash background is a LITERAL colour, never an attribute.
+         LANDMINE (same bug, same fix as the 白い熊 雫 fork): the system draws this window from the
+         MANIFEST theme BEFORE the Activity object exists, so `?attr/colorSurface` here does not
+         resolve against our theme at all — it resolves against Theme.SplashScreen's own light
+         parent, and the icon came up on GREY. SplashActivity.setTheme(...) cannot help: by the time
+         it runs, the splash window is already on screen.
+         @android:color/black is the same literal AppTheme.YellowOnBlack pins colorSurface and
+         android:colorBackground to, so the splash, the icon and the first frame of the app agree.
+         android:windowBackground is set too — on API < 31 the androidx compat splash paints that
+         instead, and it also covers the frame between the splash and the first Activity.
+         If a values-night/styles.xml is ever added, it MUST redefine this style identically; the
+         sister fork's night-mode copy kept the attribute and stayed grey in dark mode. -->
     <style name="AppTheme.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">?attr/colorSurface</item>
+        <item name="windowSplashScreenBackground">@android:color/black</item>
+        <item name="android:windowBackground">@android:color/black</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
-        <item name="postSplashScreenTheme">@style/AppTheme</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.SplashContent</item>
     </style>
 
     <style name="AppTheme.Splash.Black" parent="AppTheme.Splash">
-        <item name="postSplashScreenTheme">@style/AppTheme.Black</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.SplashContentBlack</item>
+    </style>
+
+    <!-- Fork: the theme SplashActivity actually ENDS UP with, and the reason the second, static
+         screen used to flash grey.
+         installSplashScreen() swaps the activity over to postSplashScreenTheme, which was the
+         app-wide AppTheme; activity_authentication's root carries no background of its own, so it
+         inherited that theme's window background — a light/dynamic surface, then tinted again by
+         DynamicColors.applyToActivityIfAvailable() in SplashActivity.onCreate. Result: the black
+         zoom-in splash handed over to a grey card with the small launcher icon.
+         Pinning android:windowBackground to a literal is what survives that: DynamicColors overlays
+         COLOUR attributes (colorSurface and friends) and does not touch this drawable attribute.
+         Scoped to the splash trampoline on purpose — AppTheme itself is app-wide and must not be
+         forced black here. -->
+    <style name="AppTheme.SplashContent" parent="AppTheme">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+
+    <!-- The pure-black-preference twin. NOTE the explicit parent: dot-notation would imply
+         AppTheme.SplashContent, and the explicit parent attribute deliberately overrides that so
+         this keeps inheriting AppTheme.Black, exactly as the old postSplashScreenTheme did. -->
+    <style name="AppTheme.SplashContentBlack" parent="AppTheme.Black">
+        <item name="android:windowBackground">@android:color/black</item>
     </style>
 
     <style name="AppTheme.AppWidgetContainerParent" parent="AppTheme">

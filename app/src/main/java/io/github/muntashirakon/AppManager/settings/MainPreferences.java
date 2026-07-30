@@ -31,9 +31,11 @@ public class MainPreferences extends PreferenceFragment {
         return preferences;
     }
 
+    // Fork: index-for-index with R.array.modes — see the comment there.
     private static final List<String> MODE_NAMES = Arrays.asList(
             Ops.MODE_AUTO,
             Ops.MODE_ROOT,
+            Ops.MODE_SHIZUKU,
             Ops.MODE_ADB_OVER_TCP,
             Ops.MODE_ADB_WIFI,
             Ops.MODE_NO_ROOT);

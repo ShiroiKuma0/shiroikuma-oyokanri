@@ -19,6 +19,8 @@ import java.util.concurrent.TimeUnit;
 
 import io.github.muntashirakon.AppManager.logs.Log;
 import io.github.muntashirakon.AppManager.misc.NoOps;
+import io.github.muntashirakon.AppManager.settings.Ops;
+import io.github.muntashirakon.AppManager.settings.ShizukuOps;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 
 class ServiceConnectionWrapper {
@@ -38,7 +40,11 @@ class ServiceConnectionWrapper {
             synchronized (this) {
                 // The callback may arrive after stopDaemon() cancelled the bind.
                 if (mServiceBoundWatcher == null) {
-                    RootService.stop(new Intent().setComponent(mComponentName));
+                    if (mBoundViaShizuku) {
+                        ShizukuOps.unbindUserService(mShizukuComponentName, this);
+                    } else {
+                        RootService.stop(new Intent().setComponent(mComponentName));
+                    }
                     return;
                 }
                 mIBinder = service;
@@ -99,7 +105,7 @@ class ServiceConnectionWrapper {
         private void onResponseReceived() {
             synchronized (this) {
                 if (mServiceBoundWatcher != null) {
-                mServiceBoundWatcher.countDown();
+                    mServiceBoundWatcher.countDown();
                 }
             }
         }
@@ -107,24 +113,28 @@ class ServiceConnectionWrapper {
 
     @NonNull
     private final ComponentName mComponentName;
+    // Fork: the same service, entered as a Shizuku user service. A RootService is bound by starting
+    // a process that calls back with the binder from onBind(); Shizuku instead instantiates a named
+    // class that IS the binder, so the two paths cannot share a component name.
+    @NonNull
+    private final ComponentName mShizukuComponentName;
     @NonNull
     private final ServiceConnectionImpl mServiceConnection;
-
-    public ServiceConnectionWrapper(@NonNull String pkgName, @NonNull String className) {
-        this(new ComponentName(pkgName, className), null);
-    }
+    // Fork: how the live service was actually launched, remembered rather than re-derived. Tearing
+    // down reads the current mode otherwise, and the mode has usually already been changed to the
+    // one we are switching TO by the time the old service is stopped — which would send the unbind
+    // down the wrong path and leave a shell-uid process behind.
+    private volatile boolean mBoundViaShizuku;
 
     public ServiceConnectionWrapper(@NonNull String pkgName, @NonNull String className,
+                                    @NonNull String shizukuClassName, @Nullable Runnable deathCallback) {
+        this(new ComponentName(pkgName, className), new ComponentName(pkgName, shizukuClassName), deathCallback);
+    }
+
+    public ServiceConnectionWrapper(@NonNull ComponentName cn, @NonNull ComponentName shizukuCn,
                                     @Nullable Runnable deathCallback) {
-        this(new ComponentName(pkgName, className), deathCallback);
-    }
-
-    public ServiceConnectionWrapper(@NonNull ComponentName cn) {
-        this(cn, null);
-    }
-
-    public ServiceConnectionWrapper(@NonNull ComponentName cn, @Nullable Runnable deathCallback) {
         mComponentName = cn;
+        mShizukuComponentName = shizukuCn;
         mDeathCallback = deathCallback;
         mServiceConnection = new ServiceConnectionImpl();
     }
@@ -149,6 +159,13 @@ class ServiceConnectionWrapper {
     @MainThread
     public void unbindService() {
         synchronized (mServiceConnection) {
+            if (mBoundViaShizuku) {
+                // Fork: Shizuku owns the process, so releasing our side is its unbind, not ours.
+                ShizukuOps.unbindUserService(mShizukuComponentName, mServiceConnection);
+                mBoundViaShizuku = false;
+                mIBinder = null;
+                return;
+            }
             RootService.unbind(mServiceConnection);
         }
     }
@@ -166,14 +183,36 @@ class ServiceConnectionWrapper {
                 serviceBoundWatcher = new CountDownLatch(1);
                 mServiceBoundWatcher = serviceBoundWatcher;
                 Log.d(TAG, "Launching service...");
-                Intent intent = new Intent();
-                intent.setComponent(mComponentName);
-                ThreadUtils.postOnMainThread(() -> {
-                    if (mIBinder != null) {
-                        RootService.stop(intent);
+                // Fork: in Shizuku mode there is no shell to write an app_process line into — Shizuku
+                // performs that launch itself and delivers the binder through the very same
+                // ServiceConnection, so only the launch differs and everything downstream of
+                // onServiceConnected is untouched.
+                if (Ops.isShizuku()) {
+                    mBoundViaShizuku = true;
+                    // Called straight from this worker thread, NOT posted to the main one: unlike
+                    // RootService.bind (which libsu requires to be main-thread), binding a Shizuku
+                    // user service is a plain synchronous binder transaction, and running it on the
+                    // main thread would be a blocking IPC there for no reason. The reply still
+                    // arrives on the main looper — ShizukuServiceConnection posts it — so the latch
+                    // is counted down exactly as in the ADB path.
+                    try {
+                        ShizukuOps.bindUserService(mShizukuComponentName, mServiceConnection);
+                    } catch (Throwable th) {
+                        Log.e(TAG, "Could not bind the Shizuku user service.", th);
+                        // A throw here means no callback is ever coming; count down now rather than
+                        // stall the caller for the full 45 s.
+                        serviceBoundWatcher.countDown();
                     }
-                    RootService.bind(intent, mServiceConnection);
-                });
+                } else {
+                    Intent intent = new Intent();
+                    intent.setComponent(mComponentName);
+                    ThreadUtils.postOnMainThread(() -> {
+                        if (mIBinder != null) {
+                            RootService.stop(intent);
+                        }
+                        RootService.bind(intent, mServiceConnection);
+                    });
+                }
             }
         }
         // Wait for service to be bound without holding mServiceConnection. The stop path may
@@ -193,6 +232,12 @@ class ServiceConnectionWrapper {
 
     @WorkerThread
     public void stopDaemon() {
+        if (mBoundViaShizuku) {
+            ShizukuOps.unbindUserService(mShizukuComponentName, mServiceConnection);
+            mBoundViaShizuku = false;
+            mIBinder = null;
+            return;
+        }
         Intent intent = new Intent();
         intent.setComponent(mComponentName);
         CountDownLatch serviceBoundWatcher;
