@@ -145,6 +145,9 @@ public class AppPref {
         PREF_SAVED_APK_FORMAT_STR,
         PREF_SELECTED_USERS_STR,
         PREF_SEND_NOTIFICATIONS_TO_CONNECTED_DEVICES_BOOL,
+        // Fork: one-shot marker — auto-detection has had its chance to hunt for a Shizuku server on
+        // this install. See Ops.maybeRestoreAutoForShizuku.
+        PREF_SHIZUKU_AUTO_RECHECKED_BOOL,
         PREF_SIGNATURE_SCHEMES_INT,
         PREF_SHOW_DISCLAIMER_BOOL,
 
@@ -417,6 +420,7 @@ public class AppPref {
             case PREF_FM_SORT_REVERSE_BOOL:
             case PREF_ENABLE_PERSISTENT_SESSION_BOOL:
             case PREF_USE_SYSTEM_FONT_BOOL:
+            case PREF_SHIZUKU_AUTO_RECHECKED_BOOL:
                 return false;
             case PREF_APP_OP_SHOW_DEFAULT_BOOL:
             case PREF_SHOW_DISCLAIMER_BOOL:

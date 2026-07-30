@@ -338,6 +338,43 @@ public class Ops {
         }
     }
 
+    /**
+     * Fork, exactly once per install: hand an install that auto-detection had already locked into
+     * ADB back to {@link #MODE_AUTO}, so the Shizuku hunt gets its chance.
+     * <p>
+     * Before this build, auto-detection skipped an unauthorised Shizuku server and persisted
+     * {@code adb_tcp} the moment ADB worked — a one-way door, because a stored mode is never
+     * auto-detected again. Every install made under that policy is therefore sitting on an ADB mode
+     * <i>nobody chose</i>, and {@link #autoDetectRootSystemOrAdbAndPersist(Context)} could never
+     * reach it. This is that migration, and it is self-limiting: the marker is written on the first
+     * call whatever happens, so a mode later picked by hand is never second-guessed again.
+     * <p>
+     * Only the ADB modes are rewound. {@code no-root} and {@code root} are left alone: the first is
+     * a deliberate refusal of privileges, and the second outranks Shizuku anyway.
+     * <p>
+     * <b>Call this from the app-start path only.</b> The settings mode picker writes the chosen mode
+     * and then calls {@link #init(Context, boolean)} straight away; running this there would rewind
+     * an explicit choice of ADB the instant it was made.
+     */
+    @WorkerThread
+    @NoOps
+    public static void rewindAutoDetectedAdbModeOnce(@NonNull Context context) {
+        if (AppPref.getBoolean(AppPref.PrefKey.PREF_SHIZUKU_AUTO_RECHECKED_BOOL)) {
+            return;
+        }
+        AppPref.set(AppPref.PrefKey.PREF_SHIZUKU_AUTO_RECHECKED_BOOL, true);
+        String mode = getMode();
+        if (!MODE_ADB_OVER_TCP.equals(mode) && !MODE_ADB_WIFI.equals(mode)) {
+            return;
+        }
+        if (!ShizukuOps.isPresent(context)) {
+            return;
+        }
+        Log.i(TAG, "One-shot: %s predates the Shizuku hunt in auto-detection. Going back to auto"
+                + " once so a Shizuku server gets a chance.", mode);
+        setMode(MODE_AUTO);
+    }
+
     @WorkerThread
     @NoOps // Although we've used Ops checks, its overall usage does not affect anything
     @Status
@@ -594,26 +631,34 @@ public class Ops {
             }
             LocalServices.stopServices();
         }
-        // Fork: Shizuku is tried ahead of ADB because it is strictly cheaper — an already-running,
-        // already-authorised server costs one bind, where ADB costs a port scan, a TLS handshake
-        // and a listening adbd. Strictly non-interactive: auto mode may use an authorisation 白い熊
-        // has already given, but must never raise a prompt of its own, so an unauthorised server is
-        // simply passed over here and stays available as an explicit mode.
-        if (ShizukuOps.isReady()) {
-            sIsShizuku = true;
-            sIsRoot = sIsSystem = false;
-            sIsAdb = true;
-            try {
-                LocalServices.bindServicesIfNotAlready();
-            } catch (Throwable e) {
-                Log.e(TAG, "Could not bind services through Shizuku.", e);
+        // Fork: Shizuku is hunted ahead of ADB, and hunted properly — the binder push is awaited and
+        // authorisation is requested if we do not have it yet. Shizuku is strictly cheaper (an
+        // authorised server costs one bind, where ADB costs a port scan, a TLS handshake and a
+        // listening adbd) and it is the mode this fork wants to land in, so a fresh install must be
+        // able to reach it without 白い熊 going into settings first. See
+        // ShizukuOps.prepareForAutoDetection for why this asks where +49 refused to.
+        boolean shizukuPresent = ShizukuOps.isPresent(context);
+        if (shizukuPresent) {
+            int shizukuStatus = ShizukuOps.prepareForAutoDetection(context);
+            if (shizukuStatus == ShizukuOps.READY) {
+                sIsShizuku = true;
+                sIsRoot = sIsSystem = false;
+                sIsAdb = true;
+                try {
+                    LocalServices.bindServicesIfNotAlready();
+                } catch (Throwable e) {
+                    Log.e(TAG, "Could not bind services through Shizuku.", e);
+                }
+                if (LocalServices.alive()) {
+                    setMode(MODE_SHIZUKU);
+                    checkRootOrIncompleteUsbDebuggingInAdb();
+                    return;
+                }
+                Log.w(TAG, "Shizuku was ready but the services did not come up; trying ADB.");
+            } else {
+                Log.i(TAG, "Shizuku is installed but not usable right now (status %d); trying ADB.",
+                        shizukuStatus);
             }
-            if (LocalServices.alive()) {
-                setMode(MODE_SHIZUKU);
-                checkRootOrIncompleteUsbDebuggingInAdb();
-                return;
-            }
-            Log.w(TAG, "Shizuku was ready but the services did not come up; trying ADB.");
             sIsShizuku = false;
             sIsAdb = false;
         }
@@ -622,14 +667,14 @@ public class Ops {
             // INTERNET permission is not granted
             // Skip checking for ADB
             fallbackToNoRoot(context);
-            setMode(MODE_NO_ROOT);
+            setModeFromAutoDetection(MODE_NO_ROOT, shizukuPresent);
             return;
         }
         // Check for ADB
         if (!AdbUtils.isAdbdRunning()) {
             // ADB not running. In auto mode, we do not attempt to enable it either
             fallbackToNoRoot(context);
-            setMode(MODE_NO_ROOT);
+            setModeFromAutoDetection(MODE_NO_ROOT, shizukuPresent);
             return;
         }
         sIsAdb = true; // First enable ADB if not already
@@ -649,7 +694,32 @@ public class Ops {
             }
         }
         fallbackToNoRoot(context);
-        setMode(MODE_NO_ROOT);
+        setModeFromAutoDetection(MODE_NO_ROOT, shizukuPresent);
+    }
+
+    /**
+     * Fork: what auto-detection is allowed to persist when it did <i>not</i> land on Shizuku.
+     * <p>
+     * Auto-detection persisting its answer is upstream behaviour and it is normally right — it turns
+     * the next launch into a straight bind instead of a re-scan. But it is a one-way door: once
+     * {@code adb_tcp} (or {@code no-root}) is written, {@link #getMode()} never returns
+     * {@link #MODE_AUTO} again and the Shizuku hunt above never runs again either. A Shizuku server
+     * is started <i>by hand</i>, typically after the phone has already been booted and this app has
+     * already been opened once, so the very first launch is the launch most likely to miss it —
+     * and under the old code that first miss was permanent.
+     * <p>
+     * So when a Shizuku-family manager is installed but did not serve us this time, the preference
+     * stays on auto and the next launch looks again. Nothing is lost: the ADB fallback below has
+     * already run, and an explicit mode picked in settings is never touched by this method.
+     */
+    @NoOps
+    private static void setModeFromAutoDetection(@Mode String detected, boolean shizukuPresent) {
+        if (shizukuPresent) {
+            Log.i(TAG, "Auto-detection settled on %s, but a Shizuku manager is installed:"
+                    + " staying on auto so the next launch can look for its server again.", detected);
+            return;
+        }
+        setMode(detected);
     }
 
     @UiThread
