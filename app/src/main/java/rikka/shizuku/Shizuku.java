@@ -94,6 +94,38 @@ public class Shizuku {
         onBinderReceived(null, null);
     };
 
+    /**
+     * Wire code for {@code attachApplication(IShizukuApplication, Bundle)}.
+     * <p>
+     * LANDMINE (measured on-device against genuine Shizuku 13.6.0, 2026-07-30, cost four builds): an
+     * AIDL wire code is {@code IBinder.FIRST_CALL_TRANSACTION + <declared id>}, and
+     * {@code FIRST_CALL_TRANSACTION == 1}. {@code IShizukuService.aidl} declares
+     * {@code attachApplication ... = 17}, so it answers on <b>18</b> — while <b>17</b> belongs to
+     * {@code shouldShowRequestPermissionRationale() = 16}, whose first act is {@code requireClient()}.
+     * Transacting 17 therefore asks the server "may I show a rationale" while trying to become a
+     * client, and it answers {@code IllegalStateException: Not an attached client} — to <i>every</i>
+     * modern client, not just this app.
+     * <p>
+     * The damage was not the failed attach but the fallback: the pre-v11 attach on code 14 then
+     * succeeds, so we attach as a <i>legacy</i> client, {@link #isLegacyAttach()} goes true, and
+     * {@code ShizukuOps} refuses to raise a permission prompt it believes cannot appear. The app
+     * consequently never calls {@code requestPermission()}, never shows up in Shizuku's app list,
+     * and cannot be authorised there — which is exactly what 白い熊 reported.
+     * <p>
+     * Do not "simplify" this back to a literal. The constant the AIDL generates
+     * ({@code IShizukuService.Stub.TRANSACTION_attachApplication}) is package-private in
+     * {@code moe.shizuku.server}, so it cannot be referenced from here; spelling out the arithmetic
+     * is the next best thing, because the number alone is what got this wrong.
+     */
+    private static final int TRANSACTION_attachApplication = IBinder.FIRST_CALL_TRANSACTION + 17;
+
+    /**
+     * The pre-v11 attach. A raw wire code from the old protocol — <b>not</b>
+     * {@code FIRST_CALL_TRANSACTION}-relative, and deliberately unchanged: modern servers still
+     * intercept 14 for exactly this, which is why the broken fallback above looked like it worked.
+     */
+    private static final int TRANSACTION_attachApplication_preV11 = 14;
+
     private static boolean attachApplicationV13(IBinder binder, String packageName) throws RemoteException {
         boolean result;
 
@@ -108,7 +140,7 @@ public class Shizuku {
             data.writeStrongBinder(SHIZUKU_APPLICATION.asBinder());
             data.writeInt(1);
             args.writeToParcel(data, 0);
-            result = binder.transact(17 /*IShizukuService.Stub.TRANSACTION_attachApplication*/, data, reply, 0);
+            result = binder.transact(TRANSACTION_attachApplication, data, reply, 0);
             reply.readException();
         } finally {
             reply.recycle();
@@ -127,7 +159,7 @@ public class Shizuku {
             data.writeInterfaceToken("moe.shizuku.server.IShizukuService");
             data.writeStrongBinder(SHIZUKU_APPLICATION.asBinder());
             data.writeString(packageName);
-            result = binder.transact(14 /*IShizukuService.Stub.TRANSACTION_attachApplication*/, data, reply, 0);
+            result = binder.transact(TRANSACTION_attachApplication_preV11, data, reply, 0);
             reply.readException();
         } finally {
             reply.recycle();
@@ -184,24 +216,37 @@ public class Shizuku {
             // ordering is upstream's own intent, merely made exception-proof.
             boolean attached = false;
             legacyAttach = false;
+            // Fork: these are logged at ERROR, not WARN/INFO, on purpose. EMUI on the Mate XT keeps
+            // only error-level lines from third-party apps in the main buffer, and this is the one
+            // diagnostic that says WHY a server refused us — without it the failure is invisible on
+            // the only device this fork ships to, and every diagnosis becomes a guess (measured
+            // 2026-07-30: three builds were spent inferring what one of these lines states outright).
             try {
                 attached = attachApplicationV13(binder, packageName);
             } catch (Throwable e) {
-                Log.w("ShizukuApplication", "attachApplication v13 (code 17) failed, trying v11", e);
+                Log.e("ShizukuApplication", "attachApplication v13 (code 17) failed [" + e + "], trying v11", e);
             }
             if (!attached) {
                 try {
                     attached = attachApplicationV11(binder, packageName);
                     legacyAttach = attached;
                 } catch (Throwable e) {
-                    Log.w("ShizukuApplication", "attachApplication v11 (code 14) failed", e);
+                    Log.e("ShizukuApplication", "attachApplication v11 (code 14) failed [" + e + "]", e);
                 }
             }
             if (!attached) {
                 preV11 = true;
             }
-            Log.i("ShizukuApplication", "attachApplication attached=" + attached
-                    + " preV11=" + preV11 + " legacyAttach=" + legacyAttach);
+            String summary = "attachApplication attached=" + attached
+                    + " preV11=" + preV11 + " legacyAttach=" + legacyAttach
+                    + " serverApiVersion=" + serverApiVersion + " serverUid=" + serverUid
+                    + " permissionGranted=" + permissionGranted;
+            if (attached && !legacyAttach && !preV11) {
+                Log.i("ShizukuApplication", summary);
+            } else {
+                // Anything other than a clean v13 attach is abnormal and costs the Shizuku mode.
+                Log.e("ShizukuApplication", summary);
+            }
 
             if (preV11) {
                 binderReady = true;
