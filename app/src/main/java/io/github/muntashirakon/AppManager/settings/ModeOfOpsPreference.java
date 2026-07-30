@@ -24,8 +24,8 @@ import com.google.android.material.color.MaterialColors;
 import com.google.android.material.textfield.TextInputLayout;
 import com.google.android.material.textview.MaterialTextView;
 
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 import io.github.muntashirakon.AppManager.R;
@@ -42,9 +42,11 @@ import io.github.muntashirakon.view.TextInputLayoutCompat;
 import io.github.muntashirakon.widget.TextInputTextView;
 
 public class ModeOfOpsPreference extends Fragment {
+    // Fork: index-for-index with R.array.modes — see the comment there.
     private static final List<String> MODE_NAMES = Arrays.asList(
             Ops.MODE_AUTO,
             Ops.MODE_ROOT,
+            Ops.MODE_SHIZUKU,
             Ops.MODE_ADB_OVER_TCP,
             Ops.MODE_ADB_WIFI,
             Ops.MODE_NO_ROOT);
@@ -114,10 +116,15 @@ public class ModeOfOpsPreference extends Fragment {
         mRemoteServicesStatusView = view.findViewById(R.id.remote_services_status);
         mModeOfOpsView = view.findViewById(R.id.op_name);
         MaterialButton changeModeView = view.findViewById(R.id.action_settings);
-        List<String> disabledItems;
+        List<String> disabledItems = new ArrayList<>();
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Utils.isTv(requireContext())) {
-            disabledItems = Collections.singletonList(Ops.MODE_ADB_WIFI);
-        } else disabledItems = null;
+            disabledItems.add(Ops.MODE_ADB_WIFI);
+        }
+        // Fork: offering Shizuku with no Shizuku-family app installed would be an item that can
+        // only ever fail. It reappears by itself once one is installed.
+        if (!ShizukuOps.isInstalled(requireContext())) {
+            disabledItems.add(Ops.MODE_SHIZUKU);
+        }
         changeModeView.setOnClickListener(v -> new SearchableSingleChoiceDialogBuilder<>(requireActivity(), MODE_NAMES, mModes)
                 .setTitle(R.string.pref_mode_of_operations)
                 .setSelection(mCurrentMode)
@@ -320,6 +327,7 @@ public class ModeOfOpsPreference extends Fragment {
         switch (mode) {
             case Ops.MODE_ROOT:
                 return uid != Ops.ROOT_UID;
+            case Ops.MODE_SHIZUKU:
             case Ops.MODE_ADB_OVER_TCP:
             case Ops.MODE_ADB_WIFI:
                 return uid > Ops.SHELL_UID;

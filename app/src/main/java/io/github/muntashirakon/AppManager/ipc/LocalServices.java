@@ -35,6 +35,8 @@ public class LocalServices {
     @NonNull
     private static final ServiceConnectionWrapper sFileSystemServiceConnectionWrapper
             = new ServiceConnectionWrapper(BuildConfig.APPLICATION_ID, FileSystemService.class.getName(),
+            // Fork: the Shizuku entry point for the same service.
+            io.github.muntashirakon.io.ShizukuFileSystemService.class.getName(),
             LocalServices::onServiceBinderDied);
 
     @WorkerThread
@@ -102,6 +104,8 @@ public class LocalServices {
     @NonNull
     private static final ServiceConnectionWrapper sAMServiceConnectionWrapper
             = new ServiceConnectionWrapper(BuildConfig.APPLICATION_ID, AMService.class.getName(),
+            // Fork: the Shizuku entry point for the same service.
+            ShizukuAMService.class.getName(),
             LocalServices::onServiceBinderDied);
 
     @WorkerThread
