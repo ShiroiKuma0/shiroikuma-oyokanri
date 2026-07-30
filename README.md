@@ -17,7 +17,7 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+49`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+54`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
 </div>
 
@@ -221,10 +221,12 @@ behaviour, same per-uid firewall access — but nothing has to listen on a TCP p
 path entirely.
 
 It prefers 白い熊's own Shizuku fork, **白い熊 雫** (`shiroikuma.shizuku`), and falls back to stock
-Shizuku when that isn't installed. Auto-detection tries it **ahead of ADB** — an already-authorised
-server costs one bind, where ADB costs a port scan and a handshake — but never raises a prompt of its
-own; a mode chosen for you should not put a dialog on screen. Choosing it explicitly shuts the ADB
-path down, because leaving a TCP listener up would defeat the point.
+Shizuku when that isn't installed. Auto-detection **hunts for it ahead of ADB** — it waits for the
+server's binder and asks for authorisation, so a *fresh install* lands in Shizuku mode by itself
+instead of falling into ADB, which is the thing this mode exists to avoid. A refusal is remembered by
+the server, not re-asked. If no server serves us this time the preference stays on auto rather than
+locking itself into ADB, so starting the server later is enough — no trip into settings. Choosing the
+mode explicitly shuts the ADB path down, because leaving a TCP listener up would defeat the point.
 
 When it can't connect it says which of the three things is actually wrong — *not installed*, *not
 running*, *not authorised* — since those send you to three different places.

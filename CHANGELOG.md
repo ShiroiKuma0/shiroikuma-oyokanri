@@ -6,6 +6,86 @@ All notable fork changes are recorded here. Versions use the fork's
 `customBaseVersionName+customBuildNumber` scheme (the base mirrors the upstream App Manager release
 this fork is built on).
 
+## 4.1.0+54 — 2026-07-30
+
++49 shipped Shizuku mode; this build makes it work. Three separate defects stood between the app and
+a running Shizuku server, and each one hid the next: a fresh install never looked for Shizuku at all,
+the binder the server pushed was thrown away on arrival, and the attach that follows asked the server
+the wrong question — which is why 応用管理 never appeared in Shizuku's app list, and why there was
+nothing there to authorise. All three were measured on-device against genuine Shizuku 13.6.0.
+
+### 🎯 `attachApplication` is wire code 18, not 17
+
+- An AIDL wire code is `IBinder.FIRST_CALL_TRANSACTION + <declared id>`, and `FIRST_CALL_TRANSACTION`
+  is **1**. `IShizukuService.aidl` declares `attachApplication … = 17`, so it answers on **18** —
+  while **17** belongs to `shouldShowRequestPermissionRationale() = 16`, whose first act is
+  `requireClient()`. The client transacted 17, i.e. asked the server *"may I show a rationale"* while
+  trying to become a client, and was answered **`IllegalStateException: Not an attached client`** — as
+  any modern client would be, not just this app.
+- **The failed attach was not the damage; the fallback was.** The pre-v11 attach on code 14 then
+  succeeds, so the app attached as a *legacy* client, `isLegacyAttach()` went true, and the mode
+  deliberately skipped a permission prompt it believed could never appear. `requestPermission()` was
+  therefore never called, the app never appeared in Shizuku's list, and so it could not be authorised
+  from there either — a closed loop with no way in.
+- The code is now spelled `FIRST_CALL_TRANSACTION + 17` rather than a bare `18`, because the bare
+  number is precisely what got it wrong. The constant the AIDL generates is package-private in
+  `moe.shizuku.server` and cannot be referenced from the client, so spelling out the arithmetic is
+  the next best thing.
+- **This supersedes +49's reading of the same symptom.** That build was right that a *thrown* attach
+  must not short-circuit the fallback, but it took the exception at face value and concluded the
+  server was refusing the transaction. The server was answering a different method, exactly as asked.
+
+### 🧩 The binder was arriving and being thrown away
+
+- Shizuku mode reported **"the Shizuku server is not running"** while the server was demonstrably
+  calling our provider on every launch. The real error underneath:
+  `ClassCastException: moe.shizuku.api.BinderContainer cannot be cast to rikka.shizuku.BinderContainer`.
+- **A server does not put every key into one bundle.** It makes a *separate* `call()` per client API,
+  each carrying one key whose value is a container **of the matching type**. The provider read the
+  legacy key into a variable declared as the modern container, so the implicit checkcast threw on
+  exactly the servers that key exists for — and the `catch` then blamed a missing container class,
+  when all three were present and only the types were crossed.
+- The value is now read as a `Parcelable` and the binder pulled out of whichever container arrived,
+  with a reflective fallback over any `IBinder`-typed field for a fourth flavour nobody has written
+  yet. The key that was never read at all — `af.shizuku.plus.api.intent.extra.BINDER` — is read now
+  too, so 白い熊 雫's own call is heard and not merely its `rikka` one.
+
+### 🔎 Shizuku is what a fresh install finds
+
+- **Auto-detection hunts for a server instead of glancing at one.** It gated on "a server is pinging
+  *and* has already authorised us", and on a fresh install neither half can be true: the binder push
+  is asynchronous, so it has usually not landed when the splash worker runs, and nothing has
+  authorised a just-installed app. So auto-detection walked straight into ADB — the mode this fork
+  added Shizuku to get away from. It now awaits the binder and requests authorisation, on shorter
+  timeouts than the explicit mode (3 s for the binder, 60 s for the answer) so an installed-but-
+  stopped manager cannot stall the splash. This reverses +49's rule that auto mode must never raise a
+  prompt of its own: asking once at first start is the whole point, and a refusal is remembered by
+  the server rather than re-asked.
+- **Falling back to ADB no longer slams the door.** A stored mode is never auto-detected again, and a
+  Shizuku server is started *by hand* — usually after the phone has booted and the app has already
+  been opened once — so the first launch is the one most likely to miss it, and that miss used to be
+  permanent. The preference now stays on `auto` when a manager is installed but did not serve us, and
+  the next launch looks again.
+- **A one-shot rewind** hands an install already locked into `adb_tcp` by the old policy back to
+  `auto`, exactly once per install. It runs only from the app-start path, never from the settings
+  picker, so an ADB mode chosen by hand is never second-guessed; `root` and `no-root` are left alone.
+- **A frozen manager is no longer invisible.** `getPackageInfo(pkg, 0)` answers *NameNotFound* for a
+  frozen or disabled package — and freezing apps is what this app is for — while a Shizuku server is
+  a shell process that outlives its manager being frozen. The lookup now passes
+  `MATCH_UNINSTALLED_PACKAGES | MATCH_DISABLED_COMPONENTS`, and still requires `FLAG_INSTALLED`, so a
+  package uninstalled with its data kept — a ghost that can never serve us — is not waited on at
+  every launch.
+- **A live binder wins outright**, with no package lookup at all: if a server is already talking to
+  us then a server exists, whatever the manager's install state, or its package id.
+
+### 🔦 Diagnostics that survive EMUI
+
+- The attach diagnostics log at **error** level now, rather than warning/info. EMUI on the Mate XT
+  keeps only error-level lines from third-party apps in the main buffer, so the one line that states
+  *why* a server refused us was invisible on the only device this fork ships to — and three builds
+  were spent inferring what it states outright. A clean v13 attach still logs at info; anything else
+  is abnormal and costs the whole mode, so it is an error.
+
 ## 4.1.0+49 — 2026-07-30
 
 A new **mode of operation: Shizuku**. ADB-over-TCP was never the privilege — it is only the delivery
