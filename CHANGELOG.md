@@ -6,6 +6,74 @@ All notable fork changes are recorded here. Versions use the fork's
 `customBaseVersionName+customBuildNumber` scheme (the base mirrors the upstream App Manager release
 this fork is built on).
 
+## 4.1.0+49 — 2026-07-30
+
+A new **mode of operation: Shizuku**. ADB-over-TCP was never the privilege — it is only the delivery
+van for a single `app_process` command line, after which every privileged call in the app runs
+through the same `IAMService` binder. Shizuku performs that launch itself, so the capabilities are
+identical (uid 2000, same app-ops behaviour, same firewall access) while `adbd`, the port scan, the
+pairing keys and the `INTERNET` dependency all leave the privilege path. Plus the two splash-screen
+backgrounds that were grey, and a toast that claimed the wrong mode.
+
+### 🔌 Shizuku mode of operation
+
+- **`MODE_SHIZUKU`**, third in the mode picker after Root, and greyed out when no Shizuku-family app
+  is installed — an option that could only ever fail is not an option. It reappears by itself once
+  one is installed.
+- **Prefers our own fork, 白い熊 雫 (`shiroikuma.shizuku`), over stock Shizuku**
+  (`moe.shizuku.privileged.api`). The binder is *pushed* rather than dialled — whichever server is
+  running resolves us by provider authority — so the preference governs the places where a choice
+  genuinely exists: what the status line names, and which manager is opened when authorisation is
+  needed.
+- **Two user services, no new privilege machinery.** `ShizukuAMService` and
+  `ShizukuFileSystemService` are the entry points Shizuku instantiates; the privileged half of the
+  app needed no change at all, because it never depended on how its process was born. Both answer
+  Shizuku's `destroy` transaction by exiting, so an unbind cannot leave an orphaned shell-uid process
+  behind.
+- **Picking Shizuku shuts the ADB path down** — services bound the old way are dropped and the local
+  server is closed. Leaving a TCP listener up is precisely what this mode exists to avoid.
+- **Auto mode tries Shizuku ahead of ADB**, but strictly non-interactively: it may use an
+  authorisation already granted, and never raises a prompt of its own.
+- **Three distinct failures, not one.** *Not installed*, *not running* and *not authorised* send you
+  to three different places, so the message names the right one instead of a generic "unavailable".
+- **The manifest declares both API permission names.** A Shizuku server decides which packages are
+  its clients by scanning `requestedPermissions`, and the two servers look for different names; a
+  `uses-permission` naming an undefined permission is inert but still appears in that list, so
+  declaring both makes one build work against either server.
+
+### 🧨 Two landmines, both measured on-device
+
+- **`Bundle.getParcelable()` unparcels the whole bundle, not just the key you ask for.** The server
+  writes three different `BinderContainer` classes into one Bundle, so reading our key needs all
+  three classes present or the read throws and the hand-off fails whole. Vendoring only one of them
+  made the mode report *"the server is not running"* while the server was demonstrably calling our
+  provider. All three ship now — and none of them is referenced anywhere in code, so none may be
+  deleted as unused: the reference is a string inside a parcel.
+- **A thrown attach is not a failed attach.** The client library chains its v13 and v11
+  `attachApplication` attempts with `&&`, which only falls back when the first returns `false` — but
+  a server that does not dispatch that transaction answers with an exception instead. Each attempt is
+  now guarded separately, and the app records which one succeeded so it can skip a permission prompt
+  that such a server can never raise.
+
+### 🖤 The splash is black now, both halves of it
+
+- **The zoom-in splash** used `?attr/colorSurface` for its background. The system draws that window
+  from the manifest theme **before the Activity exists**, so the attribute resolved against the
+  splash library's own light parent and the black-and-yellow icon zoomed in on **grey**. It is a
+  literal black now.
+- **The static screen behind it** was grey for a different reason: `activity_authentication` carries
+  no background of its own, so it inherited the app-wide theme's window background, which
+  `DynamicColors` then tinted. The post-splash theme is now a splash-scoped variant pinning
+  `android:windowBackground` to literal black — a drawable attribute, which is exactly what survives
+  the dynamic-colour overlay.
+
+### 🔤 The mode toast tells the truth
+
+- uid 2000 is reached by two different routes, so **"Working on ADB mode" after a Shizuku hand-off
+  was simply false** — and false in a way that matters here, since no `adbd`, TCP port or pairing key
+  is involved. It now reads **"Working on Shizuku mode"**, and the two neighbouring warnings that
+  said *"instead of ADB mode"* were corrected the same way.
+
 ## 4.1.0+43 — 2026-07-29
 
 Two contract changes from 白い熊 自由作業盤's backup-automation hand-off, in one build. Nothing else
