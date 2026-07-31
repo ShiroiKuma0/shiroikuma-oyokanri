@@ -6,6 +6,72 @@ All notable fork changes are recorded here. Versions use the fork's
 `customBaseVersionName+customBuildNumber` scheme (the base mirrors the upstream App Manager release
 this fork is built on).
 
+## 4.1.0+55 — 2026-07-31
+
+The yellow dialog border was never a theme. It could not be, and that is why it had been landing on
+some dialogs and not others ever since it was introduced — including on the backup **delete
+confirmation**, which is where 白い熊 noticed the gap. This build closes it everywhere and records
+the reason, so the next dialog added to a fork screen cannot quietly become the odd one out.
+
+### 🖼️ Why a border cannot be inherited
+
+- `MaterialAlertDialogBuilder.create()` rebuilds the dialog's window background as its own
+  stroke-less `MaterialShapeDrawable`. Anything a theme puts there is overwritten on the way out of
+  `create()`, so the frame can only ever be painted **after** the dialog has been built — that is
+  what `UiUtils.applyForkDialogBorder(dialog)` exists to do, driven by the `forkDialogBorderDrawable`
+  theme attribute and a no-op wherever that attribute is unset.
+- Build +47 wired that call into the six shared libcore builders (`Searchable*`, `TextInput*`,
+  `Scrollable`) and into `MainActivity`, and stopped there. Every dialog still raised with a plain
+  `new MaterialAlertDialogBuilder(ctx)….show()` therefore kept the yellow-on-black **palette** —
+  that part *is* inherited, from the host activity's dialog overlay — while having no **frame**.
+- The result was an asymmetry with no visible logic to it: a search dialog and a text-input dialog
+  were framed, the confirmation dialog three taps later was not, on the same screen and in the same
+  flow.
+
+### 🧷 One entry point, and one that works before `show()`
+
+- `utils/ForkDialog` gains **`bordered(dialog)`**, for the call sites that do not own the `show()`:
+  `DialogFragment.onCreateDialog`, which returns the dialog for the fragment to show later, and
+  dialogs whose buttons are re-wired after `create()`. Applying the border straight after `create()`
+  is sufficient — M3 rebuilds that background inside `create()` only, never again in `show()`.
+- Together with the existing `builder(ctx)` (yellow-on-black overlay pinned explicitly, so it does
+  not depend on the host theme surviving) and `present(builder)` (create → show → border), that is
+  the whole surface a fork dialog needs.
+
+### ✅ 36 dialogs swept, across 25 files
+
+Every dialog reachable from a yellow-on-black screen now goes through `ForkDialog`:
+
+- **Backup / restore** — delete backup (the reported one), delete base backup, the
+  overwrite-existing-backup warning, restore-multiple confirmation.
+- **App details** — status, battery optimisation (twice), sensors, overlay, freeze, clear data,
+  usage access, block/unblock trackers, launch-activity, icon picker, SSAID.
+- **Main list** — uninstall-again.
+- **Filters** — edit filters, edit filter option.
+- **Profiles** — delete (twice), exit confirmation, new profile, remove-from-profile,
+  backup/restore.
+- **Settings** — import backups, SAF notice, no volumes found, remove all rules, installer app,
+  import existing rules, saved APK name format, keystore import (twice), key import.
+- **白い熊 応用管理 UI page** — automation token regenerate, font family, font weight, font size,
+  colour picker.
+
+### 🔀 Two dialogs kept their host's theme on purpose
+
+- The **ADB** dialogs in `Ops` (manual wireless debugging, pairing) can also appear over the
+  installer, which is not a fork screen, so they keep their plain builder and gain only the
+  `present()` wrapper. They now behave exactly like the `TextInputDialogBuilder` step standing
+  beside them in the same flow: framed on a fork host, untouched anywhere else.
+- Left alone deliberately: `SettingsExportImportPanel` and `DirectoryChooserDialog`, which already
+  paint their own border, and every non-fork screen — file manager, logcat, scanner, editor,
+  debloater, one-click ops, installer, operation history — where the border call is a no-op anyway,
+  the theme attribute being unset there.
+
+### 📝 Recorded
+
+- `CLAUDE.md`'s dialog landmine now names `ForkDialog`, states why the libcore builders were framed
+  while direct ones were not, and says which of the three helpers to use for which kind of call
+  site.
+
 ## 4.1.0+54 — 2026-07-30
 
 +49 shipped Shizuku mode; this build makes it work. Three separate defects stood between the app and

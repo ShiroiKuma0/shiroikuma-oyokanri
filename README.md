@@ -17,7 +17,7 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+54`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+55`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
 </div>
 
@@ -94,8 +94,8 @@ on every startup once privileges are up. Set an app up once; it stays that way, 
 ## 🎨 Configurable yellow-on-black UI
 
 The fork's signature look: pure-black backgrounds with a bright `#FFFF00` foreground, applied across
-the main list, app-details, profiles, settings, overflow menu, the installer banner, dialogs (with
-yellow borders and yellow-outlined buttons), and the launcher / file-manager / TV-banner icons. Toasts
+the main list, app-details, profiles, settings, overflow menu, the installer banner, **every** dialog
+(yellow border, yellow-outlined buttons), and the launcher / file-manager / TV-banner icons. Toasts
 are restyled as a black box with yellow text and border, and even the splash screen renders the app
 name, status and version in yellow.
 
