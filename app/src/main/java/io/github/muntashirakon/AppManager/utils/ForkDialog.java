@@ -59,4 +59,22 @@ public final class ForkDialog {
         UiUtils.applyForkDialogBorder(dialog);
         return dialog;
     }
+
+    /**
+     * Paint the yellow border on an already-built dialog and return it. For the
+     * call sites that cannot use {@link #present(MaterialAlertDialogBuilder)}
+     * because they do not own the {@code show()} - chiefly
+     * {@code DialogFragment.onCreateDialog}, which returns the dialog for the
+     * fragment to show later, and dialogs whose buttons are re-wired after
+     * {@code create()}.
+     * <p>
+     * Applying the border straight after {@code create()} is enough: M3 rebuilds
+     * the window background inside {@code create()} only, never again in
+     * {@code show()}.
+     */
+    @NonNull
+    public static AlertDialog bordered(@NonNull AlertDialog dialog) {
+        UiUtils.applyForkDialogBorder(dialog);
+        return dialog;
+    }
 }

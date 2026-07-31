@@ -15,7 +15,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.DialogFragment;
 
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
@@ -23,6 +22,7 @@ import java.lang.ref.WeakReference;
 
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.profiles.struct.BaseProfile;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.adapters.SelectedArrayAdapter;
 import io.github.muntashirakon.lifecycle.SoftInputLifeCycleObserver;
 import io.github.muntashirakon.view.TextInputLayoutCompat;
@@ -68,7 +68,7 @@ public class NewProfileDialogFragment extends DialogFragment {
                 mType = position;
             }
         });
-        return new MaterialAlertDialogBuilder(requireActivity())
+        return ForkDialog.bordered(ForkDialog.builder(requireActivity())
                 .setTitle(R.string.new_profile)
                 .setView(mDialogView)
                 .setPositiveButton(R.string.go, (dialog, which) -> {
@@ -78,7 +78,7 @@ public class NewProfileDialogFragment extends DialogFragment {
                     }
                 })
                 .setNegativeButton(R.string.cancel, null)
-                .create();
+                .create());
     }
 
     @Nullable

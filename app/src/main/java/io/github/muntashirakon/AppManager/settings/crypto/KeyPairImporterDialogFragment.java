@@ -17,7 +17,6 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.FragmentActivity;
 
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.TextInputLayout;
 
 import java.util.ArrayList;
@@ -28,6 +27,7 @@ import io.github.muntashirakon.AppManager.crypto.ks.KeyStoreUtils;
 import io.github.muntashirakon.AppManager.logs.Log;
 import io.github.muntashirakon.AppManager.utils.BetterActivityResult;
 import io.github.muntashirakon.AppManager.utils.ExUtils;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 import io.github.muntashirakon.AppManager.utils.Utils;
@@ -121,12 +121,12 @@ public class KeyPairImporterDialogFragment extends DialogFragment {
                 mKeyType = position;
         });
         setDefault();
-        AlertDialog alertDialog = new MaterialAlertDialogBuilder(mActivity)
+        AlertDialog alertDialog = ForkDialog.bordered(ForkDialog.builder(mActivity)
                 .setTitle(R.string.import_key)
                 .setView(view)
                 .setPositiveButton(R.string.ok, null)
                 .setNegativeButton(R.string.cancel, null)
-                .create();
+                .create());
         alertDialog.setOnShowListener(dialog -> {
             AlertDialog dialog1 = (AlertDialog) dialog;
             Button okButton = dialog1.getButton(AlertDialog.BUTTON_POSITIVE);

@@ -26,7 +26,6 @@ import androidx.core.content.ContextCompat;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.DiffUtil;
 
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
 
@@ -46,6 +45,7 @@ import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.logs.Log;
 import io.github.muntashirakon.AppManager.profiles.struct.BaseProfile;
 import io.github.muntashirakon.AppManager.shortcut.CreateShortcutDialogFragment;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 import io.github.muntashirakon.AppManager.utils.Utils;
 import io.github.muntashirakon.AppManager.utils.appearance.ColorCodes;
@@ -296,7 +296,7 @@ public class ProfilesActivity extends BaseActivity implements NewProfileDialogFr
                         Intent intent = ProfileApplierActivity.getApplierIntent(mActivity, profile.profileId);
                         mActivity.startActivity(intent);
                     } else if (id == R.id.action_delete) {
-                        new MaterialAlertDialogBuilder(mActivity)
+                        ForkDialog.present(ForkDialog.builder(mActivity)
                                 .setTitle(mActivity.getString(R.string.delete_filename, profile.name))
                                 .setMessage(R.string.are_you_sure)
                                 .setPositiveButton(R.string.cancel, null)
@@ -306,8 +306,7 @@ public class ProfilesActivity extends BaseActivity implements NewProfileDialogFr
                                     } else {
                                         UIUtils.displayShortToast(R.string.deletion_failed);
                                     }
-                                })
-                                .show();
+                                }));
                     } else if (id == R.id.action_routine_ops) {
                         // TODO(7/11/20): Setup routine operations for this profile
                         UIUtils.displayShortToast("Not yet implemented");

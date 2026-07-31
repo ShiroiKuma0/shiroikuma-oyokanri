@@ -46,7 +46,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.io.File;
 import java.io.OutputStream;
@@ -92,6 +91,7 @@ import io.github.muntashirakon.AppManager.utils.AppNotesManager;
 import io.github.muntashirakon.AppManager.utils.ArrayUtils;
 import io.github.muntashirakon.AppManager.utils.BroadcastUtils;
 import io.github.muntashirakon.AppManager.utils.DateUtils;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.ForkThemeUtils;
 import io.github.muntashirakon.AppManager.utils.FreezeUtils;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
@@ -1024,7 +1024,8 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                 showBackupRestoreDialogOrAppNotInstalled(item);
                 return;
             }
-            new MaterialAlertDialogBuilder(mActivity)
+            // Fork: yellow-on-black + bordered like every other fork dialog.
+            ForkDialog.present(ForkDialog.builder(mActivity)
                     .setTitle(mActivity.getString(R.string.uninstall_app, item.label))
                     .setMessage(R.string.uninstall_app_again_message)
                     .setNegativeButton(R.string.no, null)
@@ -1039,8 +1040,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                                 displayLongToast(R.string.failed_to_uninstall, item.label);
                             }
                         });
-                    }))
-                    .show();
+                    })));
             return;
         }
         // The app is installed

@@ -22,7 +22,6 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.button.MaterialButton;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.resources.MaterialAttributes;
 
 import java.io.IOException;
@@ -33,6 +32,7 @@ import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.backup.BackupFlags;
 import io.github.muntashirakon.AppManager.backup.struct.BackupMetadataV5;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsManager;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 import io.github.muntashirakon.dialog.SearchableFlagsDialogBuilder;
 import io.github.muntashirakon.util.AdapterUtils;
@@ -146,7 +146,8 @@ public class RestoreSingleFragment extends Fragment {
     }
 
     private void handleDelete(List<BackupMetadataV5> selectedBackups) {
-        new MaterialAlertDialogBuilder(mContext)
+        // Fork: yellow-on-black + bordered like every other fork dialog.
+        ForkDialog.present(ForkDialog.builder(mContext)
                 .setTitle(R.string.delete_backup)
                 .setMessage(R.string.are_you_sure)
                 .setNegativeButton(R.string.no, null)
@@ -160,8 +161,7 @@ public class RestoreSingleFragment extends Fragment {
                     operationInfo.op = BatchOpsManager.OP_DELETE_BACKUP;
                     operationInfo.relativeDirs = relativeDirs.toArray(new String[0]);
                     mViewModel.prepareForOperation(operationInfo);
-                })
-                .show();
+                }));
     }
 
     private static class BackupAdapter extends RecyclerView.Adapter<BackupAdapter.ViewHolder> {

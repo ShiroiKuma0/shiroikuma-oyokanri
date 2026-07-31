@@ -57,6 +57,7 @@ import io.github.muntashirakon.AppManager.filters.options.FilterOption;
 import io.github.muntashirakon.AppManager.filters.options.FilterOptions;
 import io.github.muntashirakon.AppManager.utils.ContextUtils;
 import io.github.muntashirakon.AppManager.utils.DateUtils;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 import io.github.muntashirakon.adapters.SelectedArrayAdapter;
 import io.github.muntashirakon.view.TextInputLayoutCompat;
@@ -204,7 +205,7 @@ public class EditFilterOptionFragment extends DialogFragment {
             updateUiForType(mCurrentKeyType);
         });
         Objects.requireNonNull(mOnClickDialogButtonInterface);
-        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(activity);
+        MaterialAlertDialogBuilder builder = ForkDialog.builder(activity);
         builder.setView(view)
                 .setPositiveButton(editMode ? R.string.update : R.string.add, (dialog, which) -> {
                     if (mCurrentFilterOption == null) {
@@ -232,7 +233,7 @@ public class EditFilterOptionFragment extends DialogFragment {
         if (editMode) {
             builder.setNeutralButton(R.string.delete, (dialog, which) -> mOnClickDialogButtonInterface.onDeleteItem(mPosition, mFilterOption.id));
         }
-        return builder.create();
+        return ForkDialog.bordered(builder.create());
     }
 
     private void updateUiForFilter(@NonNull FilterOption filterOption) {

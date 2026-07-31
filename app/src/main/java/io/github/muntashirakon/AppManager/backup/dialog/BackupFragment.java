@@ -17,8 +17,6 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-
 import java.util.Set;
 
 import io.github.muntashirakon.AppManager.R;
@@ -26,6 +24,7 @@ import io.github.muntashirakon.AppManager.backup.BackupFlags;
 import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsManager;
 import io.github.muntashirakon.AppManager.utils.DateUtils;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.dialog.TextInputDialogBuilder;
 import io.github.muntashirakon.widget.MaterialAlertView;
 
@@ -130,12 +129,12 @@ public class BackupFragment extends Fragment {
             int baseBackupCount = mViewModel.getBackupInfoList().size() - mViewModel.getAppsWithoutBackups().size();
             if (baseBackupCount > 0) {
                 // One or more app has backups, warn users
-                new MaterialAlertDialogBuilder(mContext)
+                // Fork: yellow-on-black + bordered like every other fork dialog.
+                ForkDialog.present(ForkDialog.builder(mContext)
                         .setTitle(R.string.backup)
                         .setMessage(getResources().getQuantityString(R.plurals.backup_exists_are_you_sure, baseBackupCount))
                         .setPositiveButton(R.string.yes, (dialog, which) -> mViewModel.prepareForOperation(operationInfo))
-                        .setNegativeButton(R.string.no, null)
-                        .show();
+                        .setNegativeButton(R.string.no, null));
             } else {
                 // No need to warn users, proceed to back up
                 mViewModel.prepareForOperation(operationInfo);

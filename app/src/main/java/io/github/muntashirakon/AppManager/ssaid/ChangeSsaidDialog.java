@@ -20,7 +20,6 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.FragmentActivity;
 
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
@@ -30,6 +29,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
 
 import io.github.muntashirakon.AppManager.R;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 
 @RequiresApi(Build.VERSION_CODES.O)
@@ -73,13 +73,13 @@ public class ChangeSsaidDialog extends DialogFragment {
         int uid = requireArguments().getInt(ARG_UID);
         int sizeByte = packageName.equals("android") ? 32 : 8;
         View view = getLayoutInflater().inflate(R.layout.dialog_ssaid_info, null);
-        AlertDialog alertDialog = new MaterialAlertDialogBuilder(activity)
+        AlertDialog alertDialog = ForkDialog.bordered(ForkDialog.builder(activity)
                 .setTitle(R.string.ssaid)
                 .setView(view)
                 .setPositiveButton(R.string.apply, null)
                 .setNegativeButton(R.string.close, null)
                 .setNeutralButton(R.string.reset_to_default, null)
-                .create();
+                .create());
         TextInputEditText ssaidEditText = view.findViewById(android.R.id.text1);
         TextInputLayout ssaidInputLayout = view.findViewById(R.id.ssaid_layout);
         AtomicReference<Button> applyButton = new AtomicReference<>();

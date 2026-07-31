@@ -15,7 +15,6 @@ import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.SwitchPreferenceCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.TextInputEditText;
 
 import java.util.ArrayList;
@@ -33,6 +32,7 @@ import io.github.muntashirakon.AppManager.settings.M3PreferenceGroupDecoration;
 import io.github.muntashirakon.AppManager.users.UserInfo;
 import io.github.muntashirakon.AppManager.users.Users;
 import io.github.muntashirakon.AppManager.utils.ArrayUtils;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.TextUtilsCompat;
 import io.github.muntashirakon.AppManager.utils.Utils;
 import io.github.muntashirakon.dialog.SearchableMultiChoiceDialogBuilder;
@@ -243,7 +243,7 @@ public class ConfPreferences extends PreferenceFragmentCompat {
             if (mBackupInfo != null) {
                 editText.setText(mBackupInfo.name);
             }
-            new MaterialAlertDialogBuilder(mActivity)
+            ForkDialog.present(ForkDialog.builder(mActivity)
                     .setTitle(R.string.backup_restore)
                     .setView(view)
                     .setPositiveButton(R.string.ok, (dialog, which) -> {
@@ -266,8 +266,7 @@ public class ConfPreferences extends PreferenceFragmentCompat {
                     .setNegativeButton(R.string.disable, (dialog, which) -> {
                         mModel.setBackupInfo(mBackupInfo = null);
                         backupDataPref.setSummary(R.string.disabled_app);
-                    })
-                    .show();
+                    }));
             return true;
         });
         // Set export rules

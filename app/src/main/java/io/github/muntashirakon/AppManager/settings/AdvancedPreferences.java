@@ -21,7 +21,6 @@ import androidx.preference.SwitchPreferenceCompat;
 
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.transition.MaterialSharedAxis;
 
@@ -33,6 +32,7 @@ import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.settings.crypto.ImportExportKeyStoreDialogFragment;
 import io.github.muntashirakon.AppManager.utils.AppPref;
 import io.github.muntashirakon.AppManager.utils.ArrayUtils;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.MultithreadedExecutor;
 import io.github.muntashirakon.AppManager.utils.Utils;
 import io.github.muntashirakon.dialog.SearchableMultiChoiceDialogBuilder;
@@ -83,7 +83,7 @@ public class AdvancedPreferences extends PreferenceFragment {
                     }
                 });
             }
-            AlertDialog dialog = new MaterialAlertDialogBuilder(requireActivity())
+            AlertDialog dialog = ForkDialog.builder(requireActivity())
                     .setTitle(R.string.pref_saved_apk_name_format)
                     .setView(view)
                     .setPositiveButton(R.string.save, (dialog1, which) -> {
@@ -101,6 +101,7 @@ public class AdvancedPreferences extends PreferenceFragment {
                 UiUtils.showKeyboard(inputApkNameFormat);
             }, 200));
             dialog.show();
+            ForkDialog.bordered(dialog);
             return true;
         });
         // Thread count

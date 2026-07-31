@@ -27,7 +27,6 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.preference.Preference;
 import androidx.preference.SwitchPreferenceCompat;
 
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.transition.MaterialSharedAxis;
 
 import java.util.Collections;
@@ -49,6 +48,7 @@ import io.github.muntashirakon.AppManager.settings.crypto.AESCryptoSelectionDial
 import io.github.muntashirakon.AppManager.settings.crypto.ECCCryptoSelectionDialogFragment;
 import io.github.muntashirakon.AppManager.settings.crypto.OpenPgpKeySelectionDialogFragment;
 import io.github.muntashirakon.AppManager.settings.crypto.RSACryptoSelectionDialogFragment;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.dialog.DialogTitleBuilder;
 import io.github.muntashirakon.dialog.SearchableItemsDialogBuilder;
 import io.github.muntashirakon.dialog.SearchableMultiChoiceDialogBuilder;
@@ -263,7 +263,7 @@ public class BackupRestorePreferences extends PreferenceFragment {
                                     default:
                                         path = "";
                                 }
-                                new MaterialAlertDialogBuilder(mActivity)
+                                ForkDialog.present(ForkDialog.builder(mActivity)
                                         .setTitle(R.string.pref_import_backups)
                                         .setMessage(R.string.import_backups_warning_delete_backups_after_import)
                                         .setPositiveButton(R.string.no, (dialog1, which1) -> {
@@ -274,8 +274,7 @@ public class BackupRestorePreferences extends PreferenceFragment {
                                             mDeleteBackupsAfterImport = true;
                                             mSafSelectImportDirectory.launch(getSafIntent(path));
                                         })
-                                        .setNeutralButton(R.string.cancel, null)
-                                        .show();
+                                        .setNeutralButton(R.string.cancel, null));
                             })
                             .setNegativeButton(R.string.close, null)
                             .show();
@@ -342,7 +341,7 @@ public class BackupRestorePreferences extends PreferenceFragment {
                 .setTitle(R.string.backup_volume)
                 .setSubtitle(R.string.backup_volume_dialog_description)
                 .setStartIcon(R.drawable.ic_zip_disk)
-                .setEndIcon(R.drawable.ic_add, v -> new MaterialAlertDialogBuilder(mActivity)
+                .setEndIcon(R.drawable.ic_add, v -> ForkDialog.present(ForkDialog.builder(mActivity)
                         .setTitle(R.string.notice)
                         .setMessage(R.string.notice_saf)
                         .setPositiveButton(R.string.go, (dialog1, which1) -> {
@@ -351,15 +350,13 @@ public class BackupRestorePreferences extends PreferenceFragment {
                             }
                             mSafSelectBackupVolume.launch(getSafIntent("AppManager"));
                         })
-                        .setNeutralButton(R.string.cancel, null)
-                        .show());
+                        .setNeutralButton(R.string.cancel, null)));
 
         if (storageLocations.isEmpty()) {
-            alertDialog.set(new MaterialAlertDialogBuilder(mActivity)
+            alertDialog.set(ForkDialog.present(ForkDialog.builder(mActivity)
                     .setCustomTitle(titleBuilder.build())
                     .setMessage(R.string.no_volumes_found)
-                    .setNegativeButton(R.string.ok, null)
-                    .show());
+                    .setNegativeButton(R.string.ok, null)));
             return;
         }
         Uri[] backupVolumes = new Uri[storageLocations.size()];
