@@ -12,7 +12,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.preference.Preference;
 
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.transition.MaterialSharedAxis;
 
 import java.util.ArrayList;
@@ -29,6 +28,7 @@ import io.github.muntashirakon.AppManager.rules.compontents.ExternalComponentsIm
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
 import io.github.muntashirakon.AppManager.users.Users;
 import io.github.muntashirakon.AppManager.utils.DateUtils;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.PackageUtils;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
@@ -121,12 +121,11 @@ public class ImportExportRulesPreferences extends PreferenceFragment {
                 });
         ((Preference) Objects.requireNonNull(findPreference("import_existing")))
                 .setOnPreferenceClickListener(preference -> {
-                    new MaterialAlertDialogBuilder(requireActivity())
+                    ForkDialog.present(ForkDialog.builder(requireActivity())
                             .setTitle(R.string.pref_import_existing)
                             .setMessage(R.string.apply_to_system_apps_question)
                             .setPositiveButton(R.string.no, (dialog, which) -> importExistingRules(false))
-                            .setNegativeButton(R.string.yes, ((dialog, which) -> importExistingRules(true)))
-                            .show();
+                            .setNegativeButton(R.string.yes, ((dialog, which) -> importExistingRules(true))));
                     return true;
                 });
         ((Preference) Objects.requireNonNull(findPreference("import_watt")))

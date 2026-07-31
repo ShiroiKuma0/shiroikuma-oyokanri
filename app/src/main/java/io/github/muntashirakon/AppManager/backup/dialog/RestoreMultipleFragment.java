@@ -16,13 +16,12 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-
 import java.util.Set;
 
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.backup.BackupFlags;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsManager;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.widget.MaterialAlertView;
 
 public class RestoreMultipleFragment extends Fragment {
@@ -77,7 +76,8 @@ public class RestoreMultipleFragment extends Fragment {
     }
 
     private void handleRestore(int flags) {
-        new MaterialAlertDialogBuilder(mContext)
+        // Fork: yellow-on-black + bordered like every other fork dialog.
+        ForkDialog.present(ForkDialog.builder(mContext)
                 .setTitle(R.string.restore)
                 .setMessage(R.string.are_you_sure)
                 .setPositiveButton(R.string.yes, (dialog, which) -> {
@@ -87,7 +87,6 @@ public class RestoreMultipleFragment extends Fragment {
                     operationInfo.flags = flags;
                     mViewModel.prepareForOperation(operationInfo);
                 })
-                .setNegativeButton(R.string.no, null)
-                .show();
+                .setNegativeButton(R.string.no, null));
     }
 }

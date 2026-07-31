@@ -35,7 +35,6 @@ import androidx.recyclerview.widget.DiffUtil;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
 import java.lang.annotation.Retention;
@@ -66,6 +65,7 @@ import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.shortcut.CreateShortcutDialogFragment;
 import io.github.muntashirakon.AppManager.types.UserPackagePair;
 import io.github.muntashirakon.AppManager.utils.ContextUtils;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 import io.github.muntashirakon.AppManager.utils.Utils;
@@ -171,13 +171,12 @@ public class AppDetailsComponentsFragment extends AppDetailsFragment {
                 viewModel.applyRules();
             }
         } else if (id == R.id.action_block_unblock_trackers) {  // Components
-            new MaterialAlertDialogBuilder(activity)
+            ForkDialog.present(ForkDialog.builder(activity)
                     .setTitle(R.string.block_unblock_trackers)
                     .setMessage(R.string.choose_what_to_do)
                     .setPositiveButton(R.string.block, (dialog, which) -> blockUnblockTrackers(true))
                     .setNegativeButton(R.string.cancel, null)
-                    .setNeutralButton(R.string.unblock, (dialog, which) -> blockUnblockTrackers(false))
-                    .show();
+                    .setNeutralButton(R.string.unblock, (dialog, which) -> blockUnblockTrackers(false)));
         } else if (id == R.id.action_sort_by_name) {  // All
             setSortBy(AppDetailsFragment.SORT_BY_NAME);
             item.setChecked(true);
@@ -608,13 +607,13 @@ public class AppDetailsComponentsFragment extends AppDetailsFragment {
                                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                         ActivityManagerCompat.startActivityViaAssist(ContextUtils.getContext(), intent, () -> {
                             CountDownLatch waitForInteraction = new CountDownLatch(1);
-                            ThreadUtils.postOnMainThread(() -> new MaterialAlertDialogBuilder(holder.itemView.getContext())
-                                    .setTitle(R.string.launch_activity_dialog_title)
-                                    .setMessage(R.string.launch_activity_dialog_message)
-                                    .setCancelable(false)
-                                    .setOnDismissListener((dialog) -> waitForInteraction.countDown())
-                                    .setNegativeButton(R.string.close, null)
-                                    .show());
+                            ThreadUtils.postOnMainThread(() -> ForkDialog.present(
+                                    ForkDialog.builder(holder.itemView.getContext())
+                                            .setTitle(R.string.launch_activity_dialog_title)
+                                            .setMessage(R.string.launch_activity_dialog_message)
+                                            .setCancelable(false)
+                                            .setOnDismissListener((dialog) -> waitForInteraction.countDown())
+                                            .setNegativeButton(R.string.close, null)));
                             try {
                                 waitForInteraction.await(10, TimeUnit.MINUTES);
                             } catch (InterruptedException ignore) {

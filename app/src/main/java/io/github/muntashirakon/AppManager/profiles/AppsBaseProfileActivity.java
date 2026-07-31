@@ -24,7 +24,6 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.viewpager2.adapter.FragmentStateAdapter;
 import androidx.viewpager2.widget.ViewPager2;
 
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.navigation.NavigationBarView;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
@@ -34,6 +33,7 @@ import java.util.Objects;
 import io.github.muntashirakon.AppManager.BaseActivity;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.shortcut.CreateShortcutDialogFragment;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 import io.github.muntashirakon.dialog.SearchableSingleChoiceDialogBuilder;
 import io.github.muntashirakon.dialog.TextInputDialogBuilder;
@@ -64,7 +64,7 @@ public abstract class AppsBaseProfileActivity extends BaseActivity implements Na
         @Override
         public void handleOnBackPressed() {
             if (model != null && model.isModified()) {
-                new MaterialAlertDialogBuilder(AppsBaseProfileActivity.this)
+                ForkDialog.present(ForkDialog.builder(AppsBaseProfileActivity.this)
                         .setTitle(R.string.exit_confirmation)
                         .setMessage(R.string.profile_modified_are_you_sure)
                         .setPositiveButton(R.string.no, null)
@@ -75,8 +75,7 @@ public abstract class AppsBaseProfileActivity extends BaseActivity implements Na
                         .setNeutralButton(R.string.save_and_exit, (dialog, which) -> {
                             model.save(true);
                             setEnabled(false);
-                        })
-                        .show();
+                        }));
                 return;
             }
             setEnabled(false);
@@ -173,12 +172,11 @@ public abstract class AppsBaseProfileActivity extends BaseActivity implements Na
         } else if (id == R.id.action_discard) {
             model.discard();
         } else if (id == R.id.action_delete) {
-            new MaterialAlertDialogBuilder(this)
+            ForkDialog.present(ForkDialog.builder(this)
                     .setTitle(getString(R.string.delete_filename, model.getProfileName()))
                     .setMessage(R.string.are_you_sure)
                     .setPositiveButton(R.string.cancel, null)
-                    .setNegativeButton(R.string.ok, (dialog, which) -> model.delete())
-                    .show();
+                    .setNegativeButton(R.string.ok, (dialog, which) -> model.delete()));
         } else if (id == R.id.action_duplicate) {
             new TextInputDialogBuilder(this, R.string.input_profile_name)
                     .setTitle(R.string.new_profile)

@@ -67,7 +67,6 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.checkbox.MaterialCheckBox;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
 
 import java.io.File;
@@ -162,6 +161,7 @@ import io.github.muntashirakon.AppManager.utils.ContextUtils;
 import io.github.muntashirakon.AppManager.utils.DateUtils;
 import io.github.muntashirakon.AppManager.utils.DigestUtils;
 import io.github.muntashirakon.AppManager.utils.ExUtils;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.FreezeUtils;
 import io.github.muntashirakon.AppManager.utils.IntentUtils;
 import io.github.muntashirakon.AppManager.utils.KeyStoreUtils;
@@ -358,12 +358,11 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
         mAppInfoModel.getTagCloud().observe(getViewLifecycleOwner(), this::setupTagCloud);
         mAppInfoModel.getAppInfo().observe(getViewLifecycleOwner(), this::setupVerticalView);
         mAppInfoModel.getInstallExistingResult().observe(getViewLifecycleOwner(), statusMessagePair ->
-                new MaterialAlertDialogBuilder(requireActivity())
+                ForkDialog.present(ForkDialog.builder(requireActivity())
                         .setTitle(mAppLabel)
                         .setIcon(mApplicationInfo.loadIcon(mPackageManager))
                         .setMessage(statusMessagePair.second)
-                        .setNegativeButton(R.string.close, null)
-                        .show());
+                        .setNegativeButton(R.string.close, null)));
         mMainModel.getTagsAlteredLiveData().observe(getViewLifecycleOwner(), altered -> {
             // Reload tag cloud
             mAppInfoModel.loadTagCloud(mPackageInfo, mIsExternalApk);
@@ -516,7 +515,7 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
             displayMagiskDenyListDialog();
         } else if (itemId == R.id.action_battery_opt) {
             if (SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.DEVICE_POWER)) {
-                new MaterialAlertDialogBuilder(requireContext())
+                ForkDialog.present(ForkDialog.builder(requireContext())
                         .setTitle(R.string.battery_optimization)
                         .setMessage(R.string.choose_what_to_do)
                         .setPositiveButton(R.string.enable, (dialog, which) -> {
@@ -534,8 +533,7 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
                             } else {
                                 UIUtils.displayShortToast(R.string.failed);
                             }
-                        })
-                        .show();
+                        }));
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 try {
                     startActivity(IntentUtils.getBatteryOptSettings(mPackageName));
@@ -545,7 +543,7 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
             }
         } else if (itemId == R.id.action_sensor) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.MANAGE_SENSORS)) {
-                new MaterialAlertDialogBuilder(requireContext())
+                ForkDialog.present(ForkDialog.builder(requireContext())
                         .setTitle(R.string.sensors)
                         .setMessage(R.string.choose_what_to_do)
                         .setPositiveButton(R.string.enable, (dialog, which) -> ThreadUtils.postOnBackgroundThread(() -> {
@@ -573,8 +571,7 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
                                                 + LangUtils.getSeparatorString()
                                                 + e.getMessage()));
                             }
-                        }))
-                        .show();
+                        })));
             } else {
                 Log.e(TAG, "No sensor permission.");
             }
@@ -895,15 +892,14 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
                             spannable.append("\n")
                                     .append(getSmallerText(getStyledKeyValue(ctx, R.string.priority, String.valueOf(priority))));
                         } // else static overlays have the highest priority
-                        new MaterialAlertDialogBuilder(ctx)
+                        ForkDialog.present(ForkDialog.builder(ctx)
                                 .setTitle(R.string.title_overlay)
                                 .setMessage(spannable)
                                 .setNeutralButton(R.string.app_info, (dialog, which) -> {
                                     Intent appDetailsIntent = AppDetailsActivity.getIntent(ctx, target, mUserId);
                                     startActivity(appDetailsIntent);
                                 })
-                                .setNegativeButton(R.string.close, null)
-                                .show();
+                                .setNegativeButton(R.string.close, null));
                     });
         }
         if (tagCloud.hasRequestedLargeHeap) {
@@ -1048,7 +1044,7 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
             batteryOptTag.setTextRes(R.string.no_battery_optimization)
                     .setColor(ColorCodes.getAppNoBatteryOptimizationIndicatorColor(context));
             if (SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.DEVICE_POWER)) {
-                batteryOptTag.setOnClickListener(v -> new MaterialAlertDialogBuilder(v.getContext())
+                batteryOptTag.setOnClickListener(v -> ForkDialog.present(ForkDialog.builder(v.getContext())
                         .setTitle(R.string.battery_optimization)
                         .setMessage(R.string.enable_battery_optimization)
                         .setNegativeButton(R.string.no, null)
@@ -1059,8 +1055,7 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
                             } else {
                                 UIUtils.displayShortToast(R.string.failed);
                             }
-                        })
-                        .show());
+                        })));
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 batteryOptTag.setOnClickListener(v -> ExUtils.exceptionAsIgnored(() ->
                         startActivity(IntentUtils.getBatteryOptSettings(mPackageName))));
@@ -1375,11 +1370,10 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
                 actionItems.add(freezeAction);
                 freezeAction.setOnClickListener(v -> {
                             if (BuildConfig.APPLICATION_ID.equals(mPackageName)) {
-                                new MaterialAlertDialogBuilder(mActivity)
+                                ForkDialog.present(ForkDialog.builder(mActivity)
                                         .setMessage(R.string.are_you_sure)
                                         .setPositiveButton(R.string.yes, (d, w) -> freeze(true))
-                                        .setNegativeButton(R.string.no, null)
-                                        .show();
+                                        .setNegativeButton(R.string.no, null));
                             } else freeze(true);
                         })
                         .setOnLongClickListener(v -> {
@@ -1495,7 +1489,7 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
                 // Clear data
                 ActionItem clearDataAction = new ActionItem(R.string.clear_data, R.drawable.ic_clear_data);
                 actionItems.add(clearDataAction);
-                clearDataAction.setOnClickListener(v -> new MaterialAlertDialogBuilder(mActivity)
+                clearDataAction.setOnClickListener(v -> ForkDialog.present(ForkDialog.builder(mActivity)
                         .setTitle(mAppLabel)
                         .setMessage(R.string.clear_data_message)
                         .setPositiveButton(R.string.clear, (dialog, which) -> {
@@ -1521,8 +1515,7 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
                                         });
                             }
                         })
-                        .setNegativeButton(R.string.cancel, null)
-                        .show());
+                        .setNegativeButton(R.string.cancel, null)));
             }
             if (!isStaticSharedLib && (SelfPermissions.canClearAppCache() || accessibilityServiceRunning)) {
                 // Clear cache
@@ -2001,7 +1994,7 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
             }
         }
         if (!SelfPermissions.checkUsageStatsPermission()) {
-            ThreadUtils.postOnMainThread(() -> new MaterialAlertDialogBuilder(mActivity)
+            ThreadUtils.postOnMainThread(() -> ForkDialog.present(ForkDialog.builder(mActivity)
                     .setTitle(R.string.grant_usage_access)
                     .setMessage(R.string.grant_usage_acess_message)
                     .setPositiveButton(R.string.go, (dialog, which) -> {
@@ -2020,8 +2013,7 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
                     .setNegativeButton(R.string.cancel, null)
                     .setNeutralButton(R.string.never_ask, (dialog, which) -> FeatureController.getInstance().modifyState(
                             FeatureController.FEAT_USAGE_ACCESS, false))
-                    .setCancelable(false)
-                    .show());
+                    .setCancelable(false)));
             return;
         }
         PackageSizeInfo sizeInfo = appInfo.sizeInfo;

@@ -29,7 +29,6 @@ import androidx.preference.Preference;
 import androidx.preference.PreferenceCategory;
 import androidx.preference.SwitchPreferenceCompat;
 
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.transition.MaterialSharedAxis;
 
 import java.util.ArrayList;
@@ -40,6 +39,7 @@ import io.github.muntashirakon.AppManager.BuildConfig;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.apk.signing.Signer;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.PackageUtils;
 import io.github.muntashirakon.AppManager.utils.Utils;
 import io.github.muntashirakon.dialog.ScrollableDialogBuilder;
@@ -131,7 +131,7 @@ public class InstallerPreferences extends PreferenceFragment {
         mInstallerAppPref.setSummary(PackageUtils.getPackageLabel(mPm,
                 canSetInstallerApp ? mInstallerApp : BuildConfig.APPLICATION_ID));
         mInstallerAppPref.setOnPreferenceClickListener(preference -> {
-            new MaterialAlertDialogBuilder(requireActivity())
+            ForkDialog.present(ForkDialog.builder(requireActivity())
                     .setTitle(R.string.installer_app)
                     .setMessage(R.string.installer_app_message)
                     .setPositiveButton(R.string.choose, (dialog1, which1) -> {
@@ -155,8 +155,7 @@ public class InstallerPreferences extends PreferenceFragment {
                     .setNeutralButton(R.string.reset_to_default, (dialog, which) -> {
                         Prefs.Installer.setInstallerPackageName(mInstallerApp = BuildConfig.APPLICATION_ID);
                         mInstallerAppPref.setSummary(PackageUtils.getPackageLabel(mPm, mInstallerApp));
-                    })
-                    .show();
+                    }));
             return true;
         });
         // Disable verification

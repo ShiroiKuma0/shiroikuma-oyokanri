@@ -27,7 +27,6 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.viewpager2.adapter.FragmentStateAdapter;
 import androidx.viewpager2.widget.ViewPager2;
 
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 
@@ -46,6 +45,7 @@ import io.github.muntashirakon.AppManager.batchops.struct.BatchBackupOptions;
 import io.github.muntashirakon.AppManager.types.UserPackagePair;
 import io.github.muntashirakon.AppManager.users.UserInfo;
 import io.github.muntashirakon.AppManager.utils.ArrayUtils;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.StoragePermission;
 import io.github.muntashirakon.dialog.BottomSheetBehavior;
 import io.github.muntashirakon.dialog.CapsuleBottomSheetDialogFragment;
@@ -377,7 +377,8 @@ public class BackupRestoreDialogFragment extends CapsuleBottomSheetDialogFragmen
     private void handleDeleteBaseBackup() {
         // TODO: 5/7/22 Clarify the message by including base backup in the message.
         // TODO: 5/7/22 Display a check box that will include all the backups instead of only base backups.
-        new MaterialAlertDialogBuilder(mActivity)
+        // Fork: yellow-on-black + bordered like every other fork dialog.
+        ForkDialog.present(ForkDialog.builder(mActivity)
                 .setTitle(R.string.delete_backup)
                 .setMessage(R.string.are_you_sure)
                 .setPositiveButton(R.string.yes, (dialog, which) -> {
@@ -386,8 +387,7 @@ public class BackupRestoreDialogFragment extends CapsuleBottomSheetDialogFragmen
                     operationInfo.op = BatchOpsManager.OP_DELETE_BACKUP;
                     mViewModel.prepareForOperation(operationInfo);
                 })
-                .setNegativeButton(R.string.no, null)
-                .show();
+                .setNegativeButton(R.string.no, null));
     }
 
     @UiThread

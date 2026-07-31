@@ -14,8 +14,6 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.DialogFragment;
 
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,6 +26,7 @@ import io.github.muntashirakon.AppManager.profiles.struct.AppsProfile;
 import io.github.muntashirakon.AppManager.profiles.struct.BaseProfile;
 import io.github.muntashirakon.AppManager.utils.ArrayUtils;
 import io.github.muntashirakon.AppManager.utils.ExUtils;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 import io.github.muntashirakon.dialog.SearchableMultiChoiceDialogBuilder;
@@ -73,11 +72,11 @@ public class RemoveFromProfileDialogFragment extends DialogFragment {
             }
         }
         if (profiles.isEmpty()) {
-            return new MaterialAlertDialogBuilder(requireContext())
+            return ForkDialog.bordered(ForkDialog.builder(requireContext())
                     .setTitle(R.string.remove_from_profile)
                     .setMessage(R.string.no_profile_contains_selection)
                     .setNegativeButton(R.string.close, null)
-                    .create();
+                    .create());
         }
         List<CharSequence> profileNames = new ArrayList<>(profiles.size());
         for (AppsProfile profile : profiles) {

@@ -68,6 +68,7 @@ import io.github.muntashirakon.AppManager.users.Users;
 import io.github.muntashirakon.AppManager.utils.AppPref;
 import io.github.muntashirakon.AppManager.utils.ContextUtils;
 import io.github.muntashirakon.AppManager.utils.ExUtils;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 import io.github.muntashirakon.AppManager.utils.Utils;
@@ -737,14 +738,16 @@ public class Ops {
                 })
                 .setEndIconContentDescription(R.string.open_developer_options_page);
 
-        new MaterialAlertDialogBuilder(activity)
+        // Fork: bordered like the TextInputDialogBuilder/ScrollableDialogBuilder
+        // steps of the same ADB flow. The builder keeps the host activity's own
+        // theme, so this is a no-op outside the yellow-on-black screens.
+        ForkDialog.present(new MaterialAlertDialogBuilder(activity)
                 .setCustomTitle(builder.build())
                 .setMessage(R.string.manual_wireless_debugging_instructions)
                 .setCancelable(false)
                 .setPositiveButton(R.string.adb_connect, (dialog1, which1) -> callback.onStatusReceived(STATUS_ADB_CONNECT_REQUIRED))
                 .setNeutralButton(R.string.adb_pair, (dialog1, which1) -> callback.onStatusReceived(STATUS_ADB_PAIRING_REQUIRED))
-                .setNegativeButton(R.string.cancel, (dialog, which) -> callback.connectAdb(-1))
-                .show();
+                .setNegativeButton(R.string.cancel, (dialog, which) -> callback.connectAdb(-1)));
     }
 
     @WorkerThread
@@ -897,17 +900,18 @@ public class Ops {
                 showMultiWindowPairingInstructions(activity, callback);
             } else {
                 // No way to pair ADB
-                new MaterialAlertDialogBuilder(activity)
+                // Fork: bordered — see displayManualWirelessDebuggingInstructions above.
+                ForkDialog.present(new MaterialAlertDialogBuilder(activity)
                         .setTitle(R.string.adb_pairing_unavailable_title)
                         .setMessage(R.string.adb_pairing_unavailable_message)
                         .setPositiveButton(R.string.close, (dialog, which) -> callback.connectAdb(-1))
-                        .setOnCancelListener(dialog -> callback.connectAdb(-1))
-                        .show();
+                        .setOnCancelListener(dialog -> callback.connectAdb(-1)));
             }
             return;
         }
         if (!canUseAdbPairingNotification(activity)) {
-            new MaterialAlertDialogBuilder(activity)
+            // Fork: bordered.
+            ForkDialog.present(new MaterialAlertDialogBuilder(activity)
                     .setTitle(R.string.adb_pairing_notifications_required_title)
                     .setMessage(R.string.adb_pairing_notifications_required_message)
                     .setCancelable(false)
@@ -917,11 +921,11 @@ public class Ops {
                         activity.startActivity(intent);
                         callback.connectAdb(-1);
                     })
-                    .setNegativeButton(R.string.cancel, (dialog, which) -> callback.connectAdb(-1))
-                    .show();
+                    .setNegativeButton(R.string.cancel, (dialog, which) -> callback.connectAdb(-1)));
             return;
         }
-        new MaterialAlertDialogBuilder(activity)
+        // Fork: bordered.
+        ForkDialog.present(new MaterialAlertDialogBuilder(activity)
                 .setTitle(R.string.adb_pairing_title)
                 .setMessage(R.string.adb_pairing_instruction)
                 .setCancelable(false)
@@ -933,8 +937,7 @@ public class Ops {
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     activity.startActivity(developerOptionsIntent);
                     startAdbPairing(activity, callback);
-                })
-                .show();
+                }));
     }
 
     static boolean canUseAdbPairingNotification(@NonNull Context context) {

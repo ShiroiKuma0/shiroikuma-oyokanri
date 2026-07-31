@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.crypto.ks.KeyStoreManager;
 import io.github.muntashirakon.AppManager.utils.ExUtils;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 import io.github.muntashirakon.io.IoUtils;
@@ -67,7 +68,7 @@ public class ImportExportKeyStoreDialogFragment extends DialogFragment {
                     dismiss();
                     return;
                 }
-                new MaterialAlertDialogBuilder(mActivity)
+                ForkDialog.present(ForkDialog.builder(mActivity)
                         .setTitle(R.string.import_keystore)
                         .setMessage(R.string.confirm_import_keystore)
                         .setPositiveButton(R.string.yes, (dialog, which) -> ThreadUtils.postOnBackgroundThread(() -> {
@@ -110,21 +111,20 @@ public class ImportExportKeyStoreDialogFragment extends DialogFragment {
                             }
                         }))
                         .setNegativeButton(R.string.close, (dialog, which) -> dismiss())
-                        .setCancelable(false)
-                        .show();
+                        .setCancelable(false));
             });
 
     @NonNull
     @Override
     public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
         mActivity = requireActivity();
-        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(mActivity)
+        MaterialAlertDialogBuilder builder = ForkDialog.builder(mActivity)
                 .setTitle(R.string.pref_import_export_keystore)
                 .setMessage(R.string.choose_what_to_do)
                 .setPositiveButton(R.string.pref_export, null)
                 .setNegativeButton(R.string.cancel, null)
                 .setNeutralButton(R.string.pref_import, null);
-        AlertDialog alertDialog = builder.create();
+        AlertDialog alertDialog = ForkDialog.bordered(builder.create());
         alertDialog.setOnShowListener(dialog -> {
             AlertDialog dialog1 = (AlertDialog) dialog;
             Button exportButton = dialog1.getButton(AlertDialog.BUTTON_POSITIVE);

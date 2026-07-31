@@ -10,7 +10,6 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.preference.Preference;
 import androidx.preference.SwitchPreferenceCompat;
 
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.transition.MaterialSharedAxis;
 
 import java.util.Objects;
@@ -20,6 +19,7 @@ import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.rules.struct.ComponentRule;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
 import io.github.muntashirakon.AppManager.utils.ArrayUtils;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.FreezeUtils;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 import io.github.muntashirakon.dialog.DialogTitleBuilder;
@@ -159,15 +159,14 @@ public class RulesPreferences extends PreferenceFragment {
         skipFreeze.setChecked(Prefs.Blocking.getSkipFreezeMethodDialog());
         // Remove all rules
         ((Preference) Objects.requireNonNull(findPreference("remove_all_rules"))).setOnPreferenceClickListener(preference -> {
-            new MaterialAlertDialogBuilder(mActivity)
+            ForkDialog.present(ForkDialog.builder(mActivity)
                     .setTitle(R.string.pref_remove_all_rules)
                     .setMessage(getString(R.string.are_you_sure) + " " + getString(R.string.pref_remove_all_rules_msg))
                     .setPositiveButton(R.string.yes, (dialog, which) -> {
                         mActivity.progressIndicator.show();
                         model.removeAllRules();
                     })
-                    .setNegativeButton(R.string.no, null)
-                    .show();
+                    .setNegativeButton(R.string.no, null));
             return true;
         });
     }

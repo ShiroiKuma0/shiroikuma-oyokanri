@@ -22,6 +22,7 @@ import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -36,7 +37,6 @@ import androidx.core.content.ContextCompat;
 import androidx.core.graphics.ColorUtils;
 import androidx.fragment.app.Fragment;
 
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
 import java.io.File;
@@ -471,15 +471,14 @@ public class FontsPreferences extends Fragment {
         regenerate.setBackgroundResource(ripple.resourceId);
         regenerate.setClickable(true);
         regenerate.setFocusable(true);
-        regenerate.setOnClickListener(v -> new MaterialAlertDialogBuilder(requireContext())
+        regenerate.setOnClickListener(v -> ForkDialog.present(ForkDialog.builder(requireContext())
                 .setTitle(R.string.settings_automation_regenerate_title)
                 .setMessage(R.string.settings_automation_regenerate_msg)
                 .setPositiveButton(R.string.settings_automation_regenerate, (d, w) -> {
                     value.setText(AutomationAuth.abbreviate(AutomationAuth.regenerate(appContext)));
                     UIUtils.displayShortToast(R.string.settings_automation_regenerated);
                 })
-                .setNegativeButton(R.string.cancel, null)
-                .show());
+                .setNegativeButton(R.string.cancel, null)));
         row.addView(regenerate);
         return row;
     }
@@ -1073,7 +1072,7 @@ public class FontsPreferences extends Fragment {
             // Preview each option in its own typeface, at the category's
             // effective weight so it reflects how the surface will look.
             int weight = FontPrefs.effectiveWeight(requireContext(), cat.key);
-            new MaterialAlertDialogBuilder(requireContext())
+            ForkDialog.present(ForkDialog.builder(requireContext())
                     .setTitle(R.string.pref_font_family)
                     .setAdapter(fontPickerAdapter(opts, weight), (d, which) -> {
                         FontUtil.Option chosen = opts.get(which);
@@ -1090,18 +1089,16 @@ public class FontsPreferences extends Fragment {
                             render.run();
                         }
                     })
-                    .setNegativeButton(R.string.cancel, null)
-                    .show();
+                    .setNegativeButton(R.string.cancel, null));
         });
 
-        rowWeight.setOnClickListener(v -> new MaterialAlertDialogBuilder(requireContext())
+        rowWeight.setOnClickListener(v -> ForkDialog.present(ForkDialog.builder(requireContext())
                 .setTitle(R.string.pref_font_weight)
                 .setItems(FontUtil.WEIGHT_LABELS, (d, which) -> {
                     FontPrefs.setWeight(requireContext(), cat.key, FontUtil.WEIGHT_VALUES[which]);
                     render.run();
                 })
-                .setNegativeButton(R.string.cancel, null)
-                .show());
+                .setNegativeButton(R.string.cancel, null)));
 
         sizeSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
@@ -1123,7 +1120,7 @@ public class FontsPreferences extends Fragment {
             input.setInputType(InputType.TYPE_CLASS_NUMBER);
             int cur = FontPrefs.getSize(requireContext(), cat.key);
             if (cur > 0) input.setText(String.valueOf(cur));
-            new MaterialAlertDialogBuilder(requireContext())
+            ForkDialog.present(ForkDialog.builder(requireContext())
                     .setTitle(R.string.pref_font_size)
                     .setView(input)
                     .setPositiveButton(R.string.ok, (d, w) -> {
@@ -1139,8 +1136,7 @@ public class FontsPreferences extends Fragment {
                         FontPrefs.setSize(requireContext(), cat.key, 0);
                         render.run();
                     })
-                    .setNegativeButton(R.string.cancel, null)
-                    .show();
+                    .setNegativeButton(R.string.cancel, null));
         });
 
         // --- Per-element colours (fork) ---
@@ -1278,7 +1274,7 @@ public class FontsPreferences extends Fragment {
             });
             presets.addView(sw);
         }
-        new MaterialAlertDialogBuilder(requireContext())
+        ForkDialog.present(ForkDialog.builder(requireContext())
                 .setTitle(spec.labelRes)
                 .setView(body)
                 .setPositiveButton(R.string.ok, (d, w) -> {
@@ -1294,8 +1290,7 @@ public class FontsPreferences extends Fragment {
                     ColorPrefs.reset(requireContext(), spec.key);
                     onChanged.run();
                 })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                .setNegativeButton(R.string.cancel, null));
     }
 
     @NonNull

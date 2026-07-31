@@ -27,14 +27,13 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModelProvider;
 
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-
 import java.util.List;
 import java.util.TreeSet;
 import java.util.concurrent.Future;
 
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.self.imagecache.ImageLoader;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.ResourceUtil;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 
@@ -74,10 +73,10 @@ public class IconPickerDialogFragment extends DialogFragment {
             }
         });
         mModel.resolveIcons();
-        return new MaterialAlertDialogBuilder(requireActivity())
+        return ForkDialog.bordered(ForkDialog.builder(requireActivity())
                 .setTitle(R.string.icon_picker)
                 .setView(grid)
-                .setNegativeButton(R.string.cancel, null).create();
+                .setNegativeButton(R.string.cancel, null).create());
     }
 
     public interface IconPickerListener {

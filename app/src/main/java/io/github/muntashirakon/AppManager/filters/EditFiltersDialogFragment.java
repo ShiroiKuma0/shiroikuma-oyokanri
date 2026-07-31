@@ -18,7 +18,6 @@ import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.FragmentActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
@@ -28,6 +27,7 @@ import java.util.Objects;
 
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.filters.options.FilterOption;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.dialog.DialogTitleBuilder;
 import io.github.muntashirakon.view.TextInputLayoutCompat;
 import io.github.muntashirakon.widget.RecyclerView;
@@ -143,7 +143,7 @@ public class EditFiltersDialogFragment extends DialogFragment implements EditFil
                 onDeleteItem(position, filterOption.id);
             }
         });
-        return new MaterialAlertDialogBuilder(activity)
+        return ForkDialog.present(ForkDialog.builder(activity)
                 .setCustomTitle(builder.build())
                 .setView(view)
                 .setNegativeButton(R.string.cancel, null)
@@ -152,8 +152,7 @@ public class EditFiltersDialogFragment extends DialogFragment implements EditFil
                         mFilterItem.setExpr(mFinderFilterEditor.getText().toString());
                     }
                     mOnSaveDialogButtonInterface.onItemAltered(mFilterItem);
-                })
-                .show();
+                }));
     }
 
     private void displayEditor(int position, @NonNull FilterOption filterOption) {
