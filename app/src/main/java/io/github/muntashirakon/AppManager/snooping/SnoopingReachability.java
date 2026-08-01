@@ -63,7 +63,6 @@ public final class SnoopingReachability {
 
     private static final String PERM_WRITE_EXTERNAL_STORAGE = "android.permission.WRITE_EXTERNAL_STORAGE";
 
-    private static final String BIND_ACCESSIBILITY = SnoopingComponents.BIND_ACCESSIBILITY;
     private static final String BIND_NOTIFICATION_LISTENER = SnoopingComponents.BIND_NOTIFICATION_LISTENER;
     private static final String BIND_VPN = SnoopingComponents.BIND_VPN;
     private static final String BIND_VOICE_INTERACTION = SnoopingComponents.BIND_VOICE_INTERACTION;
@@ -147,10 +146,18 @@ public final class SnoopingReachability {
             case "device_identifiers":
                 return isSystemApp() || hasAny(PERM_READ_PRIVILEGED_PHONE_STATE);
 
-            // ── These three are only ever exercised through a component the app
-            //    must declare, and the system binds it by that permission.
-            case "accessibility":
-                return hasServiceBoundWith(BIND_ACCESSIBILITY);
+            // ── These are only ever exercised through a component the app must
+            //    declare, and the system binds it by that permission.
+            //
+            //    NOT "accessibility" (白い熊, 2026-08-01). ACCESS_ACCESSIBILITY
+            //    used to be gated on a BIND_ACCESSIBILITY_SERVICE service here,
+            //    and measurement on the Mate XT supported the rule — all ten
+            //    packages that had ever exercised the op declared such a service.
+            //    It is off anyway: this is the one capability that subsumes every
+            //    other on the page, the op costs nothing to block, and a rule that
+            //    is right about today's manifest still hides the row from the app
+            //    that adds the service in its next update. Being wrong here is not
+            //    symmetric, so the row is now shown for every app.
             case "notifications_read":
                 return hasServiceBoundWith(BIND_NOTIFICATION_LISTENER);
             case "vpn":
