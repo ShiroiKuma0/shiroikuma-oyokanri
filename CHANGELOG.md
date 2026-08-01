@@ -6,6 +6,120 @@ All notable fork changes are recorded here. Versions use the fork's
 `customBaseVersionName+customBuildNumber` scheme (the base mirrors the upstream App Manager release
 this fork is built on).
 
+## 4.1.0+067 — 2026-08-01
+
+Everything this page could do was **soft**. An app-op we wrote or a permission we revoked could be
+put back by Settings, by another tool, and sometimes by the app itself. 白い熊 made the sister app
+**白い熊 雫** (`shiroikuma.shizuku`) Device Owner, and it now delegates policy powers to this one — so
+a decision made on the Snooping page can be made *hard*, and nothing outside this app can undo it.
+
+Alongside that, two long-standing bugs surfaced on a second phone (a Motorola razr 40 ultra, Android
+15) that the Mate XT had been hiding for months, and the page finally learned to stop offering
+switches it cannot move.
+
+### 🔒 Device-policy locks
+
+- **`DevicePolicyBridge`** — the delegated powers, called as the **public SDK with a `null` admin**:
+  permission hard lock (`POLICY_FIXED`), suspension, uninstall block. No hidden API, no binder relay,
+  and it keeps working while 雫 is stopped, because `system_server` persists the delegation. Every
+  write re-reads the platform and reports whether it actually landed; `setPackagesSuspended`'s return
+  array is treated as failure when non-empty. Scopes are asked of the platform on a 5-second TTL and
+  never assumed, so a delegation revoked in 雫 stops us within seconds rather than at the next launch.
+- **`PolicyApiClient`** — a `ContentResolver.call` client for 雫's policy provider, carrying only what
+  no `DELEGATION_*` scope can: accessibility blocking, user restrictions, always-on VPN, camera,
+  user-control. A provider call rather than a broadcast because it is **synchronous** (a switch you
+  just tapped needs an answer) and because `Binder.getCallingUid()` identifies us on the far side, so
+  unlike the 保存復元 contract there is no token to carry. Degrades to "unavailable" when 雫 is absent.
+- **A policy card pinned above the capabilities**, stating whether the powers are active and, when
+  they are not, **why** — no Device Owner on this phone, versus authorised in 雫 but not for us. It
+  carries the **suspend** switch (a stronger freeze than hiding: the app cannot be opened at all) and
+  the way into the rest of the controls.
+- **A padlock column beside each toggle** — hollow where a lock could land, filled where one does.
+  Tap locks, tap again releases, no confirmation in either direction.
+
+### 🧨 `setPermissionGrantState` takes dangerous runtime permissions and nothing else
+
+Having *a* permission is not enough. `GET_USAGE_STATS` is backed by
+`android.permission.PACKAGE_USAGE_STATS`, whose protection level on the razr reads
+`signature|privileged|development|appop|retailDemo` — so a lock offered on **Read app usage** was
+accepted by our UI and refused by the platform after the fact. Lockability is now resolved from the
+protection level up front, and the app must actually request the permission, mirroring the rule
+`SnoopingResolver#canWritePermission` already applied to the ordinary write path. App-op-only rows —
+clipboard, screen capture, background running — can never be locked, and no longer pretend otherwise.
+
+### 🚫 Rows that cannot move are gone
+
+- A lever's `isModifiable()` was a global privilege check with no package argument, so it could not
+  say "movable in general, not for this app". It gained an `isModifiable(packageInfo, userId)`
+  overload, judged live on every load and never cached, so the same app on another phone keeps its
+  working switch.
+- **The case that surfaced it, measured 2026-08-01:** the razr ships `com.android.vending` on the doze
+  **system-excidle** list. There are three power-save whitelists, and `dumpsys deviceidle whitelist`
+  names them in its own output — `user`, `system`, `system-excidle`. The first two have per-package
+  removals; **the except-idle list has none on any release** (`cmd deviceidle except-idle-whitelist`
+  offers only `+`, `=` and `reset`, and no binder call exists), so that exemption cannot be cleared by
+  us, by `adb`, or by root. "Exempt from battery optimisation" is now hidden for such an app instead
+  of being offered and refused.
+- The lever also got **stronger**: `enableBatteryOptimization` now falls through to
+  `removeSystemPowerWhitelistApp` when the user-list removal leaves the app exempt — verified working
+  on EMUI, and restoring cleanly — so ROM-whitelisted apps that were previously un-blockable now block.
+  The battery panel's doze switch is withheld on a pinned app for the same reason.
+
+### 🎨 Dynamic colour was eating the fork theme
+
+On a **fresh install** the razr rendered white-on-green instead of yellow-on-black — the fork's entire
+look, gone. `AppearanceUtils.onActivityPreCreated` pinned `AppTheme_YellowOnBlack` and then, three
+lines later, called `DynamicColors.applyToActivityIfAvailable` **unconditionally**; dynamic colour
+rewrites `colorPrimary` / `colorSurface` / `colorOnSurface` from the wallpaper and overwrote the
+palette we had just set.
+
+It hid for this long because that call is a **no-op wherever the platform does not offer Material
+You**: on the Mate XT (EMUI) it never fired, so the theme survived and the bug only appeared on the
+first phone that supports dynamic colour. It is also the clobber behind the long-standing
+dialog-theming landmine — the yellow-on-black overlay has to be passed explicitly at every call site
+precisely because this wiped `materialAlertDialogTheme`.
+
+### 🖼️ Bottom sheets finally get the house border
+
+The +55 dialog sweep could never have reached them, and for a structural reason rather than an
+oversight: a bottom sheet is **not** an `AlertDialog`. It has no window background to replace, so
+`applyForkDialogBorder` had nothing to act on, and its 16dp inset would have been wrong anyway for a
+sheet flush with the screen edge. The frame now goes on the sheet's own container view, applied once
+in `CapsuleBottomSheetDialogFragment` — the base every sheet inherits — via a new
+`forkBottomSheetBorderDrawable` attr. Only the **top** corners are rounded, since rounding the bottom
+curves the stroke away and leaves two notches; and the attr sits on the **activity** theme, because a
+sheet resolves attributes from its host and beside the dialog attr it would have resolved to nothing.
+
+Swept up: Backup/restore, Restore…, list options, app-usage details, the audio player, file
+properties, debloater options and bloatware details.
+
+### 🧭 The page explains itself
+
+New: **⋮ → What the marks mean.** The card frame, the remember box, the padlock, the status pill and
+what locking actually does — none of it was documented anywhere before. It opens with the three
+gestures in one line, and carries the warning that used to be a confirmation dialog: a policy-fixed
+permission is invisible to the app it lands on, so an app that assumes it can simply re-ask may fail
+or loop rather than explain itself.
+
+### 🟡 Smaller things
+
+- **Foreground state takes the configurable theme yellow** rather than a hard-coded amber. The fork
+  has one yellow, and it is the theme's.
+- **Remember/forget left the lock menu**, where it implied a relationship to device policy that it
+  does not have. It is the row's **long-press** now, shown as a **box around the switch**. Remembering
+  deliberately stores a state equal to the platform default: the "only departures" rule governs writes
+  made through the switch, but here it has been asked for explicitly, and pinning a default is how you
+  say *keep it this way even if the default changes*.
+- **The row menu is gone.** Once remember/forget moved and the state entries became redundant with
+  tapping the card, it held one useful entry.
+- **The main list's backup column now taps like the rest of the row** — a simple tap opens app info,
+  and every backup action moved to its long-press menu, offering only what the app has. It was the one
+  part of a row where the identical tap two centimetres away did something else, and it carried two
+  gestures with nothing to distinguish them.
+- **The build counter is zero-padded in `versionName` too.** The APK filename padded it but the
+  manifest did not, so the install dialog read `4.1.0+62` while the file said `+062`. `versionCode` is
+  untouched integer arithmetic, so upgrade ordering is unaffected.
+
 ## 4.1.0+55 — 2026-07-31
 
 The yellow dialog border was never a theme. It could not be, and that is why it had been landing on
