@@ -19,7 +19,14 @@ android {
         minSdk min_sdk
         targetSdk target_sdk
         versionCode customBaseVersionCode * 10000 + customBuildNumber
-        versionName "${customBaseVersionName}+${customBuildNumber}"
+        // Fork: the build counter is zero-padded to three digits, matching the APK
+        // filename convention (~/tmp then sorts in build order). It has to be done
+        // HERE as well as in the delivery step, or the two disagree: the filename
+        // read +062 while the manifest — which is what Android and every installer
+        // actually show — read +62. versionCode above stays plain integer
+        // arithmetic, so upgrade ordering is untouched; this is only how the name
+        // reads.
+        versionName "${customBaseVersionName}+${String.format('%03d', customBuildNumber)}"
         javaCompileOptions {
             annotationProcessorOptions {
                 arguments += [
