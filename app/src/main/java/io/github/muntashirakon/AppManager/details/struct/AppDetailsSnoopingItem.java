@@ -6,6 +6,7 @@ import android.annotation.UserIdInt;
 import android.app.AppOpsManager;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.PermissionInfo;
 import android.os.Build;
 import android.os.RemoteException;
 import android.os.UserHandleHidden;
@@ -15,12 +16,15 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.annotation.WorkerThread;
+import androidx.core.content.pm.PermissionInfoCompat;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.Set;
 
 import io.github.muntashirakon.AppManager.compat.AppOpsManagerCompat;
 import io.github.muntashirakon.AppManager.compat.PermissionCompat;
+import io.github.muntashirakon.AppManager.devicepolicy.DevicePolicyBridge;
 import io.github.muntashirakon.AppManager.permission.PermUtils;
 import io.github.muntashirakon.AppManager.permission.PermissionException;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
@@ -135,6 +139,22 @@ public class AppDetailsSnoopingItem extends AppDetailsItem<String> {
             return opItem.hasModifiablePermission || SelfPermissions.canModifyAppOpMode();
         }
         return permissionItem != null && permissionItem.modifiable;
+    }
+
+    /**
+     * The same question asked <em>about one app</em>. A lever may hold the
+     * privileges it needs and still be unable to move this particular package —
+     * see {@link SnoopingLever#isModifiable(PackageInfo, int)}. The op and
+     * permission paths already answer per-app elsewhere (the op's linked
+     * permission, {@code SnoopingResolver#canWritePermission}), so only the lever
+     * path has anything extra to say here.
+     */
+    @WorkerThread
+    public boolean isModifiable(@NonNull PackageInfo packageInfo, int userId) {
+        if (lever != null) {
+            return lever.isModifiable(packageInfo, userId);
+        }
+        return isModifiable();
     }
 
     /**
@@ -340,6 +360,83 @@ public class AppDetailsSnoopingItem extends AppDetailsItem<String> {
     @Nullable
     public String getPermissionName() {
         return capability.permission;
+    }
+
+    /**
+     * Fork: whether a <b>device-policy lock</b> pins this capability — i.e. the
+     * permission behind it is {@code POLICY_FIXED} by the Device Owner, so neither
+     * the app nor Settings can put it back.
+     * <p>
+     * Read from the platform in {@link #refreshPolicyLock}, never from anything we
+     * stored: a lock set by 白い熊 雫 directly, or left behind by an older build of
+     * ours, has to show the padlock just the same.
+     */
+    public boolean policyLocked;
+
+    /**
+     * Whether a device-policy lock could land here at all.
+     * <p>
+     * <b>Landmine — measured on-device 2026-08-01.</b> Device policy's only per-app
+     * lever is {@code setPermissionGrantState}, and the platform accepts it for
+     * <b>dangerous runtime permissions only</b>. Having <em>a</em> permission is
+     * not enough: {@code GET_USAGE_STATS} is backed by
+     * {@code android.permission.PACKAGE_USAGE_STATS}, whose protection level is
+     * {@code signature|privileged|development|appop|retailDemo} — so the lock was
+     * offered on "Read app usage", the platform refused it, and the row said so
+     * after the fact instead of never offering it. The protection level is
+     * therefore resolved up front, exactly like {@code SnoopingResolver}'s
+     * {@code canWritePermission} does for the write path.
+     * <p>
+     * The app must also <em>request</em> the permission: policy state on a
+     * permission a package never declared is the same class of no-op.
+     */
+    public boolean policyLockable;
+
+    @WorkerThread
+    public void refreshPolicyLock(@NonNull PackageInfo packageInfo,
+                                  @NonNull Set<String> requestedPermissions) {
+        String permission = getPermissionName();
+        if (permission == null) {
+            policyLocked = false;
+            policyLockable = false;
+            return;
+        }
+        policyLocked = DevicePolicyBridge.isPermissionLocked(packageInfo.packageName, permission);
+        policyLockable = requestedPermissions.contains(permission)
+                && isDangerous(permission, packageInfo.packageName);
+    }
+
+    /**
+     * Re-read <em>only</em> whether device policy pins this row.
+     * <p>
+     * The cheap half of {@link #refreshPolicyLock}: it needs nothing but the
+     * package name, so a single row can be brought up to date straight after a
+     * lock is applied, without re-resolving the whole page. Lockability does not
+     * change under us — it is a property of the permission's protection level —
+     * so it is deliberately left alone here.
+     */
+    @WorkerThread
+    public void refreshPolicyLockState(@NonNull String packageName) {
+        String permission = getPermissionName();
+        policyLocked = permission != null
+                && DevicePolicyBridge.isPermissionLocked(packageName, permission);
+    }
+
+    @WorkerThread
+    private static boolean isDangerous(@NonNull String permission, @NonNull String packageName) {
+        try {
+            PermissionInfo permissionInfo = PermissionCompat.getPermissionInfo(permission, packageName, 0);
+            return permissionInfo != null
+                    && PermissionInfoCompat.getProtection(permissionInfo) == PermissionInfo.PROTECTION_DANGEROUS;
+        } catch (Throwable th) {
+            // Unknown protection level: do not offer a lock we cannot vouch for.
+            return false;
+        }
+    }
+
+    /** Whether a lock could be applied here at all — see {@link #policyLockable}. */
+    public boolean isPolicyLockable() {
+        return policyLockable;
     }
 
     /** True when the live state differs from what we stored, i.e. the setting has drifted. */

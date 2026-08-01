@@ -45,6 +45,23 @@ public interface SnoopingLever {
     /** Whether we hold the privileges this particular lever needs. */
     boolean isModifiable();
 
+    /**
+     * Whether this switch can be moved <b>for this app, on this device</b>.
+     * <p>
+     * Privileges are not the whole question (白い熊, 2026-08-01). A capability can
+     * be perfectly modifiable in general and pinned for one particular package —
+     * an OEM's own app on the doze except-idle list is exempt and no API on any
+     * release can un-exempt it. The page's promise is that every switch on it
+     * works, so a row that fails this is not shown at all rather than shown and
+     * refused. Judged live on every load, never cached and never persisted, so
+     * the same app on another phone (or after an OS update that unpins it) gets
+     * its row back by itself.
+     */
+    @WorkerThread
+    default boolean isModifiable(@NonNull PackageInfo packageInfo, @UserIdInt int userId) {
+        return isModifiable();
+    }
+
     /** Whether the app has the capability right now. */
     @WorkerThread
     boolean isAllowed(@NonNull PackageInfo packageInfo, @UserIdInt int userId);

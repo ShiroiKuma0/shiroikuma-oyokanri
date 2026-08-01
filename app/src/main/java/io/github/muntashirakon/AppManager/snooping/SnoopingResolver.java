@@ -117,8 +117,9 @@ public final class SnoopingResolver {
             }
             AppDetailsSnoopingItem item = build(capability, packageInfo, userId, requestedPermissions,
                     configuredOps, canGetGrantRevoke);
-            if (item == null || !item.isModifiable()) {
-                // Either unsupported here or we cannot actually change it.
+            if (item == null || !item.isModifiable(packageInfo, userId)) {
+                // Either unsupported here, or we cannot actually change it —
+                // asked per app and per device, not merely per privilege.
                 continue;
             }
             if (item.tier == AppDetailsSnoopingItem.TIER_NOT_REQUESTED && !includeNotRequested) {
@@ -129,6 +130,7 @@ public final class SnoopingResolver {
             item.refreshEffectiveMode(appOpsManager, packageInfo);
             item.refreshEffectivePermission(appOpsManager, packageInfo);
             item.refreshLeverState(packageInfo, userId);
+            item.refreshPolicyLock(packageInfo, requestedPermissions);
             item.storedState = stored.get(capability.entry.id);
             if (!includeNotRequested && !item.isAllowed()
                     && SnoopingImmovable.isMarked(packageName, capability.entry.id)) {

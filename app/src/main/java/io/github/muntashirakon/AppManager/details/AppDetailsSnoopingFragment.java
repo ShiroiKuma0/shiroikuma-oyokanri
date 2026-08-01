@@ -6,14 +6,22 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.text.SpannableString;
+import android.text.Spanned;
 import android.text.TextUtils;
+import android.text.style.StyleSpan;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.ColorInt;
@@ -21,7 +29,10 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.annotation.UiThread;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.ColorUtils;
+import androidx.core.graphics.drawable.DrawableCompat;
+import androidx.core.widget.ImageViewCompat;
 import androidx.recyclerview.widget.GridLayoutManager;
 
 import com.google.android.material.card.MaterialCardView;
@@ -33,6 +44,9 @@ import java.util.List;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.details.struct.AppDetailsItem;
 import io.github.muntashirakon.AppManager.details.struct.AppDetailsSnoopingItem;
+import io.github.muntashirakon.AppManager.devicepolicy.DangerDialog;
+import io.github.muntashirakon.AppManager.devicepolicy.DevicePolicyBridge;
+import io.github.muntashirakon.AppManager.devicepolicy.PolicyApiClient;
 import io.github.muntashirakon.AppManager.logs.Log;
 import io.github.muntashirakon.AppManager.snooping.SnoopingCatalog;
 import io.github.muntashirakon.AppManager.snooping.SnoopingEnforcer;
@@ -75,12 +89,16 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
     @ColorInt
     private static final int STATUS_COLOR_BLOCKED = 0xFF7FE3A5;
     /**
-     * "Only while in use" is neither of the other two and must not be mistaken
-     * for either: amber, between the blood red of unrestricted access and the
-     * green of none.
+     * "Only while in use" is a narrowing <em>we</em> chose, so it takes the same
+     * yellow as every other decision of ours rather than an amber of its own
+     * (白い熊: the fork has one yellow, and it is the configurable theme's).
+     * Which of the two yellow states a row is in is read from the pill's words —
+     * a narrowed row names its own rung, e.g. "No background mobile data".
      */
     @ColorInt
-    private static final int STATUS_COLOR_FOREGROUND = 0xFFFFC24B;
+    private static int statusColorForeground() {
+        return ForkThemeUtils.getTextColor();
+    }
     @ColorInt
     private static final int DETAIL_COLOR = 0xFFD0D6DC;
     /** Blocked chip fill = its text colour at this alpha, i.e. a wash of its own hue. */
@@ -97,6 +115,18 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
 
     private SnoopingRecyclerAdapter mAdapter;
     private boolean mCanEnforce;
+
+    // ── Device-policy state, read from the platform and from 白い熊 雫 ─────────
+    /** We hold delegated scopes, i.e. hard locks are actually available. */
+    private boolean mPolicyDelegate;
+    /** 雫 answered and is Device Owner — so the powers exist but may not be ours yet. */
+    private boolean mPolicyOwnerPresent;
+    private boolean mPolicySuspended;
+    private boolean mPolicyUninstallBlocked;
+    /** Resolved on the worker with the rest, so no bind() ever makes a binder call. */
+    private boolean mPolicyCanLock;
+    private boolean mPolicyCanSuspend;
+    private boolean mPolicyCanBlockUninstall;
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
@@ -132,6 +162,45 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 mAdapter.setItems(items);
             }
             ProgressIndicatorCompat.setVisibility(progressIndicator, false);
+        });
+        loadPolicyState();
+    }
+
+    /**
+     * Fork: what device policy can do for this app, asked fresh.
+     * <p>
+     * Both halves are read every time rather than cached across screens: the
+     * delegation is granted in another app entirely (白い熊 雫), so it can appear
+     * or vanish while this page is open, and a stale "no powers" would be a
+     * padlock that silently stopped being offered.
+     */
+    private void loadPolicyState() {
+        if (viewModel == null) return;
+        String packageName = viewModel.getPackageName();
+        ThreadUtils.postOnBackgroundThread(() -> {
+            DevicePolicyBridge.invalidate();
+            boolean delegate = DevicePolicyBridge.isDelegate();
+            boolean suspended = packageName != null && DevicePolicyBridge.isSuspended(packageName);
+            boolean uninstallBlocked = packageName != null
+                    && DevicePolicyBridge.isUninstallBlocked(packageName);
+            // Only ask 雫 when we have nothing: the answer is only needed to tell
+            // "no Device Owner on this phone" from "not authorised yet", and a
+            // provider call per page open is worth skipping when it cannot matter.
+            boolean ownerPresent = delegate || PolicyApiClient.isDeviceOwnerPresent();
+            boolean canLock = DevicePolicyBridge.canLockPermissions();
+            boolean canSuspend = DevicePolicyBridge.canSuspend();
+            boolean canBlockUninstall = DevicePolicyBridge.canBlockUninstall();
+            ThreadUtils.postOnMainThread(() -> {
+                if (isDetached()) return;
+                mPolicyDelegate = delegate;
+                mPolicyOwnerPresent = ownerPresent;
+                mPolicySuspended = suspended;
+                mPolicyUninstallBlocked = uninstallBlocked;
+                mPolicyCanLock = canLock;
+                mPolicyCanSuspend = canSuspend;
+                mPolicyCanBlockUninstall = canBlockUninstall;
+                if (mAdapter != null) mAdapter.notifyPolicyChanged();
+            });
         });
     }
 
@@ -186,6 +255,13 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         }
         if (id == R.id.action_snooping_missing_ops) {
             showMissingOps();
+            return true;
+        }
+        if (id == R.id.action_snooping_legend) {
+            UIUtils.presentWithYellowBorder(activity, UIUtils.yellowOnBlackDialog(activity)
+                    .setTitle(R.string.snooping_legend)
+                    .setMessage(R.string.snooping_legend_body)
+                    .setPositiveButton(R.string.ok, null));
             return true;
         }
         return false;
@@ -259,10 +335,325 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         });
     }
 
+    /**
+     * The box drawn around a switch whose decision is remembered. Built in code
+     * rather than as a drawable resource so it takes the configurable fork theme's
+     * yellow, like everything else the fork draws itself.
+     */
+    @NonNull
+    private static Drawable rememberedBox(@NonNull Context context) {
+        GradientDrawable box = new GradientDrawable();
+        box.setShape(GradientDrawable.RECTANGLE);
+        box.setColor(Color.TRANSPARENT);
+        box.setCornerRadius(ForkThemeUtils.dpToPx(context, 8f));
+        box.setStroke(Math.round(ForkThemeUtils.dpToPx(context, 1.5f)), ForkThemeUtils.getTextColor());
+        return box;
+    }
+
+    /**
+     * A tappable pill in the fork's language — black fill, yellow hairline, fully
+     * rounded. Same silhouette as the dialog list items, built in code so it takes
+     * the configurable theme's yellow rather than a fixed one.
+     */
+    @NonNull
+    private static Drawable pillBackground(@NonNull Context context) {
+        GradientDrawable pill = new GradientDrawable();
+        pill.setShape(GradientDrawable.RECTANGLE);
+        pill.setColor(Color.BLACK);
+        pill.setCornerRadius(ForkThemeUtils.dpToPx(context, 24f));
+        pill.setStroke(Math.round(ForkThemeUtils.dpToPx(context, 1f)), ForkThemeUtils.getTextColor());
+        return pill;
+    }
+
+    /** Tint a compound drawable without depending on API-gated TextViewCompat tinting. */
+    private static void setLeadingIcon(@NonNull TextView view, int drawableRes, @ColorInt int color) {
+        setIcon(view, drawableRes, color, true);
+    }
+
+    private static void setIcon(@NonNull TextView view, int drawableRes, @ColorInt int color,
+                                boolean leading) {
+        Drawable icon = null;
+        if (drawableRes != 0) {
+            icon = ContextCompat.getDrawable(view.getContext(), drawableRes);
+            if (icon != null) {
+                // mutate() or the tint leaks into every other user of the shared
+                // constant state — the same drawable is on several rows here.
+                icon = DrawableCompat.wrap(icon.mutate());
+                DrawableCompat.setTint(icon, color);
+            }
+        }
+        view.setCompoundDrawablesRelativeWithIntrinsicBounds(leading ? icon : null, null,
+                leading ? null : icon, null);
+    }
+
+    // ── Device-policy actions ───────────────────────────────────────────────
+
+    private void toggleSuspend() {
+        if (viewModel == null) return;
+        String packageName = viewModel.getPackageName();
+        if (packageName == null) return;
+        if (mPolicySuspended) {
+            // Releasing only gives control back, so it needs no ceremony.
+            applySuspend(packageName, false);
+            return;
+        }
+        DangerDialog.confirmReversible(activity, R.string.policy_suspend_title,
+                getString(R.string.policy_suspend_what),
+                getString(R.string.policy_suspend_breaks),
+                getString(R.string.policy_suspend_undo),
+                R.string.policy_suspend_action,
+                () -> applySuspend(packageName, true));
+    }
+
+    private void applySuspend(@NonNull String packageName, boolean suspended) {
+        ProgressIndicatorCompat.setVisibility(progressIndicator, true);
+        ThreadUtils.postOnBackgroundThread(() -> {
+            boolean ok = DevicePolicyBridge.setSuspended(packageName, suspended);
+            ThreadUtils.postOnMainThread(() -> {
+                if (isDetached()) return;
+                ProgressIndicatorCompat.setVisibility(progressIndicator, false);
+                if (!ok) UIUtils.displayLongToast(R.string.policy_failed);
+                loadPolicyState();
+            });
+        });
+    }
+
+    /**
+     * The rest of the device-policy controls. A menu rather than more rows on the
+     * card: they are rarely used, and each one is dangerous enough that having to
+     * go looking for it is a feature.
+     */
+    private void showPolicyMenu() {
+        if (viewModel == null) return;
+        String packageName = viewModel.getPackageName();
+        if (packageName == null) return;
+        List<CharSequence> labels = new ArrayList<>();
+        List<Runnable> actions = new ArrayList<>();
+
+        if (mPolicyCanBlockUninstall || mPolicyUninstallBlocked) {
+            boolean blocked = mPolicyUninstallBlocked;
+            labels.add(getString(blocked ? R.string.policy_release_action : R.string.policy_uninstall_block));
+            actions.add(() -> {
+                if (blocked) {
+                    runPolicy(() -> DevicePolicyBridge.setUninstallBlocked(packageName, false));
+                } else {
+                    DangerDialog.confirmReversible(activity, R.string.policy_uninstall_title,
+                            getString(R.string.policy_uninstall_what),
+                            getString(R.string.policy_uninstall_breaks),
+                            getString(R.string.policy_uninstall_undo),
+                            R.string.policy_uninstall_block,
+                            () -> runPolicy(() -> DevicePolicyBridge.setUninstallBlocked(packageName, true)));
+                }
+            });
+        }
+
+        // The 雫-side powers. Offered unconditionally because only 雫 can say
+        // whether they apply, and it answers with a real reason when they do not.
+        labels.add(getString(R.string.policy_user_control));
+        actions.add(() -> DangerDialog.confirmReversible(activity, R.string.policy_user_control_title,
+                getString(R.string.policy_user_control_what),
+                getString(R.string.policy_user_control_breaks),
+                getString(R.string.policy_user_control_undo),
+                R.string.policy_user_control,
+                () -> runRemotePolicy(() -> PolicyApiClient.setUserControlDisabled(packageName, true))));
+
+        labels.add(getString(R.string.policy_accessibility_block));
+        actions.add(() -> DangerDialog.confirm(activity, R.string.policy_accessibility_title,
+                getString(R.string.policy_accessibility_what),
+                getString(R.string.policy_accessibility_breaks),
+                getString(R.string.policy_accessibility_undo),
+                R.string.policy_accessibility_block,
+                () -> runRemotePolicy(() -> PolicyApiClient.setAccessibilityBlocked(packageName, true))));
+
+        // Bold: this is the way back, and the one entry someone already stuck
+        // needs to find first.
+        labels.add(bold(getString(R.string.policy_clear_all)));
+        actions.add(() -> DangerDialog.confirm(activity, R.string.policy_clear_all_title,
+                getString(R.string.policy_clear_all_what),
+                getString(R.string.policy_clear_all_breaks),
+                getString(R.string.policy_clear_all_undo),
+                R.string.policy_clear_all_action,
+                () -> clearAllLocks(packageName)));
+
+        // Pills rather than setItems' bare lines: these entries are device-policy
+        // actions sitting in a plain list, and at body-list size they read like
+        // menu filler. ArrayAdapter binds onto the pill layout's TextView root, so
+        // the Spannable above keeps its weight.
+        UIUtils.presentWithYellowBorder(activity, UIUtils.yellowOnBlackDialog(activity)
+                .setTitle(R.string.policy_more_title)
+                .setAdapter(new ArrayAdapter<>(activity, R.layout.item_dialog_pill, labels),
+                        (dialog, which) -> actions.get(which).run())
+                .setNegativeButton(R.string.cancel, null));
+    }
+
+    /** A menu entry that should carry more weight than the ones around it. */
+    @NonNull
+    private static CharSequence bold(@NonNull CharSequence text) {
+        SpannableString out = new SpannableString(text);
+        out.setSpan(new StyleSpan(Typeface.BOLD), 0, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return out;
+    }
+
+    /**
+     * Lock this capability with device policy, or release it — the whole of what
+     * the row's menu used to be.
+     * <p>
+     * Releasing is immediate; locking asks first, because a policy-fixed
+     * permission is invisible to the app it lands on — it cannot request it and
+     * Settings greys it out, so an app that assumes it can re-ask may simply
+     * misbehave with nothing to explain why. The confirmation is where that is
+     * said. Same asymmetry as the suspend switch: giving control back needs no
+     * ceremony.
+     */
+    private void toggleLock(@NonNull AppDetailsSnoopingItem item) {
+        if (viewModel == null) return;
+        String permission = item.getPermissionName();
+        String packageName = viewModel.getPackageName();
+        if (permission == null || packageName == null) return;
+        // No confirmation in either direction (白い熊, 2026-08-01). Locking is one
+        // tap and releasing is one tap, so a dialog between them would only be in
+        // the way; what it used to say lives in the legend instead, where it can
+        // be read once rather than dismissed every time.
+        runRowPolicy(item, () ->
+                DevicePolicyBridge.setPermissionLocked(packageName, permission, !item.policyLocked));
+    }
+
+    /**
+     * A delegated write that changes <b>one row's</b> lock, and then re-reads that
+     * row.
+     * <p>
+     * {@link #runPolicy} alone was not enough: it ends in {@link #loadPolicyState},
+     * which refreshes the card's own fields and calls {@code notifyPolicyChanged},
+     * and that invalidates <em>row 0 only</em>. A row's {@code policyLocked} is
+     * filled in by {@link io.github.muntashirakon.AppManager.snooping.SnoopingResolver},
+     * i.e. only on a full reload — so the write landed, the toast said "Applied",
+     * and the padlock kept drawing its stale hollow self until the page was left
+     * and re-entered.
+     */
+    private void runRowPolicy(@NonNull AppDetailsSnoopingItem item,
+                              @NonNull java.util.concurrent.Callable<Boolean> work) {
+        if (viewModel == null) return;
+        String packageName = viewModel.getPackageName();
+        ProgressIndicatorCompat.setVisibility(progressIndicator, true);
+        ThreadUtils.postOnBackgroundThread(() -> {
+            boolean ok;
+            try {
+                ok = Boolean.TRUE.equals(work.call());
+            } catch (Exception e) {
+                ok = false;
+            }
+            if (packageName != null) {
+                // Re-read rather than assume the write's return value: the same
+                // rule the rest of this page follows.
+                item.refreshPolicyLockState(packageName);
+            }
+            boolean finalOk = ok;
+            ThreadUtils.postOnMainThread(() -> {
+                if (isDetached()) return;
+                ProgressIndicatorCompat.setVisibility(progressIndicator, false);
+                UIUtils.displayLongToast(finalOk ? R.string.policy_applied : R.string.policy_failed);
+                if (mAdapter != null) {
+                    int pos = mAdapter.findPosition(item);
+                    if (pos != RecyclerView.NO_POSITION) {
+                        mAdapter.notifyItemChanged(pos);
+                    }
+                }
+            });
+        });
+    }
+
+    /** A delegated write: runs in our own process, reports what the platform did. */
+    private void runPolicy(@NonNull java.util.concurrent.Callable<Boolean> work) {
+        ProgressIndicatorCompat.setVisibility(progressIndicator, true);
+        ThreadUtils.postOnBackgroundThread(() -> {
+            boolean ok;
+            try {
+                ok = Boolean.TRUE.equals(work.call());
+            } catch (Exception e) {
+                ok = false;
+            }
+            boolean finalOk = ok;
+            ThreadUtils.postOnMainThread(() -> {
+                if (isDetached()) return;
+                ProgressIndicatorCompat.setVisibility(progressIndicator, false);
+                UIUtils.displayLongToast(finalOk ? R.string.policy_applied : R.string.policy_failed);
+                loadPolicyState();
+            });
+        });
+    }
+
+    /** A 雫-side write: the reason it gives is worth showing verbatim. */
+    private void runRemotePolicy(@NonNull java.util.concurrent.Callable<PolicyApiClient.Result> work) {
+        ProgressIndicatorCompat.setVisibility(progressIndicator, true);
+        ThreadUtils.postOnBackgroundThread(() -> {
+            PolicyApiClient.Result result;
+            try {
+                result = work.call();
+            } catch (Exception e) {
+                result = PolicyApiClient.Result.unavailable();
+            }
+            PolicyApiClient.Result finalResult = result;
+            ThreadUtils.postOnMainThread(() -> {
+                if (isDetached()) return;
+                ProgressIndicatorCompat.setVisibility(progressIndicator, false);
+                if (!finalResult.reachable()) {
+                    UIUtils.displayLongToast(R.string.policy_unavailable);
+                } else {
+                    UIUtils.displayLongToast(DangerDialog.describe(activity, finalResult.ok,
+                            finalResult.error).toString());
+                }
+                loadPolicyState();
+            });
+        });
+    }
+
+    /**
+     * The escape hatch, as far as this side can reach it.
+     * <p>
+     * 雫 owns the complete one — it can walk every permission of any package and
+     * reset anything not at the default, which needs no ledger and works when
+     * 応用管理 is gone. When it does not answer we still release what we can see:
+     * the locks on this page's own rows, plus suspension and the uninstall block.
+     * Better a partial release with an honest report than nothing at all.
+     */
+    private void clearAllLocks(@NonNull String packageName) {
+        ProgressIndicatorCompat.setVisibility(progressIndicator, true);
+        List<String> permissions = new ArrayList<>();
+        if (mAdapter != null) {
+            for (Row row : mAdapter.mRows) {
+                if (row.item != null && row.item.policyLocked) {
+                    String permission = row.item.getPermissionName();
+                    if (permission != null) permissions.add(permission);
+                }
+            }
+        }
+        ThreadUtils.postOnBackgroundThread(() -> {
+            PolicyApiClient.Result remote = PolicyApiClient.clearAllLocks(packageName);
+            int released = 0;
+            if (!remote.ok) {
+                for (String permission : permissions) {
+                    if (DevicePolicyBridge.setPermissionLocked(packageName, permission, false)) released++;
+                }
+                if (DevicePolicyBridge.isSuspended(packageName)
+                        && DevicePolicyBridge.setSuspended(packageName, false)) released++;
+                if (DevicePolicyBridge.isUninstallBlocked(packageName)
+                        && DevicePolicyBridge.setUninstallBlocked(packageName, false)) released++;
+            }
+            boolean ok = remote.ok || released > 0;
+            ThreadUtils.postOnMainThread(() -> {
+                if (isDetached()) return;
+                ProgressIndicatorCompat.setVisibility(progressIndicator, false);
+                UIUtils.displayLongToast(ok ? R.string.policy_applied : R.string.policy_failed);
+                refreshDetails();
+            });
+        });
+    }
+
     private void refreshDetails() {
         if (viewModel == null) return;
         ProgressIndicatorCompat.setVisibility(progressIndicator, true);
         viewModel.triggerPackageChange();
+        loadPolicyState();
     }
 
     @Override
@@ -270,21 +661,31 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         // Fork: the snooping tab is a fixed, grouped catalogue — not searchable.
     }
 
-    /** A header row, or a capability row. */
+    /** The device-policy card, a group header, or a capability row. */
     private static class Row {
         @Nullable
         final SnoopingCatalog.Group group;
         @Nullable
         final AppDetailsSnoopingItem item;
+        final boolean policy;
 
         Row(@NonNull SnoopingCatalog.Group group) {
             this.group = group;
             this.item = null;
+            this.policy = false;
         }
 
         Row(@NonNull AppDetailsSnoopingItem item) {
             this.group = null;
             this.item = item;
+            this.policy = false;
+        }
+
+        /** The one policy card, pinned at the top. */
+        Row() {
+            this.group = null;
+            this.item = null;
+            this.policy = true;
         }
 
         boolean isHeader() {
@@ -295,8 +696,17 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
     private class SnoopingRecyclerAdapter extends RecyclerView.Adapter<SnoopingRecyclerAdapter.ViewHolderBase> {
         private static final int TYPE_HEADER = 0;
         private static final int TYPE_ITEM = 1;
+        private static final int TYPE_POLICY = 2;
 
         private final List<Row> mRows = new ArrayList<>();
+
+        /** The policy card is row 0 whenever it exists, so this is enough. */
+        @UiThread
+        void notifyPolicyChanged() {
+            if (!mRows.isEmpty() && mRows.get(0).policy) {
+                notifyItemChanged(0);
+            }
+        }
 
         @SuppressLint("NotifyDataSetChanged")
         @UiThread
@@ -313,6 +723,18 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 }
                 mRows.add(new Row(item));
             }
+            if (!mRows.isEmpty()) {
+                // Pinned above every capability: the hard freeze acts on the whole
+                // app rather than on one capability, and the banner has to be read
+                // before anything is tapped, not after.
+                //
+                // Only when there is something to sit above, though — the
+                // RecyclerView's empty view is driven by the item count
+                // (AppDetailsFragment: recyclerView.setEmptyView), so a row that is
+                // always present would silently retire "No capabilities" for the
+                // rare app that has none.
+                mRows.add(0, new Row());
+            }
             notifyDataSetChanged();
         }
 
@@ -322,7 +744,9 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
 
         @Override
         public int getItemViewType(int position) {
-            return mRows.get(position).isHeader() ? TYPE_HEADER : TYPE_ITEM;
+            Row row = mRows.get(position);
+            if (row.policy) return TYPE_POLICY;
+            return row.isHeader() ? TYPE_HEADER : TYPE_ITEM;
         }
 
         @Override
@@ -334,6 +758,9 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         @Override
         public ViewHolderBase onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             LayoutInflater inflater = LayoutInflater.from(parent.getContext());
+            if (viewType == TYPE_POLICY) {
+                return new PolicyViewHolder(inflater.inflate(R.layout.item_app_details_snooping_policy, parent, false));
+            }
             if (viewType == TYPE_HEADER) {
                 return new HeaderViewHolder(inflater.inflate(R.layout.item_app_details_snooping_header, parent, false));
             }
@@ -343,7 +770,9 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         @Override
         public void onBindViewHolder(@NonNull ViewHolderBase holder, int position) {
             Row row = mRows.get(position);
-            if (holder instanceof HeaderViewHolder && row.group != null) {
+            if (holder instanceof PolicyViewHolder) {
+                ((PolicyViewHolder) holder).bind();
+            } else if (holder instanceof HeaderViewHolder && row.group != null) {
                 ((HeaderViewHolder) holder).title.setText(row.group.labelRes);
             } else if (holder instanceof ItemViewHolder && row.item != null) {
                 ((ItemViewHolder) holder).bind(row.item);
@@ -365,11 +794,103 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             }
         }
 
+        /**
+         * The device-policy card. Two jobs, both of which have to be visible
+         * before anything on this page is tapped:
+         * <ol>
+         *   <li>say plainly whether hard locks are available at all, and when
+         *       they are not, <em>why</em> — no Device Owner on this phone, or
+         *       authorised in 白い熊 雫 but not for us;</li>
+         *   <li>carry the hard freeze, which is the one control here that is a
+         *       verdict on the whole app rather than on one capability.</li>
+         * </ol>
+         */
+        class PolicyViewHolder extends ViewHolderBase {
+            final MaterialCardView card;
+            final TextView title;
+            final TextView summary;
+            final View suspendRow;
+            final TextView suspendLabel;
+            final TextView suspendNote;
+            final TextView suspendSummary;
+            final MaterialSwitch suspendToggle;
+            final TextView more;
+
+            PolicyViewHolder(@NonNull View itemView) {
+                super(itemView);
+                card = (MaterialCardView) itemView;
+                title = itemView.findViewById(R.id.policy_title);
+                summary = itemView.findViewById(R.id.policy_summary);
+                suspendRow = itemView.findViewById(R.id.policy_suspend_row);
+                suspendLabel = itemView.findViewById(R.id.policy_suspend_label);
+                suspendNote = itemView.findViewById(R.id.policy_suspend_note);
+                suspendSummary = itemView.findViewById(R.id.policy_suspend_summary);
+                suspendToggle = itemView.findViewById(R.id.policy_suspend_toggle);
+                more = itemView.findViewById(R.id.policy_more);
+            }
+
+            void bind() {
+                Context context = itemView.getContext();
+                int yellow = ForkThemeUtils.getTextColor();
+                title.setText(mPolicyDelegate ? R.string.policy_title_active : R.string.policy_title_inactive);
+                title.setTextColor(mPolicyDelegate ? yellow : DETAIL_COLOR);
+                setLeadingIcon(title, mPolicyDelegate ? R.drawable.ic_lock : R.drawable.ic_unlock,
+                        mPolicyDelegate ? yellow : DETAIL_COLOR);
+                summary.setTextColor(DETAIL_COLOR);
+                if (mPolicyDelegate) {
+                    summary.setText(R.string.policy_summary_active);
+                } else {
+                    summary.setText(mPolicyOwnerPresent
+                            ? R.string.policy_summary_not_authorized
+                            : R.string.policy_summary_no_owner);
+                }
+                // Every control below needs a real delegation; without one the
+                // card is a status line and nothing more. Withheld rather than
+                // shown-and-refused, the same rule the capability rows follow.
+                boolean canSuspend = mPolicyDelegate && mPolicyCanSuspend;
+                suspendRow.setVisibility(canSuspend ? View.VISIBLE : View.GONE);
+                more.setVisibility(mPolicyDelegate ? View.VISIBLE : View.GONE);
+                if (canSuspend) {
+                    suspendLabel.setText(R.string.policy_suspend);
+                    suspendLabel.setTextColor(mPolicySuspended ? DangerDialog.DANGER_RED : yellow);
+                    setLeadingIcon(suspendLabel, R.drawable.ic_lock,
+                            mPolicySuspended ? DangerDialog.DANGER_RED : yellow);
+                    // Bold, right under the row's title: what this is, not a
+                    // warning about it (白い熊, 2026-08-01). Suspension is released
+                    // by this same switch, so 危険 was the wrong word — what
+                    // actually needs saying is that it is a harder freeze than
+                    // hiding, and that nothing outside this app can lift it.
+                    suspendNote.setText(R.string.policy_suspend_note);
+                    suspendNote.setTextColor(yellow);
+                    suspendSummary.setText(R.string.policy_suspend_summary);
+                    suspendSummary.setTextColor(DETAIL_COLOR);
+                    suspendSummary.setBackgroundTintList(ColorStateList.valueOf(
+                            ColorUtils.setAlphaComponent(DETAIL_COLOR, DETAIL_CHIP_ALPHA)));
+                    suspendToggle.setChecked(mPolicySuspended);
+                    ColorStateList tint = ColorStateList.valueOf(
+                            mPolicySuspended ? DangerDialog.DANGER_RED : yellow);
+                    suspendToggle.setThumbTintList(tint);
+                    suspendToggle.setTrackDecorationTintList(tint);
+                    suspendToggle.setTrackTintList(ColorStateList.valueOf(Color.TRANSPARENT));
+                    suspendRow.setOnClickListener(v -> toggleSuspend());
+                }
+                more.setText(R.string.policy_more);
+                more.setTextColor(yellow);
+                more.setBackground(pillBackground(context));
+                more.setOnClickListener(v -> showPolicyMenu());
+                // The card itself is not a control — only its rows are.
+                card.setStrokeColor(mPolicyDelegate ? yellow : card.getStrokeColor());
+                card.setOnClickListener(null);
+                card.setClickable(false);
+            }
+        }
+
         class ItemViewHolder extends ViewHolderBase {
             final MaterialCardView card;
             final TextView label;
             final TextView status;
             final TextView detail;
+            final ImageView lock;
             final MaterialSwitch toggle;
             /** The card's own outline, captured before we ever override it. */
             final int defaultStrokeColor;
@@ -381,6 +902,7 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 label = itemView.findViewById(R.id.snooping_label);
                 status = itemView.findViewById(R.id.snooping_status);
                 detail = itemView.findViewById(R.id.snooping_detail);
+                lock = itemView.findViewById(R.id.snooping_lock);
                 toggle = itemView.findViewById(R.id.snooping_toggle);
                 // getStrokeWidth/getStrokeColor are plain fields, safe before
                 // layout — unlike getRadius(), which resolves against bounds.
@@ -399,9 +921,10 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 toggle.setChecked(allowed);
                 status.setText(statusText(context, item, state));
                 int statusColor = state == SnoopingState.FOREGROUND
-                        ? STATUS_COLOR_FOREGROUND
+                        ? statusColorForeground()
                         : (allowed ? STATUS_TEXT_ALLOWED : STATUS_COLOR_BLOCKED);
                 status.setTextColor(statusColor);
+                bindLockGlyph(item);
                 status.setBackgroundTintList(ColorStateList.valueOf(
                         state == SnoopingState.ALLOWED
                                 ? STATUS_CHIP_ALLOWED
@@ -421,8 +944,8 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 boolean changed = item.isChangedFromDefault();
                 int accent;
                 if (state == SnoopingState.FOREGROUND) {
-                    // Narrowed on purpose — its own colour, in both directions.
-                    accent = STATUS_COLOR_FOREGROUND;
+                    // Narrowed on purpose — our yellow, like every other decision.
+                    accent = statusColorForeground();
                 } else if (allowed) {
                     accent = CHANGED_STROKE_ALLOWED;
                 } else if (changed) {
@@ -447,13 +970,57 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 toggle.setThumbTintList(accentTint);
                 toggle.setTrackDecorationTintList(accentTint);
                 toggle.setTrackTintList(ColorStateList.valueOf(Color.TRANSPARENT));
+                // A box around the switch means the decision is REMEMBERED — it is
+                // replayed when the app is reinstalled or updated and travels in a
+                // settings export. No box means the live state stands on its own.
+                // 白い熊, 2026-08-01: this used to be a "Forget this setting" entry
+                // in the row menu, which put it next to the device-policy lock and
+                // implied a relationship the two do not have.
+                toggle.setBackground(item.storedState != null ? rememberedBox(context) : null);
                 // A tap advances to the next state this row supports — two for
                 // nearly everything, three for the network row.
                 card.setOnClickListener(v -> applyState(item, item.nextState()));
                 card.setOnLongClickListener(v -> {
-                    showRowMenu(item);
+                    toggleRemembered(item);
                     return true;
                 });
+            }
+
+            /**
+             * The padlock, on <b>every row a lock can reach</b> — not only the
+             * rows already locked (白い熊, 2026-08-01). A glyph that appeared only
+             * after locking left nothing to tell you a row was lockable at all,
+             * so the whole feature hid behind a long-press nobody would guess.
+             * <p>
+             * Filled when device policy pins the row, hollow when it merely
+             * could; yellow in both states, since it is one of ours. Rows with no
+             * dangerous runtime permission behind them get nothing at all —
+             * {@code setPermissionGrantState} has no lever there, and an
+             * affordance that cannot act is what this page exists to refuse.
+             */
+            void bindLockGlyph(@NonNull AppDetailsSnoopingItem item) {
+                boolean lockable = item.isPolicyLockable() && mPolicyDelegate && mPolicyCanLock;
+                if (!item.policyLocked && !lockable) {
+                    lock.setVisibility(View.GONE);
+                    lock.setOnClickListener(null);
+                    return;
+                }
+                lock.setVisibility(View.VISIBLE);
+                lock.setImageResource(item.policyLocked ? R.drawable.ic_lock : R.drawable.ic_unlock);
+                ImageViewCompat.setImageTintList(lock,
+                        ColorStateList.valueOf(ForkThemeUtils.getTextColor()));
+                // Its own view, so a plain tap is enough — no hit-testing against
+                // compound padding, and the card keeps its own click (which
+                // advances the capability's state) untouched.
+                //
+                // The tap acts directly rather than opening a menu (白い熊,
+                // 2026-08-01). Once remember/forget moved to the long-press and
+                // the state options became redundant with tapping the card, that
+                // menu held exactly one useful entry — a list of one is a worse
+                // control than the switch it was wrapping. Locking still passes
+                // through its confirmation; releasing does not, exactly like the
+                // suspend switch, because giving control back needs no ceremony.
+                lock.setOnClickListener(v -> toggleLock(item));
             }
 
             void onToggle(@NonNull AppDetailsSnoopingItem item, @SnoopingState.State int state) {
@@ -484,44 +1051,6 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             }
         }
 
-        /**
-         * The row's long-press menu: every state this capability supports, the
-         * component behind it where there is one, and the saved decision.
-         * Built as a list rather than a stack of dialogs because the useful
-         * actions differ per row and a fixed layout would be mostly disabled.
-         */
-        private void showRowMenu(@NonNull AppDetailsSnoopingItem item) {
-            if (viewModel == null) return;
-            CharSequence title = getString(item.capability.entry.labelRes);
-            List<CharSequence> labels = new ArrayList<>();
-            List<Runnable> actions = new ArrayList<>();
-            int current = item.getState();
-            for (int state : item.supportedStates()) {
-                if (state == current) {
-                    // Offering the state it is already in would just be a no-op
-                    // write, and a menu of one useful entry among three reads badly.
-                    continue;
-                }
-                int custom = item.stateLabelRes(state);
-                labels.add(custom != 0 ? getString(custom) : getString(stateActionRes(state)));
-                actions.add(() -> applyState(item, state));
-            }
-            if (item.storedState != null) {
-                labels.add(getString(R.string.snooping_forget_one));
-                actions.add(() -> {
-                    viewModel.forgetSnoopingSetting(item);
-                    refreshDetails();
-                });
-            }
-            labels.add(getString(R.string.snooping_explain_saved_state));
-            actions.add(() -> explainSavedState(item));
-            UIUtils.presentWithYellowBorder(activity, UIUtils.yellowOnBlackDialog(activity)
-                    .setTitle(title)
-                    .setItems(labels.toArray(new CharSequence[0]),
-                            (dialog, which) -> actions.get(which).run())
-                    .setNegativeButton(R.string.cancel, null));
-        }
-
         private int findPosition(@NonNull AppDetailsSnoopingItem item) {
             for (int i = 0; i < mRows.size(); ++i) {
                 if (mRows.get(i).item == item) {
@@ -550,33 +1079,25 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             });
         }
 
-        private void explainSavedState(@NonNull AppDetailsSnoopingItem item) {
-            CharSequence title = getString(item.capability.entry.labelRes);
-            int message;
-            if (item.storedState == null) {
-                message = R.string.snooping_not_saved_explanation;
-            } else if (item.storedState == SnoopingState.BLOCKED) {
-                message = R.string.snooping_saved_blocked_explanation;
+        /**
+         * Remember this row's decision, or stop remembering it. The live state is
+         * never touched — only whether the enforcer will put it back.
+         */
+        private void toggleRemembered(@NonNull AppDetailsSnoopingItem item) {
+            if (viewModel == null) return;
+            boolean remembered = item.storedState != null;
+            if (remembered) {
+                viewModel.forgetSnoopingSetting(item);
             } else {
-                message = R.string.snooping_saved_allowed_explanation;
+                viewModel.rememberSnoopingSetting(item);
             }
-            UIUtils.presentWithYellowBorder(activity, UIUtils.yellowOnBlackDialog(activity)
-                    .setTitle(title)
-                    .setMessage(message)
-                    .setPositiveButton(R.string.ok, null));
-        }
-    }
-
-    @StringRes
-    private static int stateActionRes(@SnoopingState.State int state) {
-        switch (state) {
-            case SnoopingState.ALLOWED:
-                return R.string.snooping_action_allow;
-            case SnoopingState.FOREGROUND:
-                return R.string.snooping_action_foreground;
-            case SnoopingState.BLOCKED:
-            default:
-                return R.string.snooping_action_block;
+            UIUtils.displayShortToast(remembered
+                    ? R.string.snooping_now_forgotten
+                    : R.string.snooping_now_remembered);
+            int pos = findPosition(item);
+            if (pos != RecyclerView.NO_POSITION) {
+                notifyItemChanged(pos);
+            }
         }
     }
 
