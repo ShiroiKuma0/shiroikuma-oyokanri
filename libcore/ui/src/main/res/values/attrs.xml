@@ -15,6 +15,13 @@
          dialog overlay points it at a black/yellow-bordered shape. -->
     <attr name="forkDialogBorderDrawable" format="reference" />
 
+    <!-- Fork: the same idea for BOTTOM SHEETS, which are not AlertDialogs and so
+         were never reached by the dialog border. Read by
+         UiUtils.applyForkBottomSheetBorder() and set on the sheet's own container
+         view rather than on a window. Unset on every non-fork theme, so those
+         sheets are left untouched. -->
+    <attr name="forkBottomSheetBorderDrawable" format="reference" />
+
     <attr name="materialAlertViewStyle" format="reference" />
     <attr name="materialAlertDialogListItemTextStyle" format="reference" />
     <attr name="materialFullScreenAlertDialogTheme" format="reference" />

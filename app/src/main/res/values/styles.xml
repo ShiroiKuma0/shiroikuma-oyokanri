@@ -108,6 +108,12 @@
     </style>
 
     <style name="AppTheme.YellowOnBlack" parent="AppTheme">
+        <!-- Fork: the bottom-sheet frame. It belongs on the ACTIVITY theme, not on
+             the dialog overlay where forkDialogBorderDrawable lives: a bottom sheet
+             resolves its attributes from the hosting activity's theme, so putting
+             it beside the dialog one would resolve to nothing and the sheets would
+             stay borderless. -->
+        <item name="forkBottomSheetBorderDrawable">@drawable/bottom_sheet_bg_yellow_on_black</item>
         <item name="colorPrimary">@color/theme_bright_yellow</item>
         <item name="colorOnPrimary">@android:color/black</item>
         <item name="colorPrimaryContainer">@color/theme_bright_yellow</item>
