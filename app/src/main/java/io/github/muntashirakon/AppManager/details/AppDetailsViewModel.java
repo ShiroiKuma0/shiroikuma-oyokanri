@@ -1748,6 +1748,27 @@ public class AppDetailsViewModel extends AndroidViewModel {
         }
     }
 
+    /**
+     * Fork: remember this row's <em>current</em> state as the decision to replay,
+     * without touching the live state.
+     * <p>
+     * The counterpart of {@link #forgetSnoopingSetting}, and the other half of the
+     * long-press on a row. Note it deliberately stores even a state equal to the
+     * platform default: the usual rule ("store only departures from the default")
+     * governs writes the user makes through the switch, where a redundant record
+     * would be enforcement noise. Here the user has asked for it in so many words,
+     * and pinning a default-valued state is exactly how you say "keep it this way
+     * even if a future update changes what the default is".
+     */
+    @AnyThread
+    public void rememberSnoopingSetting(@NonNull AppDetailsSnoopingItem item) {
+        if (mPackageName != null) {
+            int state = item.getState();
+            SnoopingPrefs.setSetting(mPackageName, item.capability.entry.id, state);
+            item.storedState = state;
+        }
+    }
+
     /** Fork: forget every recorded snooping decision for this package (live state untouched). */
     @AnyThread
     public void forgetSnoopingSettings() {

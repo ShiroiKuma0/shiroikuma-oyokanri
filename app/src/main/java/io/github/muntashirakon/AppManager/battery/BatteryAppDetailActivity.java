@@ -45,6 +45,7 @@ import java.util.concurrent.Executors;
 
 import io.github.muntashirakon.AppManager.BaseActivity;
 import io.github.muntashirakon.AppManager.R;
+import io.github.muntashirakon.AppManager.compat.DeviceIdleManagerCompat;
 import io.github.muntashirakon.AppManager.compat.PackageManagerCompat;
 import io.github.muntashirakon.AppManager.db.AppsDb;
 import io.github.muntashirakon.AppManager.db.dao.BatterySampleDao;
@@ -510,7 +511,12 @@ public class BatteryAppDetailActivity extends BaseActivity {
                         stateLabel(network, state), v -> cycleNetworkLever());
             }
             SnoopingLever doze = BatteryControls.lever(BatteryControls.LEVER_BATTERY_EXEMPTION);
-            if (doze != null && doze.isApplicable(mPackageInfo, mUserId)) {
+            // The pin is not a privilege question — an app on the doze except-idle
+            // list can never be un-exempted on this device — so unlike the
+            // recommendations above, this switch is withheld rather than offered
+            // and refused. Same rule as the Snooping page.
+            if (doze != null && doze.isApplicable(mPackageInfo, mUserId)
+                    && DeviceIdleManagerCompat.isExemptionRemovable(mPackageInfo.packageName)) {
                 boolean exempt = doze.isAllowed(mPackageInfo, mUserId);
                 addSwitchRow(density, getString(R.string.battery_control_doze_exemption),
                         getString(R.string.battery_control_doze_exemption_summary), exempt,

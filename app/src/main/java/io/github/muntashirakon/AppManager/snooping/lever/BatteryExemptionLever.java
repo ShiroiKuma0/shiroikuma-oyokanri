@@ -50,6 +50,16 @@ public class BatteryExemptionLever implements SnoopingLever {
 
     @WorkerThread
     @Override
+    public boolean isModifiable(@NonNull PackageInfo packageInfo, @UserIdInt int userId) {
+        // An OEM's own app can be pinned to the doze except-idle list, which has
+        // no per-package removal anywhere in the platform — so the switch would
+        // be one we could never move for this package, however many privileges
+        // we hold. See DeviceIdleManagerCompat#isExemptionRemovable.
+        return isModifiable() && DeviceIdleManagerCompat.isExemptionRemovable(packageInfo.packageName);
+    }
+
+    @WorkerThread
+    @Override
     public boolean isAllowed(@NonNull PackageInfo packageInfo, @UserIdInt int userId) {
         return isExempt(packageInfo.packageName);
     }

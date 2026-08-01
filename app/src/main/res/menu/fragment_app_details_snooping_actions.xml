@@ -38,4 +38,12 @@
         android:title="@string/snooping_missing_ops"
         app:showAsAction="never" />
 
+    <!-- Fork: what every frame, box and glyph on this page means. It lives in the
+         page's own overflow because that is where you are when you meet a symbol
+         you do not recognise — a legend buried in Settings is one nobody finds. -->
+    <item
+        android:id="@+id/action_snooping_legend"
+        android:title="@string/snooping_legend"
+        app:showAsAction="never" />
+
 </menu>

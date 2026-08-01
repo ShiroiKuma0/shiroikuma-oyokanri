@@ -2311,4 +2311,96 @@
     <string name="warning_working_on_root_mode_shizuku">Warning: Working on root instead of Shizuku mode.</string>
     <string name="warning_working_on_system_mode_shizuku">Warning: Working on system instead of Shizuku mode.</string>
     <string name="shizuku_not_authorised">Shizuku did not authorise App Manager. Make sure the server is running, then allow the request when it appears.</string>
+
+    <!-- Fork: the Snooping page's legend — what each frame, box and glyph means. -->
+    <string name="snooping_legend">What the marks mean</string>
+    <string name="snooping_now_remembered">Remembered. This decision is re-applied after a reinstall or update.</string>
+    <string name="snooping_now_forgotten">Forgotten. The capability keeps its current state, but nothing will put it back.</string>
+    <string name="snooping_legend_body">A tap changes a capability. A long-press remembers or forgets the decision. Tapping the padlock opens the device-policy options.
+
+CARD FRAME
+· Red — the app can use this capability right now, and that is not what a fresh install gives you.
+· Yellow — you closed something the platform leaves open.
+· No frame — the capability is in the state a fresh install would have. Nothing here to look at.
+
+BOX AROUND THE SWITCH
+· Box — the decision is remembered: it is re-applied when the app is reinstalled or updated, and it travels in a settings export.
+· No box — only the live state stands. Nothing will put it back if an update resets it.
+Long-press the row to switch between the two. This never changes the capability itself.
+
+PADLOCK (needs 白い熊 雫 as Device Owner)
+· Hollow — device policy could pin this row. Tap to lock.
+· Filled — device policy pins it now. Tap to release.
+· No padlock — device policy has no lever here. It can only fix dangerous runtime permissions, so app-op-only rows can never be locked.
+
+WHAT LOCKING ACTUALLY DOES
+The permission is denied by device policy. The app cannot request it, and its switch in Settings is greyed out — so nothing outside this page can put it back, not you and not the app.
+
+Because the refusal is silent, an app that assumes a denied permission can simply be asked for again may fail, loop or crash rather than explain itself. If an app starts misbehaving right after you lock something, check its locks first.
+
+A lock outlives this app: uninstalling 白い熊 応用管理 does not release it, and only 白い熊 雫 can clear it then — “More device-policy controls…” on the card at the top of this page has “Clear all device-policy locks” for exactly that.
+
+STATUS PILL
+· Red “Allowed” — the app can do this now.
+· Green “Blocked” — it cannot.
+· Yellow — narrowed rather than shut; the pill names which rung.</string>
+
+    <!-- Fork: device-policy (Device Owner) locks, delegated by 白い熊 雫. -->
+    <string name="policy_danger_tag">危険 · HARD TO UNDO</string>
+    <string name="policy_applied">Applied.</string>
+    <string name="policy_failed">The device policy refused this.</string>
+    <string name="policy_failed_reason">Refused: %s</string>
+    <string name="policy_unavailable">白い熊 雫 did not answer. Check that it is installed, is Device Owner, and has authorised this app.</string>
+
+    <string name="policy_title_active">Device policy powers: ACTIVE</string>
+    <string name="policy_title_inactive">Device policy powers: not available</string>
+    <string name="policy_summary_active">Locks set here are fixed by device policy. Settings cannot undo them, the app cannot undo them, and they stay behind if this app is uninstalled.</string>
+    <string name="policy_summary_no_owner">白い熊 雫 is not Device Owner on this phone, so nothing here can be hard-locked. Everything on this page stays reversible.</string>
+    <string name="policy_summary_not_authorized">白い熊 雫 has not authorised this app yet. Turn on “Allow device-policy powers” for 白い熊 応用管理 in 雫’s settings.</string>
+
+    <string name="policy_locked_chip">Policy-locked</string>
+    <string name="policy_lock">Lock with device policy</string>
+    <string name="policy_unlock">Release device-policy lock</string>
+    <string name="policy_lock_title">Lock this permission?</string>
+    <string name="policy_lock_what">%s is denied by device policy, permanently, until you release it here.</string>
+    <string name="policy_lock_breaks">The app cannot request it and its switch in Settings is greyed out. An app that assumes a denied permission can be asked for again may fail, loop or crash rather than explain itself — if an app starts misbehaving, check its locks first.</string>
+    <string name="policy_lock_undo">To release: long-press this row and choose “Release device-policy lock”, or use “Clear all locks” in 白い熊 雫. The lock outlives this app — uninstalling 白い熊 応用管理 does NOT release it.</string>
+
+    <string name="policy_suspend">Suspend this app</string>
+    <string name="policy_suspend_note">A stronger freeze than hiding — the app cannot be opened at all.</string>
+    <string name="policy_suspend_summary">Released from this same switch. Settings has no control for it, the app cannot lift it, and it stays in place if 白い熊 応用管理 is uninstalled — only this page or 白い熊 雫 can release it then.</string>
+    <string name="policy_suspend_title">Suspend this app?</string>
+    <string name="policy_suspend_what">A stronger freeze than hiding: the app is suspended by device policy. It cannot be opened — the system shows a stub in its place — and its notifications are silenced.</string>
+    <string name="policy_suspend_breaks">Nothing else on the phone can lift it: not Settings, not the app itself. Don’t suspend what you need to operate the phone — your keyboard, your launcher, Settings, 白い熊 雫, or 白い熊 応用管理.</string>
+    <string name="policy_suspend_undo">To release: turn this same switch off again. If 白い熊 応用管理 is uninstalled while it is suspended, the suspension stays and only 白い熊 雫 can clear it.</string>
+    <string name="policy_suspend_action">Suspend</string>
+    <string name="policy_release_action">Release</string>
+
+    <string name="policy_more">More device-policy controls…</string>
+    <string name="policy_more_title">Device policy controls</string>
+
+    <string name="policy_uninstall_block">Block uninstall</string>
+    <string name="policy_uninstall_title">Block uninstall?</string>
+    <string name="policy_uninstall_what">The app cannot be uninstalled by anyone while this is on.</string>
+    <string name="policy_uninstall_breaks">It cannot be removed from Settings, from this app, or with adb — the platform refuses the uninstall outright.</string>
+    <string name="policy_uninstall_undo">To release: turn it off again here, or use “Clear all locks” in 白い熊 雫.</string>
+
+    <string name="policy_user_control">Block force-stop and clear-data</string>
+    <string name="policy_user_control_title">Block force-stop?</string>
+    <string name="policy_user_control_what">Settings can no longer force-stop this app or clear its data.</string>
+    <string name="policy_user_control_breaks">A misbehaving app can then only be stopped from here or from 白い熊 雫 — the usual “Force stop” button stops working for it.</string>
+    <string name="policy_user_control_undo">To release: turn it off again here, or use “Clear all locks” in 白い熊 雫.</string>
+
+    <string name="policy_accessibility_block">Block its accessibility service</string>
+    <string name="policy_accessibility_title">Block this accessibility service?</string>
+    <string name="policy_accessibility_what">The app’s accessibility service is blocked by device policy. Nothing can enable it — not you in Settings, not the app.</string>
+    <string name="policy_accessibility_breaks">Be careful what you block. Accessibility services are how automation tools, keyboard helpers, screen readers and gesture utilities work. Blocking one you rely on can leave you unable to operate the phone the way you normally do.</string>
+    <string name="policy_accessibility_undo">To release: turn it off again here, or use “Clear all locks” in 白い熊 雫. Settings cannot lift it.</string>
+
+    <string name="policy_clear_all">Clear all device-policy locks on this app</string>
+    <string name="policy_clear_all_title">Clear every lock on this app?</string>
+    <string name="policy_clear_all_what">Every device-policy lock on this app is released: permission locks, suspension, uninstall block and force-stop block.</string>
+    <string name="policy_clear_all_breaks">Nothing breaks — this only gives control back. The app regains whatever the platform’s own defaults allow it.</string>
+    <string name="policy_clear_all_undo">You can re-apply any of them afterwards.</string>
+    <string name="policy_clear_all_action">Clear locks</string>
 </resources>

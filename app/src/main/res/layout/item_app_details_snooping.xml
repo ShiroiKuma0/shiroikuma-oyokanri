@@ -63,6 +63,23 @@
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 
+        <!-- Fork: the device-policy padlock, in a column of its own to the LEFT of
+             the toggle and as tall as it. It began as a compound drawable on the
+             label, which made it small, ragged down the list, and awkward to hit;
+             a real column lines every lock up and gives it a proper tap target. -->
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/snooping_lock"
+            android:layout_width="40dp"
+            android:layout_height="32dp"
+            android:layout_gravity="center_vertical"
+            android:layout_weight="0"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/policy_lock"
+            android:scaleType="fitCenter"
+            android:visibility="gone"
+            tools:src="@drawable/ic_unlock"
+            tools:visibility="visible" />
+
         <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/snooping_toggle"
             android:layout_width="56dp"
