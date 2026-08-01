@@ -2312,6 +2312,11 @@
     <string name="warning_working_on_system_mode_shizuku">Warning: Working on system instead of Shizuku mode.</string>
     <string name="shizuku_not_authorised">Shizuku did not authorise App Manager. Make sure the server is running, then allow the request when it appears.</string>
 
+    <!-- Fork: the main list's right-hand backup column. A simple tap opens app
+         info like the rest of the row; the backup actions live on a long-press. -->
+    <string name="backup_longpress_hint">long-press</string>
+    <string name="restore_and_delete">Restore or delete…</string>
+
     <!-- Fork: the Snooping page's legend — what each frame, box and glyph means. -->
     <string name="snooping_legend">What the marks mean</string>
     <string name="snooping_now_remembered">Remembered. This decision is re-applied after a reinstall or update.</string>
