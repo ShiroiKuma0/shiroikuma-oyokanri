@@ -6,6 +6,89 @@ All notable fork changes are recorded here. Versions use the fork's
 `customBaseVersionName+customBuildNumber` scheme (the base mirrors the upstream App Manager release
 this fork is built on).
 
+## 4.1.0+071 — 2026-08-01
+
+A session that started as a question — *why isn't "Access Accessibility" on the Snooping page?* —
+and ended by removing a filter, adding four capabilities, and fixing three ways the page could
+mislead you: a tab that never reloaded, a row that could not be moved, and a decision that had
+quietly stopped holding.
+
+### 🕵️ Accessibility access is shown for every app
+
+`ACCESS_ACCESSIBILITY` was hidden for any app that declared no `BIND_ACCESSIBILITY_SERVICE` service.
+Measurement on the Mate XT actually **supported** that rule — all ten packages that had ever
+exercised the op declared such a service, and six of the seven with the op blocked declared none —
+and the rule is still the wrong trade. This is the one capability that subsumes nearly every other
+on the page, the op costs nothing to block, and a manifest rule that is right about today's APK
+still hides the row from the app that adds the service in its next update. Being wrong here is not
+symmetric, so the row is now unconditional.
+
+### ➕ Four new capabilities
+
+- **Install other apps** / **Uninstall other apps** (`REQUEST_INSTALL_PACKAGES`,
+  `REQUEST_DELETE_PACKAGES`) — beside *See every installed app*, because changing the set of
+  installed apps is the other half of the same reach. Their permissions are `normal`, so the write
+  moves **the op alone** rather than attempting to revoke an install-time permission.
+- **Place and receive internet (SIP) calls** (`USE_SIP`) — a second, parallel call stack with the
+  same microphone and call-metadata reach as the dialler ops, covered by none of them.
+- **Read the system log** (`READ_LOGS`) — the second *permission-only* row after background
+  location, and it works for the same structural reason: `READ_LOGS` carries the **development**
+  protection flag, which is exactly what makes it revocable. The system log carries what every other
+  app printed — identifiers, URLs, sometimes contents.
+
+### 🔁 The tabs stopped lying to each other
+
+`AppDetailsActivity.loadTabs()` loads every tab once; paging between them reloads nothing, and a
+write notifies only the row that issued it. So blocking a capability on **Snooping** left the **App
+ops** tab showing the mode from when the screen opened — and that was not merely stale reading:
+`setAppOpMode(item)` picks its direction from the mode the row is holding, so the next toggle there
+wrote **the opposite of what its switch appeared to do**.
+
+A state epoch in the view model, bumped by every write that changes what an app may do (snooping
+toggles, block-all, app-op writes, permission toggles, revoke-all-dangerous, reset-app-ops); the
+Snooping and Permissions fragments record the epoch they rendered and re-read in `onResume` **only
+when it moved**, so paging around costs nothing.
+
+### 🧊 A stored `MODE_FOREGROUND` outlives its permission
+
+Measured on `com.elink.fittrackhealth.pro`: `ACCESS_COARSE_LOCATION` revoked and `USER_FIXED`, while
+the **uid** op `COARSE_LOCATION` was still at `foreground` — the permission policy service normally
+syncs such an op down to `ignore`, and here it plainly had not. Because the row reads the raw stored
+mode first (without which a narrowing would be invisible), it claimed **"Only while in use" with its
+switch on for an app that cannot use location at all** — and it could not be moved: asking for
+*blocked* re-revoked an already-revoked permission, nothing changed, and the write was reported as
+failed for ever.
+
+A revoked permission is no access whatever mode the op carries, so the permission now wins — but
+only where the app actually **declares** it, or every pre-set row on the page would be mislabelled.
+
+### 🔴 Drift is now visible
+
+A remembered decision that no longer matches what the platform enforces had **no UI at all**: the
+switch and the status pill both report the live state, faithfully, and so hide the disagreement.
+Now the box around the switch turns **red** instead of theme yellow, and the pill appends
+**"you set: Blocked"**. The rule that the pill says nothing about the stored decision holds only
+while the two agree; when they differ, the stored decision is the one thing the row cannot otherwise
+say. Tapping the row re-applies it.
+
+### 📖 The legend is laid out, not streamed
+
+*What the marks mean* was a single `setMessage` string — every mark, every colour and two screens of
+explanation in one grey block, which is unreadable exactly when it is needed. It is built as views
+now, in the fork's kxkb language: **bold headings over a text-width yellow rule**, a full-bleed
+hairline between sections, **bulleted marks whose lead-in is bold and drawn in the colour it
+describes**, hanging bullets so wrapped lines align, and the **status pill first** because it is what
+you look at first.
+
+### 🎚️ Air between the switch and its box
+
+The "remembered" box is drawn as the switch's own **background**, so the view's bounds *are* the box
+— and at the old fixed 56dp the M3 track (52dp) filled them: the two outlines merged into one, and
+the thicker red drift box appeared to bleed over the track. `wrap_content` plus padding fixes it, and
+it has to be the padding: `SwitchCompat` ignores horizontal gravity and lays its track against the
+end padding edge, so spare width on a fixed-width switch lands on one side only. The padding is
+unconditional, so a row with a box and one without hold their switch in exactly the same place.
+
 ## 4.1.0+067 — 2026-08-01
 
 Everything this page could do was **soft**. An app-op we wrote or a permission we revoked could be

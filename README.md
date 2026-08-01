@@ -18,7 +18,7 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+067`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+071`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
 </div>
 
@@ -91,6 +91,13 @@ matches the platform default is not stored at all, so set-then-unset leaves noth
 stored is keyed by package name, so it outlives uninstalling the app, rides along in a settings export,
 and is re-applied automatically when that package appears on another phone — on install, on update, and
 on every startup once privileges are up. Set an app up once; it stays that way, everywhere.
+
+**And when a decision stops holding, the page says so.** A remembered setting can be undone from
+outside — by Settings, by the app asking again, by a write the platform accepted and later dropped —
+and a switch that simply reports the live state hides exactly that. So a drifted row draws its box in
+**red** and the pill spells out *what you asked for* beside what the system is doing; one tap puts it
+back. ⋮ → *What the marks mean* is the legend for all of it, and it reads like a reference card
+rather than a wall of text.
 
 ## 🔒 Device-policy locks — decisions Settings cannot undo
 
