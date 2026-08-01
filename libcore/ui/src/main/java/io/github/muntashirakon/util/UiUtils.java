@@ -118,6 +118,38 @@ public final class UiUtils {
         }
     }
 
+    /**
+     * Fork: the bottom-sheet counterpart of {@link #applyForkDialogBorder}.
+     * <p>
+     * Bottom sheets were the one family the +55 dialog-border sweep could not
+     * reach, and for a structural reason rather than an oversight: a sheet is not
+     * an {@code AlertDialog}, it has no window background of its own to replace,
+     * and its frame is the background of the sheet's container view. Insetting it
+     * like a dialog would be wrong as well — a sheet is flush with the bottom
+     * screen edge.
+     * <p>
+     * Applied once in {@code CapsuleBottomSheetDialogFragment}, which every sheet
+     * in the app inherits, so a new sheet gets the frame without knowing about
+     * it. A no-op when {@code forkBottomSheetBorderDrawable} is unset, i.e. on
+     * every non-fork theme.
+     */
+    public static void applyForkBottomSheetBorder(@Nullable View sheet) {
+        if (sheet == null) {
+            return;
+        }
+        Context context = sheet.getContext();
+        TypedValue typedValue = new TypedValue();
+        if (!context.getTheme().resolveAttribute(R.attr.forkBottomSheetBorderDrawable, typedValue, true)
+                || typedValue.resourceId == 0) {
+            // No fork border configured on this theme; leave the sheet untouched.
+            return;
+        }
+        Drawable background = ContextCompat.getDrawable(context, typedValue.resourceId);
+        if (background != null) {
+            sheet.setBackground(background);
+        }
+    }
+
     public static int getColumnCount(@NonNull View v, @Dimension(unit = Dimension.DP) int columnWidth, int defaultCount) {
         int width = v.getWidth();
         if (width == 0) {

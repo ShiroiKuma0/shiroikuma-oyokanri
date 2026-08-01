@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!--
+    Fork: the yellow frame for BOTTOM SHEETS, the sibling of
+    alert_dialog_bg_yellow_on_black.
+
+    Bottom sheets never went through the +55 dialog-border sweep because they are
+    not MaterialAlertDialogs: they carry no window background of their own, so
+    UiUtils.applyForkDialogBorder() (which replaces the *window* background, inset
+    by 16dp) has nothing to act on and would be wrong even if it did — a sheet is
+    anchored to the bottom screen edge, and insetting it would leave it floating.
+    The frame therefore goes on the sheet's own container view; see
+    UiUtils.applyForkBottomSheetBorder.
+
+    Only the TOP corners are rounded, and the bottom edge is square: a bottom
+    sheet is flush with the screen edge, so rounding the bottom would curve the
+    yellow stroke away from the corners and leave two visible notches.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@android:color/black" />
+    <stroke
+        android:width="2dp"
+        android:color="@color/theme_bright_yellow" />
+    <corners
+        android:bottomLeftRadius="0dp"
+        android:bottomRightRadius="0dp"
+        android:topLeftRadius="28dp"
+        android:topRightRadius="28dp" />
+</shape>

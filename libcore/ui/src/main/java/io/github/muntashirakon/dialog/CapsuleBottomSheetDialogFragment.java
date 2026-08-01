@@ -177,6 +177,10 @@ public abstract class CapsuleBottomSheetDialogFragment extends BottomSheetDialog
         mBodyContainer = mBottomSheetContainer.findViewById(R.id.body);
         mLoadingLayout = mBottomSheetContainer.findViewById(R.id.loader);
         mMainContainer = (FrameLayout) mBodyContainer.getParent();
+        // Fork: the yellow frame, in the one place every bottom sheet inherits.
+        // A sheet carries no window background, so the dialog border never
+        // reached any of these — see UiUtils#applyForkBottomSheetBorder.
+        UiUtils.applyForkBottomSheetBorder(mBottomSheetContainer);
         mBody = initRootView(inflater, mBottomSheetContainer, savedInstanceState);
 
         if (!displayLoaderByDefault()) {
