@@ -247,6 +247,10 @@ public final class SnoopingCatalog {
             Entry.op("icc_auth_identifier", R.string.snooping_icc_auth_identifier, Group.MESSAGING_CALLS,
                     "USE_ICC_AUTH_WITH_DEVICE_IDENTIFIER"),
             Entry.op("calls_place", R.string.snooping_calls_place, Group.MESSAGING_CALLS, "CALL_PHONE"),
+            // A second, parallel call stack: an app that places and answers SIP
+            // calls carries the same microphone and call-metadata reach as the
+            // dialler ops above, and is not covered by any of them.
+            Entry.op("sip_calls", R.string.snooping_sip_calls, Group.MESSAGING_CALLS, "USE_SIP"),
 
             // ── Personal data ───────────────────────────────────────────────
             Entry.op("contacts_read", R.string.snooping_contacts_read, Group.PERSONAL_DATA, "READ_CONTACTS"),
@@ -264,6 +268,21 @@ public final class SnoopingCatalog {
                     "QUERY_ALL_PACKAGES"),
             Entry.op("cross_profile", R.string.snooping_cross_profile, Group.PERSONAL_DATA,
                     "INTERACT_ACROSS_PROFILES"),
+            // Beside "see every installed app": changing the set of installed
+            // apps is the other half of the same reach. Neither is snooping in
+            // the sense of a sensor, and both are how an app turns knowledge of
+            // the phone into a change to it (白い熊, 2026-08-01).
+            Entry.op("install_packages", R.string.snooping_install_packages, Group.PERSONAL_DATA,
+                    "REQUEST_INSTALL_PACKAGES"),
+            Entry.op("delete_packages", R.string.snooping_delete_packages, Group.PERSONAL_DATA,
+                    "REQUEST_DELETE_PACKAGES"),
+            // The system log carries what every other app printed — identifiers,
+            // URLs, sometimes contents. No app-op exists for it on any release,
+            // so the permission itself is the lever, like location_background.
+            // Its protection level is signature|privileged|**development**, and
+            // that development flag is exactly what lets us revoke it.
+            Entry.perm("read_logs", R.string.snooping_read_logs, Group.PERSONAL_DATA,
+                    "android.permission.READ_LOGS"),
 
             // ── Storage & media ─────────────────────────────────────────────
             Entry.op("storage_all_files", R.string.snooping_storage_all_files, Group.STORAGE_MEDIA, "MANAGE_EXTERNAL_STORAGE"),

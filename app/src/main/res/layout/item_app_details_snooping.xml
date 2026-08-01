@@ -80,14 +80,30 @@
             tools:src="@drawable/ic_unlock"
             tools:visibility="visible" />
 
+        <!-- Fork: wrap_content + padding, NOT a fixed width (白い熊, +71). The
+             "remembered" box is drawn as this view's BACKGROUND, so the view's
+             own bounds are the box: at the old 56dp the M3 track (52dp) filled
+             them and the two outlines merged into one, and the thicker red drift
+             box appeared to bleed over the track. Padding is what puts air
+             between them — and it must be the padding rather than a wider fixed
+             width, because SwitchCompat ignores horizontal gravity and always
+             draws the track at the padding edge, so any spare width would land
+             on one side only. wrap_content then measures to track + padding,
+             symmetric by construction, and every row still lines up because they
+             all measure the same. The padding is unconditional so a row with a
+             box and one without hold their switch in exactly the same place. -->
         <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/snooping_toggle"
-            android:layout_width="56dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
+            android:layout_marginStart="6dp"
+            android:layout_marginEnd="2dp"
             android:layout_weight="0"
             android:clickable="false"
-            android:focusable="false" />
+            android:focusable="false"
+            android:paddingHorizontal="7dp"
+            android:paddingVertical="6dp" />
 
     </androidx.appcompat.widget.LinearLayoutCompat>
 

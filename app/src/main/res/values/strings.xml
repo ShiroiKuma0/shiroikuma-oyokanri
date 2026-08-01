@@ -1994,6 +1994,8 @@
     <string name="snooping_state_allowed">Allowed</string>
     <string name="snooping_state_blocked">Blocked</string>
     <string name="snooping_tier_ungated">needs no permission</string>
+    <!-- Fork: shown on a row whose remembered decision no longer matches what the platform enforces. %s = the state that was asked for. -->
+    <string name="snooping_status_drifted">you set: %s</string>
     <string name="snooping_tier_not_requested">not requested</string>
     <string name="snooping_app_op_only">App op %1$s</string>
     <string name="snooping_not_saved_explanation">This capability is not saved. Flip its switch to record the decision — it will then survive a reinstall, travel in a settings export, and be re-applied when this app turns up on another phone.</string>
@@ -2105,6 +2107,10 @@
     <string name="snooping_calls_place">Place calls</string>
     <string name="snooping_query_all_packages">See every installed app</string>
     <string name="snooping_cross_profile">Reach across work/personal profiles</string>
+    <string name="snooping_install_packages">Install other apps</string>
+    <string name="snooping_delete_packages">Uninstall other apps</string>
+    <string name="snooping_read_logs">Read the system log</string>
+    <string name="snooping_sip_calls">Place and receive internet (SIP) calls</string>
     <string name="snooping_storage_no_isolation">Bypass storage isolation</string>
     <string name="snooping_wifi_state_change">Turn Wi-Fi on and off</string>
 
@@ -2321,34 +2327,49 @@
     <string name="snooping_legend">What the marks mean</string>
     <string name="snooping_now_remembered">Remembered. This decision is re-applied after a reinstall or update.</string>
     <string name="snooping_now_forgotten">Forgotten. The capability keeps its current state, but nothing will put it back.</string>
-    <string name="snooping_legend_body">A tap changes a capability. A long-press remembers or forgets the decision. Tapping the padlock opens the device-policy options.
+    <!-- Fork: the Snooping legend. Structured rather than streamed: AppDetailsSnoopingFragment#showLegend
+         lays these out as headings with a text-width rule, bulleted marks, and paragraphs, so the dialog
+         can be skimmed. Each mark is a pair — "_mark" is the bold, coloured lead-in, the other its text. -->
+    <string name="snooping_legend_intro">A tap changes a capability. A long-press remembers or forgets the decision. Tapping the padlock opens the device-policy options.</string>
 
-CARD FRAME
-· Red — the app can use this capability right now, and that is not what a fresh install gives you.
-· Yellow — you closed something the platform leaves open.
-· No frame — the capability is in the state a fresh install would have. Nothing here to look at.
+    <string name="snooping_legend_pill">Status pill</string>
+    <string name="snooping_legend_pill_allowed_mark">Red \u201cAllowed\u201d</string>
+    <string name="snooping_legend_pill_allowed">the app can do this now.</string>
+    <string name="snooping_legend_pill_blocked_mark">Green \u201cBlocked\u201d</string>
+    <string name="snooping_legend_pill_blocked">it cannot.</string>
+    <string name="snooping_legend_pill_narrowed_mark">Yellow</string>
+    <string name="snooping_legend_pill_narrowed">narrowed rather than shut; the pill names which rung.</string>
 
-BOX AROUND THE SWITCH
-· Box — the decision is remembered: it is re-applied when the app is reinstalled or updated, and it travels in a settings export.
-· No box — only the live state stands. Nothing will put it back if an update resets it.
-Long-press the row to switch between the two. This never changes the capability itself.
+    <string name="snooping_legend_frame">Card frame</string>
+    <string name="snooping_legend_frame_red_mark">Red</string>
+    <string name="snooping_legend_frame_red">the app can use this capability right now, and that is not what a fresh install gives you.</string>
+    <string name="snooping_legend_frame_yellow_mark">Yellow</string>
+    <string name="snooping_legend_frame_yellow">you closed something the platform leaves open.</string>
+    <string name="snooping_legend_frame_none_mark">No frame</string>
+    <string name="snooping_legend_frame_none">the capability is in the state a fresh install would have. Nothing here to look at.</string>
 
-PADLOCK (needs 白い熊 雫 as Device Owner)
-· Hollow — device policy could pin this row. Tap to lock.
-· Filled — device policy pins it now. Tap to release.
-· No padlock — device policy has no lever here. It can only fix dangerous runtime permissions, so app-op-only rows can never be locked.
+    <string name="snooping_legend_box">Box around the switch</string>
+    <string name="snooping_legend_box_yellow_mark">Yellow box</string>
+    <string name="snooping_legend_box_yellow">the decision is remembered: it is re-applied when the app is reinstalled or updated, and it travels in a settings export.</string>
+    <string name="snooping_legend_box_red_mark">Red box</string>
+    <string name="snooping_legend_box_red">remembered, but it no longer holds: the pill says what you asked for and the switch shows what the system is doing instead. Something outside this page changed it \u2014 Settings, the app asking again, or a write the platform accepted and later dropped. Tap the row to re-apply it.</string>
+    <string name="snooping_legend_box_none_mark">No box</string>
+    <string name="snooping_legend_box_none">only the live state stands. Nothing will put it back if an update resets it.</string>
+    <string name="snooping_legend_box_note">Long-press the row to switch between the two. This never changes the capability itself.</string>
 
-WHAT LOCKING ACTUALLY DOES
-The permission is denied by device policy. The app cannot request it, and its switch in Settings is greyed out — so nothing outside this page can put it back, not you and not the app.
+    <string name="snooping_legend_padlock">Padlock</string>
+    <string name="snooping_legend_padlock_sub">Needs \u767d\u3044\u718a \u96eb as Device Owner.</string>
+    <string name="snooping_legend_padlock_hollow_mark">Hollow</string>
+    <string name="snooping_legend_padlock_hollow">device policy could pin this row. Tap to lock.</string>
+    <string name="snooping_legend_padlock_filled_mark">Filled</string>
+    <string name="snooping_legend_padlock_filled">device policy pins it now. Tap to release.</string>
+    <string name="snooping_legend_padlock_none_mark">No padlock</string>
+    <string name="snooping_legend_padlock_none">device policy has no lever here. It can only fix dangerous runtime permissions, so app-op-only rows can never be locked.</string>
 
-Because the refusal is silent, an app that assumes a denied permission can simply be asked for again may fail, loop or crash rather than explain itself. If an app starts misbehaving right after you lock something, check its locks first.
-
-A lock outlives this app: uninstalling 白い熊 応用管理 does not release it, and only 白い熊 雫 can clear it then — “More device-policy controls…” on the card at the top of this page has “Clear all device-policy locks” for exactly that.
-
-STATUS PILL
-· Red “Allowed” — the app can do this now.
-· Green “Blocked” — it cannot.
-· Yellow — narrowed rather than shut; the pill names which rung.</string>
+    <string name="snooping_legend_locking">What locking actually does</string>
+    <string name="snooping_legend_locking_1">The permission is denied by device policy. The app cannot request it, and its switch in Settings is greyed out \u2014 so nothing outside this page can put it back, not you and not the app.</string>
+    <string name="snooping_legend_locking_2">Because the refusal is silent, an app that assumes a denied permission can simply be asked for again may fail, loop or crash rather than explain itself. If an app starts misbehaving right after you lock something, check its locks first.</string>
+    <string name="snooping_legend_locking_3">A lock outlives this app: uninstalling \u767d\u3044\u718a \u5fdc\u7528\u7ba1\u7406 does not release it, and only \u767d\u3044\u718a \u96eb can clear it then \u2014 \u201cMore device-policy controls\u2026\u201d on the card at the top of this page has \u201cClear all device-policy locks\u201d for exactly that.</string>
 
     <!-- Fork: device-policy (Device Owner) locks, delegated by 白い熊 雫. -->
     <string name="policy_danger_tag">危険 · HARD TO UNDO</string>

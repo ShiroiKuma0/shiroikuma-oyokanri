@@ -10,10 +10,13 @@ import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.text.SpannableStringBuilder;
 import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.TextUtils;
+import android.text.style.ForegroundColorSpan;
 import android.text.style.StyleSpan;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -22,6 +25,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.ColorInt;
@@ -33,6 +37,7 @@ import androidx.core.content.ContextCompat;
 import androidx.core.graphics.ColorUtils;
 import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.core.widget.ImageViewCompat;
+import androidx.core.widget.NestedScrollView;
 import androidx.recyclerview.widget.GridLayoutManager;
 
 import com.google.android.material.card.MaterialCardView;
@@ -127,6 +132,13 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
     private boolean mPolicyCanLock;
     private boolean mPolicyCanSuspend;
     private boolean mPolicyCanBlockUninstall;
+    /**
+     * Fork: the {@link AppDetailsViewModel#getStateEpoch() state epoch} this list
+     * was built from. Tabs are loaded once and never again as you page between
+     * them, so a switch flipped on the App ops tab would otherwise leave this
+     * page showing — and acting on — the state from when the screen opened.
+     */
+    private int mRenderedEpoch;
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
@@ -157,6 +169,7 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             alertView.setVisibility(View.GONE);
         }
         if (viewModel == null) return;
+        mRenderedEpoch = viewModel.getStateEpoch();
         viewModel.get(AppDetailsFragment.SNOOPING).observe(getViewLifecycleOwner(), items -> {
             if (items != null && mAdapter != null && viewModel.isPackageExist()) {
                 mAdapter.setItems(items);
@@ -164,6 +177,22 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             ProgressIndicatorCompat.setVisibility(progressIndicator, false);
         });
         loadPolicyState();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (viewModel == null) {
+            return;
+        }
+        // Fork: re-read only when something actually moved — see mRenderedEpoch.
+        int epoch = viewModel.getStateEpoch();
+        if (epoch != mRenderedEpoch) {
+            mRenderedEpoch = epoch;
+            ProgressIndicatorCompat.setVisibility(progressIndicator, true);
+            viewModel.load(AppDetailsFragment.SNOOPING);
+            loadPolicyState();
+        }
     }
 
     /**
@@ -258,13 +287,177 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             return true;
         }
         if (id == R.id.action_snooping_legend) {
-            UIUtils.presentWithYellowBorder(activity, UIUtils.yellowOnBlackDialog(activity)
-                    .setTitle(R.string.snooping_legend)
-                    .setMessage(R.string.snooping_legend_body)
-                    .setPositiveButton(R.string.ok, null));
+            showLegend();
             return true;
         }
         return false;
+    }
+
+    /**
+     * Fork: the legend, laid out rather than streamed (白い熊, +70).
+     * <p>
+     * It used to be one {@code setMessage} string — every mark, every colour and
+     * two screens of explanation in a single grey block, which is unreadable
+     * exactly when it is needed: you open it to answer "what is this red frame",
+     * and you have to read the whole thing to find out. Built as views instead,
+     * in the fork's kxkb language — a bold heading over a <b>text-width</b> yellow
+     * rule (a {@code match_parent} rule inside a {@code wrap_content} vertical
+     * box, which is the whole trick), bulleted marks whose lead-in is bold and
+     * drawn <em>in the colour it is describing</em>, and hairlines between
+     * sections. The mark's own colour is the point: the eye finds the red bullet
+     * without reading a word.
+     */
+    private void showLegend() {
+        Context context = activity;
+        LinearLayout root = new LinearLayout(context);
+        root.setOrientation(LinearLayout.VERTICAL);
+        int side = legendDp(context, 24f);
+        root.setPadding(side, legendDp(context, 4f), side, legendDp(context, 8f));
+
+        addLegendParagraph(root, context, R.string.snooping_legend_intro, 0f);
+
+        addLegendHeading(root, context, R.string.snooping_legend_pill, true);
+        addLegendMark(root, context, R.string.snooping_legend_pill_allowed_mark, STATUS_TEXT_ALLOWED,
+                R.string.snooping_legend_pill_allowed);
+        addLegendMark(root, context, R.string.snooping_legend_pill_blocked_mark, STATUS_COLOR_BLOCKED,
+                R.string.snooping_legend_pill_blocked);
+        addLegendMark(root, context, R.string.snooping_legend_pill_narrowed_mark, statusColorForeground(),
+                R.string.snooping_legend_pill_narrowed);
+
+        addLegendHeading(root, context, R.string.snooping_legend_frame, false);
+        addLegendMark(root, context, R.string.snooping_legend_frame_red_mark, CHANGED_STROKE_ALLOWED,
+                R.string.snooping_legend_frame_red);
+        addLegendMark(root, context, R.string.snooping_legend_frame_yellow_mark, ForkThemeUtils.getTextColor(),
+                R.string.snooping_legend_frame_yellow);
+        addLegendMark(root, context, R.string.snooping_legend_frame_none_mark, DETAIL_COLOR,
+                R.string.snooping_legend_frame_none);
+
+        addLegendHeading(root, context, R.string.snooping_legend_box, false);
+        addLegendMark(root, context, R.string.snooping_legend_box_yellow_mark, ForkThemeUtils.getTextColor(),
+                R.string.snooping_legend_box_yellow);
+        addLegendMark(root, context, R.string.snooping_legend_box_red_mark, CHANGED_STROKE_ALLOWED,
+                R.string.snooping_legend_box_red);
+        addLegendMark(root, context, R.string.snooping_legend_box_none_mark, DETAIL_COLOR,
+                R.string.snooping_legend_box_none);
+        addLegendParagraph(root, context, R.string.snooping_legend_box_note, 10f);
+
+        addLegendHeading(root, context, R.string.snooping_legend_padlock, false);
+        addLegendParagraph(root, context, R.string.snooping_legend_padlock_sub, 2f);
+        addLegendMark(root, context, R.string.snooping_legend_padlock_hollow_mark, ForkThemeUtils.getTextColor(),
+                R.string.snooping_legend_padlock_hollow);
+        addLegendMark(root, context, R.string.snooping_legend_padlock_filled_mark, ForkThemeUtils.getTextColor(),
+                R.string.snooping_legend_padlock_filled);
+        addLegendMark(root, context, R.string.snooping_legend_padlock_none_mark, DETAIL_COLOR,
+                R.string.snooping_legend_padlock_none);
+
+        addLegendHeading(root, context, R.string.snooping_legend_locking, false);
+        addLegendParagraph(root, context, R.string.snooping_legend_locking_1, 2f);
+        addLegendParagraph(root, context, R.string.snooping_legend_locking_2, 10f);
+        addLegendParagraph(root, context, R.string.snooping_legend_locking_3, 10f);
+
+        NestedScrollView scroller = new NestedScrollView(context);
+        scroller.addView(root, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        UIUtils.presentWithYellowBorder(activity, UIUtils.yellowOnBlackDialog(activity)
+                .setTitle(R.string.snooping_legend)
+                .setView(scroller)
+                .setPositiveButton(R.string.ok, null));
+    }
+
+    private static int legendDp(@NonNull Context context, float dp) {
+        return Math.round(ForkThemeUtils.dpToPx(context, dp));
+    }
+
+    /**
+     * A section heading with the fork's text-width rule under it. The rule is
+     * {@code match_parent} inside a {@code wrap_content} column, so it measures to
+     * the heading's own width — never the dialog's.
+     */
+    private static void addLegendHeading(@NonNull LinearLayout parent, @NonNull Context context,
+                                         @StringRes int titleRes, boolean first) {
+        if (!first) {
+            // Full-bleed hairline between sections, as on the UI page.
+            View hairline = new View(context);
+            LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, legendDp(context, 0.5f)));
+            hlp.topMargin = legendDp(context, 20f);
+            hairline.setLayoutParams(hlp);
+            hairline.setBackgroundColor(ColorUtils.setAlphaComponent(ForkThemeUtils.getTextColor(), 0x50));
+            parent.addView(hairline);
+        }
+        LinearLayout column = new LinearLayout(context);
+        column.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        clp.topMargin = legendDp(context, first ? 18f : 14f);
+        column.setLayoutParams(clp);
+        TextView title = new TextView(context);
+        title.setText(titleRes);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f);
+        title.setTypeface(title.getTypeface(), Typeface.BOLD);
+        title.setTextColor(ForkThemeUtils.getTextColor());
+        column.addView(title);
+        View rule = new View(context);
+        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, legendDp(context, 2f));
+        rlp.topMargin = legendDp(context, 3f);
+        rule.setLayoutParams(rlp);
+        rule.setBackgroundColor(ForkThemeUtils.getTextColor());
+        column.addView(rule);
+        parent.addView(column);
+    }
+
+    /**
+     * One bulleted mark: "· <b>Red</b> — the app can use this…", with the lead-in
+     * bold and in the colour it names, and the bullet hanging so wrapped lines
+     * align under the text rather than under the dot.
+     */
+    private static void addLegendMark(@NonNull LinearLayout parent, @NonNull Context context,
+                                      @StringRes int markRes, @ColorInt int markColor,
+                                      @StringRes int bodyRes) {
+        LinearLayout row = new LinearLayout(context);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        rlp.topMargin = legendDp(context, 9f);
+        row.setLayoutParams(rlp);
+
+        TextView bullet = new TextView(context);
+        bullet.setText("·");
+        bullet.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f);
+        bullet.setTextColor(markColor);
+        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
+                legendDp(context, 14f), ViewGroup.LayoutParams.WRAP_CONTENT);
+        bullet.setLayoutParams(blp);
+        row.addView(bullet);
+
+        String mark = context.getString(markRes);
+        SpannableStringBuilder text = new SpannableStringBuilder(mark);
+        text.setSpan(new StyleSpan(Typeface.BOLD), 0, mark.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        text.setSpan(new ForegroundColorSpan(markColor), 0, mark.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        text.append(" — ").append(context.getString(bodyRes));
+        TextView body = new TextView(context);
+        body.setText(text);
+        body.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f);
+        body.setTextColor(DETAIL_COLOR);
+        body.setLineSpacing(legendDp(context, 2f), 1f);
+        body.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        row.addView(body);
+        parent.addView(row);
+    }
+
+    private static void addLegendParagraph(@NonNull LinearLayout parent, @NonNull Context context,
+                                           @StringRes int textRes, float topDp) {
+        TextView paragraph = new TextView(context);
+        paragraph.setText(textRes);
+        paragraph.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f);
+        paragraph.setTextColor(DETAIL_COLOR);
+        paragraph.setLineSpacing(legendDp(context, 2f), 1f);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = legendDp(context, topDp);
+        paragraph.setLayoutParams(lp);
+        parent.addView(paragraph);
     }
 
     private void confirmBlockAll() {
@@ -341,12 +534,12 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
      * yellow, like everything else the fork draws itself.
      */
     @NonNull
-    private static Drawable rememberedBox(@NonNull Context context) {
+    private static Drawable rememberedBox(@NonNull Context context, @ColorInt int color) {
         GradientDrawable box = new GradientDrawable();
         box.setShape(GradientDrawable.RECTANGLE);
         box.setColor(Color.TRANSPARENT);
         box.setCornerRadius(ForkThemeUtils.dpToPx(context, 8f));
-        box.setStroke(Math.round(ForkThemeUtils.dpToPx(context, 1.5f)), ForkThemeUtils.getTextColor());
+        box.setStroke(Math.round(ForkThemeUtils.dpToPx(context, 1.5f)), color);
         return box;
     }
 
@@ -976,7 +1169,19 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 // 白い熊, 2026-08-01: this used to be a "Forget this setting" entry
                 // in the row menu, which put it next to the device-policy lock and
                 // implied a relationship the two do not have.
-                toggle.setBackground(item.storedState != null ? rememberedBox(context) : null);
+                // Red when the decision has DRIFTED — remembered as one thing,
+                // enforced as another (白い熊, 2026-08-01). The store only ever
+                // holds departures from the default, so a decision that no longer
+                // matches the live state means something outside this page put it
+                // back: Settings, the app asking again, or a write the platform
+                // discarded later. The box is the only place that can say so —
+                // the switch and the pill both report the live state, faithfully,
+                // and so hide the disagreement rather than showing it.
+                toggle.setBackground(item.storedState != null
+                        ? rememberedBox(context, item.isDrifted()
+                                ? CHANGED_STROKE_ALLOWED
+                                : ForkThemeUtils.getTextColor())
+                        : null);
                 // A tap advances to the next state this row supports — two for
                 // nearly everything, three for the network row.
                 card.setOnClickListener(v -> applyState(item, item.nextState()));
@@ -1108,18 +1313,16 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         // store now holds only departures from the default, so "saved" would
         // merely restate the switch. What the eye needs instead is which rows
         // were changed at all — that is the card's highlight, in bind().
-        // A row may name its own states — see AppDetailsSnoopingItem#stateLabelRes.
-        int stateRes = item.stateLabelRes(state);
-        if (stateRes == 0) {
-            if (state == SnoopingState.FOREGROUND) {
-                stateRes = R.string.snooping_state_foreground;
-            } else if (state == SnoopingState.ALLOWED) {
-                stateRes = R.string.snooping_state_allowed;
-            } else {
-                stateRes = R.string.snooping_state_blocked;
-            }
+        StringBuilder sb = new StringBuilder(stateLabel(context, item, state));
+        // The one case where the stored decision DOES belong here: it disagrees
+        // with what the platform enforces (白い熊, 2026-08-01). The rule above
+        // holds only while the two agree — then "saved" restates the switch. When
+        // they differ, the switch alone reports the live state and quietly loses
+        // the fact that you asked for something else and no longer have it.
+        if (item.isDrifted() && item.storedState != null) {
+            sb.append(" · ").append(context.getString(R.string.snooping_status_drifted,
+                    stateLabel(context, item, item.storedState)));
         }
-        StringBuilder sb = new StringBuilder(context.getString(stateRes));
         // "Needs no permission" is a property of the capability, NOT of the row's
         // tier: keying it off TIER_UNGATED made the label vanish the moment an op
         // was given an explicit non-default mode (which promotes the row to
@@ -1131,6 +1334,27 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             sb.append(" · ").append(context.getString(R.string.snooping_tier_not_requested));
         }
         return sb;
+    }
+
+    /**
+     * A state's label, preferring the row's own name for it — see
+     * {@link AppDetailsSnoopingItem#stateLabelRes}, whose 0 means "use the
+     * generic one" and must never reach {@code getString} (it throws).
+     */
+    @NonNull
+    private CharSequence stateLabel(@NonNull Context context, @NonNull AppDetailsSnoopingItem item,
+                                    @SnoopingState.State int state) {
+        int stateRes = item.stateLabelRes(state);
+        if (stateRes == 0) {
+            if (state == SnoopingState.FOREGROUND) {
+                stateRes = R.string.snooping_state_foreground;
+            } else if (state == SnoopingState.ALLOWED) {
+                stateRes = R.string.snooping_state_allowed;
+            } else {
+                stateRes = R.string.snooping_state_blocked;
+            }
+        }
+        return context.getString(stateRes);
     }
 
     @NonNull

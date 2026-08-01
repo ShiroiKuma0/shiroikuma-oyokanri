@@ -709,6 +709,7 @@ public class AppDetailsViewModel extends AndroidViewModel {
             }
         });
         setUsesPermission(permissionItem);
+        markStateChanged();
         return true;
     }
 
@@ -745,11 +746,44 @@ public class AppDetailsViewModel extends AndroidViewModel {
                 mBlockerLocker.notifyAll();
             }
         });
+        if (!revokedPermissions.isEmpty()) {
+            markStateChanged();
+        }
         return isSuccessful;
     }
 
     @NonNull
     private final AppOpsManagerCompat mAppOpsManager = new AppOpsManagerCompat();
+
+    /**
+     * Fork: bumped by every write that changes what an app is permitted to do.
+     * <p>
+     * The Snooping, App ops and Permissions tabs are three views of one state,
+     * and each holds the list it was handed at {@code loadTabs()} time — page
+     * changes drive no reload, and a write on one tab notifies only its own row.
+     * So blocking Approximate location on the Snooping tab left the App ops tab
+     * still showing {@code COARSE_LOCATION} as allowed, and toggling it there
+     * then decided its direction from that stale mode — writing the opposite of
+     * what the switch appeared to do (白い熊, 2026-08-01).
+     * <p>
+     * A counter rather than a cross-wired reload: a tab re-reads when it is next
+     * shown <em>and</em> something actually moved, so the fix costs nothing on
+     * the common path of simply paging through the tabs. It deliberately covers
+     * app-op, permission and snooping writes alike — they all land on the same
+     * state, whichever tab issued them.
+     */
+    private final AtomicInteger mStateEpoch = new AtomicInteger();
+
+    /** Fork: see {@link #mStateEpoch}. Fragments compare this across resumes. */
+    @AnyThread
+    public int getStateEpoch() {
+        return mStateEpoch.get();
+    }
+
+    @AnyThread
+    private void markStateChanged() {
+        mStateEpoch.incrementAndGet();
+    }
 
     @WorkerThread
     @GuardedBy("blockerLocker")
@@ -774,6 +808,7 @@ public class AppDetailsViewModel extends AndroidViewModel {
             e.printStackTrace();
             return false;
         }
+        markStateChanged();
         return true;
     }
 
@@ -800,6 +835,7 @@ public class AppDetailsViewModel extends AndroidViewModel {
                     mBlockerLocker.notifyAll();
                 }
             });
+            markStateChanged();
             return true;
         } catch (PermissionException e) {
             e.printStackTrace();
@@ -826,6 +862,7 @@ public class AppDetailsViewModel extends AndroidViewModel {
                     mBlockerLocker.notifyAll();
                 }
             });
+            markStateChanged();
             return true;
         } catch (PermissionException e) {
             e.printStackTrace();
@@ -854,6 +891,7 @@ public class AppDetailsViewModel extends AndroidViewModel {
                     mBlockerLocker.notifyAll();
                 }
             });
+            markStateChanged();
             return true;
         } catch (Exception e) {
             e.printStackTrace();
@@ -1636,6 +1674,9 @@ public class AppDetailsViewModel extends AndroidViewModel {
             return false;
         }
         SnoopingImmovable.clear(mPackageName, item.capability.entry.id);
+        // The op or permission this row just moved is the same one the App ops
+        // and Permissions tabs are showing — see mStateEpoch.
+        markStateChanged();
         if (item.isDefaultState(state)) {
             // Back at the untouched state: there is nothing to remember. Storing
             // it would only re-assert what a fresh install does anyway and would
@@ -1703,6 +1744,9 @@ public class AppDetailsViewModel extends AndroidViewModel {
         }
         for (String capabilityId : unmanage) {
             SnoopingPrefs.clearSetting(mPackageName, capabilityId);
+        }
+        if (blocked > 0) {
+            markStateChanged();
         }
         return blocked;
     }

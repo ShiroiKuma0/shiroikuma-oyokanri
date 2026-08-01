@@ -255,7 +255,27 @@ public class AppDetailsSnoopingItem extends AppDetailsItem<String> {
         // value and the only place the third state is visible.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
                 && opItem.getMode() == AppOpsManager.MODE_FOREGROUND) {
-            return SnoopingState.FOREGROUND;
+            // ...but a stored foreground mode only means anything while the
+            // permission behind the op is still granted (白い熊, 2026-08-01,
+            // measured on com.elink.fittrackhealth.pro). That app has
+            // ACCESS_COARSE_LOCATION revoked and USER_FIXED, while the uid op
+            // COARSE_LOCATION was left at foreground by whatever narrowed it
+            // earlier — PermissionPolicyService normally syncs such an op down to
+            // ignore, and here it plainly had not. The row therefore read
+            // "Only while in use" with its switch ON for an app that cannot use
+            // location at all, and a tap could not move it: the requested BLOCKED
+            // state re-revoked an already-revoked permission, nothing changed,
+            // and matchesRequestedState reported failure for ever.
+            //
+            // A revoked permission is no access, whatever mode the op carries, so
+            // the permission wins. Only for a permission the app actually
+            // declares: a TIER_NOT_REQUESTED row is built with isGranted=false by
+            // construction, and reading that as "blocked" would mislabel every
+            // pre-set row on the page.
+            if (opItem.permission == null || !opItem.appContainsPermission || opItem.permission.isGranted()) {
+                return SnoopingState.FOREGROUND;
+            }
+            return SnoopingState.BLOCKED;
         }
         if (!mHasEffectiveMode) {
             return SnoopingState.fromAllowed(opItem.isAllowed());
