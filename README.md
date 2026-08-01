@@ -11,13 +11,14 @@
 A fork of [AppManager](https://github.com/MuntashirAkon/AppManager) with **major additions**: a
 **Shizuku mode of operation** that needs no listening `adbd`, a per-app
 **battery history** that survives the charge cycle Android wipes it on, a per-app
-**anti-snooping page** that can cut an app off the network entirely, a configurable
+**anti-snooping page** that can cut an app off the network entirely, **device-policy locks** that
+Settings cannot undo, a configurable
 **yellow-on-black UI** with a deep customization page, a hard-blocking **protected profile**, a
 from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-tap **main-list quick
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+55`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+067`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
 </div>
 
@@ -90,6 +91,31 @@ matches the platform default is not stored at all, so set-then-unset leaves noth
 stored is keyed by package name, so it outlives uninstalling the app, rides along in a settings export,
 and is re-applied automatically when that package appears on another phone — on install, on update, and
 on every startup once privileges are up. Set an app up once; it stays that way, everywhere.
+
+## 🔒 Device-policy locks — decisions Settings cannot undo
+
+Everything above is **soft**: an app-op written or a permission revoked can be put back by Settings,
+by another tool, and sometimes by the app itself. Make the sister app
+[白い熊 雫](https://github.com/ShiroiKuma0/shiroikuma-shizuku) Device Owner and authorise this one, and
+a decision here becomes **hard** instead.
+
+A **padlock beside each switch** — hollow where a lock can land, filled where one does. Tap to lock,
+tap again to release. A locked permission is fixed by device policy: the app cannot request it, its
+switch in Settings is greyed out, and the lock **outlives this app** — uninstalling 白い熊 応用管理 does
+not release it. A card above the capabilities says whether the powers are live and, when they are not,
+*why*: no Device Owner on this phone, versus authorised in 雫 but not for us.
+
+The same card carries **suspension** — a harder freeze than hiding, where the app cannot be opened at
+all and the system shows a stub in its place — plus uninstall blocking, force-stop blocking,
+accessibility blocking, and **Clear all locks**, the way back that works even if this app is gone.
+
+Only what the platform will actually enforce is offered. Device policy's per-app lever is
+`setPermissionGrantState`, which takes **dangerous runtime permissions and nothing else**, so
+app-op-only rows (clipboard, screen capture, background running) show no padlock rather than a switch
+that would be refused. That is the page's standing rule, applied here too.
+
+**⋮ → What the marks mean** explains the whole vocabulary: card frame, remember box, padlock, status
+pill, and what locking actually does to an app.
 
 ## 🎨 Configurable yellow-on-black UI
 
