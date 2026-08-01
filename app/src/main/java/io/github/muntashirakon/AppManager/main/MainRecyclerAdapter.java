@@ -849,44 +849,15 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             holder.backupDate.setVisibility(View.VISIBLE);
             holder.backupDate.setText(dateFmt.format(when));
             holder.backupDate.setTextColor(mcBackup);
+            // Recycling: the no-backup branch dims this line for its hint.
+            holder.backupDate.setAlpha(1f);
             holder.backupTime.setVisibility(View.VISIBLE);
             holder.backupTime.setText(timeFmt.format(when));
             holder.backupTime.setTextColor(mcBackup);
             FontUtil.apply(holder.backupVersion, FontPrefs.BACKUP_INFO);
             FontUtil.apply(holder.backupDate, FontPrefs.BACKUP_INFO);
             FontUtil.apply(holder.backupTime, FontPrefs.BACKUP_INFO);
-            // Tapping any of the three backup lines opens the
-            // backup/restore dialog for this single app, from which the
-            // user can start a fresh backup, restore, or delete the
-            // existing one. Listener captures `item` by reference, which
-            // is fine because we re-bind per onBindViewHolder call.
-            View.OnClickListener backupTap =
-                    v -> showBackupRestoreDialogOrAppNotInstalled(item);
-            holder.backupVersion.setOnClickListener(backupTap);
-            holder.backupDate.setOnClickListener(backupTap);
-            holder.backupTime.setOnClickListener(backupTap);
-            // Long-press on any of the three backup lines opens the same
-            // dialog restricted to RESTORE + DELETE modes, so it lands
-            // directly on the existing-backup management view (the
-            // "Restore..." dialog with Delete / Restore buttons) instead
-            // of the new-backup mode the short tap defaults to.
-            View.OnLongClickListener backupLongTap = v -> {
-                if (item.backup == null) return false;
-                BackupRestoreDialogFragment frag = BackupRestoreDialogFragment.getInstance(
-                        Collections.singletonList(new UserPackagePair(
-                                item.packageName, UserHandleHidden.myUserId())),
-                        BackupRestoreDialogFragment.MODE_RESTORE
-                                | BackupRestoreDialogFragment.MODE_DELETE);
-                frag.setOnActionBeginListener(mode -> mActivity.showProgressIndicator(true));
-                frag.setOnActionCompleteListener(
-                        (mode, failedPackages) -> mActivity.showProgressIndicator(false));
-                frag.show(mActivity.getSupportFragmentManager(),
-                        BackupRestoreDialogFragment.TAG);
-                return true;
-            };
-            holder.backupVersion.setOnLongClickListener(backupLongTap);
-            holder.backupDate.setOnLongClickListener(backupLongTap);
-            holder.backupTime.setOnLongClickListener(backupLongTap);
+            bindBackupColumnGestures(holder, item);
         } else if (item.isInstalled) {
             // Fork: no backup yet, but the app is installed — surface a
             // tappable "Back up" affordance in the same right-column area.
@@ -898,22 +869,22 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             holder.backupVersion.setText(R.string.backup_tap_hint);
             holder.backupVersion.setTextColor(mcBackup);
             FontUtil.apply(holder.backupVersion, FontPrefs.BACKUP_INFO);
+            FontUtil.apply(holder.backupDate, FontPrefs.BACKUP_INFO);
             // Keep the date/time cells visible-but-empty so the tap target
             // spans the whole right-hand backup column (all three rows),
             // not just the one-line "Back up" text - much easier to hit.
             // Empty text renders nothing but the cells still occupy their
             // row height and receive clicks.
             holder.backupDate.setVisibility(View.VISIBLE);
-            holder.backupDate.setText("");
+            // Fork: the second line says HOW, now that a simple tap opens app
+            // info like the rest of the row. Without it the column reads
+            // "Back up" and then does something else when you tap it.
+            holder.backupDate.setText(R.string.backup_longpress_hint);
+            holder.backupDate.setTextColor(mcBackup);
+            holder.backupDate.setAlpha(0.6f);
             holder.backupTime.setVisibility(View.VISIBLE);
             holder.backupTime.setText("");
-            View.OnClickListener startBackupTap = v -> openBackupModeDialog(item);
-            holder.backupVersion.setOnClickListener(startBackupTap);
-            holder.backupDate.setOnClickListener(startBackupTap);
-            holder.backupTime.setOnClickListener(startBackupTap);
-            holder.backupVersion.setOnLongClickListener(null);
-            holder.backupDate.setOnLongClickListener(null);
-            holder.backupTime.setOnLongClickListener(null);
+            bindBackupColumnGestures(holder, item);
         } else {
             // No backup and not installed: nothing to show or tap.
             holder.backupVersion.setVisibility(View.GONE);
@@ -978,6 +949,79 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             }
         }
         return -1;
+    }
+
+    /**
+     * Fork: gestures for the right-hand backup column (白い熊, 2026-08-01).
+     * <p>
+     * A simple tap used to start a backup, which made the column the one part of
+     * the row that did not behave like the row — the same tap two centimetres to
+     * the left opened the app. It now opens app info like everywhere else, and
+     * every backup action lives on the long-press menu instead.
+     * <p>
+     * The tap repeats the card's selection-mode guard on purpose: without it,
+     * tapping this column during a multi-select would open an app instead of
+     * extending the selection.
+     */
+    private void bindBackupColumnGestures(@NonNull ViewHolder holder, @NonNull ApplicationItem item) {
+        View.OnClickListener openInfo = v -> {
+            int currentPos = holder.getBindingAdapterPosition();
+            if (currentPos == RecyclerView.NO_POSITION) return;
+            if (isInSelectionMode()) {
+                toggleSelection(currentPos);
+                AccessibilityUtils.requestAccessibilityFocus(holder.itemView);
+                return;
+            }
+            handleClick(item);
+        };
+        View.OnLongClickListener backupMenu = v -> {
+            showBackupMenu(item);
+            return true;
+        };
+        holder.backupVersion.setOnClickListener(openInfo);
+        holder.backupDate.setOnClickListener(openInfo);
+        holder.backupTime.setOnClickListener(openInfo);
+        holder.backupVersion.setOnLongClickListener(backupMenu);
+        holder.backupDate.setOnLongClickListener(backupMenu);
+        holder.backupTime.setOnLongClickListener(backupMenu);
+    }
+
+    /**
+     * The backup actions for one app, as a menu rather than as two gestures with
+     * no way to tell them apart. Entries reflect what this app actually has: an
+     * uninstalled app with a backup can only be restored, an installed one with
+     * no backup can only be backed up.
+     */
+    private void showBackupMenu(@NonNull ApplicationItem item) {
+        List<CharSequence> labels = new ArrayList<>();
+        List<Runnable> actions = new ArrayList<>();
+        if (item.isInstalled) {
+            labels.add(mActivity.getString(R.string.backup));
+            actions.add(() -> openBackupModeDialog(item));
+        }
+        if (item.backup != null) {
+            labels.add(mActivity.getString(R.string.restore_and_delete));
+            actions.add(() -> {
+                BackupRestoreDialogFragment frag = BackupRestoreDialogFragment.getInstance(
+                        Collections.singletonList(new UserPackagePair(
+                                item.packageName, UserHandleHidden.myUserId())),
+                        BackupRestoreDialogFragment.MODE_RESTORE
+                                | BackupRestoreDialogFragment.MODE_DELETE);
+                frag.setOnActionBeginListener(mode -> mActivity.showProgressIndicator(true));
+                frag.setOnActionCompleteListener(
+                        (mode, failedPackages) -> mActivity.showProgressIndicator(false));
+                frag.show(mActivity.getSupportFragmentManager(), BackupRestoreDialogFragment.TAG);
+            });
+        }
+        if (labels.isEmpty()) {
+            // Neither installed nor backed up: nothing this menu could offer.
+            return;
+        }
+        ForkDialog.present(ForkDialog.builder(mActivity)
+                .setTitle(item.label)
+                .setItems(labels.toArray(new CharSequence[0]),
+                        (dialog, which) -> actions.get(which).run())
+                .setNegativeButton(R.string.cancel, null));
     }
 
     private void handleClick(@NonNull ApplicationItem item) {
