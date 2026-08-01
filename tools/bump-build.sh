@@ -28,4 +28,7 @@ sed -i "s/^customBuildNumber=${current}\$/customBuildNumber=${new}/" "$GP"
 base=$(grep -oP '^customBaseVersionName=\K.+' "$GP" || true)
 [[ -n "$base" ]] || die "customBaseVersionName=<string> line not found in $GP"
 
-echo "${base}+${new}"
+# Zero-padded to three digits, matching app/build.gradle's versionName and the
+# APK filename convention. Printing the raw integer here made the bump line
+# disagree with everything downstream.
+printf '%s+%03d\n' "$base" "$new"
