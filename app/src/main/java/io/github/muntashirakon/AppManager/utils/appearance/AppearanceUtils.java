@@ -136,9 +136,10 @@ public final class AppearanceUtils {
     private static class ActivityAppearanceCallback implements Application.ActivityLifecycleCallbacks {
         @Override
         public void onActivityPreCreated(@NonNull Activity activity, @Nullable Bundle savedInstanceState) {
+            boolean yellowOnBlack = isYellowOnBlackActivity(activity);
             if (activity instanceof PerProcessActivity) {
                 int theme;
-                if (isYellowOnBlackActivity(activity)) {
+                if (yellowOnBlack) {
                     // Fork-specific yellow palette on a pure-black background.
                     // Dispatched here because this callback fires before the
                     // activity's onCreate, and setting android:theme in the
@@ -153,8 +154,25 @@ public final class AppearanceUtils {
                 }
                 activity.setTheme(theme);
             }
-            // Theme must be set first because the method below will add dynamic attributes to the theme
-            DynamicColors.applyToActivityIfAvailable(activity);
+            // Fork LANDMINE (白い熊, measured on a Motorola razr 40 ultra, Android 15,
+            // 2026-08-01): dynamic colour OVERWRITES the palette we just pinned.
+            // DynamicColors rewrites colorPrimary / colorSurface / colorOnSurface
+            // from the wallpaper, so a fresh install rendered white-on-green
+            // instead of yellow-on-black — the fork's entire look, gone.
+            //
+            // It hid for a long time because applyToActivityIfAvailable is a
+            // no-op wherever the platform does not offer dynamic colour: on the
+            // Mate XT (EMUI) it never fired, so the theme survived and the bug
+            // only appeared on a phone that supports Material You. Do not
+            // "restore" this call for the fork's own screens.
+            //
+            // It is also the clobber behind the dialog-theming landmine: the
+            // yellow-on-black dialog overlay has to be passed explicitly at every
+            // call site precisely because this wiped materialAlertDialogTheme.
+            if (!yellowOnBlack) {
+                // Theme must be set first because the method below will add dynamic attributes to the theme
+                DynamicColors.applyToActivityIfAvailable(activity);
+            }
         }
 
         /**
