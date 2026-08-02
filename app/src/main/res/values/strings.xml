@@ -2319,9 +2319,12 @@
     <string name="shizuku_not_authorised">Shizuku did not authorise App Manager. Make sure the server is running, then allow the request when it appears.</string>
 
     <!-- Fork: the main list's right-hand backup column. A simple tap opens app
-         info like the rest of the row; the backup actions live on a long-press. -->
+         info like the rest of the row; the backup actions live on a long-press,
+         which opens one dialog holding all of them (AppBackupDialogFragment). -->
     <string name="backup_longpress_hint">long-press</string>
-    <string name="restore_and_delete">Restore or delete…</string>
+    <string name="backup_dialog_no_backups">No backups yet.</string>
+    <string name="backup_dialog_unavailable">This app is neither installed nor backed up, so there is nothing to do here.</string>
+    <string name="backup_dialog_more">More backup actions</string>
 
     <!-- Fork: the Snooping page's legend — what each frame, box and glyph means. -->
     <string name="snooping_legend">What the marks mean</string>

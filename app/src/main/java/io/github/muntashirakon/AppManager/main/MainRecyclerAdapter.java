@@ -70,6 +70,7 @@ import io.github.muntashirakon.AppManager.fonts.MainIconPrefs;
 import io.github.muntashirakon.AppManager.fonts.RunningBoxPrefs;
 import io.github.muntashirakon.AppManager.fonts.SelectionFramePrefs;
 import io.github.muntashirakon.AppManager.apk.installer.PackageInstallerCompat;
+import io.github.muntashirakon.AppManager.backup.dialog.AppBackupDialogFragment;
 import io.github.muntashirakon.AppManager.backup.dialog.BackupRestoreDialogFragment;
 import io.github.muntashirakon.AppManager.compat.ApplicationInfoCompat;
 import io.github.muntashirakon.AppManager.compat.PackageManagerCompat;
@@ -957,7 +958,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
      * A simple tap used to start a backup, which made the column the one part of
      * the row that did not behave like the row — the same tap two centimetres to
      * the left opened the app. It now opens app info like everywhere else, and
-     * every backup action lives on the long-press menu instead.
+     * every backup action lives on the long-press dialog instead.
      * <p>
      * The tap repeats the card's selection-mode guard on purpose: without it,
      * tapping this column during a multi-select would open an app instead of
@@ -975,7 +976,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             handleClick(item);
         };
         View.OnLongClickListener backupMenu = v -> {
-            showBackupMenu(item);
+            showBackupDialog(item);
             return true;
         };
         holder.backupVersion.setOnClickListener(openInfo);
@@ -987,41 +988,26 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
     }
 
     /**
-     * The backup actions for one app, as a menu rather than as two gestures with
-     * no way to tell them apart. Entries reflect what this app actually has: an
-     * uninstalled app with a backup can only be restored, an installed one with
-     * no backup can only be backed up.
+     * Every backup action for this app, in one dialog (白い熊, 2026-08-02).
+     * <p>
+     * This used to be a two-line chooser — "Backup", and "Restore or delete…"
+     * which then opened the backup/restore bottom sheet — so the one thing you
+     * came here to see, the backups themselves, was always a screen away and
+     * "Backup" was a list line pretending to be an action.
+     * {@link AppBackupDialogFragment} shows the backups, acts on the ticked ones
+     * and carries "Back up" as its own action pill. It decides for itself what
+     * to offer, so nothing is gated here beyond the case where the app is
+     * neither installed nor backed up and there is nothing to open.
      */
-    private void showBackupMenu(@NonNull ApplicationItem item) {
-        List<CharSequence> labels = new ArrayList<>();
-        List<Runnable> actions = new ArrayList<>();
-        if (item.isInstalled) {
-            labels.add(mActivity.getString(R.string.backup));
-            actions.add(() -> openBackupModeDialog(item));
-        }
-        if (item.backup != null) {
-            labels.add(mActivity.getString(R.string.restore_and_delete));
-            actions.add(() -> {
-                BackupRestoreDialogFragment frag = BackupRestoreDialogFragment.getInstance(
-                        Collections.singletonList(new UserPackagePair(
-                                item.packageName, UserHandleHidden.myUserId())),
-                        BackupRestoreDialogFragment.MODE_RESTORE
-                                | BackupRestoreDialogFragment.MODE_DELETE);
-                frag.setOnActionBeginListener(mode -> mActivity.showProgressIndicator(true));
-                frag.setOnActionCompleteListener(
-                        (mode, failedPackages) -> mActivity.showProgressIndicator(false));
-                frag.show(mActivity.getSupportFragmentManager(), BackupRestoreDialogFragment.TAG);
-            });
-        }
-        if (labels.isEmpty()) {
-            // Neither installed nor backed up: nothing this menu could offer.
+    private void showBackupDialog(@NonNull ApplicationItem item) {
+        if (!item.isInstalled && item.backup == null) {
             return;
         }
-        ForkDialog.present(ForkDialog.builder(mActivity)
-                .setTitle(item.label)
-                .setItems(labels.toArray(new CharSequence[0]),
-                        (dialog, which) -> actions.get(which).run())
-                .setNegativeButton(R.string.cancel, null));
+        AppBackupDialogFragment fragment = AppBackupDialogFragment.getInstance(item.packageName,
+                UserHandleHidden.myUserId(), item.label);
+        fragment.setOnActionBeginListener(mode -> mActivity.showProgressIndicator(true));
+        fragment.setOnActionCompleteListener((mode, failedPackages) -> mActivity.showProgressIndicator(false));
+        fragment.show(mActivity.getSupportFragmentManager(), AppBackupDialogFragment.TAG);
     }
 
     private void handleClick(@NonNull ApplicationItem item) {
@@ -1118,22 +1104,6 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                 })
                 .setNegativeButton(R.string.cancel, null)
                 .show();
-    }
-
-    /**
-     * Fork: open the backup/restore dialog in MODE_BACKUP for a single
-     * installed app that has no backup yet. When "Skip backup method dialog"
-     * is enabled, the dialog's backup-only path starts the backup immediately
-     * with the default options instead of showing the picker.
-     */
-    private void openBackupModeDialog(@NonNull ApplicationItem item) {
-        BackupRestoreDialogFragment fragment = BackupRestoreDialogFragment.getInstance(
-                Collections.singletonList(new UserPackagePair(
-                        item.packageName, UserHandleHidden.myUserId())),
-                BackupRestoreDialogFragment.MODE_BACKUP);
-        fragment.setOnActionBeginListener(mode -> mActivity.showProgressIndicator(true));
-        fragment.setOnActionCompleteListener((mode, failedPackages) -> mActivity.showProgressIndicator(false));
-        fragment.show(mActivity.getSupportFragmentManager(), BackupRestoreDialogFragment.TAG);
     }
 
     private void showBackupRestoreDialogOrAppNotInstalled(@NonNull ApplicationItem item) {

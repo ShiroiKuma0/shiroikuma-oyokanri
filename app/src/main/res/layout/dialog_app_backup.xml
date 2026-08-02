@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Fork: body of the main list's one-stop backup dialog (AppBackupDialogFragment).
+     Everything the old two-step flow needed a second screen for lives here: the
+     app's existing backups as a tick list, the actions that work on the ticked
+     ones, and - as the dialog's own positive button - "Back up".
+     The action row is a FlowLayout rather than a LinearLayout because three
+     pills plus the dialog's own two do not fit one line on a narrow screen;
+     wrapping is better than clipping. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="@dimen/padding_medium">
+
+    <TextView
+        android:id="@+id/message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingVertical="@dimen/padding_small"
+        android:textColor="@color/theme_bright_yellow"
+        android:textSize="15sp"
+        android:visibility="gone"
+        tools:text="No backups yet."
+        tools:visibility="visible" />
+
+    <io.github.muntashirakon.widget.MaxHeightScrollView
+        android:id="@+id/list_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        app:maxHeight="320dp"
+        tools:visibility="visible">
+
+        <LinearLayout
+            android:id="@+id/backup_list"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+    </io.github.muntashirakon.widget.MaxHeightScrollView>
+
+    <io.github.muntashirakon.widget.FlowLayout
+        android:id="@+id/backup_actions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="end"
+        android:paddingTop="@dimen/padding_small"
+        android:visibility="gone"
+        app:childSpacing="8dp"
+        app:rowSpacing="4dp"
+        tools:visibility="visible">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/more"
+            style="@style/Widget.AppTheme.Button.Dialog.YellowOutlined"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/backup_dialog_more"
+            android:minWidth="52dp"
+            app:icon="@drawable/ic_more_vert"
+            app:iconGravity="textStart"
+            app:iconPadding="0dp"
+            app:iconSize="24dp"
+            app:iconTint="@color/theme_bright_yellow" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/action_delete"
+            style="@style/Widget.AppTheme.Button.Dialog.YellowOutlined"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/delete" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/action_restore"
+            style="@style/Widget.AppTheme.Button.Dialog.YellowOutlined"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/restore" />
+
+    </io.github.muntashirakon.widget.FlowLayout>
+
+</LinearLayout>
