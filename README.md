@@ -18,7 +18,7 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+071`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+072`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
 </div>
 
@@ -224,8 +224,10 @@ The app list does more without a trip into details:
 
 - **Readable per-app backup folders** instead of the opaque `backups/<uuid>` layout, plus a **Backup
   directory** option that points the engine at a fast filesystem path (bypassing slow SAF volumes).
-- Inline backup details in the main list (version / date / time), with **tap = new backup** and
-  **long-press = restore/delete**, and a tap-to-back-up affordance for apps that have none.
+- Inline backup details in the main list (version / date / time). A **tap opens app info** like the
+  rest of the row; a **long-press opens one dialog holding every backup action** — the app's backups
+  as a tick list, with Restore, Delete, freeze/unfreeze and *Back up* all on it, so nothing drills
+  down into a second screen.
 - **Category-based settings Export/Import** at the top of the UI page: pick a directory once, see the
   latest export at a glance, then export or restore any mix of seven categories (general settings,
   colours & fonts, monitor, toolbar & filters, notes, anti-snooping settings, profiles) — so a new install comes up looking

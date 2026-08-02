@@ -6,6 +6,54 @@ All notable fork changes are recorded here. Versions use the fork's
 `customBaseVersionName+customBuildNumber` scheme (the base mirrors the upstream App Manager release
 this fork is built on).
 
+## 4.1.0+072 — 2026-08-02
+
+One dialog now holds every backup action for one app, instead of a chooser that hid the backups
+behind a second screen.
+
+### 💾 Every backup action in one dialog
+
+Long-pressing the main list's backup column used to open a two-line chooser — *Backup*, and
+*Restore or delete…* which then opened the backup/restore bottom sheet. So the one thing you came
+there to see — **the backups themselves** — was always a screen away, and *Backup* was a bare list
+line pretending to be an action.
+
+`AppBackupDialogFragment` is both of those at once:
+
+- The app's **backups as a tick list**, base backup pre-ticked (the same default the bottom sheet
+  uses), each row naming its date, flags, version, user, encryption, compression, size and frozen
+  state.
+- **Restore** (enabled at exactly one ticked) and **Delete** (one or more) as pills under the list,
+  plus a **⋮** pill carrying the backup freeze/unfreeze that used to live in the restore dialog's
+  overflow — and only the applicable half of it, because a list of two where one is greyed out says
+  less than a list of one.
+- **Back up** as the dialog's own positive button, beside Cancel. It is an action pill now, not a
+  list line.
+- An **uninstalled app with a backup** keeps Restore and Delete and loses Back up, which would mean
+  nothing for it; an **installed app with no backups** says so and offers only Back up.
+
+It reuses `BackupRestoreDialogViewModel` — the same loader, the same `prepareForOperation`, the same
+`BatchOpsService` hand-off — so backup, restore and delete behave identically to the bottom sheet,
+which stays in place for batch selections and app details. *Skip backup method dialog* still
+short-circuits the options picker, and the overwrite warning now keys off whether a **base** backup
+actually exists rather than the sheet's app-count arithmetic.
+
+### 🧭 Four things the dialog has to keep doing
+
+- The positive button is wired in `onStart()` rather than at build time, so a click does **not**
+  dismiss: the view model carrying the operation dies with the fragment, and dismissing before the
+  service hand-off would drop the operation on the floor.
+- Everything is inflated from the **yellow-on-black dialog overlay context**. The Material 3
+  multi-choice row declares its tick mark as `app:drawableStartCompat`, which only the AppCompat
+  inflater factory honours — rows inflated from the fragment's own context would come out with no
+  tick at all.
+- Row labels are formatted **off the main thread**: sizing a backup means walking its directory.
+- The package is only re-processed on a fresh create; the state LiveData is sticky, so a rotation
+  re-renders from what is already loaded instead of re-reading every backup.
+
+The action row is a `FlowLayout`, not a `LinearLayout`: three pills plus the dialog's own two do not
+fit one line on a narrow screen, and wrapping beats clipping.
+
 ## 4.1.0+071 — 2026-08-01
 
 A session that started as a question — *why isn't "Access Accessibility" on the Snooping page?* —
