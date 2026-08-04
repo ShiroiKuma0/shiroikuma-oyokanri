@@ -18,7 +18,7 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+083`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+084`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
 </div>
 
@@ -156,6 +156,12 @@ it from Settings) lets you tune, per element:
   grid** (configurable widths and colours), the **running-app box** (border width/roundness, yellow
   for user apps / orange for system), the **selected-card frame**, and the **app-icon size and
   roundness** (square → circle).
+
+The **top bar scrolls sideways** instead of hiding what will not fit. Search field, process monitor,
+battery history, app usage, clear-filters, the filter funnel and the layout picker all stay on the
+bar at full size on a folded panel; whatever runs past the screen edge is reached by dragging the
+bar. Widen the screen and it goes back to filling the width, with the search field stretching across
+the space the icons leave.
 
 Changes apply live the moment you leave the screen, and a reference **legend** explains what every
 colour and style means. A four-state main list — installed, frozen (snowflake + cool film), stopped,
