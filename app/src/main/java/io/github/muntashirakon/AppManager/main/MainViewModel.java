@@ -52,6 +52,7 @@ import java.util.concurrent.Future;
 import io.github.muntashirakon.AppManager.apk.list.ListExporter;
 import io.github.muntashirakon.AppManager.backup.BackupUtils;
 import io.github.muntashirakon.AppManager.compat.ActivityManagerCompat;
+import io.github.muntashirakon.AppManager.compat.ApplicationInfoCompat;
 import io.github.muntashirakon.AppManager.compat.PackageManagerCompat;
 import io.github.muntashirakon.AppManager.db.entity.App;
 import io.github.muntashirakon.AppManager.db.utils.AppDb;
@@ -1190,10 +1191,17 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
                 ApplicationInfo liveAi = livePi.applicationInfo;
                 item.isDisabled = !liveAi.enabled;
                 item.isFrozen = FreezeUtils.isFrozen(liveAi);
+                // Fork, +81: and WHICH freeze it is, for the rows that are frozen
+                // by suspension. FLAG_SUSPENDED is plain user state, readable
+                // without privilege, and it is set the same way whether the
+                // suspension came from a device-policy admin, from the shell, or
+                // from our own freeze-by-suspend.
+                item.isSuspendedApp = ApplicationInfoCompat.isSuspended(liveAi);
                 liveLastUpdateTime = livePi.lastUpdateTime;
             } catch (Throwable e) {
                 // Not installed / not accessible — fall back to cached values
                 item.isFrozen = !app.isEnabled;
+                item.isSuspendedApp = false;
             }
             item.label = app.packageLabel;
             item.targetSdk = app.sdk;

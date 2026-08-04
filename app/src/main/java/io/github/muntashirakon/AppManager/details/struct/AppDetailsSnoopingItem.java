@@ -25,6 +25,7 @@ import java.util.Set;
 import io.github.muntashirakon.AppManager.compat.AppOpsManagerCompat;
 import io.github.muntashirakon.AppManager.compat.PermissionCompat;
 import io.github.muntashirakon.AppManager.devicepolicy.DevicePolicyBridge;
+import io.github.muntashirakon.AppManager.devicepolicy.PolicyLockState;
 import io.github.muntashirakon.AppManager.permission.PermUtils;
 import io.github.muntashirakon.AppManager.permission.PermissionException;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
@@ -412,6 +413,21 @@ public class AppDetailsSnoopingItem extends AppDetailsItem<String> {
      */
     public boolean policyLockable;
 
+    /**
+     * Fork, +80: whether this row's lock is <b>remembered</b> — i.e. put back by
+     * {@link io.github.muntashirakon.AppManager.devicepolicy.PolicyEnforcer} if it
+     * ever stops being in force.
+     * <p>
+     * Read alongside {@link #policyLocked}, never instead of it. The two are
+     * independent, and every combination of them means something: locked and
+     * remembered is the ordinary armed state; locked and not remembered is a lock
+     * 雫 set directly, or one you chose to leave un-armed; <b>not</b> locked and
+     * remembered is the case the whole feature exists for — the lock is gone
+     * (reinstall, or a Device Owner that went away) and nothing else on the page
+     * could have told you.
+     */
+    public boolean policyLockRemembered;
+
     @WorkerThread
     public void refreshPolicyLock(@NonNull PackageInfo packageInfo,
                                   @NonNull Set<String> requestedPermissions) {
@@ -419,9 +435,11 @@ public class AppDetailsSnoopingItem extends AppDetailsItem<String> {
         if (permission == null) {
             policyLocked = false;
             policyLockable = false;
+            policyLockRemembered = false;
             return;
         }
         policyLocked = DevicePolicyBridge.isPermissionLocked(packageInfo.packageName, permission);
+        policyLockRemembered = PolicyLockState.isPermissionLockRemembered(packageInfo.packageName, permission);
         policyLockable = requestedPermissions.contains(permission)
                 && isDangerous(permission, packageInfo.packageName);
     }
@@ -440,6 +458,8 @@ public class AppDetailsSnoopingItem extends AppDetailsItem<String> {
         String permission = getPermissionName();
         policyLocked = permission != null
                 && DevicePolicyBridge.isPermissionLocked(packageName, permission);
+        policyLockRemembered = permission != null
+                && PolicyLockState.isPermissionLockRemembered(packageName, permission);
     }
 
     @WorkerThread

@@ -2,8 +2,9 @@
 <!-- Fork: one device-policy control, drawn as a half-width toggle box inside the
      policy card (白い熊, +75). Deliberately the SAME shape as a capability row
      below — outlined card, label, chip-backed explanation, hollow switch — so
-     the whole page reads with one grammar: red = the hard lock is in force,
-     yellow = it is not, and a thick frame means we put it there.
+     the whole page reads with one grammar. The label names the CAPABILITY, not
+     the lock (白い熊, +78), so: switch on and red = the phone is still open to
+     this, switch off and yellow with a thick frame = we have shut it.
 
      Included four times, so every id inside is duplicated. That is safe only
      because every lookup is scoped to the box's own root (findViewById on the
@@ -40,7 +41,7 @@
                 android:textAppearance="?android:attr/textAppearanceListItem"
                 android:textSize="15sp"
                 android:textStyle="bold"
-                tools:text="Block uninstall" />
+                tools:text="Can be uninstalled" />
 
             <!-- Same wrap_content + padding as the capability rows' switch, and
                  for the same reason: any "remembered"-style box is drawn as this
@@ -86,7 +87,7 @@
             android:paddingVertical="3dp"
             android:textAppearance="?attr/textAppearanceBodySmall"
             android:textSize="12sp"
-            tools:text="Nobody can remove it — not Settings, not adb." />
+            tools:text="Off: the platform refuses every uninstall — no other app outside 白い熊 応用管理 can remove it." />
 
     </androidx.appcompat.widget.LinearLayoutCompat>
 

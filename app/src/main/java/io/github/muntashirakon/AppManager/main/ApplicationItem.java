@@ -164,6 +164,20 @@ public class ApplicationItem extends PackageItemInfo implements IFilterableAppIn
      */
     public boolean isFrozen;
     /**
+     * Fork, +81: whether the app is frozen <b>by suspension</b> specifically — the
+     * strongest of the three freeze mechanisms, and the only one where the system
+     * puts a stub dialog in the app's place rather than merely hiding it.
+     * <p>
+     * A display flag, deliberately distinct from the {@link #isSuspended()} method
+     * beside it: that one calls {@code fetchPackageInfo()} and asks the platform,
+     * which is far too expensive to do per row at bind time. This is filled in
+     * from the same live query that fills {@link #isFrozen}, at list-load, and is
+     * the only one the adapter may read. (The field/method pair mirrors the
+     * existing {@code isFrozen} / {@code isFrozen()} pair — keep the two straight:
+     * the field is cheap and cached, the method is live and lazy.)
+     */
+    public boolean isSuspendedApp;
+    /**
      * Whether the app is installed
      */
     public boolean isInstalled = true;
@@ -643,6 +657,11 @@ public class ApplicationItem extends PackageItemInfo implements IFilterableAppIn
     public void setFrozenStateForBatchOp(boolean frozen) {
         isFrozen = frozen;
         mFreezeFlags = frozen ? FreezeOption.FREEZE_TYPE_DISABLED : 0;
+        // Fork, +81: an unfreeze clears suspension too (FreezeUtils.unfreeze lifts
+        // every mechanism), so the row must stop drawing the padlock at once. A
+        // freeze is left alone: which mechanism it used is not known here, and the
+        // package-change path that follows resolves it properly.
+        if (!frozen) isSuspendedApp = false;
     }
 
     // Fork: cheaply mark this row installed in memory right after a batch

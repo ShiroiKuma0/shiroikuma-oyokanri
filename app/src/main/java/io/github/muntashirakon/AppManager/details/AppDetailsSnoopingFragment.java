@@ -6,6 +6,7 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
@@ -20,6 +21,7 @@ import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.TouchDelegate;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -56,6 +58,7 @@ import io.github.muntashirakon.AppManager.snooping.SnoopingCatalog;
 import io.github.muntashirakon.AppManager.snooping.SnoopingEnforcer;
 import io.github.muntashirakon.AppManager.snooping.SnoopingPrefs;
 import io.github.muntashirakon.AppManager.snooping.SnoopingState;
+import io.github.muntashirakon.AppManager.utils.BroadcastUtils;
 import io.github.muntashirakon.AppManager.utils.ForkThemeUtils;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
@@ -110,6 +113,15 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
     private static final int DETAIL_CHIP_ALPHA = 0x1F;
     /** Outline of a row whose live state is not the default one. */
     private static final float CHANGED_STROKE_DP = 3f;
+    /**
+     * How far the padlock's hit rect grows past its own bounds — towards the
+     * label on one side and, by exactly the switch's start margin, towards the
+     * switch on the other. Asymmetric on purpose: the end side is the one that
+     * was losing taps, and the start side has a selectable detail chip that
+     * should keep its own.
+     */
+    private static final float LOCK_TOUCH_GROW_START_DP = 4f;
+    private static final float LOCK_TOUCH_GROW_END_DP = 6f;
     /**
      * …and in red when the change went the dangerous way — switched ON where the
      * platform's own default is off. Yellow marks the protective direction.
@@ -361,12 +373,18 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 R.string.snooping_legend_padlock_filled);
         addLegendMark(root, context, R.string.snooping_legend_padlock_none_mark, DETAIL_COLOR,
                 R.string.snooping_legend_padlock_none);
+        addLegendMark(root, context, R.string.snooping_legend_padlock_ring_yellow_mark,
+                ForkThemeUtils.getTextColor(), R.string.snooping_legend_padlock_ring_yellow);
+        addLegendMark(root, context, R.string.snooping_legend_padlock_ring_red_mark,
+                CHANGED_STROKE_ALLOWED, R.string.snooping_legend_padlock_ring_red);
+        addLegendParagraph(root, context, R.string.snooping_legend_padlock_ring_note, 10f);
 
         addLegendHeading(root, context, R.string.snooping_legend_locking, false);
         addLegendParagraph(root, context, R.string.snooping_legend_locking_1, 2f);
         addLegendParagraph(root, context, R.string.snooping_legend_locking_2, 10f);
         addLegendParagraph(root, context, R.string.snooping_legend_locking_3, 10f);
         addLegendParagraph(root, context, R.string.snooping_legend_policy_boxes, 10f);
+        addLegendParagraph(root, context, R.string.snooping_legend_policy_suspend, 10f);
 
         NestedScrollView scroller = new NestedScrollView(context);
         scroller.addView(root, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
@@ -556,6 +574,27 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         return box;
     }
 
+    /**
+     * The same mark for the padlock, drawn as a <b>stadium</b> rather than a box
+     * (白い熊, +80).
+     * <p>
+     * Deliberately a different shape from {@link #rememberedBox}: the two sit in
+     * neighbouring columns of the same row and mean different things — one
+     * remembers the capability's state, the other remembers a device-policy lock —
+     * so two 8dp rounded rectangles side by side would have read as one control
+     * with two halves. The corner radius is half the view's height, which makes it
+     * a ring rather than a frame; the padlock's 4dp padding is what keeps the glyph
+     * clear of the curve.
+     */
+    private static Drawable rememberedRing(@NonNull Context context, @ColorInt int color) {
+        GradientDrawable ring = new GradientDrawable();
+        ring.setShape(GradientDrawable.RECTANGLE);
+        ring.setColor(Color.TRANSPARENT);
+        ring.setCornerRadius(ForkThemeUtils.dpToPx(context, 16f));
+        ring.setStroke(Math.round(ForkThemeUtils.dpToPx(context, 1.5f)), color);
+        return ring;
+    }
+
     /** Tint a compound drawable without depending on API-gated TextViewCompat tinting. */
     private static void setLeadingIcon(@NonNull TextView view, int drawableRes, @ColorInt int color) {
         setIcon(view, drawableRes, color, true);
@@ -579,21 +618,18 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
 
     // ── Device-policy actions ───────────────────────────────────────────────
 
+    /**
+     * Suspend the app, or release it — one tap either way (白い熊, +81).
+     * <p>
+     * The last confirmation on this card, gone the same way the three boxes' went
+     * in +78: what it warned about is in the row's own description, which is read
+     * before the tap rather than dismissed after it.
+     */
     private void toggleSuspend() {
         if (viewModel == null) return;
         String packageName = viewModel.getPackageName();
         if (packageName == null) return;
-        if (mPolicySuspended) {
-            // Releasing only gives control back, so it needs no ceremony.
-            applySuspend(packageName, false);
-            return;
-        }
-        DangerDialog.confirmReversible(activity, R.string.policy_suspend_title,
-                getString(R.string.policy_suspend_what),
-                getString(R.string.policy_suspend_breaks),
-                getString(R.string.policy_suspend_undo),
-                R.string.policy_suspend_action,
-                () -> applySuspend(packageName, true));
+        applySuspend(packageName, !mPolicySuspended);
     }
 
     private void applySuspend(@NonNull String packageName, boolean suspended) {
@@ -604,70 +640,74 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 if (isDetached()) return;
                 ProgressIndicatorCompat.setVisibility(progressIndicator, false);
                 if (!ok) UIUtils.displayLongToast(R.string.policy_failed);
+                else notifyPackageAltered(packageName);
                 loadPolicyState();
             });
         });
     }
 
     /**
-     * Block this app's uninstall, or release it.
+     * Tell the rest of the app that this package's state changed (白い熊, +81).
      * <p>
-     * Same asymmetry as everything else here: locking asks first, releasing is
-     * one tap. Delegated, so the platform answers for itself afterwards.
+     * <b>Landmine.</b> The main list is not polled: it is rebuilt from broadcasts,
+     * and its {@code PackageChangeReceiver} lives on the view model, so it hears
+     * them even while this screen is on top. Suspension, though, produces no
+     * {@code ACTION_PACKAGE_CHANGED} of its own — the platform sends
+     * {@code ACTION_PACKAGES_SUSPENDED}, which did not reach us on the Mate XT —
+     * so an app suspended from here kept its <em>running</em> box and its upright
+     * label on the main list until something else forced a reload. Sending our own
+     * {@code ACTION_PACKAGE_ALTERED} is the mechanism the rest of the fork already
+     * uses for its own writes; the receiver re-reads the package live and every
+     * derived flag (frozen, suspended, running) falls out correctly.
+     */
+    private void notifyPackageAltered(@NonNull String packageName) {
+        Context context = getContext();
+        if (context == null) return;
+        BroadcastUtils.sendPackageAltered(context.getApplicationContext(), new String[]{packageName});
+    }
+
+    /**
+     * Block this app's uninstall, or release it — one tap either way (白い熊, +78).
+     * <p>
+     * The confirmation is gone, along with the other two boxes'. What it said is
+     * now the box's own description, where it is read <em>before</em> the tap
+     * rather than dismissed after it — the same move the per-row padlock made,
+     * and for the same reason: a warning that appears every single time stops
+     * being read at all. Delegated, so the platform answers for itself afterwards.
      */
     private void toggleUninstallBlock(@NonNull String packageName) {
-        if (mPolicyUninstallBlocked) {
-            runPolicy(() -> DevicePolicyBridge.setUninstallBlocked(packageName, false));
-            return;
-        }
-        DangerDialog.confirmReversible(activity, R.string.policy_uninstall_title,
-                getString(R.string.policy_uninstall_what),
-                getString(R.string.policy_uninstall_breaks),
-                getString(R.string.policy_uninstall_undo),
-                R.string.policy_uninstall_block,
-                () -> runPolicy(() -> DevicePolicyBridge.setUninstallBlocked(packageName, true)));
+        boolean block = !mPolicyUninstallBlocked;
+        runPolicy(() -> DevicePolicyBridge.setUninstallBlocked(packageName, block));
     }
 
     /** Stop Settings force-stopping this app or clearing its data — a 雫-side power. */
     private void toggleUserControl(@NonNull String packageName) {
         boolean disable = !mPolicyUserControlDisabled;
-        Runnable apply = () -> runRemotePolicy(
-                () -> PolicyApiClient.setUserControlDisabled(packageName, disable),
+        runRemotePolicy(() -> PolicyApiClient.setUserControlDisabled(packageName, disable),
                 ok -> PolicyLockState.setUserControlDisabled(packageName, disable));
-        if (!disable) {
-            apply.run();
-            return;
-        }
-        DangerDialog.confirmReversible(activity, R.string.policy_user_control_title,
-                getString(R.string.policy_user_control_what),
-                getString(R.string.policy_user_control_breaks),
-                getString(R.string.policy_user_control_undo),
-                R.string.policy_user_control, apply);
     }
 
     /**
-     * Block this app's accessibility service — a 雫-side power, and the one that
-     * keeps its 危険 confirmation: an accessibility service you rely on is how
-     * you operate the phone, and blocking the wrong one is felt immediately.
+     * Block this app's accessibility service — a 雫-side power, and the sharpest
+     * one on the card: an accessibility service you rely on is how you operate the
+     * phone, so shutting the wrong one is felt immediately. That warning is in the
+     * box's description now rather than in a dialog.
      */
     private void toggleAccessibilityBlock(@NonNull String packageName) {
         boolean block = !mPolicyAccessibilityBlocked;
-        Runnable apply = () -> runRemotePolicy(
-                () -> PolicyApiClient.setAccessibilityBlocked(packageName, block),
+        runRemotePolicy(() -> PolicyApiClient.setAccessibilityBlocked(packageName, block),
                 ok -> PolicyLockState.setAccessibilityBlocked(packageName, block));
-        if (!block) {
-            apply.run();
-            return;
-        }
-        DangerDialog.confirm(activity, R.string.policy_accessibility_title,
-                getString(R.string.policy_accessibility_what),
-                getString(R.string.policy_accessibility_breaks),
-                getString(R.string.policy_accessibility_undo),
-                R.string.policy_accessibility_block, apply);
     }
 
+    /**
+     * The one box that still asks. It is not a toggle — it releases every lock on
+     * the app at once, and the only way back from a mistap is to re-apply each of
+     * them by hand. {@code confirmReversible} rather than {@code confirm}: 危険 is
+     * for powers that can leave the phone hard to operate, and this is the way
+     * back from exactly those.
+     */
     private void confirmClearAllLocks(@NonNull String packageName) {
-        DangerDialog.confirm(activity, R.string.policy_clear_all_title,
+        DangerDialog.confirmReversible(activity, R.string.policy_clear_all_title,
                 getString(R.string.policy_clear_all_what),
                 getString(R.string.policy_clear_all_breaks),
                 getString(R.string.policy_clear_all_undo),
@@ -695,8 +735,46 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         // tap and releasing is one tap, so a dialog between them would only be in
         // the way; what it used to say lives in the legend instead, where it can
         // be read once rather than dismissed every time.
-        runRowPolicy(item, () ->
-                DevicePolicyBridge.setPermissionLocked(packageName, permission, !item.policyLocked));
+        boolean lock = !item.policyLocked;
+        runRowPolicy(item, () -> {
+            boolean ok = DevicePolicyBridge.setPermissionLocked(packageName, permission, lock);
+            // Arm the memory with the lock, and drop it with the release (白い熊,
+            // +80). Remembering by default is what makes the feature worth having
+            // — a lock you had to arm separately is a lock you would forget to arm
+            // — and forgetting on release is what stops the enforcer putting back,
+            // at the next install, exactly what you just let go. Only on a write
+            // the platform actually took: the page's standing rule.
+            if (ok) PolicyLockState.setPermissionLockRemembered(packageName, permission, lock);
+            return ok;
+        });
+    }
+
+    /**
+     * Remember this row's lock, or forget it, without touching the lock itself.
+     * <p>
+     * The padlock's long-press, mirroring the row's own: a tap changes the thing,
+     * a long-press changes whether we will put it back. Offered only where it
+     * means something — a lock that exists, or a memory of one that no longer
+     * does. Arming an un-locked row would be an instruction to lock it later,
+     * which is not what a long-press should quietly set up.
+     */
+    private void togglePolicyLockRemembered(@NonNull AppDetailsSnoopingItem item) {
+        if (viewModel == null) return;
+        String permission = item.getPermissionName();
+        String packageName = viewModel.getPackageName();
+        if (permission == null || packageName == null) return;
+        boolean remembered = !item.policyLockRemembered;
+        PolicyLockState.setPermissionLockRemembered(packageName, permission, remembered);
+        item.policyLockRemembered = remembered;
+        UIUtils.displayShortToast(remembered
+                ? R.string.policy_lock_now_remembered
+                : R.string.policy_lock_now_forgotten);
+        if (mAdapter != null) {
+            int pos = mAdapter.findPosition(item);
+            if (pos != RecyclerView.NO_POSITION) {
+                mAdapter.notifyItemChanged(pos);
+            }
+        }
     }
 
     /**
@@ -812,12 +890,17 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
     private void clearAllLocks(@NonNull String packageName) {
         ProgressIndicatorCompat.setVisibility(progressIndicator, true);
         List<String> permissions = new ArrayList<>();
+        List<String> remembered = new ArrayList<>();
         if (mAdapter != null) {
             for (Row row : mAdapter.mRows) {
-                if (row.item != null && row.item.policyLocked) {
-                    String permission = row.item.getPermissionName();
-                    if (permission != null) permissions.add(permission);
-                }
+                if (row.item == null) continue;
+                String permission = row.item.getPermissionName();
+                if (permission == null) continue;
+                if (row.item.policyLocked) permissions.add(permission);
+                // Collected separately: a row can be remembered without being
+                // locked — that is exactly the state this feature exists to show
+                // — and its memory has to go with everything else.
+                if (row.item.policyLockRemembered) remembered.add(permission);
             }
         }
         ThreadUtils.postOnBackgroundThread(() -> {
@@ -826,6 +909,14 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             if (!remote.ok) {
                 for (String permission : permissions) {
                     if (DevicePolicyBridge.setPermissionLocked(packageName, permission, false)) released++;
+                }
+                // Forget unconditionally, even where the release itself failed
+                // (白い熊, +80). The platform may refuse us, but our own memory is
+                // always ours to honour — and leaving one behind would put back,
+                // at the next install, precisely what this button was pressed to
+                // let go.
+                for (String permission : remembered) {
+                    PolicyLockState.setPermissionLockRemembered(packageName, permission, false);
                 }
                 if (DevicePolicyBridge.isSuspended(packageName)
                         && DevicePolicyBridge.setSuspended(packageName, false)) released++;
@@ -844,6 +935,9 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 if (isDetached()) return;
                 ProgressIndicatorCompat.setVisibility(progressIndicator, false);
                 UIUtils.displayLongToast(ok ? R.string.policy_applied : R.string.policy_failed);
+                // Clearing the locks can have lifted a suspension, so the main
+                // list has to be told the same way applySuspend tells it.
+                if (ok) notifyPackageAltered(packageName);
                 refreshDetails();
             });
         });
@@ -1065,24 +1159,35 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 suspendRow.setVisibility(canSuspend ? View.VISIBLE : View.GONE);
                 controls.setVisibility(mPolicyDelegate ? View.VISIBLE : View.GONE);
                 if (canSuspend) {
+                    // Suspension is the one control on this card that improves
+                    // your position rather than describing an exposure (白い熊,
+                    // +79), so it takes the protective half of the page's palette
+                    // and not the alarming one: OFF is grey — the state every
+                    // phone ships in, nothing to look at — and ON is yellow, the
+                    // colour of a shutter you closed. It was red-when-suspended,
+                    // which read as a warning about the very thing you had just
+                    // done to protect yourself. Unlike the boxes below it, its
+                    // switch needs no inversion: the label already names the
+                    // action, so ON is "suspended" and that is the yellow one.
+                    int accent = mPolicySuspended ? yellow : DETAIL_COLOR;
                     suspendLabel.setText(R.string.policy_suspend);
-                    suspendLabel.setTextColor(mPolicySuspended ? DangerDialog.DANGER_RED : yellow);
-                    setLeadingIcon(suspendLabel, R.drawable.ic_lock,
-                            mPolicySuspended ? DangerDialog.DANGER_RED : yellow);
+                    suspendLabel.setTextColor(accent);
+                    setLeadingIcon(suspendLabel, R.drawable.ic_lock, accent);
                     // Bold, right under the row's title: what this is, not a
                     // warning about it (白い熊, 2026-08-01). Suspension is released
                     // by this same switch, so 危険 was the wrong word — what
                     // actually needs saying is that it is a harder freeze than
-                    // hiding, and that nothing outside this app can lift it.
+                    // hiding, and that nothing outside this app can lift it. It
+                    // follows the accent so the row speaks with one voice: loud
+                    // once the shutter is down, quiet while it is up.
                     suspendNote.setText(R.string.policy_suspend_note);
-                    suspendNote.setTextColor(yellow);
+                    suspendNote.setTextColor(accent);
                     suspendSummary.setText(R.string.policy_suspend_summary);
                     suspendSummary.setTextColor(DETAIL_COLOR);
                     suspendSummary.setBackgroundTintList(ColorStateList.valueOf(
                             ColorUtils.setAlphaComponent(DETAIL_COLOR, DETAIL_CHIP_ALPHA)));
                     suspendToggle.setChecked(mPolicySuspended);
-                    ColorStateList tint = ColorStateList.valueOf(
-                            mPolicySuspended ? DangerDialog.DANGER_RED : yellow);
+                    ColorStateList tint = ColorStateList.valueOf(accent);
                     suspendToggle.setThumbTintList(tint);
                     suspendToggle.setTrackDecorationTintList(tint);
                     suspendToggle.setTrackTintList(ColorStateList.valueOf(Color.TRANSPARENT));
@@ -1101,14 +1206,24 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
              * They read exactly like a capability row below, because they are the
              * same kind of thing — a switch over something the app may or may not
              * do — and one colour language across the page is worth more than a
-             * distinction nobody asked for: <b>red</b> while the hard lock is in
-             * force, <b>yellow</b> while it is not, and the thick frame for the
-             * state we put it in, which is the row rule ("changed from default")
-             * applied here, where the default is always "not locked".
+             * distinction nobody asked for.
+             * <p>
+             * <b>The switch names the capability, not the lock</b> (白い熊, +78).
+             * It used to be the other way round — "Block uninstall", on when the
+             * block was in force — which inverted the page's own grammar: an app
+             * nothing protects showed three switches at rest and no red anywhere,
+             * while a locked-down one lit up like a warning. Now the label states
+             * what the phone is still open to ("Can be uninstalled"), so the switch
+             * is <b>right and red</b> exactly when the row rule says it should be —
+             * the app can be got at right now — and <b>left and yellow with a thick
+             * frame</b> once we have shut it. The frame keeps its meaning too: not
+             * locked is what every fresh install gives you, so the frame marks our
+             * doing, never the platform's default.
              */
             void bindControlBoxes() {
                 String packageName = viewModel != null ? viewModel.getPackageName() : null;
                 if (packageName == null) return;
+                Context context = itemView.getContext();
                 // Uninstall blocking is a delegated scope, so unlike the other
                 // three it can genuinely be missing. INVISIBLE rather than GONE:
                 // the grid keeps its shape and the boxes below stay where the
@@ -1116,27 +1231,52 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 boolean canBlockUninstall = mPolicyCanBlockUninstall || mPolicyUninstallBlocked;
                 boxUninstall.setVisibility(canBlockUninstall ? View.VISIBLE : View.INVISIBLE);
                 if (canBlockUninstall) {
-                    bindBox(boxUninstall, R.string.policy_box_uninstall, R.string.policy_box_uninstall_note,
+                    bindBox(boxUninstall, R.string.policy_box_uninstall,
+                            context.getString(R.string.policy_box_uninstall_note),
                             mPolicyUninstallBlocked, v -> toggleUninstallBlock(packageName));
                 }
                 // The two 雫-side powers. Offered whenever we are a delegate,
                 // because only 雫 can say whether they apply — and it answers
                 // with a real reason when they do not.
                 bindBox(boxUserControl, R.string.policy_box_user_control,
-                        mPolicyUserControlDisabled ? R.string.policy_box_unreadable
-                                : R.string.policy_box_user_control_note,
+                        noteWithUnreadable(context, R.string.policy_box_user_control_note,
+                                mPolicyUserControlDisabled),
                         mPolicyUserControlDisabled, v -> toggleUserControl(packageName));
                 bindBox(boxAccessibility, R.string.policy_box_accessibility,
-                        mPolicyAccessibilityBlocked ? R.string.policy_box_unreadable
-                                : R.string.policy_box_accessibility_note,
+                        noteWithUnreadable(context, R.string.policy_box_accessibility_note,
+                                mPolicyAccessibilityBlocked),
                         mPolicyAccessibilityBlocked, v -> toggleAccessibilityBlock(packageName));
                 bindActionBox(boxClear, R.string.policy_box_clear, R.string.policy_box_clear_note,
                         v -> confirmClearAllLocks(packageName));
             }
 
-            /** One box with a switch: label, one-line note, accent, frame. */
+            /**
+             * A 雫-side box's description, plus — only once the lock is on — the
+             * fact that nothing can read it back.
+             * <p>
+             * Appended rather than substituted (白い熊, +78): the caveat used to
+             * <em>replace</em> the description, so the box explained what the
+             * switch did right up until you used it, and then explained something
+             * else. Both facts are true at once, so both are shown at once.
+             */
+            @NonNull
+            private CharSequence noteWithUnreadable(@NonNull Context context, @StringRes int noteRes,
+                                                    boolean locked) {
+                String note = context.getString(noteRes);
+                return locked ? note + "\n" + context.getString(R.string.policy_box_unreadable) : note;
+            }
+
+            /**
+             * One box with a switch: label, description, accent, frame.
+             * <p>
+             * {@code locked} is the state of the <b>lock</b>; the switch shows its
+             * negation, because the label names the capability — see
+             * {@link #bindControlBoxes()}. Nothing else on this page reads its
+             * switch backwards, so keep the inversion here, at the one place that
+             * draws it, rather than in the four call sites.
+             */
             private void bindBox(@NonNull MaterialCardView box, @StringRes int labelRes,
-                                 @StringRes int noteRes, boolean on,
+                                 @NonNull CharSequence noteText, boolean locked,
                                  @NonNull View.OnClickListener onClick) {
                 Context context = box.getContext();
                 // Scoped to the box's own root — the four includes share ids.
@@ -1144,24 +1284,29 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 TextView note = box.findViewById(R.id.policy_box_note);
                 MaterialSwitch toggle = box.findViewById(R.id.policy_box_toggle);
                 View action = box.findViewById(R.id.policy_box_action);
-                int accent = on ? CHANGED_STROKE_ALLOWED : ForkThemeUtils.getTextColor();
+                // Red while the capability is open — the row rule, unchanged:
+                // red is "the app can be got at right now", yellow is "you closed
+                // something the platform leaves open".
+                int accent = locked ? ForkThemeUtils.getTextColor() : CHANGED_STROKE_ALLOWED;
                 label.setText(labelRes);
                 label.setTextColor(accent);
-                note.setText(noteRes);
+                note.setText(noteText);
                 note.setTextColor(DETAIL_COLOR);
                 note.setBackgroundTintList(ColorStateList.valueOf(
                         ColorUtils.setAlphaComponent(DETAIL_COLOR, DETAIL_CHIP_ALPHA)));
                 action.setVisibility(View.GONE);
                 toggle.setVisibility(View.VISIBLE);
-                toggle.setChecked(on);
+                toggle.setChecked(!locked);
                 ColorStateList tint = ColorStateList.valueOf(accent);
                 toggle.setThumbTintList(tint);
                 toggle.setTrackDecorationTintList(tint);
                 toggle.setTrackTintList(ColorStateList.valueOf(Color.TRANSPARENT));
                 // The frame marks OUR doing, exactly as it does on a capability
-                // row. Both branches set both properties, or the next bind of a
-                // released box would keep the thick red outline.
-                if (on) {
+                // row — and here that is the LOCKED state, since an unlocked power
+                // is what every fresh install gives you. Both branches set both
+                // properties, or the next bind of a released box would keep the
+                // thick outline.
+                if (locked) {
                     box.setStrokeColor(accent);
                     box.setStrokeWidth(Math.round(ForkThemeUtils.dpToPx(context, CHANGED_STROKE_DP)));
                 } else {
@@ -1210,6 +1355,14 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             /** The card's own outline, captured before we ever override it. */
             final int defaultStrokeColor;
             final int defaultStrokeWidth;
+            /**
+             * The padlock's own background — the borderless ripple the layout gives
+             * it. Captured because the "remembered" ring replaces it, and a bind
+             * that dropped the ring would otherwise leave the glyph with no touch
+             * feedback for the rest of that view's life.
+             */
+            @Nullable
+            final Drawable lockDefaultBackground;
 
             ItemViewHolder(@NonNull View itemView) {
                 super(itemView);
@@ -1218,6 +1371,7 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 status = itemView.findViewById(R.id.snooping_status);
                 detail = itemView.findViewById(R.id.snooping_detail);
                 lock = itemView.findViewById(R.id.snooping_lock);
+                lockDefaultBackground = lock.getBackground();
                 toggle = itemView.findViewById(R.id.snooping_toggle);
                 // getStrokeWidth/getStrokeColor are plain fields, safe before
                 // layout — unlike getRadius(), which resolves against bounds.
@@ -1327,15 +1481,45 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
              */
             void bindLockGlyph(@NonNull AppDetailsSnoopingItem item) {
                 boolean lockable = item.isPolicyLockable() && mPolicyDelegate && mPolicyCanLock;
-                if (!item.policyLocked && !lockable) {
+                // A remembered lock keeps its padlock even when the platform no
+                // longer holds one — that combination IS the thing worth seeing,
+                // and hiding the glyph would hide it (白い熊, +80).
+                if (!item.policyLocked && !item.policyLockRemembered && !lockable) {
                     lock.setVisibility(View.GONE);
                     lock.setOnClickListener(null);
+                    lock.setOnLongClickListener(null);
+                    lock.setBackground(lockDefaultBackground);
+                    applyLockTouchDelegate(false);
                     return;
                 }
                 lock.setVisibility(View.VISIBLE);
+                applyLockTouchDelegate(true);
                 lock.setImageResource(item.policyLocked ? R.drawable.ic_lock : R.drawable.ic_unlock);
                 ImageViewCompat.setImageTintList(lock,
                         ColorStateList.valueOf(ForkThemeUtils.getTextColor()));
+                // The ring says the lock is remembered — put back if the platform
+                // ever loses it. Red when it already has: remembered but hollow
+                // means the lock is gone, which only a reinstall or a Device Owner
+                // that went away can do, and nothing else here could report.
+                // Both branches set the background (recycled views), and the
+                // no-ring branch restores the ripple the layout gave it.
+                if (item.policyLockRemembered) {
+                    lock.setBackground(rememberedRing(itemView.getContext(), item.policyLocked
+                            ? ForkThemeUtils.getTextColor()
+                            : CHANGED_STROKE_ALLOWED));
+                } else {
+                    lock.setBackground(lockDefaultBackground);
+                }
+                // Long-press changes only whether we will put it back — offered
+                // where there is a lock or a memory of one, and nowhere else.
+                if (item.policyLocked || item.policyLockRemembered) {
+                    lock.setOnLongClickListener(v -> {
+                        togglePolicyLockRemembered(item);
+                        return true;
+                    });
+                } else {
+                    lock.setOnLongClickListener(null);
+                }
                 // Its own view, so a plain tap is enough — no hit-testing against
                 // compound padding, and the card keeps its own click (which
                 // advances the capability's state) untouched.
@@ -1348,6 +1532,49 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 // through its confirmation; releasing does not, exactly like the
                 // suspend switch, because giving control back needs no ceremony.
                 lock.setOnClickListener(v -> toggleLock(item));
+            }
+
+            /**
+             * Make the padlock's hit area match what the eye sees (白い熊, +83).
+             * <p>
+             * The glyph is a 24dp square in a 48dp column, and the row's card
+             * carries a click of its own that <b>advances the capability</b>. So
+             * every pixel between the two is a trap: aim at the padlock, land a
+             * few dp to its right, and you have changed a permission instead of
+             * locking one. Widening the view was half the answer; this is the
+             * other half — the lock's rect grows over the gap towards the switch
+             * and takes the row's full height, so the whole column belongs to it.
+             * <p>
+             * It stops short of the switch on purpose. The switch is
+             * {@code clickable="false"} and its taps fall through to the card,
+             * which is how a tap there advances the state — so a delegate that
+             * reached into it would silently steal that gesture instead.
+             * <p>
+             * Cleared when the padlock is hidden, or a row with no lock at all
+             * would keep swallowing taps meant for the card. Posted, because
+             * {@code getHitRect} is meaningless before layout.
+             */
+            void applyLockTouchDelegate(boolean visible) {
+                View parent = lock.getParent() instanceof View ? (View) lock.getParent() : null;
+                if (parent == null) return;
+                if (!visible) {
+                    parent.setTouchDelegate(null);
+                    return;
+                }
+                parent.post(() -> {
+                    if (lock.getVisibility() != View.VISIBLE) {
+                        parent.setTouchDelegate(null);
+                        return;
+                    }
+                    Rect rect = new Rect();
+                    lock.getHitRect(rect);
+                    Context context = parent.getContext();
+                    rect.left -= Math.round(ForkThemeUtils.dpToPx(context, LOCK_TOUCH_GROW_START_DP));
+                    rect.right += Math.round(ForkThemeUtils.dpToPx(context, LOCK_TOUCH_GROW_END_DP));
+                    rect.top = 0;
+                    rect.bottom = parent.getHeight();
+                    parent.setTouchDelegate(new TouchDelegate(rect, lock));
+                });
             }
 
             void onToggle(@NonNull AppDetailsSnoopingItem item, @SnoopingState.State int state) {

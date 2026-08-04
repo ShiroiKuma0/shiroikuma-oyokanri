@@ -23,6 +23,7 @@ import io.github.muntashirakon.AppManager.compat.ManifestCompat;
 import io.github.muntashirakon.AppManager.compat.PackageManagerCompat;
 import io.github.muntashirakon.AppManager.db.AppsDb;
 import io.github.muntashirakon.AppManager.db.entity.FreezeType;
+import io.github.muntashirakon.AppManager.devicepolicy.DevicePolicyBridge;
 import io.github.muntashirakon.AppManager.profiles.ProtectedAppsProfile;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
 import io.github.muntashirakon.AppManager.settings.Prefs;
@@ -125,6 +126,19 @@ public final class FreezeUtils {
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && PackageManagerCompat.isPackageSuspended(packageName, userId)) {
             PackageManagerCompat.suspendPackages(new String[]{packageName}, userId, false);
+        }
+        // Fork, +81: a DEVICE-POLICY suspension is a different slot. The platform
+        // records suspension per suspending package, so the call above — made as
+        // the shell — cannot clear one applied under 雫's admin: the snowflake
+        // would appear to do nothing at all, for ever. Best-effort and deliberately
+        // last, so an ordinary unfreeze on a phone with no Device Owner costs one
+        // cheap refusal and nothing else.
+        try {
+            if (DevicePolicyBridge.isSuspended(packageName)) {
+                DevicePolicyBridge.setSuspended(packageName, false);
+            }
+        } catch (Throwable ignore) {
+            // No delegation, or no owner. Nothing to lift that we could have lifted.
         }
         if (PackageManagerCompat.getApplicationEnabledSetting(packageName, userId) != PackageManager.COMPONENT_ENABLED_STATE_ENABLED) {
             PackageManagerCompat.setApplicationEnabledSetting(packageName, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, 0, userId);

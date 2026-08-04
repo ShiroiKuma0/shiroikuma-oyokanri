@@ -68,11 +68,14 @@ public final class ColorPrefs {
     public static final String STROKE_SYSTEM = "stroke_system";
     public static final String FREEZE_FROZEN = "freeze_frozen";
     public static final String FREEZE_THAWED = "freeze_thawed";
+    /** Fork, +81: the padlock a suspended row shows in place of the snowflake. */
+    public static final String FREEZE_SUSPENDED = "freeze_suspended";
     public static final String CHIP = "chip";
     public static final String ADDPILL = "addpill";
     // Fork: dormant-row films (painted as the card background)
     public static final String FILM_FROZEN = "film_frozen";
     public static final String FILM_UNINSTALLED = "film_uninstalled";
+    public static final String FILM_SUSPENDED = "film_suspended";
 
     // ---- colour-role keys (process monitor / reaper row state) ----
     public static final String MONITOR_KILLABLE = "monitor_killable";        // default yellow
@@ -178,10 +181,14 @@ public final class ColorPrefs {
             case MONITOR_SEPARATOR_H:
             case MONITOR_SEPARATOR_V:
                 return 0xFF2A2A2A;  // subtle dark grey (matches the old hairline)
+            case FREEZE_SUSPENDED:
+                return ContextCompat.getColor(ctx, R.color.theme_violet);
             case FILM_FROZEN:
                 return ContextCompat.getColor(ctx, R.color.theme_film_frozen);
             case FILM_UNINSTALLED:
                 return ContextCompat.getColor(ctx, R.color.theme_film_uninstalled);
+            case FILM_SUSPENDED:
+                return ContextCompat.getColor(ctx, R.color.theme_film_suspended);
             case VERSION_NORMAL:
             case APPTYPE_NORMAL:
             case DATE_NORMAL:

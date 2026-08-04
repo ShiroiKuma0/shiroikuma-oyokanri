@@ -30,8 +30,15 @@
                 android:layout_width="@dimen/main_list_icon_size"
                 android:layout_height="@dimen/main_list_icon_size"
                 android:layout_gravity="center_horizontal"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
                 tools:srcCompat="@mipmap/ic_launcher_round"
                 android:contentDescription="@string/str_logo" />
+            <!-- Fork, +82: the icon is clickable in its own right — it opens the
+                 app's Snooping page. The rest of the column below it still
+                 toggles freeze, so the two do not compete for the same pixels. -->
+
 
             <!-- Fork: freeze (snowflake) and force-stop (✕) indicators on one
                  line in the whitespace under the icon. The snowflake is pinned
