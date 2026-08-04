@@ -6,6 +6,93 @@ All notable fork changes are recorded here. Versions use the fork's
 `customBaseVersionName+customBuildNumber` scheme (the base mirrors the upstream App Manager release
 this fork is built on).
 
+## 4.1.0+077 — 2026-08-04
+
+Two more entries on the top bar, a one-column list that actually uses its width, two more screens in
+the fork's palette, and the device-policy powers brought out of the menu they were hiding in.
+(Covers builds +073 through +077; the intermediate ones were never released.)
+
+### 🧭 App usage and clear-all-filters on the top bar
+
+**App usage** now sits immediately right of the battery icon — the third *where did it go* screen
+beside the monitor (what is burning CPU right now) and the battery history (what drained it while you
+weren't looking). **Clear all filters** sits immediately left of the filter funnel it undoes, so the
+pair reads as set/reset.
+
+Both are `always`, not `ifRoom`. As `ifRoom` they silently fell into the overflow on a narrow or
+folded panel — which is where clear-all-filters had been hiding ever since it was added, present in
+the menu and invisible on the bar.
+
+### 📐 A one-column list that uses its width
+
+The layout picker gained **1 column**, between *Adaptive* and *2 columns* — and then had to earn it.
+
+Each row's three columns were declared at a fixed **1 : 2** (label/package : version and backup), a
+ratio tuned for a two-column grid and wrong the moment a row gets wide. The right column's content
+does not grow with the row — a version, user/system, an SDK level, a signature, and the backup values
+beside them — so on a one-column list that share bought it hundreds of dp of nothing: a gap between
+the version block and the backup block, another between the backup block and the card's edge, and the
+package name **ellipsized at a third of the row** to pay for both.
+
+It is no longer a share:
+
+- The version/backup block is **measured from its own signature line** and pinned to that width, so
+  the label column absorbs the entire surplus. Measured rather than hardcoded in dp, so the
+  configurable fonts carry through — a larger row font widens the block instead of clipping inside
+  it. On a one-column list that hands roughly 235dp back to the app name.
+- Inside each pair the **backup field became `wrap_content`**, so the backup values sit flush at the
+  card's end, the version values flush left, and a long version string gets whatever the backup side
+  did not need instead of a fixed half.
+- The old 2/3 proportion survives as a **clamp**, so a folded panel or any multi-column grid is left
+  exactly as it was. The change can only ever widen the label column, never narrow it.
+
+Separately, the app name now **reserves the width of the note "+" and the debug star** that float over
+the top-right of its column. They live in the same `FrameLayout` as the name, pinned `end|top`, while
+the name is left-aligned — so a long name used to run underneath them and render with a "+" stamped
+through its last characters.
+
+### 🎨 App usage and Finder in the fork's palette
+
+Both screens render under the yellow-on-black theme: the purple *Daily* pill becomes the yellow/black
+chip, the chart bars and progress bars turn yellow, the surfaces go black.
+
+Two things a theme structurally cannot reach are done by hand. The row cards take **the main list's
+frame** — yellow for a user app, orange for a system one, width and roundness read from the same
+preferences the main list and the battery list read, through a new shared helper so the screens cannot
+drift apart. Without it a black card on a black screen has no edges at all. And the usage-access
+permission dialogs go through the fork's dialog builder, since the yellow border is painted on the
+window background after `show()` and can never be inherited from a theme.
+
+### 🔒 The device-policy powers, out of the menu
+
+The four powers behind *More device-policy controls…* are now **toggle boxes on the policy card**,
+two per row, shaped like a capability row below it: **Block uninstall**, **Block force-stop**, **Block
+accessibility**, **Clear all locks**, each with a one-line explanation. They colour like the rest of
+the page — **red while the hard lock is in force, yellow while it is not** — and take the thick frame
+only when we put it there, which is the capability rows' *changed from default* rule applied where the
+default is always "not locked". The pill and the list dialog behind it are gone; among other things,
+that dialog had been hiding the way back behind two taps and a menu nobody would think to open.
+
+**Clear all locks** keeps the box shape and its place in the grid but takes an open padlock instead of
+a switch. It is an action, not a state, and a switch that sprang back to off would misdescribe it.
+
+Two of the four cannot be read back. Force-stop blocking and accessibility blocking are
+Device-Owner-only in *both* directions — their getters refuse us as surely as their setters do, and
+白い熊 雫's status call answers about the device, never about one package. They are recorded on the same
+terms the write-only firewall rules already use: **only a write 雫 reports as `ok`**, which it sets
+from the real `DevicePolicyManager` call rather than from having received the request, so a refusal
+never becomes a tick. The record is device-local, never travels in a settings export, and is cleared
+when *clear all locks* succeeds. Both the boxes' own note line and the legend say plainly that the
+state shown is ours rather than the platform's.
+
+### 🔧 Mode of operation
+
+The status card was the one surface on that page using Material 3's primary-container pair — a yellow
+fill with dark-on-yellow text — so it read as an inverted block on an otherwise yellow-on-black
+screen, with two of its three states barely legible on it. It is now repainted from the configurable
+fork theme: black fill, yellow stroke, yellow text, and the dimmed "not needed in this mode" state a
+faded version of the same yellow rather than a hue of its own.
+
 ## 4.1.0+072 — 2026-08-02
 
 One dialog now holds every backup action for one app, instead of a chooser that hid the backups

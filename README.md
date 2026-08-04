@@ -18,7 +18,7 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+072`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+077`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
 </div>
 
@@ -113,8 +113,10 @@ not release it. A card above the capabilities says whether the powers are live a
 *why*: no Device Owner on this phone, versus authorised in 雫 but not for us.
 
 The same card carries **suspension** — a harder freeze than hiding, where the app cannot be opened at
-all and the system shows a stub in its place — plus uninstall blocking, force-stop blocking,
-accessibility blocking, and **Clear all locks**, the way back that works even if this app is gone.
+all and the system shows a stub in its place — and, as four toggle boxes beneath it, **block
+uninstall**, **block force-stop**, **block accessibility** and **clear all locks**, the way back that
+works even if this app is gone. They colour like the capability rows: red while the hard lock is in
+force, yellow while it is not, with the thick frame drawn only where we put it.
 
 Only what the platform will actually enforce is offered. Device policy's per-app lever is
 `setPermissionGrantState`, which takes **dangerous runtime permissions and nothing else**, so
@@ -127,8 +129,9 @@ pill, and what locking actually does to an app.
 ## 🎨 Configurable yellow-on-black UI
 
 The fork's signature look: pure-black backgrounds with a bright `#FFFF00` foreground, applied across
-the main list, app-details, profiles, settings, overflow menu, the installer banner, **every** dialog
-(yellow border, yellow-outlined buttons), and the launcher / file-manager / TV-banner icons. Toasts
+the main list, app-details, profiles, settings, app usage, Finder, overflow menu, the installer banner,
+**every** dialog (yellow border, yellow-outlined buttons), and the launcher / file-manager / TV-banner
+icons. Toasts
 are restyled as a black box with yellow text and border, and even the splash screen renders the app
 name, status and version in yellow.
 
@@ -139,7 +142,8 @@ it from Settings) lets you tune, per element:
   SDK, signature and the app-details header, with **`.ttf` / `.otf` import** from storage.
 - **Colours** — per-element text/fill/border colours for labels, indicators, chips, the running box,
   the selected-card frame, separators and the process-monitor rows.
-- **Main-list layout** — adaptive or a fixed **2 / 3 / 4-column** grid, an **edge-to-edge separator
+- **Main-list layout** — adaptive or a fixed **1 / 2 / 3 / 4-column** grid (one column gives the app
+  name the whole row's surplus, with version and backup sized to their text at the card's edge), an **edge-to-edge separator
   grid** (configurable widths and colours), the **running-app box** (border width/roundness, yellow
   for user apps / orange for system), the **selected-card frame**, and the **app-icon size and
   roundness** (square → circle).
