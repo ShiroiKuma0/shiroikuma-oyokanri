@@ -18,7 +18,7 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+077`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+083`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
 </div>
 
@@ -112,11 +112,20 @@ switch in Settings is greyed out, and the lock **outlives this app** — uninsta
 not release it. A card above the capabilities says whether the powers are live and, when they are not,
 *why*: no Device Owner on this phone, versus authorised in 雫 but not for us.
 
-The same card carries **suspension** — a harder freeze than hiding, where the app cannot be opened at
-all and the system shows a stub in its place — and, as four toggle boxes beneath it, **block
-uninstall**, **block force-stop**, **block accessibility** and **clear all locks**, the way back that
-works even if this app is gone. They colour like the capability rows: red while the hard lock is in
-force, yellow while it is not, with the thick frame drawn only where we put it.
+Every switch on that card names the **capability**, never the lock — *Can be uninstalled*, *Can be
+force-stopped*, *Accessibility can be enabled* — so it reads exactly like the capability rows below
+it: flipped right and red while the phone is still open to this, flipped left and yellow with a thick
+frame once policy has shut it. None of them asks for confirmation; what a dialog would have said is
+the box's own description, where it can be read before the tap instead of dismissed after it. Beside
+them sit **suspension** — a harder freeze than hiding, where the app cannot be opened at all and the
+system shows a stub in its place — and **clear all locks**, the way back that works even if this app
+is gone.
+
+A lock can also be **remembered**: a ring around the padlock means it is put back if the platform
+ever loses it. A hard lock cannot drift the way an app-op can — Settings will not lift it and the app
+cannot — but it dies with a full uninstall, and everything the Device Owner holds dies with it. When
+that happens the ring turns **red on a hollow padlock**: remembered, and gone. Nothing else on the
+page could have told you.
 
 Only what the platform will actually enforce is offered. Device policy's per-app lever is
 `setPermissionGrantState`, which takes **dangerous runtime permissions and nothing else**, so
@@ -217,7 +226,10 @@ list **snaps to its final state in one pass** instead of repainting row-by-row o
 The app list does more without a trip into details:
 
 - A one-tap **force-stop ✕** on every running app (next to the freeze snowflake under the icon).
-- A freeze/unfreeze toggle on the whole icon column, with an at-a-glance snowflake indicator.
+- A tap on the **app icon** opens that app's Snooping page; the rest of the icon column stays a
+  freeze/unfreeze toggle, with an at-a-glance snowflake indicator.
+- **Suspended apps read apart from merely frozen ones** at a glance: a violet padlock in place of the
+  snowflake, the app's name struck through, and a heavier film over the row.
 - Free-text **per-app notes** (on the list and in app-details; included in settings export/import).
 - Per-row **profile pills** — tap to filter, long-press to remove, "+" to add to a profile.
 - A **copy-all-displayed-IDs** toolbar action, a **multi-profile include/exclude filter** with a

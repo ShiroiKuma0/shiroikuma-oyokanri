@@ -6,6 +6,121 @@ All notable fork changes are recorded here. Versions use the fork's
 `customBaseVersionName+customBuildNumber` scheme (the base mirrors the upstream App Manager release
 this fork is built on).
 
+## 4.1.0+083 — 2026-08-04
+
+The device-policy card stops speaking in double negatives, its last dialogs go away, a lock can now
+be remembered, and a suspended app finally looks suspended on the main list.
+(Covers builds +078 through +083; the intermediate ones were never released.)
+
+### 🔁 Switches that name the capability, not the lock
+
+The four device-policy boxes were labelled after the **lock** — *Block uninstall* — and were on when
+that lock was in force. That inverted the page's own grammar. An app nothing protects showed three
+switches sitting at rest and no red anywhere on the card, while a thoroughly locked-down app lit up
+like a warning. The colour language of every capability row below it says the opposite: red means the
+app can be got at right now.
+
+Each box now states what the phone is still open to — **Can be uninstalled**, **Can be
+force-stopped**, **Accessibility can be enabled** — so the switch is flipped right and red exactly
+when that is true, and left and yellow with a thick frame once policy has shut it. The frame keeps
+its meaning too: unlocked is what every fresh install gives you, so the frame marks a decision of
+yours, never the platform's default.
+
+The **suspend** switch runs the other way on purpose and is now drawn that way: grey and off is the
+state every phone ships in, yellow and on means you have shut the app down harder than freezing
+would. It was red-when-suspended, which read as a warning about the very thing you had just done to
+protect yourself.
+
+### 💬 No more confirmation dialogs on that card
+
+All four dialogs are gone — the three boxes and the suspend switch. Every word they carried is now
+the control's own description, where it is read *before* the tap rather than dismissed after it: what
+the lock does, what stops working, and how to undo it. The accessibility box still warns that
+automation tools, keyboard helpers and screen readers are what accessibility services drive, because
+that is the one whose consequence is felt immediately — it just says so where you can act on it.
+
+The "held by 白い熊 雫, which offers no way to read it back" caveat is now **appended** to a box's
+description instead of replacing it, so a box no longer explains what its switch does right up until
+you use it and then explains something else.
+
+**Clear all locks** keeps a confirmation — it is not a toggle, it releases everything at once, and the
+only way back from a mistap is re-applying each lock by hand — but it loses its 危険 heading. It is
+the way back from the dangerous things, not one of them.
+
+### 🔗 Remembered device-policy locks
+
+A padlock beside a capability can now be **remembered**, and the mark is a ring around it.
+
+Why it is needed at all: a hard lock cannot drift the way an app-op can — Settings will not lift it
+and the app cannot, which is the whole point. But it is stored against the package's *installation*,
+so a full uninstall takes it with it; and everything 白い熊 雫 holds vanishes the moment it stops
+being Device Owner, for every package at once. Both leave a lock you set silently absent.
+
+- **Yellow ring** — remembered: if the platform loses the lock, it is put back.
+- **Red ring on a hollow padlock** — remembered, and gone. The lock is not in force. This is the
+  state nothing else on the page could report, since the padlock and the pill both faithfully show
+  what the platform is doing right now and therefore hide the disagreement.
+- Tapping the padlock to lock also arms the memory; releasing forgets it; **long-press** changes only
+  the memory, and only where there is a lock or a memory of one.
+
+The replay runs on package install, on our own update, and on the app-start sweep. It re-reads after
+every write and records nothing it did not achieve, so a lock the platform refuses stays remembered
+and is tried again rather than quietly dropped. Unlike a remembered capability it does **not** travel
+in a settings export — a Device Owner belongs to one phone, and so does everything it holds.
+
+One ordering rule made it work: the ordinary snooping replay and the lock replay now run in **one**
+background task rather than two. A fresh install has every permission back at its default, so the
+plain replay certainly writes — to the very grant state a policy lock pins — and the shared thread
+pool would not have ordered two separate posts.
+
+### 🟣 Suspended apps on the main list
+
+Suspending an app from the Snooping card left it looking **active** on the main list: same upright
+label, no film, and an orange "running" frame around an app the system had stopped dead.
+
+The cause is worth recording. The main list is never polled — it is rebuilt from broadcasts — and
+suspension emits no `ACTION_PACKAGE_CHANGED`. The platform sends `ACTION_PACKAGES_SUSPENDED`, which
+the fork does listen for, and it never arrived. So the row kept the state it was built with; and
+because the running frame is drawn only when a row is *not* frozen, a row that never learned it was
+frozen also never stopped looking alive. Every policy write that changes what the list shows now
+announces it directly, the same way the rest of the app announces its own writes.
+
+Suspended rows then keep the italic and the film that every frozen row has, and add three cues so the
+deepest dormant state is never mistaken for an ordinary freeze:
+
+- a **violet padlock** in place of the snowflake — shape carries further than colour at that size;
+- the app's name **struck through** — the cue that survives any icon size, column count or palette;
+- a **heavier violet film**, distinct from the cool cyan of frozen and the mauve of uninstalled.
+
+Both new colours are configurable like everything else, and both appear in the UI page's legend.
+
+A companion fix: the platform records suspension **per suspending package**, so the ordinary
+unsuspend could not lift one applied under 雫's admin — the main-list snowflake would have appeared
+to do nothing at all, for ever. Unfreezing now releases a device-policy suspension too.
+
+### 👆 Tap an icon, get its Snooping page
+
+Tapping an app's **icon** on the main list now opens that app's Snooping page. The rest of the icon
+column still toggles freeze, so nothing was displaced — the glyph you tap to freeze is the freeze
+snowflake, which is where it belonged.
+
+The target tab is threaded through every route into app details — a single reachable user, a package
+we wrongly believed uninstalled, a picker across several users — so the tap always lands on the same
+tab. The icon also repeats the card's selection-mode guard (during a multi-select it extends the
+selection instead of opening an app, since the icon is the easiest thing to hit by accident) and
+forwards its long-press to the card, which a clickable child would otherwise swallow.
+
+### 🎯 The padlock's tap area
+
+The padlock glyph is a 24dp square and its column was 40dp, leaving 8dp of slack each side. Aim at
+it, overshoot by a finger's width to the right, and the tap landed past the view on the card — whose
+click **advances the capability**. Missing a lock did not do nothing; it changed a permission.
+
+The column is now 48dp, and a touch delegate extends the lock's hit area over the gap towards the
+switch and across the row's whole height. It stops at the switch's edge deliberately: the switch's
+own taps fall through to the card, which is how tapping it advances the state, so reaching further
+would have stolen that gesture instead.
+
 ## 4.1.0+077 — 2026-08-04
 
 Two more entries on the top bar, a one-column list that actually uses its width, two more screens in
