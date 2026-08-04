@@ -6,6 +6,30 @@ All notable fork changes are recorded here. Versions use the fork's
 `customBaseVersionName+customBuildNumber` scheme (the base mirrors the upstream App Manager release
 this fork is built on).
 
+## 4.1.0+084 — 2026-08-04
+
+The top bar stops hiding things on a narrow screen.
+
+### ↔️ The main top bar scrolls sideways
+
+Every entry on the main top bar — the process monitor, battery history, app usage, clear-filters,
+the filter funnel, the layout picker — is pinned there on purpose. The alternative, letting Android
+place them "if there is room", is what put them in the overflow menu on a folded panel, which is
+exactly where they are of no use.
+
+The bill for that came due on the search field. It is not a menu entry but the toolbar's own custom
+view, sized to whatever the icons leave behind — and on a narrow screen they left nothing. It
+collapsed to its bare search-type button, which reads as the search bar having disappeared
+altogether.
+
+The bar now **scrolls left and right**. Everything stays on it at full size, and whatever runs past
+the screen edge is reached by dragging the bar. Nothing is squeezed, nothing retreats into the
+overflow, and no entry has to be dropped to make room for another.
+
+Widen the screen and it behaves exactly as before: when the whole bar fits, the search field
+stretches across the space the icons leave, and there is nothing to scroll. So the unfolded display
+is unchanged and only the folded one gains the gesture.
+
 ## 4.1.0+083 — 2026-08-04
 
 The device-policy card stops speaking in double negatives, its last dialogs go away, a lock can now
