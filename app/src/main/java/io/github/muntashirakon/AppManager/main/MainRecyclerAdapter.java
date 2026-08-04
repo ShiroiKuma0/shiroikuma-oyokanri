@@ -15,6 +15,7 @@ import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Outline;
+import android.graphics.Paint;
 import android.graphics.Typeface;
 
 import androidx.core.graphics.ColorUtils;
@@ -127,10 +128,14 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
     // the outline-vs-filled drawable swap alone was too subtle to read.
     private final int mColorYellow;
     private final int mColorIceBlue;
+    // Fork, +81: violet marks the third dormant state, suspended.
+    private final int mColorViolet;
     // Fork: dark "dormant" films painted as the card background (cool = frozen,
-    // mauve = uninstalled). Defaults; overridable via ColorPrefs at runtime.
+    // mauve = uninstalled, violet = suspended). Defaults; overridable via
+    // ColorPrefs at runtime.
     private final int mColorFilmFrozen;
     private final int mColorFilmUninstalled;
+    private final int mColorFilmSuspended;
     // Fork: uninstalled labels are dimmed to ~65% alpha so they read as inactive.
     private static final int UNINSTALLED_LABEL_DIM_ALPHA = 0xA6;
     private final int mLabelFrozenUser;
@@ -178,12 +183,12 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
     private int mcSignature;
     private boolean mcSignatureSet;
     // Non-text indicators (Stage 2): freeze snowflake, chips, + pill.
-    private int mcFreezeFrozen, mcFreezeThawed;
+    private int mcFreezeFrozen, mcFreezeThawed, mcFreezeSuspended;
     private int mcChip, mcAddPill;
     // Fork: re-added running/active box strokes (yellow user / orange system)
     // and the dormant-row films (cool = frozen, mauve = uninstalled).
     private int mcStrokeUser, mcStrokeSystem;
-    private int mcFilmFrozen, mcFilmUninstalled;
+    private int mcFilmFrozen, mcFilmUninstalled, mcFilmSuspended;
 
     // package name -> profile names containing it. Loaded asynchronously on
     // adapter creation; until the load finishes the map is empty and bind
@@ -203,8 +208,10 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         mQueryStringHighlight = ColorCodes.getQueryStringHighlightColor(activity);
         mColorYellow = ContextCompat.getColor(activity, R.color.theme_bright_yellow);
         mColorIceBlue = ContextCompat.getColor(activity, R.color.theme_ice_blue);
+        mColorViolet = ContextCompat.getColor(activity, R.color.theme_violet);
         mColorFilmFrozen = ContextCompat.getColor(activity, R.color.theme_film_frozen);
         mColorFilmUninstalled = ContextCompat.getColor(activity, R.color.theme_film_uninstalled);
+        mColorFilmSuspended = ContextCompat.getColor(activity, R.color.theme_film_suspended);
         mLabelFrozenUser = ContextCompat.getColor(activity, R.color.theme_label_frozen_user);
         mLabelFrozenSystem = ContextCompat.getColor(activity, R.color.theme_label_frozen_system);
         reloadColors();
@@ -345,12 +352,14 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         mcSignature = ColorPrefs.getColor(mActivity, ColorPrefs.SIGNATURE, mColorSecondary);
         mcFreezeFrozen = ColorPrefs.getColor(mActivity, ColorPrefs.FREEZE_FROZEN, mColorIceBlue);
         mcFreezeThawed = ColorPrefs.getColor(mActivity, ColorPrefs.FREEZE_THAWED, mColorYellow);
+        mcFreezeSuspended = ColorPrefs.getColor(mActivity, ColorPrefs.FREEZE_SUSPENDED, mColorViolet);
         mcChip = ColorPrefs.getColor(mActivity, ColorPrefs.CHIP, mColorYellow);
         mcAddPill = ColorPrefs.getColor(mActivity, ColorPrefs.ADDPILL, mColorYellow);
         mcStrokeUser = ColorPrefs.getColor(mActivity, ColorPrefs.STROKE_USER, mColorYellow);
         mcStrokeSystem = ColorPrefs.getColor(mActivity, ColorPrefs.STROKE_SYSTEM, mColorOrange);
         mcFilmFrozen = ColorPrefs.getColor(mActivity, ColorPrefs.FILM_FROZEN, mColorFilmFrozen);
         mcFilmUninstalled = ColorPrefs.getColor(mActivity, ColorPrefs.FILM_UNINSTALLED, mColorFilmUninstalled);
+        mcFilmSuspended = ColorPrefs.getColor(mActivity, ColorPrefs.FILM_SUSPENDED, mColorFilmSuspended);
         // (The selected card's frame is deliberately NOT cached here — it is
         // read at bind time so it stays fresh in multi-window, where the
         // onResume flag consumption never runs.)
@@ -551,6 +560,11 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         int filmColor;
         if (!item.isInstalled) {
             filmColor = mcFilmUninstalled;
+        } else if (item.isSuspendedApp) {
+            // Fork, +81: suspended is checked BEFORE frozen — it is a kind of
+            // frozen (isFrozen is true as well), and it is the deeper state, so
+            // it has to win the film.
+            filmColor = mcFilmSuspended;
         } else if (item.isFrozen) {
             filmColor = mcFilmFrozen;
         } else {
@@ -660,11 +674,22 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         // drawable swap alone was too subtle on its own — Material Symbols
         // ac_unit looks similar in filled and outlined form — so the colour
         // change carries most of the signal.
-        holder.freezeIndicator.setImageResource(item.isFrozen
-                ? R.drawable.ic_snowflake_24dp
-                : R.drawable.ic_snowflake_outline_24dp);
-        holder.freezeIndicator.setImageTintList(ColorStateList.valueOf(
-                item.isFrozen ? mcFreezeFrozen : mcFreezeThawed));
+        // Fork, +81: a SUSPENDED row swaps the snowflake for a filled padlock in
+        // violet. Shape carries further than colour at this size, and the two
+        // together mean the deepest dormant state on the list is never mistaken
+        // for an ordinary freeze — which matters, because the app is not merely
+        // asleep: the system puts a stub in its place and nothing can open it.
+        // Three-way, and every branch sets both properties (recycled views).
+        if (item.isSuspendedApp) {
+            holder.freezeIndicator.setImageResource(R.drawable.ic_lock);
+            holder.freezeIndicator.setImageTintList(ColorStateList.valueOf(mcFreezeSuspended));
+        } else {
+            holder.freezeIndicator.setImageResource(item.isFrozen
+                    ? R.drawable.ic_snowflake_24dp
+                    : R.drawable.ic_snowflake_outline_24dp);
+            holder.freezeIndicator.setImageTintList(ColorStateList.valueOf(
+                    item.isFrozen ? mcFreezeFrozen : mcFreezeThawed));
+        }
         // Make the whole left icon column a tap target to toggle freeze, but
         // ONLY for eligible apps: anything that is not AppManager itself.
         // Our own package keeps the column non-clickable so taps fall
@@ -682,9 +707,41 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             holder.iconColumn.setOnClickListener(null);
             holder.iconColumn.setClickable(false);
         }
+        // Fork, +82: the ICON itself opens the app's Snooping page. The rest of
+        // the column — the snowflake row and the space around it — keeps the
+        // freeze toggle, so nothing is lost: the glyph you tap to freeze is the
+        // freeze glyph, which is where it belonged anyway.
+        //
+        // The selection-mode guard is repeated here deliberately, exactly as the
+        // backup column repeats it. Without it, a tap on the icon during a
+        // multi-select opens an app instead of extending the selection — and the
+        // icon is the easiest thing on the row to hit by accident while
+        // selecting. Long-press is forwarded to the card so range-selection by
+        // long-pressing the icon keeps working, which a clickable child would
+        // otherwise swallow.
+        holder.icon.setOnClickListener(v -> {
+            int currentPos = holder.getBindingAdapterPosition();
+            if (currentPos == RecyclerView.NO_POSITION) return;
+            if (isInSelectionMode()) {
+                toggleSelection(currentPos);
+                AccessibilityUtils.requestAccessibilityFocus(holder.itemView);
+                return;
+            }
+            handleClick(item, AppDetailsActivity.TAB_SNOOPING);
+        });
+        holder.icon.setOnLongClickListener(v -> holder.itemView.performLongClick());
         // Fork: italic marks BOTH frozen and uninstalled (dormant) rows.
         boolean dormantItalic = item.isFrozen || !item.isInstalled;
         holder.label.setTypeface(null, dormantItalic ? Typeface.ITALIC : Typeface.NORMAL);
+        // Fork, +81: and a strikethrough marks the suspended ones. It is the
+        // cue that survives everything — any icon size, any column count, any
+        // colour the user picks — and it says exactly the right thing: this app
+        // is struck out, not merely dimmed. Set in both branches; paint flags
+        // live on the view, so a recycled label would keep the line for ever.
+        int paintFlags = holder.label.getPaintFlags();
+        holder.label.setPaintFlags(item.isSuspendedApp
+                ? paintFlags | Paint.STRIKE_THRU_TEXT_FLAG
+                : paintFlags & ~Paint.STRIKE_THRU_TEXT_FLAG);
         // Set app label
         if (!TextUtils.isEmpty(mSearchQuery) && item.label.toLowerCase(Locale.ROOT).contains(mSearchQuery)) {
             // Highlight searched query
@@ -1084,6 +1141,22 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
     }
 
     private void handleClick(@NonNull ApplicationItem item) {
+        handleClick(item, -1);
+    }
+
+    /**
+     * Open this row, landing on {@code tabIndex} of App details.
+     * <p>
+     * Fork, +82: the tab is threaded through the whole method rather than
+     * short-circuited at the caller, because every one of the branches below can
+     * end in App details — a single reachable user, a package we wrongly believed
+     * uninstalled, a picker over several users — and a tap that lands on 盗み見
+     * for one of them and on App info for another would be the kind of
+     * inconsistency nobody can hold in their head. {@code -1} means "wherever
+     * App details opens by default", which is what every pre-existing caller
+     * wants.
+     */
+    private void handleClick(@NonNull ApplicationItem item, int tabIndex) {
         if (!item.isInstalled || item.userIds.length == 0) {
             // The app should not be installed. But make sure this is really true. (For current user only)
             ApplicationInfo info;
@@ -1102,8 +1175,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                 item.isInstalled = true;
                 item.isOnlyDataInstalled = false;
                 item.userIds = new int[]{UserHandleHidden.myUserId()};
-                Intent intent = AppDetailsActivity.getIntent(mActivity, item.packageName, UserHandleHidden.myUserId());
-                mActivity.startActivity(intent);
+                mActivity.startActivity(detailsIntent(item.packageName, UserHandleHidden.myUserId(), tabIndex));
                 return;
             }
             // 2. If the app can be installed, offer it to install again.
@@ -1150,8 +1222,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         if (item.userIds.length == 1) {
             int[] userHandles = Users.getUsersIds();
             if (ArrayUtils.contains(userHandles, item.userIds[0])) {
-                Intent intent = AppDetailsActivity.getIntent(mActivity, item.packageName, item.userIds[0]);
-                mActivity.startActivity(intent);
+                mActivity.startActivity(detailsIntent(item.packageName, item.userIds[0], tabIndex));
                 return;
             }
             // Outside our jurisdiction
@@ -1171,12 +1242,19 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         new SearchableItemsDialogBuilder<>(mActivity, userNames)
                 .setTitle(R.string.select_user)
                 .setOnItemClickListener((dialog, which, item1) -> {
-                    Intent intent = AppDetailsActivity.getIntent(mActivity, item.packageName, item.userIds[which]);
-                    mActivity.startActivity(intent);
+                    mActivity.startActivity(detailsIntent(item.packageName, item.userIds[which], tabIndex));
                     dialog.dismiss();
                 })
                 .setNegativeButton(R.string.cancel, null)
                 .show();
+    }
+
+    /** App details for this package, on a given tab when one was asked for. */
+    @NonNull
+    private Intent detailsIntent(@NonNull String packageName, int userId, int tabIndex) {
+        return tabIndex >= 0
+                ? AppDetailsActivity.getIntent(mActivity, packageName, userId, tabIndex)
+                : AppDetailsActivity.getIntent(mActivity, packageName, userId);
     }
 
     private void showBackupRestoreDialogOrAppNotInstalled(@NonNull ApplicationItem item) {

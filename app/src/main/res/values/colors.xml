@@ -34,4 +34,13 @@
          temperatures so the categories read apart at a glance. -->
     <color name="theme_film_frozen">#15242E</color>
     <color name="theme_film_uninstalled">#241826</color>
+    <!-- Fork, +81: suspended is a THIRD dormant state, and the strongest one —
+         the app cannot be opened at all and the system shows a stub in its
+         place. It is a kind of frozen, so it keeps the italic and the film, but
+         it needs to read apart from an ordinary freeze at a glance. Violet: not
+         the cool cyan of frozen, not the mauve of uninstalled, and nowhere else
+         on the row. The film is deliberately a shade heavier than the other two
+         — this is the deepest "off" a row can be. -->
+    <color name="theme_violet">#C77DFF</color>
+    <color name="theme_film_suspended">#2A1440</color>
 </resources>

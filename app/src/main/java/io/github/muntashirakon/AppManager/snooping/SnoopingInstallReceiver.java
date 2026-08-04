@@ -11,6 +11,9 @@ import android.os.UserHandleHidden;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import io.github.muntashirakon.AppManager.devicepolicy.PolicyEnforcer;
+import io.github.muntashirakon.AppManager.utils.ThreadUtils;
+
 /**
  * Fork: lands the stored anti-snooping decisions the moment a package shows up.
  * <p>
@@ -35,6 +38,7 @@ public class SnoopingInstallReceiver extends BroadcastReceiver {
         if (!Intent.ACTION_PACKAGE_ADDED.equals(action) && !Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
             return;
         }
+        Context appContext = context.getApplicationContext();
         if (Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
             // We were updated: re-assert everything, since anything could have
             // drifted while this build was not installed. Also forget every
@@ -43,6 +47,10 @@ public class SnoopingInstallReceiver extends BroadcastReceiver {
             // are re-tested rather than trusted.
             SnoopingImmovable.clearAll();
             SnoopingEnforcer.enforceAllAsync(context);
+            // Fork, +80: our own update takes no device-policy lock with it (they
+            // are held under 雫's admin, not ours) — but this is a cheap, certain
+            // moment to notice one that went missing for any other reason.
+            PolicyEnforcer.replayAllAsync(appContext);
             return;
         }
         String packageName = packageNameOf(intent);
@@ -52,7 +60,17 @@ public class SnoopingInstallReceiver extends BroadcastReceiver {
         // A new version of the app may well behave differently, so its marks go.
         SnoopingImmovable.clearPackage(packageName);
         int userId = userIdOf(intent);
-        SnoopingEnforcer.enforcePackageAsync(context, packageName, userId);
+        // Fork, +80: ONE runnable, not two posts. A fresh install has every
+        // permission back at its default, so the snooping replay certainly writes
+        // here — and it writes the same grant state a device-policy lock pins. The
+        // lock has to land after it, and ThreadUtils' background executor is a
+        // shared pool that would not have ordered two posts. See PolicyEnforcer.
+        ThreadUtils.postOnBackgroundThread(() -> {
+            if (SnoopingPrefs.isAutoApplyEnabled()) {
+                SnoopingEnforcer.enforcePackage(appContext, packageName, userId);
+            }
+            PolicyEnforcer.replayPackage(packageName);
+        });
     }
 
     @Nullable

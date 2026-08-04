@@ -154,6 +154,8 @@ public class FontsPreferences extends Fragment {
                     new Cat(null, R.string.pref_color_cat_freeze, new ColorSpec[]{
                             new ColorSpec(ColorPrefs.FREEZE_FROZEN, R.string.pref_color_freeze_frozen),
                             new ColorSpec(ColorPrefs.FREEZE_THAWED, R.string.pref_color_freeze_thawed),
+                            // Fork, +81: the padlock a suspended row shows instead.
+                            new ColorSpec(ColorPrefs.FREEZE_SUSPENDED, R.string.pref_color_freeze_suspended),
                     }),
                     new Cat(null, R.string.pref_color_cat_chips, new ColorSpec[]{
                             new ColorSpec(ColorPrefs.CHIP, R.string.pref_color_chip),
@@ -553,12 +555,16 @@ public class FontsPreferences extends Fragment {
                 tv -> tv.setBackground(shadeChip(ColorPrefs.getColor(ctx, ColorPrefs.FILM_FROZEN), density)));
         addLegendRow(inflater, content, sample, R.string.pref_legend_film_uninstalled,
                 tv -> tv.setBackground(shadeChip(ColorPrefs.getColor(ctx, ColorPrefs.FILM_UNINSTALLED), density)));
+        addLegendRow(inflater, content, sample, R.string.pref_legend_film_suspended,
+                tv -> tv.setBackground(shadeChip(ColorPrefs.getColor(ctx, ColorPrefs.FILM_SUSPENDED), density)));
 
         addLegendHeader(content, R.string.pref_legend_sec_freeze, density);
         addLegendRow(inflater, content, "❄", R.string.pref_legend_freeze_on,
                 tv -> tv.setTextColor(ColorPrefs.getColor(ctx, ColorPrefs.FREEZE_FROZEN)));
         addLegendRow(inflater, content, "❄", R.string.pref_legend_freeze_off,
                 tv -> tv.setTextColor(ColorPrefs.getColor(ctx, ColorPrefs.FREEZE_THAWED)));
+        addLegendRow(inflater, content, "\uD83D\uDD12", R.string.pref_legend_freeze_suspended,
+                tv -> tv.setTextColor(ColorPrefs.getColor(ctx, ColorPrefs.FREEZE_SUSPENDED)));
     }
 
     /**

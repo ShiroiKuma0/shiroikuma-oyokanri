@@ -66,15 +66,29 @@
         <!-- Fork: the device-policy padlock, in a column of its own to the LEFT of
              the toggle and as tall as it. It began as a compound drawable on the
              label, which made it small, ragged down the list, and awkward to hit;
-             a real column lines every lock up and gives it a proper tap target. -->
+             a real column lines every lock up and gives it a proper tap target.
+
+             The padding is not decoration (白い熊, +80): the "remembered" ring is
+             drawn as this view's BACKGROUND, i.e. at its bounds, and a stadium at
+             48×32 cuts straight through the corners of a glyph that fills them.
+             The padding is what holds the glyph inside the curve.
+
+             48dp wide, not 40 (白い熊, +83). The glyph is a 24dp square, so at 40dp
+             it left only 8dp of slack on each side: aim at the padlock, overshoot
+             by a finger's width to the right, and the tap lands past the view on
+             the card — whose click ADVANCES THE CAPABILITY. Missing a lock and
+             changing a permission instead is the worst possible way to miss.
+             `ItemViewHolder#applyLockTouchDelegate` widens the hit rect further
+             still, over the gap up to the switch and the row's whole height. -->
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/snooping_lock"
-            android:layout_width="40dp"
+            android:layout_width="48dp"
             android:layout_height="32dp"
             android:layout_gravity="center_vertical"
             android:layout_weight="0"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/policy_lock"
+            android:padding="4dp"
             android:scaleType="fitCenter"
             android:visibility="gone"
             tools:src="@drawable/ic_unlock"
