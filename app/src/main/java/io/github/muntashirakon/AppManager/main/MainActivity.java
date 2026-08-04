@@ -296,6 +296,16 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                     ViewGroup.LayoutParams.WRAP_CONTENT);
             layoutParams.gravity = Gravity.CENTER;
             actionBar.setCustomView(mSearchView, layoutParams);
+            // Fork: the toolbar lives in a HorizontalScrollView (see
+            // activity_main.xml), so when the bar is too wide for the screen it
+            // is measured UNSPECIFIED and MATCH_PARENT above means nothing —
+            // the search field would fall back to SearchView's 320dp preferred
+            // width and push the action icons off the visible part of the bar.
+            // Give it a narrower explicit width for that case only; when the
+            // bar does fit, fillViewport re-measures it EXACTLY and the field
+            // stretches as before.
+            mSearchView.setUnconstrainedWidth(
+                    getResources().getDimensionPixelSize(R.dimen.main_search_bar_scroll_width));
             mSearchView.setIconifiedByDefault(false);
             // --- Custom theme: yellow-pill search bar with muted-yellow internals.
             // See app/src/main/res/values/colors.xml for the palette.

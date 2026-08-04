@@ -188,6 +188,34 @@ public class AdvancedSearchView extends SearchView {
         super.setOnSearchClickListener(mOnSearchIconClickListenerSuper);
     }
 
+    /**
+     * Fork: the width this view takes when its parent imposes no width at all
+     * (an {@link View.MeasureSpec#UNSPECIFIED} spec), which is what happens inside a
+     * horizontally scrolling top bar. {@link androidx.appcompat.widget.SearchView}
+     * would otherwise fall back to {@code abc_search_view_preferred_width}
+     * (320dp), which on a folded panel is nearly the whole bar and pushes every
+     * action icon off-screen. 0 (the default) keeps the upstream behaviour.
+     */
+    private int mUnconstrainedWidth = 0;
+
+    /**
+     * Fork: see {@link #mUnconstrainedWidth}. Pass a pixel width, or 0 to
+     * restore the upstream preferred-width fallback.
+     */
+    public void setUnconstrainedWidth(int widthPx) {
+        if (mUnconstrainedWidth == widthPx) return;
+        mUnconstrainedWidth = widthPx;
+        requestLayout();
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        if (mUnconstrainedWidth > 0 && MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.UNSPECIFIED) {
+            widthMeasureSpec = MeasureSpec.makeMeasureSpec(mUnconstrainedWidth, MeasureSpec.EXACTLY);
+        }
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+    }
+
     protected static class SavedState extends AbsSavedState {
         int type;
         int enabledTypes;

@@ -6,4 +6,10 @@
     <dimen name="title_font">16sp</dimen>
     <dimen name="subtitle_font">14sp</dimen>
     <dimen name="app_widget_background_padding">16dp</dimen>
+    <!-- Fork: width of the main-list search field when the top bar is wider
+         than the screen and therefore scrolls horizontally. Only used in that
+         case: when the whole bar fits, the field still stretches to fill the
+         space the action icons leave. Keep it well under a folded panel's
+         width so a few action icons stay visible beside it. -->
+    <dimen name="main_search_bar_scroll_width">240dp</dimen>
 </resources>

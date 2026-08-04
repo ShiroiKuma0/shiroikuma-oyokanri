@@ -17,13 +17,34 @@
         app:liftOnScroll="true"
         app:liftOnScrollTargetViewId="@+id/item_list">
 
-        <com.google.android.material.appbar.MaterialToolbar
-            android:id="@+id/toolbar"
+        <!-- Fork: the top bar scrolls left/right instead of dropping things.
+             Every action here is showAsAction="always" and the search field is
+             the toolbar's custom view with MATCH_PARENT width, so on a narrow
+             (folded) panel the icons ate the whole bar and squeezed the search
+             field down to its bare search-type button — it looked like the
+             search bar had vanished. Inside a HorizontalScrollView the toolbar
+             is measured UNSPECIFIED, i.e. at its natural width, so nothing is
+             squeezed and the overflowing end is reached by scrolling.
+             fillViewport="true" keeps the old behaviour whenever the bar does
+             fit: the child is then re-measured EXACTLY at the viewport width
+             and the MATCH_PARENT search field stretches across the free space
+             as before. -->
+        <HorizontalScrollView
+            android:id="@+id/toolbar_scroller"
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            app:navigationIcon="@null"
-            app:popupTheme="@style/ThemeOverlay.AppManager.PopupMenu"
-            tools:menu="@menu/activity_main_actions" />
+            android:layout_height="wrap_content"
+            android:fillViewport="true"
+            android:scrollbars="none">
+
+            <com.google.android.material.appbar.MaterialToolbar
+                android:id="@+id/toolbar"
+                android:layout_width="wrap_content"
+                android:layout_height="?attr/actionBarSize"
+                app:navigationIcon="@null"
+                app:popupTheme="@style/ThemeOverlay.AppManager.PopupMenu"
+                tools:menu="@menu/activity_main_actions" />
+
+        </HorizontalScrollView>
 
         <com.google.android.material.progressindicator.LinearProgressIndicator
             android:id="@+id/progress_linear"
