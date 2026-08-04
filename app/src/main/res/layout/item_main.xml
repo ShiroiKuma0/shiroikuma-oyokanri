@@ -218,13 +218,27 @@
             android:layout_marginStart="@dimen/padding_small">
 
             <!-- Right column: stacked vertical rows. Each of the first three
-                 rows is a horizontal pair - existing field on the left half,
-                 corresponding backup field on the right half (yellow, gone
-                 when no backup). Both children carry layout_weight=1 so each
-                 pair splits the column 50/50; both halves are left-aligned
-                 inside their own half so the existing fields and the backup
-                 fields form two clean columns ("existing" column and
-                 "backup" column). The pairings per spec:
+                 rows is a horizontal pair - existing field on the left,
+                 corresponding backup field flush at the right (yellow, gone
+                 when no backup).
+
+                 Fork (白い熊, +77): the pair used to split 50/50 (both children
+                 layout_weight=1). Both halves were then wider than their text —
+                 "System" in half a column, "long-press" in the other — so the
+                 row carried a gap in the middle AND a gap at its end, and the
+                 app label was ellipsized to pay for both. Now the BACKUP field
+                 is wrap_content with weight 0, so it takes exactly its text and
+                 the existing field (still 0dp + weight 1) absorbs the rest:
+                 the backup values line up flush right, the existing values line
+                 up flush left, and a long version string gets whatever the
+                 backup side did not need instead of a fixed half.
+
+                 The column's own width is no longer a share of the row either —
+                 MainRecyclerAdapter.applyColumnProportions measures it from the
+                 signature line below and pins it, handing the whole surplus to
+                 the label column.
+
+                 The pairings per spec:
                    row 1: version          / backed-up versionName
                    row 2: user-or-system   / backup date (YYYY-MM-DD)
                    row 3: SDK              / backup time (HH:MM:SS)
@@ -250,9 +264,10 @@
 
                 <androidx.appcompat.widget.AppCompatTextView
                     android:id="@+id/backup_version"
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:layout_weight="1"
+                    android:layout_marginStart="@dimen/padding_small"
+                    android:layout_weight="0"
                     android:gravity="center_vertical"
                     android:singleLine="true"
                     android:textAppearance="?attr/textAppearanceBodySmall"
@@ -299,9 +314,10 @@
 
                 <androidx.appcompat.widget.AppCompatTextView
                     android:id="@+id/backup_date"
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:layout_weight="1"
+                    android:layout_marginStart="@dimen/padding_small"
+                    android:layout_weight="0"
                     android:gravity="center_vertical"
                     android:singleLine="true"
                     android:textAppearance="?attr/textAppearanceBodySmall"
@@ -329,9 +345,10 @@
 
                 <androidx.appcompat.widget.AppCompatTextView
                     android:id="@+id/backup_time"
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:layout_weight="1"
+                    android:layout_marginStart="@dimen/padding_small"
+                    android:layout_weight="0"
                     android:gravity="center_vertical"
                     android:singleLine="true"
                     android:textAppearance="?attr/textAppearanceBodySmall"

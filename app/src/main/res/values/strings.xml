@@ -1868,6 +1868,7 @@
     <!-- Main-list layout picker (fork) -->
     <string name="list_layout">List layout</string>
     <string name="layout_adaptive">Adaptive (default)</string>
+    <string name="layout_1_column">1 column</string>
     <string name="layout_2_columns">2 columns</string>
     <string name="layout_3_columns">3 columns</string>
     <string name="layout_4_columns">4 columns</string>
@@ -2316,7 +2317,7 @@
     <string name="working_on_shizuku_mode">Working on Shizuku mode</string>
     <string name="warning_working_on_root_mode_shizuku">Warning: Working on root instead of Shizuku mode.</string>
     <string name="warning_working_on_system_mode_shizuku">Warning: Working on system instead of Shizuku mode.</string>
-    <string name="shizuku_not_authorised">Shizuku did not authorise App Manager. Make sure the server is running, then allow the request when it appears.</string>
+    <string name="shizuku_not_authorised">Shizuku did not authorise 白い熊 応用管理. Make sure the server is running, then allow the request when it appears.</string>
 
     <!-- Fork: the main list's right-hand backup column. A simple tap opens app
          info like the rest of the row; the backup actions live on a long-press,
@@ -2372,7 +2373,8 @@
     <string name="snooping_legend_locking">What locking actually does</string>
     <string name="snooping_legend_locking_1">The permission is denied by device policy. The app cannot request it, and its switch in Settings is greyed out \u2014 so nothing outside this page can put it back, not you and not the app.</string>
     <string name="snooping_legend_locking_2">Because the refusal is silent, an app that assumes a denied permission can simply be asked for again may fail, loop or crash rather than explain itself. If an app starts misbehaving right after you lock something, check its locks first.</string>
-    <string name="snooping_legend_locking_3">A lock outlives this app: uninstalling \u767d\u3044\u718a \u5fdc\u7528\u7ba1\u7406 does not release it, and only \u767d\u3044\u718a \u96eb can clear it then \u2014 \u201cMore device-policy controls\u2026\u201d on the card at the top of this page has \u201cClear all device-policy locks\u201d for exactly that.</string>
+    <string name="snooping_legend_locking_3">A lock outlives this app: uninstalling \u767d\u3044\u718a \u5fdc\u7528\u7ba1\u7406 does not release it, and only \u767d\u3044\u718a \u96eb can clear it then \u2014 the \u201cClear all locks\u201d box on the card at the top of this page is there for exactly that.</string>
+    <string name="snooping_legend_policy_boxes">The four boxes on that card are the device-policy powers themselves. They read like the capability rows below: red with a thick frame while the lock is in force, yellow while it is not. Two of them \u2014 force-stop and accessibility \u2014 are held by \u767d\u3044\u718a \u96eb, which offers no way to read them back, so their switches show what we last applied rather than what the platform confirms.</string>
 
     <!-- Fork: device-policy (Device Owner) locks, delegated by 白い熊 雫. -->
     <string name="policy_danger_tag">危険 · HARD TO UNDO</string>
@@ -2432,4 +2434,18 @@
     <string name="policy_clear_all_breaks">Nothing breaks — this only gives control back. The app regains whatever the platform’s own defaults allow it.</string>
     <string name="policy_clear_all_undo">You can re-apply any of them afterwards.</string>
     <string name="policy_clear_all_action">Clear locks</string>
+
+    <!-- Fork: the four device-policy controls as toggle boxes on the card. Short
+         labels and one-line explanations, because a half-width box has room for
+         a line and not a paragraph — the full account is still in each control's
+         confirmation dialog. -->
+    <string name="policy_box_uninstall">Block uninstall</string>
+    <string name="policy_box_uninstall_note">Nobody can remove it — not Settings, not adb.</string>
+    <string name="policy_box_user_control">Block force-stop</string>
+    <string name="policy_box_user_control_note">Settings’ Force stop and Clear data stop working on it.</string>
+    <string name="policy_box_accessibility">Block accessibility</string>
+    <string name="policy_box_accessibility_note">Nothing can switch its accessibility service on.</string>
+    <string name="policy_box_clear">Clear all locks</string>
+    <string name="policy_box_clear_note">Releases every lock on this app. The way back.</string>
+    <string name="policy_box_unreadable">Applied by us. The platform will not read this one back.</string>
 </resources>

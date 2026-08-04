@@ -19,7 +19,6 @@ import androidx.appcompat.app.ActionBar;
 import androidx.core.app.ActivityCompat;
 import androidx.lifecycle.ViewModelProvider;
 
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
 
 import io.github.muntashirakon.AppManager.BaseActivity;
@@ -27,6 +26,7 @@ import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
 import io.github.muntashirakon.AppManager.settings.FeatureController;
 import io.github.muntashirakon.AppManager.utils.BetterActivityResult;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 import io.github.muntashirakon.adapters.SelectedArrayAdapter;
 import io.github.muntashirakon.util.AccessibilityUtils;
@@ -190,7 +190,10 @@ public class AppUsageActivity extends BaseActivity implements SwipeRefreshLayout
     }
 
     private void promptForUsageStatsPermission() {
-        new MaterialAlertDialogBuilder(this)
+        // Fork: ForkDialog, not a bare MaterialAlertDialogBuilder — the yellow
+        // frame is painted on the window background after show() and can never
+        // be inherited from the theme.
+        ForkDialog.present(ForkDialog.builder(this)
                 .setTitle(R.string.grant_usage_access)
                 .setMessage(R.string.grant_usage_acess_message)
                 .setPositiveButton(R.string.go, (dialog, which) -> {
@@ -198,7 +201,7 @@ public class AppUsageActivity extends BaseActivity implements SwipeRefreshLayout
                         startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS));
                     } catch (ActivityNotFoundException e) {
                         // Usage access isn't available
-                        new MaterialAlertDialogBuilder(this)
+                        ForkDialog.present(ForkDialog.builder(this)
                                 .setCancelable(false)
                                 .setTitle(R.string.grant_usage_access)
                                 .setMessage(R.string.usage_access_not_supported)
@@ -206,12 +209,10 @@ public class AppUsageActivity extends BaseActivity implements SwipeRefreshLayout
                                     FeatureController.getInstance().modifyState(FeatureController
                                             .FEAT_USAGE_ACCESS, false);
                                     finish();
-                                })
-                                .show();
+                                }));
                     }
                 })
                 .setNegativeButton(getString(R.string.go_back), (dialog, which) -> finish())
-                .setCancelable(false)
-                .show();
+                .setCancelable(false));
     }
 }

@@ -103,22 +103,68 @@
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 
-        <!-- A pill, not a chip: this is the only way into the rest of the
-             device-policy controls, and as a flat tinted label it read as a
-             caption and was missed. Background is built in code so it takes the
-             configurable fork yellow. -->
-        <androidx.appcompat.widget.AppCompatTextView
-            android:id="@+id/policy_more"
+        <!-- The rest of the device-policy powers, 2×2 (白い熊, +75). They used to
+             live behind a "More device-policy controls…" pill that opened a list
+             dialog — which hid, among other things, the way back ("Clear all
+             locks") behind two taps and a menu nobody would think to open. As
+             boxes they are visible, and each one SHOWS ITS STATE, which a menu
+             line structurally cannot.
+
+             Two per row rather than four full-width rows: this card sits above
+             the capability list and would otherwise push it off the first
+             screen entirely. -->
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:id="@+id/policy_controls"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:gravity="center"
-            android:minHeight="48dp"
-            android:paddingHorizontal="20dp"
-            android:paddingVertical="10dp"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            tools:text="More device-policy controls…" />
+            android:layout_marginTop="12dp"
+            android:orientation="vertical">
+
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:baselineAligned="false"
+                android:orientation="horizontal">
+
+                <include
+                    android:id="@+id/policy_box_uninstall"
+                    layout="@layout/view_policy_control_box"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1" />
+
+                <include
+                    android:id="@+id/policy_box_user_control"
+                    layout="@layout/view_policy_control_box"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1" />
+
+            </androidx.appcompat.widget.LinearLayoutCompat>
+
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:baselineAligned="false"
+                android:orientation="horizontal">
+
+                <include
+                    android:id="@+id/policy_box_accessibility"
+                    layout="@layout/view_policy_control_box"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1" />
+
+                <include
+                    android:id="@+id/policy_box_clear"
+                    layout="@layout/view_policy_control_box"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1" />
+
+            </androidx.appcompat.widget.LinearLayoutCompat>
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
 
     </androidx.appcompat.widget.LinearLayoutCompat>
 

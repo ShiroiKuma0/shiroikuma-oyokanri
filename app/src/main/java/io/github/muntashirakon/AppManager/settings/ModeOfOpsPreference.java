@@ -15,12 +15,13 @@ import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.graphics.ColorUtils;
 import androidx.core.widget.TextViewCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.google.android.material.button.MaterialButton;
-import com.google.android.material.color.MaterialColors;
+import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.textfield.TextInputLayout;
 import com.google.android.material.textview.MaterialTextView;
 
@@ -33,6 +34,7 @@ import io.github.muntashirakon.AppManager.ipc.LocalServices;
 import io.github.muntashirakon.AppManager.servermanager.LocalServer;
 import io.github.muntashirakon.AppManager.servermanager.ServerConfig;
 import io.github.muntashirakon.AppManager.users.Users;
+import io.github.muntashirakon.AppManager.utils.ForkThemeUtils;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 import io.github.muntashirakon.AppManager.utils.Utils;
@@ -101,9 +103,25 @@ public class ModeOfOpsPreference extends Fragment {
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        mColorActive = MaterialColors.getColorStateListOrNull(view.getContext(), com.google.android.material.R.attr.colorOnPrimaryContainer);
-        mColorInactive = MaterialColors.getColorStateListOrNull(view.getContext(), com.google.android.material.R.attr.colorOutline);
-        mColorError = MaterialColors.getColorStateListOrNull(view.getContext(), com.google.android.material.R.attr.colorOnErrorContainer);
+        // Fork: this card is the only surface on the Mode-of-operation page that used M3's
+        // primary-container pair — a yellow fill with dark-on-yellow text on this theme — so it read
+        // as an inverted block on an otherwise yellow-on-black page, and the two dimmer states
+        // (colorOutline, colorOnErrorContainer) were barely legible on it. Repaint it from the
+        // configurable fork theme instead: black fill, yellow stroke, yellow text. Read here rather
+        // than in the layout because the palette is a runtime preference.
+        int forkText = ForkThemeUtils.getTextColor();
+        MaterialCardView statusCard = view.findViewById(R.id.status_card);
+        statusCard.setCardBackgroundColor(ForkThemeUtils.getBackgroundColor());
+        statusCard.setStrokeColor(ForkThemeUtils.getBorderColor());
+        statusCard.setStrokeWidth(Math.round(ForkThemeUtils.dpToPx(view.getContext(),
+                ForkThemeUtils.getBorderWidthDp())));
+        mColorActive = ColorStateList.valueOf(forkText);
+        // "Not needed in this mode" stays a dimmed version of the same yellow rather than a separate
+        // hue: it is an absence of relevance, not a state of its own.
+        mColorInactive = ColorStateList.valueOf(ColorUtils.setAlphaComponent(forkText, 0x8A));
+        // The failing states keep the theme yellow too — the ⚠ vs ✓ compound drawable is what
+        // distinguishes them, and it survives any palette 白い熊 picks.
+        mColorError = ColorStateList.valueOf(forkText);
         mIconActive = R.drawable.ic_check_circle;
         mIconInactive = io.github.muntashirakon.ui.R.drawable.ic_caution;
         mIconProgress = R.drawable.ic_sync;
@@ -116,6 +134,10 @@ public class ModeOfOpsPreference extends Fragment {
         mRemoteServicesStatusView = view.findViewById(R.id.remote_services_status);
         mModeOfOpsView = view.findViewById(R.id.op_name);
         MaterialButton changeModeView = view.findViewById(R.id.action_settings);
+        // Fork: the only text on the card whose colour the layout owns outright — updateViews()
+        // never touches it — so it has to be repainted here or it stays dark-on-black.
+        changeModeView.setTextColor(forkText);
+        changeModeView.setRippleColor(ColorStateList.valueOf(ColorUtils.setAlphaComponent(forkText, 0x40)));
         List<String> disabledItems = new ArrayList<>();
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Utils.isTv(requireContext())) {
             disabledItems.add(Ops.MODE_ADB_WIFI);

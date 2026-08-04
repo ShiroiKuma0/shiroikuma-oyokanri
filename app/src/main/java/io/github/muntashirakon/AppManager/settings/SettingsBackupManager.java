@@ -33,6 +33,7 @@ import androidx.annotation.StringRes;
 
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.battery.BatteryPrefs;
+import io.github.muntashirakon.AppManager.devicepolicy.PolicyLockState;
 import io.github.muntashirakon.AppManager.snooping.NetBlockState;
 import io.github.muntashirakon.AppManager.snooping.SnoopingImmovable;
 import io.github.muntashirakon.AppManager.snooping.SnoopingPrefs;
@@ -170,10 +171,12 @@ public final class SettingsBackupManager {
      * capability that is perfectly movable there. The battery sampler's state
      * is the previous raw counter reading from <em>this</em> phone at one
      * instant; restoring it elsewhere would make the next delta pure garbage.
+     * The 雫-side policy locks belong to the Device Owner of <em>this</em> phone,
+     * so a restored record would claim locks that were never applied here.
      */
     private static final Set<String> EXCLUDED_PREFS = new HashSet<>(
             Arrays.asList(AutomationAuth.PREF_FILE, SnoopingImmovable.PREF_FILE, NetBlockState.PREF_FILE,
-                    BatteryPrefs.STATE_PREF_FILE));
+                    BatteryPrefs.STATE_PREF_FILE, PolicyLockState.PREF_FILE));
 
     // Shared-prefs stores per category; anything unlisted falls into GENERAL
     // (the main "preferences" store, backup dirs/options, and any future

@@ -37,7 +37,9 @@ import java.util.Locale;
 import io.github.muntashirakon.AppManager.PerProcessActivity;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.details.AppDetailsActivity;
+import io.github.muntashirakon.AppManager.filters.FinderActivity;
 import io.github.muntashirakon.AppManager.main.MainActivity;
+import io.github.muntashirakon.AppManager.usage.AppUsageActivity;
 import io.github.muntashirakon.AppManager.processreaper.ProcessDetailActivity;
 import io.github.muntashirakon.AppManager.battery.BatteryAppDetailActivity;
 import io.github.muntashirakon.AppManager.battery.BatteryUsageActivity;
@@ -189,6 +191,8 @@ public final class AppearanceUtils {
                     || activity instanceof ProcessDetailActivity
                     || activity instanceof BatteryUsageActivity
                     || activity instanceof BatteryAppDetailActivity
+                    || activity instanceof AppUsageActivity
+                    || activity instanceof FinderActivity
                     || activity instanceof MainActivity;
         }
 

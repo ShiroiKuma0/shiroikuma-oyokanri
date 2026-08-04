@@ -699,17 +699,20 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
      * an entry persists it and swaps the layout manager immediately.
      */
     private void showLayoutPicker() {
+        // Entry index maps straight onto the column count from index 1 on
+        // (1 = "1 column", 2 = "2 columns", …); index 0 is adaptive.
         String[] choices = new String[]{
                 getString(R.string.layout_adaptive),
+                getString(R.string.layout_1_column),
                 getString(R.string.layout_2_columns),
                 getString(R.string.layout_3_columns),
                 getString(R.string.layout_4_columns)};
         int columns = MainLayoutPrefs.getColumns(this);
-        int checked = (columns >= 2 && columns <= 4) ? columns - 1 : 0;
+        int checked = (columns >= 1 && columns <= 4) ? columns : 0;
         ForkDialog.present(ForkDialog.builder(this)
                 .setTitle(R.string.list_layout)
                 .setSingleChoiceItems(choices, checked, (dialog, which) -> {
-                    int newColumns = which == 0 ? MainLayoutPrefs.COLUMNS_ADAPTIVE : which + 1;
+                    int newColumns = which == 0 ? MainLayoutPrefs.COLUMNS_ADAPTIVE : which;
                     MainLayoutPrefs.setColumns(this, newColumns);
                     applyListLayout();
                     dialog.dismiss();

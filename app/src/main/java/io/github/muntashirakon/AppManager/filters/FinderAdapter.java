@@ -2,7 +2,6 @@
 
 package io.github.muntashirakon.AppManager.filters;
 
-import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -19,6 +18,7 @@ import java.util.Objects;
 
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.self.imagecache.ImageLoader;
+import io.github.muntashirakon.AppManager.utils.ForkCardFrame;
 import io.github.muntashirakon.widget.RecyclerView;
 
 public class FinderAdapter extends RecyclerView.ListAdapter<FilterItem.FilteredItemInfo<FilterableAppInfo>, FinderAdapter.ViewHolder> {
@@ -62,7 +62,11 @@ public class FinderAdapter extends RecyclerView.ListAdapter<FilterItem.FilteredI
         holder.item2.setVisibility(View.GONE);
         holder.item3.setVisibility(View.GONE);
         holder.toggleBtn.setVisibility(View.GONE);
-        holder.itemView.setStrokeColor(Color.TRANSPARENT);
+        // Fork: the main list's card frame — yellow (user) / orange (system) —
+        // instead of upstream's transparent stroke, which on the yellow-on-black
+        // palette left a black card on a black screen with no edges at all.
+        ForkCardFrame.apply(holder.itemView.getContext(), holder.itemView,
+                appInfo.getApplicationInfo());
     }
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
