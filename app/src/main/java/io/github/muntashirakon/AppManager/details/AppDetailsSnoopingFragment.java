@@ -11,7 +11,6 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.SpannableStringBuilder;
-import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.TextUtils;
 import android.text.style.ForegroundColorSpan;
@@ -23,7 +22,6 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -52,6 +50,7 @@ import io.github.muntashirakon.AppManager.details.struct.AppDetailsSnoopingItem;
 import io.github.muntashirakon.AppManager.devicepolicy.DangerDialog;
 import io.github.muntashirakon.AppManager.devicepolicy.DevicePolicyBridge;
 import io.github.muntashirakon.AppManager.devicepolicy.PolicyApiClient;
+import io.github.muntashirakon.AppManager.devicepolicy.PolicyLockState;
 import io.github.muntashirakon.AppManager.logs.Log;
 import io.github.muntashirakon.AppManager.snooping.SnoopingCatalog;
 import io.github.muntashirakon.AppManager.snooping.SnoopingEnforcer;
@@ -128,6 +127,13 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
     private boolean mPolicyOwnerPresent;
     private boolean mPolicySuspended;
     private boolean mPolicyUninstallBlocked;
+    /**
+     * The two 雫-side locks, read from {@link PolicyLockState} because the
+     * platform offers this side no getter for either — see that class for why
+     * that is honest rather than lazy.
+     */
+    private boolean mPolicyUserControlDisabled;
+    private boolean mPolicyAccessibilityBlocked;
     /** Resolved on the worker with the rest, so no bind() ever makes a binder call. */
     private boolean mPolicyCanLock;
     private boolean mPolicyCanSuspend;
@@ -219,12 +225,18 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             boolean canLock = DevicePolicyBridge.canLockPermissions();
             boolean canSuspend = DevicePolicyBridge.canSuspend();
             boolean canBlockUninstall = DevicePolicyBridge.canBlockUninstall();
+            boolean userControlDisabled = packageName != null
+                    && PolicyLockState.isUserControlDisabled(packageName);
+            boolean accessibilityBlocked = packageName != null
+                    && PolicyLockState.isAccessibilityBlocked(packageName);
             ThreadUtils.postOnMainThread(() -> {
                 if (isDetached()) return;
                 mPolicyDelegate = delegate;
                 mPolicyOwnerPresent = ownerPresent;
                 mPolicySuspended = suspended;
                 mPolicyUninstallBlocked = uninstallBlocked;
+                mPolicyUserControlDisabled = userControlDisabled;
+                mPolicyAccessibilityBlocked = accessibilityBlocked;
                 mPolicyCanLock = canLock;
                 mPolicyCanSuspend = canSuspend;
                 mPolicyCanBlockUninstall = canBlockUninstall;
@@ -354,6 +366,7 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         addLegendParagraph(root, context, R.string.snooping_legend_locking_1, 2f);
         addLegendParagraph(root, context, R.string.snooping_legend_locking_2, 10f);
         addLegendParagraph(root, context, R.string.snooping_legend_locking_3, 10f);
+        addLegendParagraph(root, context, R.string.snooping_legend_policy_boxes, 10f);
 
         NestedScrollView scroller = new NestedScrollView(context);
         scroller.addView(root, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
@@ -543,21 +556,6 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         return box;
     }
 
-    /**
-     * A tappable pill in the fork's language — black fill, yellow hairline, fully
-     * rounded. Same silhouette as the dialog list items, built in code so it takes
-     * the configurable theme's yellow rather than a fixed one.
-     */
-    @NonNull
-    private static Drawable pillBackground(@NonNull Context context) {
-        GradientDrawable pill = new GradientDrawable();
-        pill.setShape(GradientDrawable.RECTANGLE);
-        pill.setColor(Color.BLACK);
-        pill.setCornerRadius(ForkThemeUtils.dpToPx(context, 24f));
-        pill.setStroke(Math.round(ForkThemeUtils.dpToPx(context, 1f)), ForkThemeUtils.getTextColor());
-        return pill;
-    }
-
     /** Tint a compound drawable without depending on API-gated TextViewCompat tinting. */
     private static void setLeadingIcon(@NonNull TextView view, int drawableRes, @ColorInt int color) {
         setIcon(view, drawableRes, color, true);
@@ -612,79 +610,69 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
     }
 
     /**
-     * The rest of the device-policy controls. A menu rather than more rows on the
-     * card: they are rarely used, and each one is dangerous enough that having to
-     * go looking for it is a feature.
+     * Block this app's uninstall, or release it.
+     * <p>
+     * Same asymmetry as everything else here: locking asks first, releasing is
+     * one tap. Delegated, so the platform answers for itself afterwards.
      */
-    private void showPolicyMenu() {
-        if (viewModel == null) return;
-        String packageName = viewModel.getPackageName();
-        if (packageName == null) return;
-        List<CharSequence> labels = new ArrayList<>();
-        List<Runnable> actions = new ArrayList<>();
-
-        if (mPolicyCanBlockUninstall || mPolicyUninstallBlocked) {
-            boolean blocked = mPolicyUninstallBlocked;
-            labels.add(getString(blocked ? R.string.policy_release_action : R.string.policy_uninstall_block));
-            actions.add(() -> {
-                if (blocked) {
-                    runPolicy(() -> DevicePolicyBridge.setUninstallBlocked(packageName, false));
-                } else {
-                    DangerDialog.confirmReversible(activity, R.string.policy_uninstall_title,
-                            getString(R.string.policy_uninstall_what),
-                            getString(R.string.policy_uninstall_breaks),
-                            getString(R.string.policy_uninstall_undo),
-                            R.string.policy_uninstall_block,
-                            () -> runPolicy(() -> DevicePolicyBridge.setUninstallBlocked(packageName, true)));
-                }
-            });
+    private void toggleUninstallBlock(@NonNull String packageName) {
+        if (mPolicyUninstallBlocked) {
+            runPolicy(() -> DevicePolicyBridge.setUninstallBlocked(packageName, false));
+            return;
         }
+        DangerDialog.confirmReversible(activity, R.string.policy_uninstall_title,
+                getString(R.string.policy_uninstall_what),
+                getString(R.string.policy_uninstall_breaks),
+                getString(R.string.policy_uninstall_undo),
+                R.string.policy_uninstall_block,
+                () -> runPolicy(() -> DevicePolicyBridge.setUninstallBlocked(packageName, true)));
+    }
 
-        // The 雫-side powers. Offered unconditionally because only 雫 can say
-        // whether they apply, and it answers with a real reason when they do not.
-        labels.add(getString(R.string.policy_user_control));
-        actions.add(() -> DangerDialog.confirmReversible(activity, R.string.policy_user_control_title,
+    /** Stop Settings force-stopping this app or clearing its data — a 雫-side power. */
+    private void toggleUserControl(@NonNull String packageName) {
+        boolean disable = !mPolicyUserControlDisabled;
+        Runnable apply = () -> runRemotePolicy(
+                () -> PolicyApiClient.setUserControlDisabled(packageName, disable),
+                ok -> PolicyLockState.setUserControlDisabled(packageName, disable));
+        if (!disable) {
+            apply.run();
+            return;
+        }
+        DangerDialog.confirmReversible(activity, R.string.policy_user_control_title,
                 getString(R.string.policy_user_control_what),
                 getString(R.string.policy_user_control_breaks),
                 getString(R.string.policy_user_control_undo),
-                R.string.policy_user_control,
-                () -> runRemotePolicy(() -> PolicyApiClient.setUserControlDisabled(packageName, true))));
+                R.string.policy_user_control, apply);
+    }
 
-        labels.add(getString(R.string.policy_accessibility_block));
-        actions.add(() -> DangerDialog.confirm(activity, R.string.policy_accessibility_title,
+    /**
+     * Block this app's accessibility service — a 雫-side power, and the one that
+     * keeps its 危険 confirmation: an accessibility service you rely on is how
+     * you operate the phone, and blocking the wrong one is felt immediately.
+     */
+    private void toggleAccessibilityBlock(@NonNull String packageName) {
+        boolean block = !mPolicyAccessibilityBlocked;
+        Runnable apply = () -> runRemotePolicy(
+                () -> PolicyApiClient.setAccessibilityBlocked(packageName, block),
+                ok -> PolicyLockState.setAccessibilityBlocked(packageName, block));
+        if (!block) {
+            apply.run();
+            return;
+        }
+        DangerDialog.confirm(activity, R.string.policy_accessibility_title,
                 getString(R.string.policy_accessibility_what),
                 getString(R.string.policy_accessibility_breaks),
                 getString(R.string.policy_accessibility_undo),
-                R.string.policy_accessibility_block,
-                () -> runRemotePolicy(() -> PolicyApiClient.setAccessibilityBlocked(packageName, true))));
+                R.string.policy_accessibility_block, apply);
+    }
 
-        // Bold: this is the way back, and the one entry someone already stuck
-        // needs to find first.
-        labels.add(bold(getString(R.string.policy_clear_all)));
-        actions.add(() -> DangerDialog.confirm(activity, R.string.policy_clear_all_title,
+    private void confirmClearAllLocks(@NonNull String packageName) {
+        DangerDialog.confirm(activity, R.string.policy_clear_all_title,
                 getString(R.string.policy_clear_all_what),
                 getString(R.string.policy_clear_all_breaks),
                 getString(R.string.policy_clear_all_undo),
                 R.string.policy_clear_all_action,
-                () -> clearAllLocks(packageName)));
-
-        // Pills rather than setItems' bare lines: these entries are device-policy
-        // actions sitting in a plain list, and at body-list size they read like
-        // menu filler. ArrayAdapter binds onto the pill layout's TextView root, so
-        // the Spannable above keeps its weight.
-        UIUtils.presentWithYellowBorder(activity, UIUtils.yellowOnBlackDialog(activity)
-                .setTitle(R.string.policy_more_title)
-                .setAdapter(new ArrayAdapter<>(activity, R.layout.item_dialog_pill, labels),
-                        (dialog, which) -> actions.get(which).run())
-                .setNegativeButton(R.string.cancel, null));
-    }
-
-    /** A menu entry that should carry more weight than the ones around it. */
-    @NonNull
-    private static CharSequence bold(@NonNull CharSequence text) {
-        SpannableString out = new SpannableString(text);
-        out.setSpan(new StyleSpan(Typeface.BOLD), 0, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        return out;
+                () -> clearAllLocks(packageName));
     }
 
     /**
@@ -775,8 +763,17 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         });
     }
 
-    /** A 雫-side write: the reason it gives is worth showing verbatim. */
-    private void runRemotePolicy(@NonNull java.util.concurrent.Callable<PolicyApiClient.Result> work) {
+    /**
+     * A 雫-side write: the reason it gives is worth showing verbatim.
+     * <p>
+     * {@code onApplied} runs on the worker, and <b>only when 雫 reports the real
+     * {@code DevicePolicyManager} call succeeded</b> — it is where the two
+     * unreadable locks record themselves in {@link PolicyLockState}. A refusal
+     * must never become a tick, so it is deliberately not called on
+     * {@code ok == false}, nor when 雫 did not answer at all.
+     */
+    private void runRemotePolicy(@NonNull java.util.concurrent.Callable<PolicyApiClient.Result> work,
+                                 @Nullable androidx.core.util.Consumer<Boolean> onApplied) {
         ProgressIndicatorCompat.setVisibility(progressIndicator, true);
         ThreadUtils.postOnBackgroundThread(() -> {
             PolicyApiClient.Result result;
@@ -784,6 +781,9 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 result = work.call();
             } catch (Exception e) {
                 result = PolicyApiClient.Result.unavailable();
+            }
+            if (result.ok && onApplied != null) {
+                onApplied.accept(true);
             }
             PolicyApiClient.Result finalResult = result;
             ThreadUtils.postOnMainThread(() -> {
@@ -833,6 +833,13 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                         && DevicePolicyBridge.setUninstallBlocked(packageName, false)) released++;
             }
             boolean ok = remote.ok || released > 0;
+            // 雫's clear_all_locks releases the two locks this side cannot read,
+            // so our record of them has to go with it — otherwise their switches
+            // would keep claiming a lock that no longer exists. Only when 雫
+            // actually did it: a partial local release did not touch them.
+            if (remote.ok) {
+                PolicyLockState.clearPackage(packageName);
+            }
             ThreadUtils.postOnMainThread(() -> {
                 if (isDetached()) return;
                 ProgressIndicatorCompat.setVisibility(progressIndicator, false);
@@ -1007,7 +1014,14 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             final TextView suspendNote;
             final TextView suspendSummary;
             final MaterialSwitch suspendToggle;
-            final TextView more;
+            final View controls;
+            final MaterialCardView boxUninstall;
+            final MaterialCardView boxUserControl;
+            final MaterialCardView boxAccessibility;
+            final MaterialCardView boxClear;
+            /** A box's own outline, captured before any bind overrides it. */
+            final int boxStrokeColor;
+            final int boxStrokeWidth;
 
             PolicyViewHolder(@NonNull View itemView) {
                 super(itemView);
@@ -1019,7 +1033,14 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 suspendNote = itemView.findViewById(R.id.policy_suspend_note);
                 suspendSummary = itemView.findViewById(R.id.policy_suspend_summary);
                 suspendToggle = itemView.findViewById(R.id.policy_suspend_toggle);
-                more = itemView.findViewById(R.id.policy_more);
+                controls = itemView.findViewById(R.id.policy_controls);
+                boxUninstall = itemView.findViewById(R.id.policy_box_uninstall);
+                boxUserControl = itemView.findViewById(R.id.policy_box_user_control);
+                boxAccessibility = itemView.findViewById(R.id.policy_box_accessibility);
+                boxClear = itemView.findViewById(R.id.policy_box_clear);
+                // Same as the capability rows: plain fields, safe before layout.
+                boxStrokeColor = boxUninstall.getStrokeColor();
+                boxStrokeWidth = boxUninstall.getStrokeWidth();
             }
 
             void bind() {
@@ -1042,7 +1063,7 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 // shown-and-refused, the same rule the capability rows follow.
                 boolean canSuspend = mPolicyDelegate && mPolicyCanSuspend;
                 suspendRow.setVisibility(canSuspend ? View.VISIBLE : View.GONE);
-                more.setVisibility(mPolicyDelegate ? View.VISIBLE : View.GONE);
+                controls.setVisibility(mPolicyDelegate ? View.VISIBLE : View.GONE);
                 if (canSuspend) {
                     suspendLabel.setText(R.string.policy_suspend);
                     suspendLabel.setTextColor(mPolicySuspended ? DangerDialog.DANGER_RED : yellow);
@@ -1067,14 +1088,115 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                     suspendToggle.setTrackTintList(ColorStateList.valueOf(Color.TRANSPARENT));
                     suspendRow.setOnClickListener(v -> toggleSuspend());
                 }
-                more.setText(R.string.policy_more);
-                more.setTextColor(yellow);
-                more.setBackground(pillBackground(context));
-                more.setOnClickListener(v -> showPolicyMenu());
+                if (mPolicyDelegate) bindControlBoxes();
                 // The card itself is not a control — only its rows are.
                 card.setStrokeColor(mPolicyDelegate ? yellow : card.getStrokeColor());
                 card.setOnClickListener(null);
                 card.setClickable(false);
+            }
+
+            /**
+             * The four device-policy powers, as toggle boxes (白い熊, +75).
+             * <p>
+             * They read exactly like a capability row below, because they are the
+             * same kind of thing — a switch over something the app may or may not
+             * do — and one colour language across the page is worth more than a
+             * distinction nobody asked for: <b>red</b> while the hard lock is in
+             * force, <b>yellow</b> while it is not, and the thick frame for the
+             * state we put it in, which is the row rule ("changed from default")
+             * applied here, where the default is always "not locked".
+             */
+            void bindControlBoxes() {
+                String packageName = viewModel != null ? viewModel.getPackageName() : null;
+                if (packageName == null) return;
+                // Uninstall blocking is a delegated scope, so unlike the other
+                // three it can genuinely be missing. INVISIBLE rather than GONE:
+                // the grid keeps its shape and the boxes below stay where the
+                // eye left them.
+                boolean canBlockUninstall = mPolicyCanBlockUninstall || mPolicyUninstallBlocked;
+                boxUninstall.setVisibility(canBlockUninstall ? View.VISIBLE : View.INVISIBLE);
+                if (canBlockUninstall) {
+                    bindBox(boxUninstall, R.string.policy_box_uninstall, R.string.policy_box_uninstall_note,
+                            mPolicyUninstallBlocked, v -> toggleUninstallBlock(packageName));
+                }
+                // The two 雫-side powers. Offered whenever we are a delegate,
+                // because only 雫 can say whether they apply — and it answers
+                // with a real reason when they do not.
+                bindBox(boxUserControl, R.string.policy_box_user_control,
+                        mPolicyUserControlDisabled ? R.string.policy_box_unreadable
+                                : R.string.policy_box_user_control_note,
+                        mPolicyUserControlDisabled, v -> toggleUserControl(packageName));
+                bindBox(boxAccessibility, R.string.policy_box_accessibility,
+                        mPolicyAccessibilityBlocked ? R.string.policy_box_unreadable
+                                : R.string.policy_box_accessibility_note,
+                        mPolicyAccessibilityBlocked, v -> toggleAccessibilityBlock(packageName));
+                bindActionBox(boxClear, R.string.policy_box_clear, R.string.policy_box_clear_note,
+                        v -> confirmClearAllLocks(packageName));
+            }
+
+            /** One box with a switch: label, one-line note, accent, frame. */
+            private void bindBox(@NonNull MaterialCardView box, @StringRes int labelRes,
+                                 @StringRes int noteRes, boolean on,
+                                 @NonNull View.OnClickListener onClick) {
+                Context context = box.getContext();
+                // Scoped to the box's own root — the four includes share ids.
+                TextView label = box.findViewById(R.id.policy_box_label);
+                TextView note = box.findViewById(R.id.policy_box_note);
+                MaterialSwitch toggle = box.findViewById(R.id.policy_box_toggle);
+                View action = box.findViewById(R.id.policy_box_action);
+                int accent = on ? CHANGED_STROKE_ALLOWED : ForkThemeUtils.getTextColor();
+                label.setText(labelRes);
+                label.setTextColor(accent);
+                note.setText(noteRes);
+                note.setTextColor(DETAIL_COLOR);
+                note.setBackgroundTintList(ColorStateList.valueOf(
+                        ColorUtils.setAlphaComponent(DETAIL_COLOR, DETAIL_CHIP_ALPHA)));
+                action.setVisibility(View.GONE);
+                toggle.setVisibility(View.VISIBLE);
+                toggle.setChecked(on);
+                ColorStateList tint = ColorStateList.valueOf(accent);
+                toggle.setThumbTintList(tint);
+                toggle.setTrackDecorationTintList(tint);
+                toggle.setTrackTintList(ColorStateList.valueOf(Color.TRANSPARENT));
+                // The frame marks OUR doing, exactly as it does on a capability
+                // row. Both branches set both properties, or the next bind of a
+                // released box would keep the thick red outline.
+                if (on) {
+                    box.setStrokeColor(accent);
+                    box.setStrokeWidth(Math.round(ForkThemeUtils.dpToPx(context, CHANGED_STROKE_DP)));
+                } else {
+                    box.setStrokeColor(boxStrokeColor);
+                    box.setStrokeWidth(boxStrokeWidth);
+                }
+                box.setOnClickListener(onClick);
+            }
+
+            /**
+             * The odd one out: "Clear all locks" is an action, not a state. It
+             * keeps the box shape so the grid reads as one block, but its switch
+             * slot carries an open padlock instead — a switch that sprang back
+             * would be a lie about what the control does.
+             */
+            private void bindActionBox(@NonNull MaterialCardView box, @StringRes int labelRes,
+                                       @StringRes int noteRes, @NonNull View.OnClickListener onClick) {
+                TextView label = box.findViewById(R.id.policy_box_label);
+                TextView note = box.findViewById(R.id.policy_box_note);
+                MaterialSwitch toggle = box.findViewById(R.id.policy_box_toggle);
+                ImageView action = box.findViewById(R.id.policy_box_action);
+                int yellow = ForkThemeUtils.getTextColor();
+                label.setText(labelRes);
+                label.setTextColor(yellow);
+                note.setText(noteRes);
+                note.setTextColor(DETAIL_COLOR);
+                note.setBackgroundTintList(ColorStateList.valueOf(
+                        ColorUtils.setAlphaComponent(DETAIL_COLOR, DETAIL_CHIP_ALPHA)));
+                toggle.setVisibility(View.GONE);
+                action.setVisibility(View.VISIBLE);
+                action.setImageResource(R.drawable.ic_unlock);
+                ImageViewCompat.setImageTintList(action, ColorStateList.valueOf(yellow));
+                box.setStrokeColor(boxStrokeColor);
+                box.setStrokeWidth(boxStrokeWidth);
+                box.setOnClickListener(onClick);
             }
         }
 

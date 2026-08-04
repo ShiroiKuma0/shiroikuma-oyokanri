@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fork: one device-policy control, drawn as a half-width toggle box inside the
+     policy card (白い熊, +75). Deliberately the SAME shape as a capability row
+     below — outlined card, label, chip-backed explanation, hollow switch — so
+     the whole page reads with one grammar: red = the hard lock is in force,
+     yellow = it is not, and a thick frame means we put it there.
+
+     Included four times, so every id inside is duplicated. That is safe only
+     because every lookup is scoped to the box's own root (findViewById on the
+     included MaterialCardView, never on the card or the fragment) — keep it that
+     way when adding a view here. -->
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    style="@style/Widget.AppTheme.CardView.ListItem.Outlined"
+    android:layout_width="0dp"
+    android:layout_height="match_parent"
+    android:layout_margin="3dp"
+    android:focusable="true"
+    app:cardElevation="0dp">
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="8dp">
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/policy_box_label"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:textAppearance="?android:attr/textAppearanceListItem"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                tools:text="Block uninstall" />
+
+            <!-- Same wrap_content + padding as the capability rows' switch, and
+                 for the same reason: any "remembered"-style box is drawn as this
+                 view's background, so its bounds have to leave air around the
+                 M3 track rather than being filled by it. -->
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/policy_box_toggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_marginStart="4dp"
+                android:layout_weight="0"
+                android:clickable="false"
+                android:focusable="false"
+                android:paddingHorizontal="7dp"
+                android:paddingVertical="6dp" />
+
+            <!-- The switch's slot, for the one box that is an ACTION rather than
+                 a state. "Clear all locks" has no "on", and a switch that sprang
+                 back would be a lie about what the control is. -->
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/policy_box_action"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_gravity="center_vertical"
+                android:layout_marginStart="4dp"
+                android:layout_weight="0"
+                android:contentDescription="@string/policy_clear_all_action"
+                android:scaleType="fitCenter"
+                android:visibility="gone"
+                tools:src="@drawable/ic_unlock"
+                tools:visibility="visible" />
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/policy_box_note"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:background="@drawable/bg_snooping_chip"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textSize="12sp"
+            tools:text="Nobody can remove it — not Settings, not adb." />
+
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
+</com.google.android.material.card.MaterialCardView>

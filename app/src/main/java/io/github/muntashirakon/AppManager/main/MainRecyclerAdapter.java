@@ -39,6 +39,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 import androidx.annotation.WorkerThread;
 import androidx.appcompat.widget.AppCompatImageView;
+import androidx.appcompat.widget.LinearLayoutCompat;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
@@ -435,12 +436,83 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         holder.packageName.setText(UIUtils.getHighlightedText(item.packageName, query, mQueryStringHighlight));
     }
 
+    /** The widest single item in the version/backup block, and its reference width. */
+    private static final String RIGHT_COLUMN_REFERENCE = "SHA384withRSA";
+
+    /**
+     * Fork (白い熊, +77): keep the app name clear of the affordances floating
+     * over the top-right of its column.
+     * <p>
+     * The note "+" and the debug star sit in the same {@code FrameLayout} as the
+     * name, pinned {@code end|top}; the name is left-aligned and wrap_content, so
+     * a long one ran straight underneath them and rendered with a "+" stamped
+     * through its last characters. Reserving their width makes it ellipsize just
+     * short of them instead.
+     * <p>
+     * The star is 20dp ({@code item_favorite} is 60px at xxhdpi) and is always
+     * laid out — it is INVISIBLE, not GONE, for a non-debuggable app. The "+"
+     * adds its own 20dp plus its 6dp end margin, and only while it is shown: an
+     * app that <em>has</em> a note carries the glyph as a compound drawable on
+     * the label instead, and then there is nothing there to avoid.
+     */
+    private static void reserveLabelOverlaySpace(@NonNull Context context, @NonNull ViewHolder holder) {
+        float density = context.getResources().getDisplayMetrics().density;
+        boolean plusShown = holder.noteAdd.getVisibility() == View.VISIBLE;
+        int reserved = Math.round((20f + 4f + (plusShown ? 26f : 0f)) * density);
+        ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) holder.label.getLayoutParams();
+        if (lp.getMarginEnd() == reserved) return;
+        lp.setMarginEnd(reserved);
+        holder.label.setLayoutParams(lp);
+    }
+
+    /**
+     * Fork (白い熊, +76/+77): give the version/backup column the width its text
+     * needs, and hand every remaining pixel to the label/package column.
+     * <p>
+     * The XML declared the two at 1:2, tuned for a two-column grid. On a
+     * one-column list that share bought the right column hundreds of dp of
+     * nothing — a gap before the backup values, another after them, and the
+     * package name ellipsized at a third of the row to pay for it. It is no
+     * longer a share: the block is measured from its own signature line (so the
+     * configurable fonts carry through) and pinned to that width, which puts the
+     * backup values flush at the card's end with the version values immediately
+     * left of them. See {@link MainLayoutPrefs#rightColumnWidthPx}.
+     * <p>
+     * Applied per bind rather than once, because the picker can change the
+     * column count and a fold can change the window under a live list, and both
+     * rebind rows without re-inflating them.
+     */
+    private static void applyColumnProportions(@NonNull Context context, @NonNull ViewHolder holder) {
+        if (holder.centerColumn == null || holder.rightColumn == null || holder.sha == null) return;
+        // The sha view's own paint, so a larger configured font widens the block
+        // instead of clipping inside it.
+        float referencePx = holder.sha.getPaint().measureText(RIGHT_COLUMN_REFERENCE);
+        int rightWidth = MainLayoutPrefs.rightColumnWidthPx(context, referencePx);
+        LinearLayoutCompat.LayoutParams centerLp =
+                (LinearLayoutCompat.LayoutParams) holder.centerColumn.getLayoutParams();
+        LinearLayoutCompat.LayoutParams rightLp =
+                (LinearLayoutCompat.LayoutParams) holder.rightColumn.getLayoutParams();
+        // requestLayout on every bind would be wasted work on a scrolling list.
+        if (rightLp.width == rightWidth && rightLp.weight == 0f
+                && centerLp.width == 0 && centerLp.weight == 1f) {
+            return;
+        }
+        // The label column takes all the slack; the block beside it takes none.
+        centerLp.width = 0;
+        centerLp.weight = 1f;
+        rightLp.width = rightWidth;
+        rightLp.weight = 0f;
+        holder.centerColumn.setLayoutParams(centerLp);
+        holder.rightColumn.setLayoutParams(rightLp);
+    }
+
     @Override
     @SuppressLint("ClickableViewAccessibility")
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         final ApplicationItem item = getItem(position);
         MaterialCardView cardView = holder.itemView;
         Context context = cardView.getContext();
+        applyColumnProportions(context, holder);
         // Add click listeners
         cardView.setOnClickListener(v -> {
             int currentPos = holder.getBindingAdapterPosition();
@@ -685,6 +757,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             holder.noteAdd.setVisibility(View.VISIBLE);
             holder.noteAdd.setOnClickListener(v -> showNoteDialog(holder, notePkg, noteLabel));
         }
+        reserveLabelOverlaySpace(context, holder);
         // Set package name
         if (!TextUtils.isEmpty(mSearchQuery) && item.packageName.toLowerCase(Locale.ROOT).contains(mSearchQuery)) {
             // Highlight searched query
@@ -1241,6 +1314,8 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
 
     public static class ViewHolder extends MultiSelectionView.ViewHolder {
         MaterialCardView itemView;
+        View centerColumn;  // Fork: label/package. Widened on a wide row.
+        View rightColumn;   // Fork: version/backup. Held to a constant width.
         View iconColumn;
         AppCompatImageView icon;
         AppCompatImageView killBadge;   // Fork: force-stop ✕ on the icon corner.
@@ -1266,6 +1341,8 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
             this.itemView = (MaterialCardView) itemView;
+            centerColumn = itemView.findViewById(R.id.main_center_column);
+            rightColumn = itemView.findViewById(R.id.main_right_column);
             iconColumn = itemView.findViewById(R.id.icon_column);
             icon = itemView.findViewById(R.id.icon);
             killBadge = itemView.findViewById(R.id.kill_badge);

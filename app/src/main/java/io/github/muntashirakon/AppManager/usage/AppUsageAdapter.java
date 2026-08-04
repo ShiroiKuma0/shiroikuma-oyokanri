@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.DiffUtil;
 
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
 import com.google.android.material.textview.MaterialTextView;
 
@@ -27,6 +28,7 @@ import io.github.muntashirakon.AppManager.BuildConfig;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.self.imagecache.ImageLoader;
 import io.github.muntashirakon.AppManager.utils.DateUtils;
+import io.github.muntashirakon.AppManager.utils.ForkCardFrame;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 import io.github.muntashirakon.widget.RecyclerView;
 
@@ -163,6 +165,12 @@ class AppUsageAdapter extends RecyclerView.ListAdapter<AppUsageAdapter.UsageList
 
     private void onBindViewHolder(@NonNull ListItemViewHolder holder, @NonNull PackageUsageInfo usageInfo) {
         final int percentUsage = getUsagePercent(usageInfo.screenTime);
+        // Fork: the main list's card frame — yellow (user) / orange (system).
+        // On the yellow-on-black palette the card and the screen are the same
+        // black, so without it the rows have no edges at all.
+        if (holder.itemView instanceof MaterialCardView) {
+            ForkCardFrame.apply(mActivity, (MaterialCardView) holder.itemView, usageInfo.applicationInfo);
+        }
         // Set label (or package name on failure)
         holder.appLabel.setText(usageInfo.appLabel);
         // Set icon

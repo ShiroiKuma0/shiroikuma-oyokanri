@@ -14,7 +14,12 @@
         android:orientation="vertical"
         android:paddingHorizontal="@dimen/padding_medium">
 
+        <!-- Fork: the container colours below are only the pre-theme fallback — ModeOfOpsPreference
+             repaints this card from ForkThemeUtils (black fill, yellow stroke, yellow text) at
+             onViewCreated. M3's primary-container pair renders dark-on-yellow here, which is the
+             one card on an otherwise yellow-on-black screen that inverts, and it was unreadable. -->
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/status_card"
             style="@style/Widget.AppTheme.CardView.ListItem"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

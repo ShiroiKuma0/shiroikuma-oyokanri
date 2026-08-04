@@ -25,19 +25,34 @@
         android:id="@+id/action_battery_history"
         android:icon="@drawable/ic_battery_history"
         android:title="@string/battery_title"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="always" />
+
+    <!-- Fork: per-app screen time / data usage, immediately right of the
+         battery icon — the third "where did it go" screen beside the monitor
+         (CPU right now) and the battery history (drain over time). "always",
+         like every other top-bar entry here: "ifRoom" silently drops into the
+         overflow on a narrow/folded panel, which defeats the point of putting
+         it on the bar. Hidden by onPrepareOptionsMenu when usage access is
+         disabled. -->
+    <item
+        android:id="@+id/action_app_usage"
+        android:icon="@drawable/ic_data_usage"
+        android:title="@string/app_usage"
+        app:showAsAction="always" />
+
+    <!-- Fork: clear-all-filters, immediately LEFT of the filter funnel it
+         undoes, so the pair reads as set/reset. -->
+    <item
+        android:id="@+id/action_clear_filters"
+        android:icon="@drawable/ic_filter_clear"
+        android:title="@string/clear_all_filters"
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/action_list_options"
         android:icon="@drawable/ic_filter"
         android:title="@string/list_options"
-        app:showAsAction="ifRoom" />
-
-    <item
-        android:id="@+id/action_clear_filters"
-        android:icon="@drawable/ic_filter_clear"
-        android:title="@string/clear_all_filters"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="always" />
 
     <!-- Fork: copy-displayed-app-IDs moved off the top toolbar into the
          overflow (was ifRoom with ic_content_copy); the 3x3 layout icon
@@ -74,12 +89,6 @@
         android:id="@+id/action_finder"
         android:icon="@drawable/ic_search"
         android:title="@string/finder_title" />
-
-    <item
-        android:id="@+id/action_app_usage"
-        android:icon="@drawable/ic_data_usage"
-        android:title="@string/app_usage" />
-
 
     <item
         android:id="@+id/action_profiles"
