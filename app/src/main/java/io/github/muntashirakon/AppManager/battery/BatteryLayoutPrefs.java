@@ -7,10 +7,14 @@ import android.content.SharedPreferences;
 
 import androidx.annotation.NonNull;
 
+import io.github.muntashirakon.AppManager.utils.LayoutGeometry;
+
 /**
  * Fork: column layout for the battery ranking, chosen from the same 3×3 grid
  * icon the main list uses. 0 = adaptive auto-fit (one column per 450 dp), 2/3/4
- * = fixed. Its own SharedPreferences file, so settings export/import covers it.
+ * = fixed. Stored <b>per geometry</b> (orientation × fold state, see
+ * {@link LayoutGeometry}). Its own SharedPreferences file, so settings
+ * export/import covers it.
  */
 public final class BatteryLayoutPrefs {
     public static final int COLUMNS_ADAPTIVE = 0;
@@ -26,10 +30,10 @@ public final class BatteryLayoutPrefs {
     }
 
     public static int getColumns(@NonNull Context context) {
-        return prefs(context).getInt(KEY_COLUMNS, COLUMNS_ADAPTIVE);
+        return LayoutGeometry.getColumns(context, prefs(context), KEY_COLUMNS, COLUMNS_ADAPTIVE);
     }
 
     public static void setColumns(@NonNull Context context, int columns) {
-        prefs(context).edit().putInt(KEY_COLUMNS, columns).apply();
+        LayoutGeometry.setColumns(context, prefs(context), KEY_COLUMNS, columns);
     }
 }

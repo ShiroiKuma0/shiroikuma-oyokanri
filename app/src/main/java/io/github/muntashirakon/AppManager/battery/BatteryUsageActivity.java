@@ -39,6 +39,7 @@ import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.db.AppsDb;
 import io.github.muntashirakon.AppManager.db.dao.BatterySampleDao;
 import io.github.muntashirakon.AppManager.details.AppDetailsActivity;
+import io.github.muntashirakon.AppManager.utils.LayoutGeometry;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 
 /**
@@ -60,6 +61,9 @@ public class BatteryUsageActivity extends BaseActivity {
     private BatteryUsageViewModel mViewModel;
     private BatteryUsageAdapter mAdapter;
     private RecyclerView mList;
+    // Fork: the geometry the current layout manager was built for — the column
+    // count is stored per orientation × fold state (see LayoutGeometry).
+    private String mLayoutGeometry;
     private View mEmpty;
     @Nullable
     private View mHeaderPanel;
@@ -164,6 +168,7 @@ public class BatteryUsageActivity extends BaseActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        applyListLayoutIfGeometryChanged();
         // Colours are read at bind time (bindCard), so a rebind is all that a
         // settings change needs.
         if (mAdapter != null) mAdapter.notifyDataSetChanged();
@@ -377,6 +382,21 @@ public class BatteryUsageActivity extends BaseActivity {
             });
         }
         mList.setLayoutManager(manager);
+        // The pick is per geometry — remember which one this layout is for.
+        mLayoutGeometry = LayoutGeometry.key(this);
+    }
+
+    /**
+     * Fork: re-read the layout when the geometry changed under a surviving
+     * activity (multi-window resize, or a window whose geometry moved while we
+     * were paused). Folding or rotating normally recreates the activity, which
+     * applies the right pick by itself.
+     */
+    private void applyListLayoutIfGeometryChanged() {
+        if (mList != null && !LayoutGeometry.key(this).equals(mLayoutGeometry)) {
+            applyListLayout();
+            mList.setAdapter(mAdapter);
+        }
     }
 
     @NonNull

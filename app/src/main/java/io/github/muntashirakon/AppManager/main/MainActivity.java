@@ -113,6 +113,7 @@ import io.github.muntashirakon.AppManager.utils.AppPref;
 import io.github.muntashirakon.AppManager.utils.DateUtils;
 import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.ForkThemeUtils;
+import io.github.muntashirakon.AppManager.utils.LayoutGeometry;
 import io.github.muntashirakon.AppManager.utils.StoragePermission;
 import io.github.muntashirakon.AppManager.utils.ClipboardUtils;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
@@ -146,6 +147,9 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
     private RecyclerView mRecyclerView;
     // Fork: separator grid between the edge-to-edge list cells.
     private MainSeparatorDecoration mSeparatorDecoration;
+    // Fork: the geometry the current layout manager was built for (see
+    // LayoutGeometry) — column counts are stored per orientation × fold state.
+    private String mLayoutGeometry;
     private MultiSelectionView mMultiSelectionView;
     MainBatchOpsHandler mBatchOpsHandler;
     private MenuItem mAppUsageMenu;
@@ -658,6 +662,9 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
      * switching windows never goes through onResume.
      */
     private void refreshForkAppearanceIfChanged() {
+        // Fork: the same two call sites are the right hook for a geometry that
+        // moved without a recreation (multi-window resize, side-by-side switch).
+        applyListLayoutIfGeometryChanged();
         boolean fontsChanged = FontPrefs.consumeChanged();
         boolean colorsChanged = ColorPrefs.consumeChanged();
         boolean separatorsChanged = SeparatorPrefs.consumeChanged();
@@ -701,6 +708,22 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             mRecyclerView.setLayoutManager(UIUtils.getGridLayoutAt450Dp(this));
         } else {
             mRecyclerView.setLayoutManager(new GridLayoutManager(this, columns));
+        }
+        // Fork: the pick is per geometry, so remember which one this layout is
+        // for — see applyListLayoutIfGeometryChanged().
+        mLayoutGeometry = LayoutGeometry.key(this);
+    }
+
+    /**
+     * Fork: re-read the layout when the geometry changed under a surviving
+     * activity. Folding or rotating normally recreates us (no configChanges is
+     * declared), and then onCreate applies the right pick; this covers the paths
+     * where the activity lives through it — a multi-window resize, or coming
+     * back to a window whose geometry moved while we were paused.
+     */
+    private void applyListLayoutIfGeometryChanged() {
+        if (mRecyclerView != null && !LayoutGeometry.key(this).equals(mLayoutGeometry)) {
+            applyListLayout();
         }
     }
 

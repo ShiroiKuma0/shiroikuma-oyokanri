@@ -39,6 +39,7 @@ import io.github.muntashirakon.AppManager.BaseActivity;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.runningapps.AppProcessItem;
 import io.github.muntashirakon.AppManager.settings.SettingsActivity;
+import io.github.muntashirakon.AppManager.utils.LayoutGeometry;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 
 /**
@@ -53,6 +54,9 @@ public class ProcessMonitorActivity extends BaseActivity {
     private ProcessMonitorAdapter mAdapter;
     private RecyclerView mList;
     private MonitorSeparatorDecoration mSeparators;
+    // Fork: the geometry the current layout manager was built for — the column
+    // count is stored per orientation × fold state (see LayoutGeometry).
+    private String mLayoutGeometry;
     private LinearProgressIndicator mProgress;
     private View mEmpty;
 
@@ -92,7 +96,7 @@ public class ProcessMonitorActivity extends BaseActivity {
         mEmpty = findViewById(R.id.monitor_empty);
 
         mList = findViewById(R.id.monitor_list);
-        mList.setLayoutManager(new GridLayoutManager(this, MonitorPrefs.getColumns(this)));
+        applyListLayout();
         mSeparators = new MonitorSeparatorDecoration(this);
         mList.addItemDecoration(mSeparators);
         mAdapter = new ProcessMonitorAdapter(this, this::onRowClick, this::onSelectionChanged,
@@ -176,6 +180,7 @@ public class ProcessMonitorActivity extends BaseActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        applyListLayoutIfGeometryChanged();
         if (mSeparators != null) {
             mSeparators.reload(this);   // pick up separator width/colour changes
             mList.invalidateItemDecorations();
@@ -452,15 +457,65 @@ public class ProcessMonitorActivity extends BaseActivity {
             mViewModel.load();
             return true;
         } else if (id == R.id.action_monitor_columns) {
-            int cols = MonitorPrefs.cycleColumns(this);
-            mList.setLayoutManager(new GridLayoutManager(this, cols));
-            UIUtils.displayShortToast(getString(R.string.monitor_columns_n, cols));
+            showLayoutPicker();
             return true;
         } else if (id == R.id.action_monitor_interval) {
             showIntervalPicker();
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    /**
+     * Fork: the same list-layout picker the main screen's grid icon opens, with
+     * the same entries and the same prefs shape — the icon used to cycle
+     * 1 → 2 → 3 blind, so reaching a layout meant tapping through the ones you
+     * did not want and there was no way to see which was in effect.
+     */
+    private void showLayoutPicker() {
+        // Entry index maps straight onto the column count from index 1 on
+        // (1 = "1 column", 2 = "2 columns", …); index 0 is adaptive.
+        String[] choices = new String[]{
+                getString(R.string.layout_adaptive),
+                getString(R.string.layout_1_column),
+                getString(R.string.layout_2_columns),
+                getString(R.string.layout_3_columns),
+                getString(R.string.layout_4_columns)};
+        int columns = MonitorPrefs.getColumns(this);
+        int checked = (columns >= MonitorPrefs.MIN_COLUMNS && columns <= MonitorPrefs.MAX_COLUMNS)
+                ? columns : 0;
+        presentWithYellowBorder(themedDialog()
+                .setTitle(R.string.list_layout)
+                .setSingleChoiceItems(choices, checked, (d, which) -> {
+                    MonitorPrefs.setColumns(this, which == 0 ? MonitorPrefs.COLUMNS_ADAPTIVE : which);
+                    applyListLayout();
+                    d.dismiss();
+                })
+                .setNegativeButton(R.string.cancel, null));
+    }
+
+    /** The picked layout: the auto-fit grid, or a fixed column count. */
+    private void applyListLayout() {
+        int columns = MonitorPrefs.getColumns(this);
+        if (columns <= MonitorPrefs.COLUMNS_ADAPTIVE) {
+            mList.setLayoutManager(UIUtils.getGridLayoutAt450Dp(this));
+        } else {
+            mList.setLayoutManager(new GridLayoutManager(this, columns));
+        }
+        // The pick is per geometry — remember which one this layout is for.
+        mLayoutGeometry = LayoutGeometry.key(this);
+    }
+
+    /**
+     * Fork: re-read the layout when the geometry changed under a surviving
+     * activity (multi-window resize, or a window whose geometry moved while we
+     * were paused). Folding or rotating normally recreates the activity, and
+     * onAuthenticated applies the right pick then.
+     */
+    private void applyListLayoutIfGeometryChanged() {
+        if (mList != null && !LayoutGeometry.key(this).equals(mLayoutGeometry)) {
+            applyListLayout();
+        }
     }
 
     private void showIntervalPicker() {

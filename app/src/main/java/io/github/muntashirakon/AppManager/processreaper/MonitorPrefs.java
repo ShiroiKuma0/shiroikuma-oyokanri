@@ -7,10 +7,13 @@ import android.content.SharedPreferences;
 
 import androidx.annotation.NonNull;
 
+import io.github.muntashirakon.AppManager.utils.LayoutGeometry;
+
 /**
- * Fork: layout prefs for the process monitor — column count (1/2/3, toggled
- * from the top bar) and the per-row app-icon size in dp (set on the UI page).
- * Dedicated SharedPreferences file, so settings export/import covers it.
+ * Fork: layout prefs for the process monitor — column count (adaptive or 1–4,
+ * picked from the top-bar grid icon) and the per-row app-icon size in dp (set on
+ * the UI page). Dedicated SharedPreferences file, so settings export/import
+ * covers it.
  */
 public final class MonitorPrefs {
     private MonitorPrefs() {}
@@ -24,8 +27,10 @@ public final class MonitorPrefs {
     private static final String KEY_DETAIL_ICON_DP = "detail_icon_dp";
     private static final String KEY_DETAIL_ROW_PAD_DP = "detail_row_pad_dp";
 
+    /** Auto-fit grid, one column per 450dp — the same rule as the main list. */
+    public static final int COLUMNS_ADAPTIVE = 0;
     public static final int MIN_COLUMNS = 1;
-    public static final int MAX_COLUMNS = 3;
+    public static final int MAX_COLUMNS = 4;
     public static final int DEFAULT_ICON_DP = 40;
     public static final int MIN_ICON_DP = 24;
     public static final int MAX_ICON_DP = 72;
@@ -54,17 +59,19 @@ public final class MonitorPrefs {
         return ctx.getApplicationContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
     }
 
+    /**
+     * {@link #COLUMNS_ADAPTIVE} or a fixed count in [{@value #MIN_COLUMNS},
+     * {@value #MAX_COLUMNS}], for the current geometry — see {@link LayoutGeometry}.
+     */
     public static int getColumns(@NonNull Context ctx) {
-        int c = sp(ctx).getInt(KEY_COLUMNS, 1);
-        return Math.max(MIN_COLUMNS, Math.min(MAX_COLUMNS, c));
+        int c = LayoutGeometry.getColumns(ctx, sp(ctx), KEY_COLUMNS, COLUMNS_ADAPTIVE);
+        return Math.max(COLUMNS_ADAPTIVE, Math.min(MAX_COLUMNS, c));
     }
 
-    /** Cycle 1 → 2 → 3 → 1, persist, and return the new value. */
-    public static int cycleColumns(@NonNull Context ctx) {
-        int next = getColumns(ctx) + 1;
-        if (next > MAX_COLUMNS) next = MIN_COLUMNS;
-        sp(ctx).edit().putInt(KEY_COLUMNS, next).apply();
-        return next;
+    /** Stores the pick for the current geometry only. */
+    public static void setColumns(@NonNull Context ctx, int columns) {
+        LayoutGeometry.setColumns(ctx, sp(ctx), KEY_COLUMNS,
+                Math.max(COLUMNS_ADAPTIVE, Math.min(MAX_COLUMNS, columns)));
     }
 
     public static int getIconSizeDp(@NonNull Context ctx) {

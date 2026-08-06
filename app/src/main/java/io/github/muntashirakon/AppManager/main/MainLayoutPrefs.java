@@ -7,9 +7,13 @@ import android.content.SharedPreferences;
 
 import androidx.annotation.NonNull;
 
+import io.github.muntashirakon.AppManager.utils.LayoutGeometry;
+
 // Fork: persists the main-list column layout chosen from the toolbar grid icon.
 // 0 = adaptive auto-fit grid (the original layout, one column per 450dp);
-// 1/2/3/4 = fixed column count. Dedicated SharedPreferences file so settings
+// 1/2/3/4 = fixed column count. Stored PER GEOMETRY (orientation × fold state,
+// see LayoutGeometry) — folded and unfolded want different layouts and each is
+// remembered on its own. Dedicated SharedPreferences file so settings
 // export/import picks it up automatically (it bundles shared_prefs/*.xml).
 public final class MainLayoutPrefs {
     public static final int COLUMNS_ADAPTIVE = 0;
@@ -25,12 +29,14 @@ public final class MainLayoutPrefs {
         return context.getApplicationContext().getSharedPreferences(PREF_FILE, Context.MODE_PRIVATE);
     }
 
+    /** The pick for the current geometry — see {@link LayoutGeometry}. */
     public static int getColumns(@NonNull Context context) {
-        return prefs(context).getInt(KEY_COLUMNS, COLUMNS_ADAPTIVE);
+        return LayoutGeometry.getColumns(context, prefs(context), KEY_COLUMNS, COLUMNS_ADAPTIVE);
     }
 
+    /** Stores the pick for the current geometry only. */
     public static void setColumns(@NonNull Context context, int columns) {
-        prefs(context).edit().putInt(KEY_COLUMNS, columns).apply();
+        LayoutGeometry.setColumns(context, prefs(context), KEY_COLUMNS, columns);
     }
 
     // ── Row proportions ──────────────────────────────────────────────────────
