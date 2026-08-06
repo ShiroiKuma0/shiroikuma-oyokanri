@@ -6,6 +6,72 @@ All notable fork changes are recorded here. Versions use the fork's
 `customBaseVersionName+customBuildNumber` scheme (the base mirrors the upstream App Manager release
 this fork is built on).
 
+## 4.1.0+088 — 2026-08-06
+
+Every list screen remembers a layout per screen shape, the process monitor's top bar stops hiding
+its own tools, and the monitor opens on the question it exists to answer.
+(Covers builds +085 through +088.)
+
+### 📐 One layout per geometry, remembered separately
+
+A column count that suits the folded cover panel is wrong on the unfolded screen and wrong again
+turned sideways — but until now the main list, the process monitor and the battery history each kept
+**one** pick and applied it everywhere. Setting the layout you wanted for one shape meant unsetting
+the one you wanted for the others.
+
+All three now keep **one pick per geometry**. Fold, unfold, rotate, or drop the app into half the
+screen, and each shape shows what you last chose *for that shape*, across restarts. Nothing new to
+configure: the picker is the same dialog, it simply writes to the shape you are currently in.
+
+What counts as a shape is the orientation together with the window's shorter side in dp — which is
+the fold, measured rather than asked for. It moves when panels unfold and stands still when you
+merely rotate, so no fold API, no vendor-specific list of devices, and a phone with three panels or
+none gets sensible slots for free. Split-screen falls out of the same rule, since Android has
+described the *window* rather than the display since Nougat: a half-screen window is its own shape
+and keeps its own layout.
+
+Your existing pick is not lost. It seeds every shape you have not set yet, so nothing changes until
+you choose — and from the first choice onwards each shape is on its own.
+
+### ↔️ The process monitor's top bar scrolls sideways too
+
+The main top bar gained this in `+084`; the monitor needed it more. It carries six tools — search,
+pause, filter, sort, layout, refresh — plus a title and a live "N processes · M killable · L leaks"
+summary, and on a folded panel Android answered by hiding most of them in the overflow menu and
+cutting the summary off mid-word.
+
+Now everything stays on the bar at full size and the overflow runs past the edge, reachable by
+dragging the bar left and right. The summary line is no longer truncated either. Widen the screen and
+it behaves exactly as before.
+
+### 🎚️ The layout icon opens a picker instead of cycling
+
+The monitor's 3×3 grid icon used to cycle 1 → 2 → 3 columns, one tap at a time. It showed neither
+what the choices were nor which one you were on, and reaching the one you wanted meant tapping
+through the ones you did not.
+
+It now opens the same single-choice dialog the main list uses — **Adaptive** or a fixed **1 / 2 / 3 /
+4 columns**, the current one already ticked, Cancel to leave it alone — and nothing changes until you
+pick. Adaptive (one column per 450dp, the main list's rule) is the new default for the monitor, and
+four columns is newly available.
+
+### ⚡ The monitor opens sorted by CPU
+
+A reaper is opened when something is burning the phone *now*, and that is a CPU question; memory is
+the standing state you can look up whenever you like. The list now opens ranked by CPU, with the Sort
+toolbar action still flipping back to RAM.
+
+The first frame is still RAM-ordered by necessity — CPU percentage is the difference between two
+`/proc` readings, so it does not exist until the second one — and the CPU order lands one refresh
+later.
+
+### 🎯 A round gauge for the process monitor
+
+The monitor's top-bar icon was Material's "speed" glyph, whose dial is an arc with a flat bottom. At
+the size a top bar actually draws it, that read as a **cloud**. It is now a proper round tachometer —
+full ring, seven scale ticks, needle and hub — chosen from nine candidates rendered at real size
+before any of them shipped.
+
 ## 4.1.0+084 — 2026-08-04
 
 The top bar stops hiding things on a narrow screen.
