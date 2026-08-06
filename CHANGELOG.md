@@ -2,9 +2,48 @@
 
 # Changelog
 
-All notable fork changes are recorded here. Versions use the fork's
-`customBaseVersionName+customBuildNumber` scheme (the base mirrors the upstream App Manager release
-this fork is built on).
+All notable fork changes are recorded here. From `4.1.0.2026-06-29.gfc1e7007+090` onward, versions
+read `<upstream base>.<upstream commit date>.g<commit>+<fork build>` — the middle field names the
+upstream App Manager commit the fork is rebased on. Earlier versions used
+`customBaseVersionName+customBuildNumber` and are never retagged.
+
+## 4.1.0.2026-06-29.gfc1e7007+090 — 2026-08-06
+
+The version now says which upstream App Manager this build actually contains.
+(Covers builds +089 and +090. No behaviour changes — this release is about what the version means.)
+
+### 🔖 The version pins the upstream commit the fork sits on
+
+This fork follows upstream's **master branch, commit by commit** — never a release tag. That is
+deliberate: MuntashirAkon commits to master for months while the release tag stays frozen, so tags
+would be a useless base. The side effect was that upstream's own version literal stood still with it:
+every build since June called itself `4.1.0`, and `4.1.0+088` told you nothing about whether upstream
+had moved since. The one fact missing from the version was the only one that could answer it.
+
+Versions now carry it:
+
+```
+4.1.0.2026-06-29.gfc1e7007+090
+└─┬──┘ └───┬────┘ └───┬───┘ └┬─┘
+  │        │          │      └── fork build number, as before
+  │        │          └───────── upstream commit this is rebased on
+  │        └──────────────────── that commit's date (UTC)
+  └───────────────────────────── upstream's own version, untouched
+```
+
+The commit is the **merge-base of our branch and upstream's** — the commit our patches sit on, not
+the tip of upstream's mirror (which would overstate what is actually in the build) and not our own
+HEAD (which the build number and the release tag already identify). It therefore moves only when the
+fork is genuinely rebased, which is exactly the "has upstream moved?" signal it exists to give.
+
+The date is there so the names **sort**. A bare commit hash is random text: `gfc1e7007` would file
+itself arbitrarily among its neighbours and bury the newest APK mid-list. It is the commit's date,
+never the build's, so every build on one upstream base shares it — and in UTC, so anything reading
+the date back from GitHub's API agrees with what the build wrote.
+
+Everything downstream follows the same string: the APK filename, the release tag, and the version the
+installer shows you are now the same text, produced in one place. `versionCode` is unchanged and
+still rises with every build, so updates install exactly as before.
 
 ## 4.1.0+088 — 2026-08-06
 
