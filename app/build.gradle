@@ -8,6 +8,11 @@ plugins {
 def customBuildNumber = (project.findProperty('customBuildNumber') ?: '0') as Integer
 def customBaseVersionName = project.findProperty('customBaseVersionName') ?: '4.0.5'
 def customBaseVersionCode = (project.findProperty('customBaseVersionCode') ?: '0') as Integer
+// Fork: upstream-base pin (see upstreamBasePin() at the bottom of this file, the
+// `git-versioning` skill, and the versioning section of CLAUDE.md). Script-level `def`,
+// NOT inside android {} — nested-closure visibility there is unreliable and has silently
+// produced an APK carrying the wrong version before.
+def upstreamPin = upstreamBasePin()
 
 android {
     namespace 'io.github.muntashirakon.AppManager'
@@ -26,7 +31,10 @@ android {
         // actually show — read +62. versionCode above stays plain integer
         // arithmetic, so upgrade ordering is untouched; this is only how the name
         // reads.
-        versionName "${customBaseVersionName}+${String.format('%03d', customBuildNumber)}"
+        // Fork: ${upstreamPin} is ".<base commit date>.g<sha8>" — the upstream commit this
+        // stack of patches sits on. Upstream's own versionName stands still between releases,
+        // so without it nothing in the name says whether we are behind upstream.
+        versionName "${customBaseVersionName}${upstreamPin}+${String.format('%03d', customBuildNumber)}"
         javaCompileOptions {
             annotationProcessorOptions {
                 arguments += [
@@ -235,6 +243,56 @@ dependencies {
         exclude group: 'org.bouncycastle', module: 'bcpkix-jdk18on'
         exclude group: 'org.bouncycastle', module: 'bcutil-jdk18on'
     }
+}
+
+// Fork: run a git command and return its trimmed stdout, or "" if it fails for any reason.
+// providers.exec is the configuration-cache-compatible way to start a process (same reason
+// buildTime() below uses it); Groovy's String.execute() is forbidden at configuration time.
+def gitOutput(List<String> command) {
+    try {
+        var execOutput = providers.exec {
+            commandLine command
+            workingDir = rootProject.projectDir
+            ignoreExitValue = true
+        }
+        if (execOutput.result.get().exitValue != 0) {
+            return ''
+        }
+        return execOutput.standardOutput.asText.get().trim()
+    } catch (Exception e) {
+        println("Git command [${command.join(' ')}] failed [$e]")
+        return ''
+    }
+}
+
+// Fork: the upstream commit our patches are rebased onto, rendered as ".<date>.g<sha8>".
+// `custom` tracks upstream master commit by commit, so upstream's own versionName (4.1.0)
+// stands still for months and says nothing about how current the fork is — this does.
+//
+//   merge-base HEAD master — NOT our own HEAD (which of *our* commits was built is already
+//   said by +N and by the release tag) and NOT master's tip (which overstates the base
+//   whenever master has been fast-forwarded but custom not yet rebased).
+//
+// The date is the base commit's committer date in UTC, never build time: every build on one
+// upstream base must share the pin, and the date is there only so the names sort — a bare
+// sha is random text and would bury the newest APK in the middle of a file listing.
+// Degrades to ".g<sha>" if the date lookup fails and to "" if git or master is unavailable.
+// The build must never fail over a missing pin.
+def upstreamBasePin() {
+    def sha = gitOutput(['git', 'merge-base', 'HEAD', 'master'])
+    if (sha.length() < 8) {
+        return ''
+    }
+    sha = sha.substring(0, 8)
+    def epoch = gitOutput(['git', 'show', '-s', '--format=%ct', sha])
+    if (!epoch.isEmpty() && isDigitsOnly(epoch)) {
+        def date = java.time.Instant.ofEpochSecond(Long.parseLong(epoch))
+                .atZone(java.time.ZoneOffset.UTC)
+                .toLocalDate()
+                .toString()
+        return ".${date}.g${sha}"
+    }
+    return ".g${sha}"
 }
 
 def buildTime() {
