@@ -1,6 +1,10 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<!-- Fork: entry icon for the process monitor/reaper screen. A speed/gauge
-     glyph (Material "speed") — evokes the live RAM/CPU "hogging" monitor.
+<!-- Fork: entry icon for the process monitor/reaper screen. A fully round
+     tachometer — ring, seven radial ticks, needle and hub — drawn in place of
+     the Material "speed" glyph, whose flat-bottomed arc read as a cloud at the
+     size the top bar actually draws (白い熊, 2026-08-06).
+     Geometry: centre (12,12); ring r=9.4; ticks r=6.3..7.6 at 210°, 170°, 130°,
+     90°, 50°, 10°, -30° (0° = east, counter-clockwise); needle to r=5 at 52°.
      Tinted to the fork yellow so it matches the other top-bar icons. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
@@ -8,10 +12,28 @@
     android:viewportWidth="24"
     android:viewportHeight="24"
     android:tint="@color/theme_bright_yellow">
+    <!-- Dial ring -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M2.6,12 A9.4,9.4 0 1 0 21.4,12 A9.4,9.4 0 1 0 2.6,12 Z"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.6" />
+    <!-- Scale ticks -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M6.54,15.15 L5.42,15.8 M5.8,10.91 L4.52,10.68 M7.95,7.17 L7.11,6.18 M12,5.7 L12,4.4 M16.05,7.17 L16.89,6.18 M18.2,10.91 L19.48,10.68 M17.46,15.15 L18.58,15.8"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="1.4" />
+    <!-- Needle -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M12.37,11.53 L15.08,8.06"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="2" />
+    <!-- Hub -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M20.38,8.57l-1.23,1.85a8,8 0 0 1 -0.22,7.58H5.07A8,8 0 0 1 15.58,6.85l1.85,-1.23A10,10 0 0 0 3.35,19a2,2 0 0 0 1.72,1h13.85a2,2 0 0 0 1.74,-1 10,10 0 0 0 -0.27,-10.44z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M10.59,15.41a2,2 0 0 0 2.83,0l5.66,-8.49 -8.49,5.66a2,2 0 0 0 0,2.83z" />
+        android:pathData="M10.6,12 A1.4,1.4 0 1 0 13.4,12 A1.4,1.4 0 1 0 10.6,12 Z" />
 </vector>

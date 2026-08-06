@@ -12,7 +12,9 @@
     android:layout_height="match_parent"
     tools:context=".processreaper.ProcessMonitorActivity">
 
-    <include layout="@layout/appbar" />
+    <!-- Fork: scrolling top bar — this screen carries six action icons plus a
+         title and subtitle, which a folded panel cannot show at once. -->
+    <include layout="@layout/appbar_scrollable" />
 
     <FrameLayout
         android:layout_width="match_parent"

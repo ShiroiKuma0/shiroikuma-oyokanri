@@ -1800,7 +1800,6 @@
     <string name="monitor_filter_apply">Apply</string>
     <string name="monitor_filter_clear">Clear</string>
     <string name="monitor_columns">Columns</string>
-    <string name="monitor_columns_n">%d columns</string>
     <string name="monitor_kill">Kill</string>
     <string name="monitor_kill_confirm_title">Kill %s?</string>
     <string name="monitor_kill_method_forcestop">Force-stops the app — its services and alarms too. It cold-starts next time you open it.</string>

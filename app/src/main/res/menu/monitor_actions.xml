@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Fork: every icon here is showAsAction="always" on purpose. The toolbar
+     lives in a HorizontalScrollView (@layout/appbar_scrollable), so a bar that
+     is too wide for a folded panel scrolls sideways instead of dropping its
+     tail; "ifRoom" would defeat that, because ActionMenuPresenter decides it
+     against a width limit derived from the screen rather than from the parent's
+     measure spec, and the items would still vanish into the overflow.
+     "interval" stays in the overflow — it is text-only, and it keeps the
+     overflow button (whose long-press opens the 白い熊 応用管理 UI page) present. -->
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <!-- Visible only in selection mode (toggled in onPrepareOptionsMenu) -->
@@ -14,32 +22,32 @@
         android:icon="@drawable/ic_search"
         android:title="@string/search"
         app:actionViewClass="androidx.appcompat.widget.SearchView"
-        app:showAsAction="ifRoom|collapseActionView" />
+        app:showAsAction="always|collapseActionView" />
     <item
         android:id="@+id/action_monitor_pause"
         android:icon="@drawable/ic_pause"
         android:title="@string/monitor_pause"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="always" />
     <item
         android:id="@+id/action_monitor_filter"
         android:icon="@drawable/ic_filter_list"
         android:title="@string/monitor_filter"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="always" />
     <item
         android:id="@+id/action_monitor_sort"
         android:icon="@drawable/ic_sort"
         android:title="@string/monitor_sort"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="always" />
     <item
         android:id="@+id/action_monitor_columns"
         android:icon="@drawable/ic_grid_3x3"
         android:title="@string/monitor_columns"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="always" />
     <item
         android:id="@+id/action_monitor_refresh"
         android:icon="@drawable/ic_refresh"
         android:title="@string/refresh"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="always" />
     <item
         android:id="@+id/action_monitor_interval"
         android:title="@string/monitor_interval"

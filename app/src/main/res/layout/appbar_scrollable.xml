@@ -1,0 +1,53 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!--
+    Fork: @layout/appbar with a horizontally scrolling toolbar, for screens that
+    carry more actions than a folded panel can show (the process monitor). Same
+    mechanism as the main screen's top bar (see activity_main.xml):
+
+    HorizontalScrollView.measureChild ignores lp.width and always passes
+    UNSPECIFIED, so the toolbar is measured at its NATURAL width — nothing is
+    squeezed, the title/subtitle are not truncated, and ActionMenuView.onMeasure
+    sets mFormatItems = (mode == EXACTLY) → false, so it lays its items out as a
+    plain row instead of running its cell-fitting pass. The overflowing end is
+    reached by scrolling.
+
+    fillViewport="true" preserves the old behaviour whenever the bar does fit:
+    the child is then re-measured EXACTLY at the viewport width, so MATCH_PARENT
+    children (an expanded search action view, say) stretch exactly as before.
+
+    NOTE: this only pays off when the menu items are showAsAction="always" —
+    "ifRoom" is resolved by ActionMenuPresenter against a width limit derived
+    from the screen, not from the parent's measure spec, so those items still
+    collapse into the overflow no matter how wide the toolbar is allowed to be.
+-->
+<io.github.muntashirakon.widget.AppBarLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/appbar"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fitsSystemWindows="true"
+    app:liftOnScroll="true"
+    app:liftOnScrollTargetViewId="@+id/scrollView">
+
+    <HorizontalScrollView
+        android:id="@+id/toolbar_scroller"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fillViewport="true"
+        android:scrollbars="none">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="wrap_content"
+            android:layout_height="?attr/actionBarSize" />
+
+    </HorizontalScrollView>
+
+    <com.google.android.material.progressindicator.LinearProgressIndicator
+        android:id="@+id/progress_linear"
+        style="@style/Widget.AppTheme.LinearProgressIndicator"
+        android:indeterminate="true"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+</io.github.muntashirakon.widget.AppBarLayout>

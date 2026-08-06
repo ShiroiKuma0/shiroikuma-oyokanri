@@ -143,7 +143,12 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
     private Map<Integer, Long> mPss = Collections.emptyMap();
     private long mPssMs;
     private static final long PSS_TTL_MS = 15_000L;
-    private volatile int mSort = SORT_RAM;
+    // Fork: opens sorted by CPU — what a reaper is opened for is "what is burning
+    // the CPU right now", and RAM is the standing state you can look up any time.
+    // The very first load has no previous tick sample, so every cpuPercent is NaN
+    // and sort() falls through to the RAM comparator; the CPU order lands on the
+    // next refresh (one interval later). Session-only, like the toolbar toggle.
+    private volatile int mSort = SORT_CPU;
 
     public ProcessMonitorViewModel(@NonNull Application application) {
         super(application);
