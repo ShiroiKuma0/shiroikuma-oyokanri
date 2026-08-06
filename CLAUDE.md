@@ -12,8 +12,9 @@ consult that for the "why" behind anything in here.
 - `applicationId`: `shiroikuma.oyokanri` (installs side-by-side with the official build; renamed from the former `shiroikuma.appmanager`, so it is a fresh install rather than an update).
 - Java package (unchanged from upstream): `io.github.muntashirakon.AppManager`.
 - Display label: 白い熊 応用管理.
-- Remote: `origin` → ShiroiKuma0/shiroikuma-oyokanri (formerly ShiroiKuma0/appmanager).
-- Branch: **`custom`** — all fork work lives here; pushes go to `origin/custom`.
+- Remote: `origin` → ShiroiKuma0/shiroikuma-oyokanri (formerly ShiroiKuma0/appmanager); `upstream` → MuntashirAkon/AppManager.
+- Branch: **`custom`** — all fork work lives here; pushes go to `origin/custom`. `master` mirrors upstream.
+- **Upstream tracking: `git`** (白い熊, 2026-08-06) — `custom` is rebased onto upstream **master commits**, not onto release tags, so the fork versionName pins the upstream base: `<upstream>.<base commit date>.g<sha8>+<BUILD_NUMBER, 3 digits>`, e.g. `4.1.0.2026-06-29.gfc1e7007+089`. See the global **`git-versioning`** skill for the rationale and the exact format, and the versioning rules under *Build & deploy pipeline* below for what this repo must NOT do with the counter.
 
 ## Target device & environment
 
@@ -32,9 +33,13 @@ consult that for the "why" behind anything in here.
 
 **Deliver automatically after every build — never ask.** Standing instruction from 白い熊 (2026-08-06), replacing the former "always ask via `AskUserQuestion`" rule: follow the global **`/after-build`** skill and its delivery chain, and do not put a question between the build and the delivery. After a successful build, walk the chain yourself — `adb devices` (**unsandboxed**, per `/adb-check`) → `adb connect 192.168.1.73:5555` → `adb connect skhw:15555` → `scp` to `skhw:~/tmp/` — and deliver **exactly once**, to the first target that answers. Those are all the **same machine**, so never deliver by two paths. Never ask "how should I deliver?" and never ask "is the phone connected?" — the chain answers that itself. Any wireless adb session opened for the batch gets `adb disconnect`ed at the end of it (check `ps` for a live `scrcpy` first). Then say plainly what landed and where.
 
-Output APK is named `shiroikuma-oyokanri_${customBaseVersionName}+${customBuildNumber}_arm64-v8a.apk`, derived from `gradle.properties`. Always copy the signed APK to `~/tmp/` before pushing to the device, so a record stays on disk.
+Output APK is named `shiroikuma-oyokanri_$(tools/fork-version.sh)_arm64-v8a.apk`, e.g. `shiroikuma-oyokanri_4.1.0.2026-06-29.gfc1e7007+089_arm64-v8a.apk`. Always copy the signed APK to `~/tmp/` before pushing to the device, so a record stays on disk.
 
-**The build counter is zero-padded to three digits — in the filename AND in `versionName` (+63).** The `/after-build` convention pads the filename so `~/tmp` sorts in build order; `app/build.gradle` must pad too, or the two disagree in the place that matters. Before +63 the file read `+062` while the **manifest** read `+62`, which is what Android and every installer actually show — 白い熊 caught it in shiroikuma-universalinstaller's install dialog. `versionName "${customBaseVersionName}+${String.format('%03d', customBuildNumber)}"`, and `tools/bump-build.sh` prints the same via `printf '%s+%03d\n'`. `versionCode` stays plain integer arithmetic, so upgrade ordering is untouched. Note the `publish-version` skill derives its git tag from the version name, so tags carry the padding from +063 on; earlier published tags (`4.1.0+55`) are **never** retagged.
+**The versionName pins the upstream commit we are rebased on (+89).** `custom` follows upstream **master**, whose versionName literal (`4.1.0`) has not moved since 2026-06-29 and will not move until upstream releases — so `4.1.0+088` said nothing whatever about how current the fork was. The name is now `<customBaseVersionName>.<base commit date>.g<sha8>+<NNN>`, where the sha is `git merge-base HEAD master` — **the upstream commit our patches sit on**, never our own HEAD (that is what `+N` and the release tag already say) and never `master`'s tip (which overstates the base whenever master is fast-forwarded but `custom` not yet rebased). The date is that commit's **committer date in UTC** — never build time, or two builds on one upstream base would disagree — and exists only so the names sort: a bare sha is random text and buries the newest APK mid-list. **Two halves that must stay in step**: `upstreamBasePin()` in `app/build.gradle` (Gradle, via `providers.exec` — a plain `ProcessBuilder`/`String.execute()` is a configuration-cache failure, which is why `buildTime()` already does it this way) and **`tools/fork-version.sh`** (shell, the single source of truth for the pipeline and for `tools/bump-build.sh`'s printed line). Both **degrade rather than fail**: no `master` ⇒ no pin, git present but the date unreadable ⇒ `.g<sha>` alone. A missing pin must never cost a build.
+
+**LANDMINE — do NOT reset `customBuildNumber` on an upstream sync in this repo.** The `git-versioning` skill says the counter resets to 1 on each sync; that holds where the upstream commit feeds `versionCode`. Here it does not — `versionCode = customBaseVersionCode * 10000 + customBuildNumber`, and `customBaseVersionCode` (450) only moves when upstream cuts a **release**. Resetting the counter after an ordinary master rebase would therefore drive the versionCode **backwards** and Android would refuse the install as a downgrade. Reset it **only** in the same edit that raises `customBaseVersionCode`; every other rebase just keeps counting, and the pin is what records that upstream moved.
+
+**The build counter is zero-padded to three digits — in the filename AND in `versionName` (+63).** The `/after-build` convention pads the filename so `~/tmp` sorts in build order; `app/build.gradle` must pad too, or the two disagree in the place that matters. Before +63 the file read `+062` while the **manifest** read `+62`, which is what Android and every installer actually show — 白い熊 caught it in shiroikuma-universalinstaller's install dialog. `versionName "${customBaseVersionName}${upstreamPin}+${String.format('%03d', customBuildNumber)}"`, and `tools/bump-build.sh` prints the same by delegating to `tools/fork-version.sh` (it used to render its own `printf '%s+%03d\n'`, which is exactly how a second copy of the format drifts). `versionCode` stays plain integer arithmetic, so upgrade ordering is untouched. Note the `publish-version` skill derives its git tag from the version name, so tags carry the padding from +063 on; earlier published tags (`4.1.0+55`) are **never** retagged.
 
 ```bash
 # from repo root
@@ -69,9 +74,10 @@ apksigner sign --ks ~/.android-keystores/appmanager-custom.jks \
     --out /tmp/am-signed.apk /tmp/am-aligned.apk
 apksigner verify --verbose /tmp/am-signed.apk 2>&1 | grep -v 'not protected by signature'
 
-VER=$(grep '^customBaseVersionName=' gradle.properties | cut -d= -f2)
-NUM=$(grep '^customBuildNumber='     gradle.properties | cut -d= -f2)
-apk_name="shiroikuma-oyokanri_${VER}+$(printf '%03d' "$NUM")_arm64-v8a.apk"   # zero-padded, see above
+# Base version + upstream-base pin + zero-padded counter, from the one place that renders it.
+# Never re-derive this from gradle.properties by hand — the pin would be dropped and the
+# filename would stop matching the manifest.
+apk_name="shiroikuma-oyokanri_$(tools/fork-version.sh)_arm64-v8a.apk"
 cp /tmp/am-signed.apk ~/tmp/"$apk_name"
 
 # Deliver straight away — first target that answers, exactly once (see the

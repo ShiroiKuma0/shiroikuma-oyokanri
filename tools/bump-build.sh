@@ -25,10 +25,9 @@ current=$(grep -oP '^customBuildNumber=\K\d+' "$GP" || true)
 new=$((current + 1))
 sed -i "s/^customBuildNumber=${current}\$/customBuildNumber=${new}/" "$GP"
 
-base=$(grep -oP '^customBaseVersionName=\K.+' "$GP" || true)
-[[ -n "$base" ]] || die "customBaseVersionName=<string> line not found in $GP"
-
-# Zero-padded to three digits, matching app/build.gradle's versionName and the
-# APK filename convention. Printing the raw integer here made the bump line
-# disagree with everything downstream.
-printf '%s+%03d\n' "$base" "$new"
+# Delegate the rendering to tools/fork-version.sh — one place computes the fork
+# versionName (base version + upstream-base pin + zero-padded counter), so the bump
+# line, the APK filename and the manifest can never disagree. Printing the raw
+# integer here, or omitting the pin, made the bump line disagree with everything
+# downstream.
+"$SCRIPT_DIR/fork-version.sh"

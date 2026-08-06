@@ -23,10 +23,13 @@ an APK those have already produced.
 
 - Newest fork APK: `ls -t ~/tmp/shiroikuma-oyokanri_*.apk | head -1`.
 - The **versionName** is the filename field between the first `_` and `_arm64` — e.g.
-  `shiroikuma-oyokanri_4.0.5+122_arm64-v8a.apk` → **`4.0.5+122`**. Use it verbatim everywhere (tag,
-  README latest-release line, release title, changelog heading). The `4.0.5` is `customBaseVersionName`
-  (mirrors upstream's base) and the `+122` tail is `customBuildNumber`, bumped per build by
-  `tools/bump-build.sh` (see `gradle.properties`). If there is no APK in `~/tmp/`, stop and tell 白い熊
+  `shiroikuma-oyokanri_4.1.0.2026-06-29.gfc1e7007+089_arm64-v8a.apk` → **`4.1.0.2026-06-29.gfc1e7007+089`**.
+  Use it verbatim everywhere (tag, README latest-release line, release title, changelog heading).
+  The `4.1.0` is `customBaseVersionName` (mirrors upstream's base), the `.2026-06-29.gfc1e7007` middle
+  is the **upstream commit this build is rebased on** (from 2026-08-06 — `git`-tracking, see
+  `CLAUDE.md`; earlier tags such as `4.1.0+088` are **never** retagged), and the `+089` tail is
+  `customBuildNumber`, bumped per build by `tools/bump-build.sh` (see `gradle.properties`). The pin
+  contains no `_`, so the field split above is unaffected. If there is no APK in `~/tmp/`, stop and tell 白い熊
   to build first — do **not** build it yourself.
 
 ## 1. Ensure the homepage lands on `custom`

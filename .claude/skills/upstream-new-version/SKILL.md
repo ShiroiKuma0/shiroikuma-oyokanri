@@ -161,8 +161,13 @@ def customBaseVersionName =  project.findProperty('customBaseVersionName') ?: '4
 def customBaseVersionCode = (project.findProperty('customBaseVersionCode') ?: '0') as Integer
 ...
 versionCode customBaseVersionCode * 10000 + customBuildNumber
-versionName "${customBaseVersionName}+${customBuildNumber}"
+versionName "${customBaseVersionName}${upstreamPin}+${String.format('%03d', customBuildNumber)}"
 ```
+
+`upstreamPin` is a third script-level `def` (`upstreamBasePin()`, bottom of the file) rendering
+`.<base commit date>.g<sha8>` for `git merge-base HEAD master` — the whole point of a `git`-tracking
+fork, since `customBaseVersionName` cannot move between upstream releases. **Nothing to hand-edit on
+a sync:** the rebase moves the merge-base, so the next build picks up the new sha by itself.
 
 Upstream bumps its literal `versionCode`/`versionName` whenever it moves, so this conflicts **almost
 every sync**. This is **small — resolve in place**: keep OUR `-P`-driven block; discard upstream's new
@@ -229,8 +234,15 @@ git add gradle.properties
 git commit -m "chore: adopt upstream ${new_name} as fork base; reset build counter"
 ```
 
-The next build's `tools/bump-build.sh` increments `0 → 1`, yielding versionName **`${new_name}+1`**
-(e.g. `4.1.0+1`) and versionCode `${new_code} * 10000 + 1`.
+The next build's `tools/bump-build.sh` increments `0 → 1`, yielding versionName
+**`${new_name}.<new base date>.g<new sha8>+001`** (e.g. `4.1.0.2026-06-29.gfc1e7007+001`) and
+versionCode `${new_code} * 10000 + 1`.
+
+**LANDMINE — the counter reset belongs to THIS step and nowhere else.** It is safe here only because
+`customBaseVersionCode` rises in the same edit; `versionCode` is built from that code alone, so
+resetting the counter on a sync that did *not* move the version would drive the versionCode backwards
+and Android would refuse the install as a downgrade. The `git-versioning` skill's "reset on every
+sync" rule assumes a repo whose versionCode follows the upstream commit — this one's does not.
 
 **If the version did NOT move** (rolling in master commits that didn't touch `defaultConfig`): make no
 change here — the counter keeps incrementing normally on the next build. The reset fires **only** on an
