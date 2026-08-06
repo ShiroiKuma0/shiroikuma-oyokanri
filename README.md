@@ -18,7 +18,7 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+084`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+088`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
 </div>
 
@@ -157,11 +157,17 @@ it from Settings) lets you tune, per element:
   for user apps / orange for system), the **selected-card frame**, and the **app-icon size and
   roundness** (square → circle).
 
-The **top bar scrolls sideways** instead of hiding what will not fit. Search field, process monitor,
-battery history, app usage, clear-filters, the filter funnel and the layout picker all stay on the
-bar at full size on a folded panel; whatever runs past the screen edge is reached by dragging the
-bar. Widen the screen and it goes back to filling the width, with the search field stretching across
-the space the icons leave.
+**One layout per screen shape.** The main list, the process monitor and the battery history each
+remember their column layout **separately for every geometry** — folded, unfolded, portrait,
+landscape, half a split screen — so the shape you are in shows what you last chose for it, across
+restarts. A fold is recognised by measuring the window's shorter side rather than by asking a vendor
+API, so a phone with three panels or none gets sensible slots for free.
+
+The **top bar scrolls sideways** instead of hiding what will not fit — on the main list and on the
+process monitor alike. Search field, process monitor, battery history, app usage, clear-filters, the
+filter funnel and the layout picker all stay on the bar at full size on a folded panel; whatever runs
+past the screen edge is reached by dragging the bar. Widen the screen and it goes back to filling the
+width, with the search field stretching across the space the icons leave.
 
 Changes apply live the moment you leave the screen, and a reference **legend** explains what every
 colour and style means. A four-state main list — installed, frozen (snowflake + cool film), stopped,
@@ -211,7 +217,8 @@ answer "which app drained the battery last night". This screen can.
 A from-scratch replacement for the legacy "Running apps" screen, built for actually reaping memory:
 
 - **PSS-ranked** memory (not RSS — PSS reflects what killing a process actually frees) and **live
-  instantaneous CPU%** sampled from `/proc` ticks.
+  instantaneous CPU%** sampled from `/proc` ticks. It **opens sorted by CPU** — a reaper is opened
+  when something is burning the phone right now — with one tap to rank by memory instead.
 - A **smart kill router** — app packages get force-stopped, orphaned shell processes get a signal —
   with a built-in denylist (Shizuku, the privilege chain, IMEs, the launcher…) plus a **user-editable
   protected set** (tap to Protect/Allow, long-press to override even the built-ins).
