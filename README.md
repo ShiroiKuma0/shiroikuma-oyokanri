@@ -18,9 +18,9 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0.2026-06-29.gfc1e7007+090`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0.2026-06-29.gfc1e7007+093`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
-<sub>Version reads as **upstream `4.1.0`**, rebased onto upstream commit **`fc1e7007` of 2026-06-29**, fork build **090**.</sub>
+<sub>Version reads as **upstream `4.1.0`**, rebased onto upstream commit **`fc1e7007` of 2026-06-29**, fork build **093**.</sub>
 
 </div>
 
@@ -41,9 +41,10 @@ few control-panel tools on top.
 
 ## 🕵️ Anti-snooping page (盗み見)
 
-Every app-details page gets a **Snooping** tab, second in the strip, gathering the privacy-invasive
-capabilities that are otherwise scattered across the App Ops and Permissions tabs — among hundreds of
-rows that mostly cannot be moved — into ten groups ordered by **consequence, not by subsystem**:
+Every app-details page opens on the **Snooping** tab — first in the strip, because it is what this
+fork is opened for — gathering the privacy-invasive capabilities that are otherwise scattered across
+the App Ops and Permissions tabs — among hundreds of rows that mostly cannot be moved — into ten
+groups ordered by **consequence, not by subsystem**:
 sending data out, accessibility & notifications, watching the screen, location, microphone & camera,
 messages & calls, personal data, files & media, nearby, running in the background.
 
@@ -122,6 +123,13 @@ the box's own description, where it can be read before the tap instead of dismis
 them sit **suspension** — a harder freeze than hiding, where the app cannot be opened at all and the
 system shows a stub in its place — and **clear all locks**, the way back that works even if this app
 is gone.
+
+The card also carries the two **ordinary** verdicts on the whole app, as pills that need no Device
+Owner at all: **Freeze** — the same freeze as the main list's snowflake, grey while the app runs,
+yellow and reading *Unfreeze* once it is shut — and **Uninstall**, red because it is the one thing on
+the page that the control which did it cannot undo. Both refuse an app in the protected `必要`
+profile, and an **i** in each pill explains it in full rather than spending three lines of the card
+on prose you read once.
 
 A lock can also be **remembered**: a ring around the padlock means it is put back if the platform
 ever loses it. A hard lock cannot drift the way an app-op can — Settings will not lift it and the app
