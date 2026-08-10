@@ -7,6 +7,63 @@ read `<upstream base>.<upstream commit date>.g<commit>+<fork build>` — the mid
 upstream App Manager commit the fork is rebased on. Earlier versions used
 `customBaseVersionName+customBuildNumber` and are never retagged.
 
+## 4.1.0.2026-06-29.gfc1e7007+093 — 2026-08-10
+
+盗み見 is the page App details opens on, and it can now end the argument about an app outright.
+(Covers builds +091 through +093. Built on upstream App Manager `4.1.0`, commit `fc1e7007`.)
+
+### 🕵️ Snooping is the first tab
+
+App details now opens on **Snooping**, with App info second. It is the page this fork exists for, and
+it was one swipe away from every route into an app — the main list, the app icon, the battery panel,
+`SHOW_APP_INFO` from Settings. All of them now land on it.
+
+The tab's internal property id is deliberately **unchanged**: those ids key the view model's
+per-property state, so display order and identity are kept apart — the order lives in one array, the
+id stays where it was.
+
+### 🧊 Freeze and Uninstall, on the same card as suspension
+
+The device-policy card carried the *hard* freeze (suspension) and nothing else that acts on the whole
+app. It now carries the two **ordinary** verdicts as well, as pills that need no Device Owner:
+
+- **Freeze** — the same freeze as the main list's snowflake, routed through the same chokepoint, so
+  the protected `必要` profile refuses it exactly as it refuses the snowflake. The freeze method is
+  chosen with the usual dialog (including *remember for this app*), or applied straight away if
+  *Skip freeze method dialog* is set. Grey and reading **Freeze** while the app runs; yellow and
+  reading **Unfreeze** once it is shut — the same palette and direction as the suspend switch above
+  it. Unfreezing lifts every freeze type at once, a suspension included.
+- **Uninstall** — the same confirmation App info asks, keep-data checkbox and all, plus *uninstall
+  updates* for an updated system app, and the platform's own uninstaller for another user's package
+  when we lack the privilege to remove it ourselves. Red in both states: it is the only thing on the
+  page that the control which did it cannot undo.
+
+They are **pills, not rows**. As rows with a title, a bold note and a chip each they spent three
+quarters of a screen on two actions and pushed the capabilities themselves below the fold; the
+account now lives behind an **i** in each pill, read once instead of scrolled past every time. The
+two are weighted halves of the card, so they line up with the two columns the list breaks into when
+the phone is unfolded.
+
+Frozen state is read **live** from the package manager, with the match flags a hidden package needs
+to resolve at all — the cached package info reloads asynchronously after a write, and binding off it
+would draw the state you just left. Every write that lands announces itself, so the main list picks
+the change up instead of showing a stale row.
+
+### 🐛 The Snooping list can go two-column again
+
+Two separate faults, one symptom — the page stuck at a single column however the phone was unfolded:
+
+- The auto-fit grid decides its column count on its **first layout**, from a width that is still zero
+  until the view has actually been laid out, and then never revisits it. That was harmless while
+  Snooping was the second tab, since an off-screen page is built after the first layout pass has
+  already happened — and it became load-bearing the moment the tab became the one the activity opens
+  on. The count now comes from the window configuration, before any view is measured, so it cannot
+  depend on when the page happens to be laid out.
+- The threshold was also simply too wide to ever split **this** screen: 450dp per column against a
+  tri-fold that unfolds to an 840dp window is one column by arithmetic. It is 380dp now, picked
+  against the two real geometries — two columns unfolded, one on the folded cover panel with room to
+  spare.
+
 ## 4.1.0.2026-06-29.gfc1e7007+090 — 2026-08-06
 
 The version now says which upstream App Manager this build actually contains.
