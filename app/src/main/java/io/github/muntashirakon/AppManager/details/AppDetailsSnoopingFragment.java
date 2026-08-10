@@ -2,15 +2,22 @@
 
 package io.github.muntashirakon.AppManager.details;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.Intent;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.UserHandleHidden;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.TextUtils;
@@ -33,6 +40,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.annotation.UiThread;
+import androidx.annotation.WorkerThread;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.ColorUtils;
 import androidx.core.graphics.drawable.DrawableCompat;
@@ -41,12 +49,18 @@ import androidx.core.widget.NestedScrollView;
 import androidx.recyclerview.widget.GridLayoutManager;
 
 import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.checkbox.MaterialCheckBox;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import io.github.muntashirakon.AppManager.BuildConfig;
 import io.github.muntashirakon.AppManager.R;
+import io.github.muntashirakon.AppManager.apk.behavior.FreezeUnfreeze;
+import io.github.muntashirakon.AppManager.apk.installer.PackageInstallerCompat;
+import io.github.muntashirakon.AppManager.compat.ActivityManagerCompat;
+import io.github.muntashirakon.AppManager.compat.PackageManagerCompat;
 import io.github.muntashirakon.AppManager.details.struct.AppDetailsItem;
 import io.github.muntashirakon.AppManager.details.struct.AppDetailsSnoopingItem;
 import io.github.muntashirakon.AppManager.devicepolicy.DangerDialog;
@@ -54,14 +68,21 @@ import io.github.muntashirakon.AppManager.devicepolicy.DevicePolicyBridge;
 import io.github.muntashirakon.AppManager.devicepolicy.PolicyApiClient;
 import io.github.muntashirakon.AppManager.devicepolicy.PolicyLockState;
 import io.github.muntashirakon.AppManager.logs.Log;
+import io.github.muntashirakon.AppManager.profiles.ProtectedAppsProfile;
+import io.github.muntashirakon.AppManager.self.SelfPermissions;
+import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.snooping.SnoopingCatalog;
 import io.github.muntashirakon.AppManager.snooping.SnoopingEnforcer;
 import io.github.muntashirakon.AppManager.snooping.SnoopingPrefs;
 import io.github.muntashirakon.AppManager.snooping.SnoopingState;
 import io.github.muntashirakon.AppManager.utils.BroadcastUtils;
+import io.github.muntashirakon.AppManager.utils.ContextUtils;
+import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.ForkThemeUtils;
+import io.github.muntashirakon.AppManager.utils.FreezeUtils;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
+import io.github.muntashirakon.dialog.ScrollableDialogBuilder;
 import io.github.muntashirakon.view.ProgressIndicatorCompat;
 import io.github.muntashirakon.widget.MaterialAlertView;
 import io.github.muntashirakon.widget.RecyclerView;
@@ -129,6 +150,8 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
     @ColorInt
     private static final int CHANGED_STROKE_ALLOWED = 0xFFFF0028;
 
+    private static final String TAG = AppDetailsSnoopingFragment.class.getSimpleName();
+
     private SnoopingRecyclerAdapter mAdapter;
     private boolean mCanEnforce;
 
@@ -150,6 +173,23 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
     private boolean mPolicyCanLock;
     private boolean mPolicyCanSuspend;
     private boolean mPolicyCanBlockUninstall;
+
+    // ── The two ordinary verdicts on the whole app (白い熊) ───────────────────
+    /**
+     * Frozen by any method — disabled, suspended or hidden. Read <b>live</b> from
+     * the package manager rather than from the view model's cached
+     * {@code PackageInfo}: the model reloads asynchronously after a freeze, so a
+     * bind driven off its copy would draw the state we just left behind.
+     */
+    private boolean mAppFrozen;
+    private boolean mCanFreeze;
+    /** External APKs have nothing to freeze or uninstall — the row is withheld. */
+    private boolean mCanUninstall;
+    /** Resolved on the worker so the uninstall dialog needs no lookup of its own. */
+    @Nullable
+    private CharSequence mAppLabel;
+    private boolean mAppIsSystem;
+    private boolean mAppIsUpdatedSystemApp;
     /**
      * Fork: the {@link AppDetailsViewModel#getStateEpoch() state epoch} this list
      * was built from. Tabs are loaded once and never again as you page between
@@ -162,6 +202,30 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         emptyView.setText(R.string.snooping_no_capabilities);
+        // Fork LANDMINE — the auto-fit grid decides once, and it decided while we
+        // were nothing (白い熊, +92). AutoFitGridLayoutManager, which the base
+        // fragment installs, computes its span count on its FIRST onLayoutChildren
+        // from getWidth() and then clears the flag for ever; getWidth() is 0 until
+        // the view has actually been laid out. That never showed while this tab was
+        // second — an offscreen page is created after the pager's own first pass,
+        // so its first layout already had a width — and it appeared the moment
+        // Snooping became the page the activity opens on: two cards per row on the
+        // unfolded tri-fold collapsed to one, permanently, because nothing ever
+        // recomputes it. The configuration knows the window's width before any view
+        // is measured, so take the count from there instead: same 450dp per column,
+        // no dependence on when we happen to be laid out, and correct in multi-window
+        // because screenWidthDp describes the window rather than the display.
+        //
+        // 450dp was also simply too wide to ever split this screen (白い熊, +93):
+        // the tri-fold unfolds to a 840dp window (2048px at density 390), so
+        // 840/450 = 1 and the page could not have gone two-column on the very
+        // device it was meant for. 380dp is chosen against the two real
+        // geometries rather than as a round number — 840/380 = 2 unfolded, and
+        // the folded cover panel's 413dp stays at 1 with room to spare.
+        int columnDp = 380;
+        int spanCount = Math.max(1,
+                activity.getResources().getConfiguration().screenWidthDp / columnDp);
+        recyclerView.setLayoutManager(new GridLayoutManager(activity, spanCount));
         mAdapter = new SnoopingRecyclerAdapter();
         recyclerView.setAdapter(mAdapter);
         // Group headings must span the whole row when the list goes multi-column
@@ -171,8 +235,8 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             glm.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
                 @Override
                 public int getSpanSize(int position) {
-                    // Read the span count at call time: it is auto-fitted and
-                    // changes when the fold state changes.
+                    // Read the span count at call time: a fold recreates the
+                    // activity, and the new one resolves a count of its own.
                     return mAdapter != null && mAdapter.isHeader(position) ? glm.getSpanCount() : 1;
                 }
             });
@@ -224,6 +288,8 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
     private void loadPolicyState() {
         if (viewModel == null) return;
         String packageName = viewModel.getPackageName();
+        boolean externalApk = viewModel.isExternalApk();
+        int userId = viewModel.getUserId();
         ThreadUtils.postOnBackgroundThread(() -> {
             DevicePolicyBridge.invalidate();
             boolean delegate = DevicePolicyBridge.isDelegate();
@@ -241,6 +307,18 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                     && PolicyLockState.isUserControlDisabled(packageName);
             boolean accessibilityBlocked = packageName != null
                     && PolicyLockState.isAccessibilityBlocked(packageName);
+            // The freeze/uninstall rows' own state, read live from the platform.
+            ApplicationInfo appInfo = packageName != null && !externalApk
+                    ? resolveApplicationInfo(packageName, userId) : null;
+            boolean frozen = appInfo != null && FreezeUtils.isFrozen(appInfo);
+            boolean canFreeze = appInfo != null && SelfPermissions.canFreezeUnfreezePackages();
+            boolean canUninstall = appInfo != null;
+            CharSequence label = appInfo != null
+                    ? appInfo.loadLabel(ContextUtils.getContext().getPackageManager()) : null;
+            boolean isSystem = appInfo != null
+                    && (appInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
+            boolean isUpdatedSystem = appInfo != null
+                    && (appInfo.flags & ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0;
             ThreadUtils.postOnMainThread(() -> {
                 if (isDetached()) return;
                 mPolicyDelegate = delegate;
@@ -252,9 +330,43 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 mPolicyCanLock = canLock;
                 mPolicyCanSuspend = canSuspend;
                 mPolicyCanBlockUninstall = canBlockUninstall;
+                mAppFrozen = frozen;
+                mCanFreeze = canFreeze;
+                mCanUninstall = canUninstall;
+                mAppLabel = label;
+                mAppIsSystem = isSystem;
+                mAppIsUpdatedSystemApp = isUpdatedSystem;
                 if (mAdapter != null) mAdapter.notifyPolicyChanged();
             });
         });
+    }
+
+    /**
+     * This app's {@link ApplicationInfo}, asked of the platform rather than of the
+     * view model.
+     * <p>
+     * <b>Landmine.</b> A package frozen by <i>hiding</i> is invisible to a plain
+     * lookup, so the match flags are not optional here: without them the very app
+     * whose freeze switch we are about to draw resolves to nothing, and the row
+     * would be withheld exactly when it is needed. The privileged path is tried
+     * first because it is the one that can see another user's packages at all;
+     * the plain package manager is the fallback for the window before privileges
+     * are up.
+     */
+    @Nullable
+    @WorkerThread
+    private static ApplicationInfo resolveApplicationInfo(@NonNull String packageName, int userId) {
+        int flags = PackageManagerCompat.MATCH_UNINSTALLED_PACKAGES
+                | PackageManager.MATCH_DISABLED_COMPONENTS;
+        try {
+            return PackageManagerCompat.getApplicationInfo(packageName, flags, userId);
+        } catch (Throwable th) {
+            try {
+                return ContextUtils.getContext().getPackageManager().getApplicationInfo(packageName, flags);
+            } catch (Throwable th2) {
+                return null;
+            }
+        }
     }
 
     @Override
@@ -385,6 +497,7 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         addLegendParagraph(root, context, R.string.snooping_legend_locking_3, 10f);
         addLegendParagraph(root, context, R.string.snooping_legend_policy_boxes, 10f);
         addLegendParagraph(root, context, R.string.snooping_legend_policy_suspend, 10f);
+        addLegendParagraph(root, context, R.string.snooping_legend_freeze_uninstall, 10f);
 
         NestedScrollView scroller = new NestedScrollView(context);
         scroller.addView(root, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
@@ -595,6 +708,28 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         return ring;
     }
 
+    /**
+     * A stadium-shaped outline in the fork's pill language — the card's black
+     * behind it, a hairline in the accent, fully rounded ends — with a ripple of
+     * the same hue so a tap reads as a press.
+     * <p>
+     * Built in code rather than as a drawable resource, like everything else the
+     * fork colours itself: the yellow is the configurable theme's, and the freeze
+     * pill re-draws in a different accent as its own state changes.
+     */
+    @NonNull
+    private static Drawable pillDrawable(@NonNull Context context, @ColorInt int color) {
+        GradientDrawable shape = new GradientDrawable();
+        shape.setShape(GradientDrawable.RECTANGLE);
+        shape.setColor(Color.TRANSPARENT);
+        // The framework clamps a radius past half the height, so this is a
+        // stadium at whatever height the text ends up needing.
+        shape.setCornerRadius(ForkThemeUtils.dpToPx(context, 100f));
+        shape.setStroke(Math.round(ForkThemeUtils.dpToPx(context, 1.5f)), color);
+        return new RippleDrawable(
+                ColorStateList.valueOf(ColorUtils.setAlphaComponent(color, 0x33)), shape, null);
+    }
+
     /** Tint a compound drawable without depending on API-gated TextViewCompat tinting. */
     private static void setLeadingIcon(@NonNull TextView view, int drawableRes, @ColorInt int color) {
         setIcon(view, drawableRes, color, true);
@@ -664,6 +799,223 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         Context context = getContext();
         if (context == null) return;
         BroadcastUtils.sendPackageAltered(context.getApplicationContext(), new String[]{packageName});
+    }
+
+    // ── The ordinary verdicts: freeze and uninstall (白い熊) ──────────────────
+
+    /**
+     * What a pill actually does, behind its "i".
+     * <p>
+     * The card's other controls carry their account on their face, because they
+     * are switches whose meaning is not obvious from a label. These two are
+     * ordinary actions with ordinary names — the explanation is worth reading
+     * once and then never again, which is exactly what a dialog is for and what
+     * three permanent lines of prose on the card were not.
+     */
+    private void showActionInfo(@StringRes int titleRes, @StringRes int noteRes,
+                                @StringRes int summaryRes) {
+        ForkDialog.present(ForkDialog.builder(activity)
+                .setTitle(titleRes)
+                .setMessage(getString(noteRes) + "\n\n" + getString(summaryRes))
+                .setPositiveButton(R.string.ok, null));
+    }
+
+    /**
+     * The <em>ordinary</em> freeze, sitting under the hard one.
+     * <p>
+     * Deliberately routed through {@link FreezeUtils} rather than through anything
+     * of this page's own: that is the chokepoint the 必要 profile guards, so an app
+     * 白い熊 protected is refused here for free — and it is the same call the main
+     * list's snowflake makes, so the two can never mean different things.
+     * <p>
+     * The freeze <i>method</i> is resolved here rather than through
+     * {@code AppDetailsViewModel.loadFreezeType()}: that LiveData is shared with
+     * the App info tab, which is alive in the pager beside us and would answer the
+     * same event by opening its own freeze dialog.
+     */
+    private void toggleFreeze() {
+        if (viewModel == null) return;
+        String packageName = viewModel.getPackageName();
+        if (packageName == null) return;
+        int userId = viewModel.getUserId();
+        if (mAppFrozen) {
+            runAppAction(() -> {
+                FreezeUtils.unfreeze(packageName, userId);
+                return true;
+            }, R.string.failed_to_unfreeze);
+            return;
+        }
+        if (BuildConfig.APPLICATION_ID.equals(packageName)) {
+            // Freezing ourselves is refused outright by FreezeUtils, but the
+            // confirmation is what App info asks, so ask it here too.
+            ForkDialog.present(ForkDialog.builder(activity)
+                    .setMessage(R.string.are_you_sure)
+                    .setPositiveButton(R.string.yes, (d, w) -> chooseFreezeMethod(packageName, userId))
+                    .setNegativeButton(R.string.no, null));
+            return;
+        }
+        chooseFreezeMethod(packageName, userId);
+    }
+
+    /**
+     * Pick the freeze method, unless the user has already said not to be asked
+     * ("Skip freeze method dialog" under Settings → Rules). Same resolution order
+     * as App info: the per-app remembered method, else the global default.
+     */
+    private void chooseFreezeMethod(@NonNull String packageName, int userId) {
+        ProgressIndicatorCompat.setVisibility(progressIndicator, true);
+        ThreadUtils.postOnBackgroundThread(() -> {
+            Integer stored = FreezeUtils.loadFreezeMethod(packageName);
+            int freezeType = stored != null ? stored : Prefs.Blocking.getDefaultFreezingMethod();
+            boolean isCustom = stored != null;
+            ThreadUtils.postOnMainThread(() -> {
+                if (isDetached()) return;
+                ProgressIndicatorCompat.setVisibility(progressIndicator, false);
+                if (Prefs.Blocking.getSkipFreezeMethodDialog()) {
+                    applyFreeze(packageName, userId, freezeType, isCustom);
+                    return;
+                }
+                View view = View.inflate(activity, R.layout.item_checkbox, null);
+                MaterialCheckBox checkBox = view.findViewById(R.id.checkbox);
+                checkBox.setText(R.string.remember_option_for_this_app);
+                checkBox.setChecked(isCustom);
+                FreezeUnfreeze.getFreezeDialog(activity, freezeType)
+                        .setIcon(R.drawable.ic_snowflake)
+                        .setTitle(R.string.freeze)
+                        .setView(view)
+                        .setPositiveButton(R.string.freeze, (dialog, which, selectedItem) -> {
+                            if (selectedItem == null) return;
+                            applyFreeze(packageName, userId, selectedItem, checkBox.isChecked());
+                        })
+                        .setNegativeButton(R.string.cancel, null)
+                        .show();
+            });
+        });
+    }
+
+    private void applyFreeze(@NonNull String packageName, int userId,
+                             @FreezeUtils.FreezeMethod int freezeType, boolean remember) {
+        runAppAction(() -> {
+            if (remember) {
+                FreezeUtils.storeFreezeMethod(packageName, freezeType);
+            } else {
+                FreezeUtils.deleteFreezeMethod(packageName);
+            }
+            FreezeUtils.freeze(packageName, userId, freezeType);
+            return true;
+        }, R.string.failed_to_freeze);
+    }
+
+    /**
+     * Run a whole-app write, then tell the world and re-read our own state.
+     * <p>
+     * The 必要 guard throws from inside {@link FreezeUtils}, so it is reported with
+     * its own message rather than as a generic failure — a protected app is not a
+     * broken one.
+     */
+    private void runAppAction(@NonNull AppAction work, @StringRes int failureRes) {
+        if (viewModel == null) return;
+        String packageName = viewModel.getPackageName();
+        if (packageName == null) return;
+        ProgressIndicatorCompat.setVisibility(progressIndicator, true);
+        ThreadUtils.postOnBackgroundThread(() -> {
+            boolean protectedApp = ProtectedAppsProfile.isProtected(packageName);
+            boolean ok = false;
+            if (!protectedApp) {
+                try {
+                    ok = work.run();
+                } catch (Throwable th) {
+                    Log.e(TAG, th);
+                }
+            }
+            boolean finalOk = ok;
+            ThreadUtils.postOnMainThread(() -> {
+                if (isDetached()) return;
+                ProgressIndicatorCompat.setVisibility(progressIndicator, false);
+                if (protectedApp) {
+                    UIUtils.displayLongToast(R.string.protected_profile_block,
+                            mAppLabel != null ? mAppLabel : packageName);
+                } else if (!finalOk) {
+                    UIUtils.displayLongToast(failureRes,
+                            mAppLabel != null ? mAppLabel : packageName);
+                } else {
+                    notifyPackageAltered(packageName);
+                }
+                loadPolicyState();
+            });
+        });
+    }
+
+    private interface AppAction {
+        boolean run() throws Throwable;
+    }
+
+    /**
+     * Uninstall, with the same confirmation App info asks — including the
+     * keep-data checkbox and, for an updated system app, the "uninstall updates"
+     * third option. No shortcut of our own: an irreversible action is the one
+     * place on this page where a dialog earns its keep.
+     */
+    private void promptUninstall() {
+        if (viewModel == null) return;
+        String packageName = viewModel.getPackageName();
+        if (packageName == null) return;
+        int userId = viewModel.getUserId();
+        CharSequence label = mAppLabel != null ? mAppLabel : packageName;
+        if (userId != UserHandleHidden.myUserId()
+                && !SelfPermissions.checkSelfOrRemotePermission(Manifest.permission.DELETE_PACKAGES)) {
+            // Another user's package and no privilege to remove it ourselves —
+            // hand it to the platform's own uninstaller, as App info does.
+            try {
+                Intent uninstallIntent = new Intent(Intent.ACTION_DELETE);
+                uninstallIntent.setData(Uri.parse("package:" + packageName));
+                ActivityManagerCompat.startActivity(uninstallIntent, userId);
+            } catch (Throwable th) {
+                UIUtils.displayLongToast("Error: " + th.getLocalizedMessage());
+            }
+            return;
+        }
+        ScrollableDialogBuilder builder = new ScrollableDialogBuilder(activity,
+                mAppIsSystem ? R.string.uninstall_system_app_message : R.string.uninstall_app_message)
+                .setTitle(label)
+                .setCheckboxLabel(R.string.keep_data_and_app_signing_signatures)
+                .setPositiveButton(R.string.uninstall, (dialog, which, keepData) ->
+                        uninstall(packageName, userId, keepData, label))
+                .setNegativeButton(R.string.cancel, (dialog, which, keepData) -> {
+                    if (dialog != null) dialog.cancel();
+                });
+        if (mAppIsUpdatedSystemApp) {
+            builder.setNeutralButton(R.string.uninstall_updates, (dialog, which, keepData) ->
+                    uninstall(packageName, UserHandleHidden.USER_ALL, keepData, label));
+        }
+        builder.show();
+    }
+
+    private void uninstall(@NonNull String packageName, int userId, boolean keepData,
+                           @NonNull CharSequence label) {
+        ProgressIndicatorCompat.setVisibility(progressIndicator, true);
+        ThreadUtils.postOnBackgroundThread(() -> {
+            // The 必要 guard also sits inside PackageInstallerCompat.uninstall, which
+            // simply returns false; asking first is what turns that into a message
+            // that says why.
+            boolean protectedApp = ProtectedAppsProfile.isProtected(packageName);
+            PackageInstallerCompat installer = PackageInstallerCompat.getNewInstance();
+            installer.setAppLabel(label);
+            boolean uninstalled = !protectedApp && installer.uninstall(packageName, userId, keepData);
+            ThreadUtils.postOnMainThread(() -> {
+                if (isDetached()) return;
+                ProgressIndicatorCompat.setVisibility(progressIndicator, false);
+                if (protectedApp) {
+                    UIUtils.displayLongToast(R.string.protected_profile_block, label);
+                } else if (uninstalled) {
+                    UIUtils.displayLongToast(R.string.uninstalled_successfully, label);
+                    activity.finish();
+                } else {
+                    UIUtils.displayLongToast(R.string.failed_to_uninstall, label);
+                    loadPolicyState();
+                }
+            });
+        });
     }
 
     /**
@@ -1108,6 +1460,15 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             final TextView suspendNote;
             final TextView suspendSummary;
             final MaterialSwitch suspendToggle;
+            final View appActions;
+            final View freezePill;
+            final ImageView freezeIcon;
+            final TextView freezeLabel;
+            final ImageView freezeInfo;
+            final View uninstallPill;
+            final ImageView uninstallIcon;
+            final TextView uninstallLabel;
+            final ImageView uninstallInfo;
             final View controls;
             final MaterialCardView boxUninstall;
             final MaterialCardView boxUserControl;
@@ -1127,6 +1488,15 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 suspendNote = itemView.findViewById(R.id.policy_suspend_note);
                 suspendSummary = itemView.findViewById(R.id.policy_suspend_summary);
                 suspendToggle = itemView.findViewById(R.id.policy_suspend_toggle);
+                appActions = itemView.findViewById(R.id.policy_app_actions);
+                freezePill = itemView.findViewById(R.id.policy_freeze_pill);
+                freezeIcon = itemView.findViewById(R.id.policy_freeze_icon);
+                freezeLabel = itemView.findViewById(R.id.policy_freeze_label);
+                freezeInfo = itemView.findViewById(R.id.policy_freeze_info);
+                uninstallPill = itemView.findViewById(R.id.policy_uninstall_pill);
+                uninstallIcon = itemView.findViewById(R.id.policy_uninstall_icon);
+                uninstallLabel = itemView.findViewById(R.id.policy_uninstall_label);
+                uninstallInfo = itemView.findViewById(R.id.policy_uninstall_info);
                 controls = itemView.findViewById(R.id.policy_controls);
                 boxUninstall = itemView.findViewById(R.id.policy_box_uninstall);
                 boxUserControl = itemView.findViewById(R.id.policy_box_user_control);
@@ -1193,11 +1563,75 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                     suspendToggle.setTrackTintList(ColorStateList.valueOf(Color.TRANSPARENT));
                     suspendRow.setOnClickListener(v -> toggleSuspend());
                 }
+                bindAppActionPills(yellow);
                 if (mPolicyDelegate) bindControlBoxes();
                 // The card itself is not a control — only its rows are.
                 card.setStrokeColor(mPolicyDelegate ? yellow : card.getStrokeColor());
                 card.setOnClickListener(null);
                 card.setClickable(false);
+            }
+
+            /**
+             * The two ordinary verdicts, as pills (白い熊).
+             * <p>
+             * They were rows with a title, a bold note and a chip each, which is
+             * three quarters of a screen spent on two actions and pushed the
+             * capabilities themselves below the fold. A pill states what it does
+             * and nothing more; the account is behind the "i", read once instead
+             * of scrolled past every time.
+             * <p>
+             * The freeze pill still carries state, because it is the one of the
+             * two that has any: grey and reading "Freeze" while the app runs,
+             * yellow and reading "Unfreeze" once it is shut — the same palette
+             * and the same direction as the suspend row above it. Uninstall is
+             * red in every state: it is the only thing on this page that the
+             * control which did it cannot undo.
+             */
+            void bindAppActionPills(@ColorInt int yellow) {
+                Context context = itemView.getContext();
+                boolean any = mCanFreeze || mCanUninstall;
+                appActions.setVisibility(any ? View.VISIBLE : View.GONE);
+                if (!any) return;
+                // INVISIBLE, not GONE: the two pills are weighted halves, so
+                // hiding one outright would stretch the other across the card.
+                freezePill.setVisibility(mCanFreeze ? View.VISIBLE : View.INVISIBLE);
+                if (mCanFreeze) {
+                    int accent = mAppFrozen ? yellow : DETAIL_COLOR;
+                    freezeLabel.setText(mAppFrozen ? R.string.unfreeze : R.string.freeze);
+                    freezeLabel.setTextColor(accent);
+                    freezeIcon.setImageResource(mAppFrozen
+                            ? R.drawable.ic_snowflake_off : R.drawable.ic_snowflake);
+                    tintPill(freezePill, freezeIcon, freezeInfo, accent, context);
+                    freezePill.setOnClickListener(v -> toggleFreeze());
+                    freezeInfo.setOnClickListener(v -> showActionInfo(R.string.policy_freeze,
+                            R.string.policy_freeze_note, R.string.policy_freeze_summary));
+                }
+                uninstallPill.setVisibility(mCanUninstall ? View.VISIBLE : View.INVISIBLE);
+                if (mCanUninstall) {
+                    uninstallLabel.setText(R.string.uninstall);
+                    uninstallLabel.setTextColor(CHANGED_STROKE_ALLOWED);
+                    tintPill(uninstallPill, uninstallIcon, uninstallInfo,
+                            CHANGED_STROKE_ALLOWED, context);
+                    uninstallPill.setOnClickListener(v -> promptUninstall());
+                    uninstallInfo.setOnClickListener(v -> showActionInfo(R.string.policy_uninstall,
+                            R.string.policy_uninstall_note, R.string.policy_uninstall_summary));
+                }
+            }
+
+            /**
+             * One pill's outline and glyphs, in the accent it is currently
+             * wearing. The background is built in code rather than as a drawable
+             * resource for the same reason everything else here is: the yellow is
+             * the configurable fork theme's, and the freeze pill changes colour
+             * with its own state.
+             */
+            private void tintPill(@NonNull View pill, @NonNull ImageView icon,
+                                  @NonNull ImageView info, @ColorInt int accent,
+                                  @NonNull Context context) {
+                pill.setBackground(pillDrawable(context, accent));
+                ColorStateList tint = ColorStateList.valueOf(accent);
+                ImageViewCompat.setImageTintList(icon, tint);
+                ImageViewCompat.setImageTintList(info, tint);
             }
 
             /**
