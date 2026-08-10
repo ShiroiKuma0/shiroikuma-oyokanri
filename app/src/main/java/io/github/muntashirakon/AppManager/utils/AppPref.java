@@ -461,7 +461,10 @@ public class AppPref {
             case PREF_APP_DETAILS_TABS_ORDER_STR:
                 return AppDetailsTabs.getDefaultOrder();
             case PREF_APP_DETAILS_TABS_START_INT:
-                return AppDetailsFragment.APP_INFO;
+                // Fork: App details opens on the Snooping tab by default (白い熊) — it is what the
+                // app is opened for. Snooping stays second in the tab order; the user can change
+                // the start tab in the App-details tabs settings.
+                return AppDetailsFragment.SNOOPING;
             case PREF_OVERLAYS_SORT_ORDER_INT:
                 return AppDetailsFragment.SORT_BY_PRIORITY;
             case PREF_RUNNING_APPS_SORT_ORDER_INT:

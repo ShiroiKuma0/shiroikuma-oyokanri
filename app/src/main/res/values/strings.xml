@@ -2383,6 +2383,7 @@
     <string name="snooping_legend_locking_3">A lock outlives this app: uninstalling \u767d\u3044\u718a \u5fdc\u7528\u7ba1\u7406 does not release it, and only \u767d\u3044\u718a \u96eb can clear it then \u2014 the \u201cClear all locks\u201d box on the card at the top of this page is there for exactly that.</string>
     <string name="snooping_legend_policy_boxes">The four boxes on that card are the device-policy powers themselves, and their switches name the capability rather than the lock \u2014 exactly as the rows below do. Flipped right and red means the phone is still open to this; flipped left and yellow, with a thick frame, means device policy has shut it. None of them asks for confirmation: what each one used to say in a dialog is now the box\u2019s own description, where it can be read before the tap instead of after it. Two of them \u2014 force-stop and accessibility \u2014 are held by \u767d\u3044\u718a \u96eb, which offers no way to read them back, so their switches show what we last applied rather than what the platform confirms.</string>
     <string name="snooping_legend_policy_suspend">\u201cSuspend this app\u201d above them reads the other way round, because it is the one control on the card that improves your position instead of describing an exposure: grey and off is the state every phone ships in, and yellow and on means you have shut the app down harder than freezing would. Same yellow, and same meaning, as a capability you closed.</string>
+    <string name="snooping_legend_freeze_uninstall">Under it sit two pills \u2014 the ordinary verdicts on the whole app, and neither needs device policy at all. \u201cFreeze\u201d is the same freeze as the snowflake on the main list: grey while the app runs, yellow and reading \u201cUnfreeze\u201d once it is shut, and unfreezing lifts every freeze type at once, a suspension above included. \u201cUninstall\u201d is red because it is the one thing on this page that the control which did it cannot undo; it asks first. Both refuse an app in the \u5fc5\u8981 profile, and the \u201ci\u201d in each pill explains it in full.</string>
 
     <!-- Fork: device-policy (Device Owner) locks, delegated by 白い熊 雫. -->
     <string name="policy_danger_tag">危険 · HARD TO UNDO</string>
@@ -2415,6 +2416,17 @@
     <string name="policy_suspend_note">A stronger freeze than hiding: the app cannot be opened at all — the system shows a stub in its place — and its notifications are silenced.</string>
     <string name="policy_suspend_summary">Turn this same switch off to release it. No other app outside 白い熊 応用管理 can lift it: not Settings, not the app itself — and it stays in place if 白い熊 応用管理 is uninstalled, leaving only 白い熊 雫 to clear it. So don’t suspend what you need to operate the phone: your keyboard, your launcher, Settings, 白い熊 雫, or 白い熊 応用管理.</string>
     <string name="policy_release_action">Release</string>
+
+    <!-- Fork: the two ordinary verdicts on the whole app, sitting under the hard
+         one. Neither is a device-policy power — they are what the main list's
+         snowflake and the App info page already do — so they are offered whether
+         or not 白い熊 雫 is Device Owner. -->
+    <string name="policy_freeze">Freeze this app</string>
+    <string name="policy_freeze_note">The ordinary freeze, exactly as the snowflake on the main list applies it: disable, suspend or hide, whichever method this app is set to.</string>
+    <string name="policy_freeze_summary">The pill reads “Unfreeze” while the app is frozen, and unfreezing lifts every freeze type at once — a suspension set above included. Nothing is removed: the app and its data stay on the phone. An app in the 必要 profile is refused.</string>
+    <string name="policy_uninstall">Uninstall this app</string>
+    <string name="policy_uninstall_note">Removes the app from this user. There is no way back from this page — you would have to install it again.</string>
+    <string name="policy_uninstall_summary">It asks first, and the confirmation can keep the app’s data and signing signatures. A system app is only reverted to its factory version. An app in the 必要 profile is refused.</string>
 
     <string name="policy_more">More device-policy controls…</string>
     <string name="policy_more_title">Device policy controls</string>

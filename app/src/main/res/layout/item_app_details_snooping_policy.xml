@@ -103,6 +103,113 @@
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 
+        <!-- Fork: the two ordinary verdicts on the whole app, under the hard one
+             (白い熊). Neither needs device policy — they are what the main list's
+             snowflake and the App info page already do — so unlike everything
+             else on this card they stay visible with no Device Owner in sight.
+             Pills rather than rows: they are actions, and three lines of prose
+             each pushed the capability list off the first screen. The account
+             they used to carry lives behind the "i", which is where an
+             explanation you read once belongs. -->
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:id="@+id/policy_app_actions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:baselineAligned="false"
+            android:orientation="horizontal">
+
+            <!-- Half the card each, so the two pills line up with the two columns
+                 the capability list breaks into when the phone is unfolded. The
+                 weights are why the missing one goes INVISIBLE rather than GONE
+                 below: a lone pill would otherwise stretch across the whole card. -->
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:id="@+id/policy_freeze_pill"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:paddingStart="10dp"
+                android:paddingEnd="6dp"
+                android:paddingVertical="6dp">
+
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:id="@+id/policy_freeze_icon"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_gravity="center_vertical"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_snowflake" />
+
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:id="@+id/policy_freeze_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginStart="8dp"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    tools:text="Freeze" />
+
+                <!-- The explanation, one tap away. Its own hit target, so tapping
+                     the pill still does the thing the pill names. -->
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:id="@+id/policy_freeze_info"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginStart="4dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/policy_freeze"
+                    android:padding="5dp"
+                    android:src="@drawable/ic_information_circle" />
+
+            </androidx.appcompat.widget.LinearLayoutCompat>
+
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:id="@+id/policy_uninstall_pill"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:paddingStart="10dp"
+                android:paddingEnd="6dp"
+                android:paddingVertical="6dp">
+
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:id="@+id/policy_uninstall_icon"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_gravity="center_vertical"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_trash_can" />
+
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:id="@+id/policy_uninstall_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginStart="8dp"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    tools:text="Uninstall" />
+
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:id="@+id/policy_uninstall_info"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginStart="4dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/policy_uninstall"
+                    android:padding="5dp"
+                    android:src="@drawable/ic_information_circle" />
+
+            </androidx.appcompat.widget.LinearLayoutCompat>
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
         <!-- The rest of the device-policy powers, 2×2 (白い熊, +75). They used to
              live behind a "More device-policy controls…" pill that opened a list
              dialog — which hid, among other things, the way back ("Clear all
