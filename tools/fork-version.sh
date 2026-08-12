@@ -37,11 +37,11 @@ sha=$(git -C "$REPO_ROOT" merge-base HEAD master 2>/dev/null | cut -c1-8 || true
 if [[ ${#sha} -eq 8 ]]; then
     # format-local: renders in $TZ, hence the TZ=UTC — plain format: would use the commit's
     # own offset and pin some commits a day early.
-    base_date=$(TZ=UTC git -C "$REPO_ROOT" show -s --format=%cd --date=format-local:%Y-%m-%d "$sha" 2>/dev/null || true)
-    if [[ ${#base_date} -eq 10 ]]; then
-        pin=".${base_date}.g${sha}"
+    base_stamp=$(TZ=UTC git -C "$REPO_ROOT" show -s --format=%cd --date=format-local:%Y-%m-%d.%H-%M "$sha" 2>/dev/null || true)
+    if [[ ${#base_stamp} -eq 16 ]]; then
+        pin="+${base_stamp}.g${sha}"
     else
-        pin=".g${sha}"
+        pin="+g${sha}"
     fi
 fi
 
