@@ -4,8 +4,71 @@
 
 All notable fork changes are recorded here. From `4.1.0.2026-06-29.gfc1e7007+090` onward, versions
 read `<upstream base>.<upstream commit date>.g<commit>+<fork build>` — the middle field names the
-upstream App Manager commit the fork is rebased on. Earlier versions used
-`customBaseVersionName+customBuildNumber` and are never retagged.
+upstream App Manager commit the fork is rebased on. From
+`4.1.0+2026-06-29.21-57.gfc1e7007+095` onward a `+` opens each top-level group (upstream's version ·
+the pin · our build counter) and the pin carries the commit's **time** as well as its date, so two
+syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
+Nothing already published is ever retagged.
+
+## 4.1.0+2026-06-29.21-57.gfc1e7007+095 — 2026-08-14
+
+A row's annotations — its note and its tags — now read as one column instead of three unrelated
+controls. (Covers builds +094 and +095. Built on upstream App Manager `4.1.0`, commit `fc1e7007` of
+2026-06-29 21:57 UTC.)
+
+### 📝 The note is one pill, and it says what it says
+
+The main list's note affordance used to be two different controls in two different places: a glyph
+glued to the end of the app name when a note existed, and a `+` floating over the column's top-right
+corner when one did not. Neither could show what the note actually **said** — a note was only ever
+readable by opening it.
+
+It is now **one pill** in both states, right-aligned at the end of the label line. With a note it
+carries the note's **first line**, ellipsized to whatever the row can spare, with the full text as its
+tooltip; with none it is the same pill holding only an add glyph — a page with a deliberately
+oversized plus, because at row size a Material-proportioned one is indistinguishable from a plain
+note. A tap opens the same editor as before, and saving a blank note still deletes it.
+
+### 🏷️ Tags right-aligned, and one builder behind every pill
+
+The profile pills are **right-aligned**, against the note pill's own edge, so a row's annotations
+form a column instead of drifting apart. When there are more than fit they **scroll sideways** rather
+than wrapping onto a second line and costing every row its height; the `+` sits outside the scroller
+and can never be scrolled out of reach.
+
+Both **add** affordances — the empty note pill and the tag `+` — are now uniform: same stadium
+outline, same pinned width, same faded ink, stacked into one column at the row's right edge. They are
+uniform *by construction*: every pill on the row comes from one builder, in the fork's own pill
+language (the same one the Snooping page's status pills use). Opacity carries the hierarchy — an add
+control is faded because it is an invitation rather than information; a written note is drawn below
+full strength so it reads as a margin note rather than a second title; a tag pill alone is
+full-strength, being a fact about the app.
+
+The battery panel's header is the same card, bound through the same builder, so the two cannot drift
+apart — and **its note pill now works at all**, having carried a visible `+` with no listener behind
+it since the card was added.
+
+### 📐 The app name in full; the note takes the rest
+
+Where the note pill stops is decided at **measure time**, not when the row is bound: the app name
+keeps its natural width — in full, and not one pixel more — and the note takes every remaining pixel,
+reaching back to exactly where the name ends.
+
+Plain weights cannot say that. Weight on both and the surplus splits between them, leaving a gap
+after a short name and truncating the note early (which is what build +094 shipped). Weight on the
+note alone and it does reach the name — until a name longer than the whole line leaves it **zero**
+pixels wide and the note disappears from the row. So the label line caps the name at *what the line
+has minus what the others need* before measuring, floored at half the line so a three- or
+four-column grid cannot reserve the name away entirely.
+
+### 🔢 Version names group with `+`, and pin to the minute
+
+The fork's version string now reads `4.1.0+2026-06-29.21-57.gfc1e7007+095`: a `+` opens each
+top-level group — upstream's own version, the upstream commit this fork is rebased on, and our build
+counter — while the pin's date, time and hash stay dot-joined, since all three describe one commit.
+The pin gained the **time** because two upstream syncs landing on the same day tied on the date and
+handed the sort order back to a random-looking hash. Both halves that render it, the Gradle build and
+the shell helper the pipeline uses, changed in step.
 
 ## 4.1.0.2026-06-29.gfc1e7007+093 — 2026-08-10
 
