@@ -175,41 +175,56 @@
 
                 </io.github.muntashirakon.AppManager.main.LabelLineLayout>
 
-                <androidx.appcompat.widget.AppCompatTextView
-                    android:id="@+id/packageName"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:singleLine="true"
-                    android:textAppearance="?attr/textAppearanceBodySmall"
-                    android:textStyle="italic"
-                    tools:text="io.github.muntashirakon.AppManager" />
+                <!-- Fork (白い熊, +096): the app-ID line — the kernel UID, then
+                     the package name it belongs to.
 
+                     The UID used to sit right-aligned and 10sp at the far end of
+                     the date line below, where it read as a stray number
+                     attached to the install date. It names the app, so it now
+                     leads the app ID instead. It stays its OWN view rather than
+                     becoming a span on the package name, so it keeps the font
+                     category (FontPrefs.UID) and the colour rows
+                     (ColorPrefs.UID_NORMAL / UID_SHARED — orange when the
+                     package shares a user ID) it already had; a span would have
+                     silently retired both settings surfaces.
+
+                     The UID is wrap_content and the package name takes the slack
+                     (0dp + weight), so a long ID is clipped at its own end
+                     instead of pushing the number off the row. -->
                 <androidx.appcompat.widget.LinearLayoutCompat
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal">
 
                     <androidx.appcompat.widget.AppCompatTextView
-                        android:id="@+id/date"
+                        android:id="@+id/shareid"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
                         android:singleLine="true"
                         android:textAppearance="?attr/textAppearanceBodySmall"
-                        tools:text="@tools:sample/date/mmddyy" />
+                        android:textStyle="italic"
+                        tools:text="10123" />
 
                     <androidx.appcompat.widget.AppCompatTextView
-                        android:id="@+id/shareid"
-                        android:layout_width="match_parent"
+                        android:id="@+id/packageName"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:gravity="end"
-                        android:paddingEnd="25sp"
+                        android:layout_weight="1"
                         android:singleLine="true"
                         android:textAppearance="?attr/textAppearanceBodySmall"
-                        android:textSize="10sp"
-                        tools:text="@tools:sample/us_zipcodes"
-                        tools:ignore="RtlSymmetry,SmallSp" />
+                        android:textStyle="italic"
+                        tools:text="io.github.muntashirakon.AppManager" />
 
                 </androidx.appcompat.widget.LinearLayoutCompat>
+
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:id="@+id/date"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:singleLine="true"
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    tools:text="@tools:sample/date/mmddyy" />
 
                 <!-- Fork (白い熊, +094): the tag (profile) line — memberships,
                      then the "+" that adds one.

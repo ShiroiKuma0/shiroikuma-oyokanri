@@ -130,9 +130,17 @@ public final class MainCardBinder {
                     .format(new Date(item.firstInstallTime)));
         } else date.setText("");
 
+        // Fork (白い熊, +096): this view leads the app-ID line now (see
+        // item_main.xml), so it carries the UID *number* the main list shows
+        // there and not the shared-user-ID name, which is long enough to take
+        // the whole line for itself. Sharing is said with the same orange the
+        // list uses instead.
         TextView shareId = card.findViewById(R.id.shareid);
-        shareId.setText(item != null && item.sharedUserId != null ? item.sharedUserId
-                : String.valueOf(uid));
+        shareId.setText(String.valueOf(uid));
+        shareId.setTextColor(item != null && item.sharedUserId != null
+                ? ColorPrefs.getColor(context, ColorPrefs.UID_SHARED, orange)
+                : ColorPrefs.getColor(context, ColorPrefs.UID_NORMAL,
+                ContextCompat.getColor(context, io.github.muntashirakon.ui.R.color.textColorSecondary)));
 
         // The right column: the main list puts version / type / SDK / signature
         // here; on the battery screens that space carries the drain instead.

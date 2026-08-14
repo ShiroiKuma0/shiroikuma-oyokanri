@@ -643,14 +643,20 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         // Set date color to orange if app can read logs (and accepted)
         holder.date.setTextColor(item.canReadLogs ? mcDateReadable : mcDateNormal);
         FontUtil.apply(holder.date, FontPrefs.INSTALL_DATE);
-        if (item.isInstalled) {
-            // Set UID
-            if (item.uidOrAppIds != null) {
-                holder.userId.setText(item.uidOrAppIds);
-            }
+        // Set UID. Fork (白い熊, +096): it now leads the app-ID line instead of
+        // trailing the install date — see item_main.xml. GONE rather than an
+        // empty string when there is nothing to show, or the empty view would
+        // still hold its end margin and hold the package name off its own left
+        // edge for every uninstalled row.
+        if (item.isInstalled && !TextUtils.isEmpty(item.uidOrAppIds)) {
+            holder.userId.setVisibility(View.VISIBLE);
+            holder.userId.setText(item.uidOrAppIds);
             // Set UID text color to orange if the package is shared
             holder.userId.setTextColor(item.sharedUserId != null ? mcUidShared : mcUidNormal);
-        } else holder.userId.setText("");
+        } else {
+            holder.userId.setText("");
+            holder.userId.setVisibility(View.GONE);
+        }
         FontUtil.apply(holder.userId, FontPrefs.UID);
         if (item.sha != null) {
             // Set signature type (right column)
