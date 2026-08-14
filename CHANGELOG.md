@@ -10,6 +10,29 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.0+2026-06-29.21-57.gfc1e7007+096 — 2026-08-14
+
+The kernel UID moves to the front of the app ID. (Built on upstream App Manager `4.1.0`, commit
+`fc1e7007` of 2026-06-29 21:57 UTC.)
+
+### 🔢 The UID leads the app ID instead of trailing the date
+
+Every main-list row carries the app's kernel UID, but it sat right-aligned and 10sp at the far end of
+the **install-date** line — where a bare number reads as something to do with the date. It names the
+app, so it now leads the **app ID**: `10123  io.github.muntashirakon.AppManager`.
+
+The number keeps its natural width and the package name takes the slack, so a long ID is clipped at
+its own end rather than pushing the UID off the row; it disappears entirely for an uninstalled app
+instead of leaving the ID held off its own left edge by an empty gap. The value is unchanged —
+the raw UID for a single-user app, `2+123` when the app exists in several users — and so is its
+meaning: it turns **orange** when the package shares a user ID with another.
+
+It stays its own view rather than becoming part of the package-name text, so the **UID font
+category** and the **UID colour rows** on the 白い熊 応用管理 UI page remain live settings; folding it
+into a span would have quietly retired both. The battery screen's header is the same card and
+follows it, printing the UID number there too — it used to print the shared-user-ID *name*, which is
+long enough to take the whole line for itself in this position.
+
 ## 4.1.0+2026-06-29.21-57.gfc1e7007+095 — 2026-08-14
 
 A row's annotations — its note and its tags — now read as one column instead of three unrelated

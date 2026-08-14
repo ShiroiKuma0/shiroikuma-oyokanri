@@ -18,9 +18,9 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+2026-06-29.21-57.gfc1e7007+095`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+2026-06-29.21-57.gfc1e7007+096`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
-<sub>Version reads as **upstream `4.1.0`**, rebased onto upstream commit **`fc1e7007` of 2026-06-29 21:57 UTC**, fork build **095**.</sub>
+<sub>Version reads as **upstream `4.1.0`**, rebased onto upstream commit **`fc1e7007` of 2026-06-29 21:57 UTC**, fork build **096**.</sub>
 
 </div>
 
@@ -260,6 +260,9 @@ The app list does more without a trip into details:
 - Per-row **profile pills**, right-aligned against the note's own edge — tap to filter, long-press to
   remove, "+" to add to a profile. More pills than fit scroll sideways instead of costing the row a
   second line.
+- The **kernel UID leads the app ID** rather than trailing the install date, so the number reads as
+  part of the identity it belongs to — and turns orange the moment a package shares a user ID with
+  another.
 - A **copy-all-displayed-IDs** toolbar action, a **multi-profile include/exclude filter** with a
   tri-state picker, and a fully **customisable bottom selection toolbar** (reorder/hide actions;
   long-press any button to open the editor).
