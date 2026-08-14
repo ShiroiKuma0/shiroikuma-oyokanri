@@ -23,8 +23,6 @@ import androidx.appcompat.widget.LinearLayoutCompat;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.material.card.MaterialCardView;
-import com.google.android.material.chip.Chip;
-import com.google.android.material.chip.ChipGroup;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -37,7 +35,9 @@ import io.github.muntashirakon.AppManager.db.dao.BatterySampleDao;
 import io.github.muntashirakon.AppManager.fonts.ColorPrefs;
 import io.github.muntashirakon.AppManager.fonts.RunningBoxPrefs;
 import io.github.muntashirakon.AppManager.main.ApplicationItem;
+import io.github.muntashirakon.AppManager.main.RowPills;
 import io.github.muntashirakon.AppManager.self.imagecache.ImageLoader;
+import io.github.muntashirakon.AppManager.utils.AppNotesManager;
 import io.github.muntashirakon.AppManager.utils.ForkThemeUtils;
 
 /**
@@ -46,10 +46,10 @@ import io.github.muntashirakon.AppManager.utils.ForkThemeUtils;
  *
  * <p>The battery panel's header is that card, so the two cannot look like two
  * different apps. Deliberately a <b>subset</b> of {@code MainRecyclerAdapter}'s
- * bind: selection state, search highlighting and the note "+" belong to the
- * list and mean nothing on a single-app page. Everything visible — icon, freeze
+ * bind: selection state, search highlighting and the tag "+" belong to the list
+ * and mean nothing on a single-app page. Everything visible — icon, freeze
  * snowflake, force-stop ✕, label, package, install date, uid, version, type,
- * SDK, signature and the profile tags — is bound here.
+ * SDK, signature, the note pill and the profile tags — is bound here.
  */
 public final class MainCardBinder {
     private MainCardBinder() {}
@@ -241,29 +241,43 @@ public final class MainCardBinder {
         goneIfPresent(card, R.id.size);
         View backupIndicator = card.findViewById(R.id.backup_indicator);
         if (backupIndicator != null) backupIndicator.setVisibility(View.GONE);
-        // The note "+" and profile pills are part of the card 白い熊 asked for,
+        // The note pill and profile pills are part of the card 白い熊 asked for,
         // so they stay; only the list's selection machinery is left out.
-        View noteAdd = card.findViewById(R.id.note_add);
-        if (noteAdd != null) noteAdd.setVisibility(View.VISIBLE);
+        //
+        // Fork (白い熊, +094): the note is ONE pill in both states, bound exactly
+        // as the list binds it — so this card shows the note's first line rather
+        // than a bare affordance, and tapping it opens the same editor. Before
+        // this the card carried a visible "+" with no listener behind it.
         View favorite = card.findViewById(R.id.favorite_icon);
         if (favorite != null) favorite.setVisibility(View.GONE);
 
-        // Profile tags — the 保存復元 / 凍結 / 必要 pills from the main list.
-        ChipGroup pills = card.findViewById(R.id.profile_pills);
+        TextView notePill = card.findViewById(R.id.note_pill);
+        if (notePill != null) {
+            // A uid with no package behind it has nothing to key a note on.
+            notePill.setVisibility(packageName == null ? View.GONE : View.VISIBLE);
+            if (packageName != null) {
+                final String notePkg = packageName;
+                final int noteInk = ForkThemeUtils.getTextColor();
+                final CharSequence noteLabel = item != null && item.label != null
+                        ? item.label : packageName;
+                RowPills.bindNote(notePill, notePkg, noteInk);
+                notePill.setOnClickListener(v -> AppNotesManager.showNoteDialog(
+                        context, notePkg, noteLabel,
+                        () -> RowPills.bindNote(notePill, notePkg, noteInk)));
+            }
+        }
+
+        // Profile tags — the 保存復元 / 凍結 / 必要 pills from the main list, built
+        // by the list's own builder so the two surfaces cannot drift apart.
+        // Read-only here: this card is a header, not a list row.
+        LinearLayoutCompat pills = card.findViewById(R.id.profile_pills);
         if (pills != null) {
             pills.removeAllViews();
             for (String name : profileTags) {
-                Chip chip = new Chip(context);
-                chip.setText(name);
-                chip.setTextColor(yellow);
-                chip.setChipBackgroundColor(ColorStateList.valueOf(Color.TRANSPARENT));
-                chip.setChipStrokeColor(ColorStateList.valueOf(yellow));
-                chip.setChipStrokeWidth(2f);
-                chip.setCheckable(false);
-                chip.setClickable(false);
-                chip.setChipIconVisible(false);
-                chip.setCloseIconVisible(false);
-                pills.addView(chip);
+                TextView pill = RowPills.tagPill(context, name, yellow);
+                pill.setClickable(false);
+                pill.setFocusable(false);
+                pills.addView(pill);
             }
         }
         View addPill = card.findViewById(R.id.profile_add_pill);

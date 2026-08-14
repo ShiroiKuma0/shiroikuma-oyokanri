@@ -103,55 +103,77 @@
             android:layout_height="wrap_content"
             android:layout_weight="1">
 
-            <!-- Fork: top-right affordances. The note "+" (shown only when the
-                 app has no note) sits to the LEFT of the debug star so the two
-                 never overlap; the star keeps its own id and bind behaviour. -->
-            <androidx.appcompat.widget.LinearLayoutCompat
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_gravity="end|top">
-
-                <androidx.appcompat.widget.AppCompatImageView
-                    android:id="@+id/note_add"
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:layout_marginEnd="6dp"
-                    android:src="@drawable/ic_add"
-                    android:visibility="gone"
-                    tools:ignore="ContentDescription"
-                    tools:visibility="visible" />
-
-                <androidx.appcompat.widget.AppCompatImageView
-                    android:id="@+id/favorite_icon"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:src="@drawable/item_favorite"
-                    tools:ignore="ContentDescription" />
-
-            </androidx.appcompat.widget.LinearLayoutCompat>
-
             <androidx.appcompat.widget.LinearLayoutCompat
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:orientation="vertical">
 
-                <!-- Fork: the per-app note badge is rendered as a compound
-                     drawableEnd on the label (set in MainRecyclerAdapter), so it
-                     hugs the end of the app name instead of being pushed to the
-                     far edge of the row, and stays visible even when the name
-                     ellipsizes. The label is wrap_content for the same reason.
-                     Only the glyph's hit region is tappable (see the label touch
-                     listener in the adapter). -->
-                <androidx.appcompat.widget.AppCompatTextView
-                    android:id="@+id/label"
-                    android:layout_width="wrap_content"
+                <!-- Fork (白い熊, +094): the label line — app name · note pill ·
+                     debug star, as one horizontal row.
+
+                     The note used to be a compound drawable on the label plus a
+                     separate "+" floating over the column's top-right corner:
+                     two different controls for one affordance, neither of which
+                     could show what the note actually said. It is now ONE pill
+                     in both states (RowPills.bindNote), right-aligned on this
+                     line and exactly as wide as the tag "+" below it when empty,
+                     so the two add controls stack into one column.
+
+                     Sizing (白い熊, +095): the app name is `wrap_content` and
+                     UNWEIGHTED — it takes its natural width, in full and not one
+                     pixel more — while `note_slot` is the only weighted child, so
+                     it absorbs every remaining pixel and the pill inside it
+                     reaches back to exactly where the name ends. The one thing
+                     weights cannot do is stop a name longer than the whole line
+                     from leaving the slot nothing at all, so `LabelLineLayout`
+                     caps the label a note-floor short of the line before
+                     measuring. See that class — it is where the rule lives. -->
+                <io.github.muntashirakon.AppManager.main.LabelLineLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:singleLine="true"
-                    android:ellipsize="end"
-                    android:textAppearance="?android:attr/textAppearanceListItem"
-                    tools:text="@string/app_name" />
+                    android:baselineAligned="false"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <androidx.appcompat.widget.AppCompatTextView
+                        android:id="@+id/label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:singleLine="true"
+                        android:ellipsize="end"
+                        android:textAppearance="?android:attr/textAppearanceListItem"
+                        tools:text="@string/app_name" />
+
+                    <!-- The debug star sits BEFORE the note pill, not after it:
+                         it is always laid out (INVISIBLE, never GONE, for a
+                         non-debuggable app), so trailing it would hold the pill
+                         ~24dp off the column's end and the two add affordances
+                         would no longer share an edge. -->
+                    <androidx.appcompat.widget.AppCompatImageView
+                        android:id="@+id/favorite_icon"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:src="@drawable/item_favorite"
+                        tools:ignore="ContentDescription" />
+
+                    <FrameLayout
+                        android:id="@+id/note_slot"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="6dp">
+
+                        <androidx.appcompat.widget.AppCompatTextView
+                            android:id="@+id/note_pill"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="end|center_vertical"
+                            tools:text="Needed for X; do not freeze" />
+
+                    </FrameLayout>
+
+                </io.github.muntashirakon.AppManager.main.LabelLineLayout>
 
                 <androidx.appcompat.widget.AppCompatTextView
                     android:id="@+id/packageName"
@@ -189,22 +211,44 @@
 
                 </androidx.appcompat.widget.LinearLayoutCompat>
 
+                <!-- Fork (白い熊, +094): the tag (profile) line — memberships,
+                     then the "+" that adds one.
+
+                     The pills are RIGHT-aligned, against the same edge as the
+                     note pill above them, so a row's annotations read as one
+                     column instead of drifting apart. `fillViewport` is what
+                     achieves it: it stretches the strip to the viewport when the
+                     pills are narrower than the line, and `gravity="end"` then
+                     pushes them to its end; when there are more pills than fit,
+                     the strip keeps its own width and scrolls sideways instead
+                     of wrapping onto a second line and costing every row its
+                     height. The "+" sits OUTSIDE the scroller so it can never be
+                     scrolled out of reach. -->
                 <androidx.appcompat.widget.LinearLayoutCompat
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
                     android:orientation="horizontal"
                     android:baselineAligned="false">
 
-                    <com.google.android.material.chip.ChipGroup
-                        android:id="@+id/profile_pills"
+                    <HorizontalScrollView
+                        android:id="@+id/profile_pills_scroller"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        app:chipSpacingHorizontal="4dp"
-                        app:chipSpacingVertical="2dp"
-                        app:singleLine="false" />
+                        android:fillViewport="true"
+                        android:scrollbars="none">
 
-                    <com.google.android.material.chip.Chip
+                        <androidx.appcompat.widget.LinearLayoutCompat
+                            android:id="@+id/profile_pills"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="end|center_vertical"
+                            android:orientation="horizontal" />
+
+                    </HorizontalScrollView>
+
+                    <androidx.appcompat.widget.AppCompatTextView
                         android:id="@+id/profile_add_pill"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
