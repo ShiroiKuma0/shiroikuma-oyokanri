@@ -28,7 +28,6 @@ import android.text.SpannableString;
 import android.text.TextUtils;
 import android.text.style.RelativeSizeSpan;
 import android.view.LayoutInflater;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
@@ -46,8 +45,6 @@ import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.card.MaterialCardView;
-import com.google.android.material.chip.Chip;
-import com.google.android.material.chip.ChipGroup;
 
 import java.io.File;
 import java.io.OutputStream;
@@ -449,29 +446,46 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
     private static final String RIGHT_COLUMN_REFERENCE = "SHA384withRSA";
 
     /**
-     * Fork (白い熊, +77): keep the app name clear of the affordances floating
-     * over the top-right of its column.
+     * Fork (白い熊, +094): the row's note affordance — ONE pill, right-aligned on
+     * the label line, in both of its states.
      * <p>
-     * The note "+" and the debug star sit in the same {@code FrameLayout} as the
-     * name, pinned {@code end|top}; the name is left-aligned and wrap_content, so
-     * a long one ran straight underneath them and rendered with a "+" stamped
-     * through its last characters. Reserving their width makes it ellipsize just
-     * short of them instead.
+     * Before this it was two: a glyph glued to the end of the app name when a
+     * note existed, and a "+" floating over the column's top-right corner when
+     * one did not. Two controls for one thing, in two different places, and
+     * neither could show what the note actually <em>said</em> — the note was
+     * only ever readable by opening it. The pill shows its first line instead,
+     * and reads as the same control whether or not it has anything to show.
      * <p>
-     * The star is 20dp ({@code item_favorite} is 60px at xxhdpi) and is always
-     * laid out — it is INVISIBLE, not GONE, for a non-debuggable app. The "+"
-     * adds its own 20dp plus its 6dp end margin, and only while it is shown: an
-     * app that <em>has</em> a note carries the glyph as a compound drawable on
-     * the label instead, and then there is nothing there to avoid.
+     * All the pill's own styling lives in {@link RowPills}, shared with the tag
+     * pills below it so the two add affordances cannot drift apart, and how wide
+     * it may grow is settled at measure time by {@link LabelLineLayout} — the app
+     * name in full, the note reaching back to exactly where the name ends. None
+     * of the row's geometry is decided here, which is the point: a bind-time
+     * guess cannot know the line's width, and +094 guessed a fixed half.
+     * <p>
+     * Both branches of every switch are set, always: the row is recycled.
      */
-    private static void reserveLabelOverlaySpace(@NonNull Context context, @NonNull ViewHolder holder) {
-        float density = context.getResources().getDisplayMetrics().density;
-        boolean plusShown = holder.noteAdd.getVisibility() == View.VISIBLE;
-        int reserved = Math.round((20f + 4f + (plusShown ? 26f : 0f)) * density);
-        ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) holder.label.getLayoutParams();
-        if (lp.getMarginEnd() == reserved) return;
-        lp.setMarginEnd(reserved);
-        holder.label.setLayoutParams(lp);
+    private void bindNotePill(@NonNull ViewHolder holder, @NonNull ApplicationItem item) {
+        final String pkg = item.packageName;
+        final CharSequence label = item.label;
+        RowPills.bindNote(holder.notePill, pkg, ForkThemeUtils.getTextColor());
+        // The same two guards the app icon carries (+82), and for the same
+        // reasons — only more so, since with a note this pill is half the label
+        // line rather than a 20dp glyph. A tap during multi-select must extend
+        // the selection instead of opening an editor, and a clickable child
+        // swallows the long-press that drives range selection unless it hands it
+        // back to the card.
+        holder.notePill.setOnClickListener(v -> {
+            int currentPos = holder.getBindingAdapterPosition();
+            if (currentPos == RecyclerView.NO_POSITION) return;
+            if (isInSelectionMode()) {
+                toggleSelection(currentPos);
+                AccessibilityUtils.requestAccessibilityFocus(holder.itemView);
+                return;
+            }
+            showNoteDialog(holder, pkg, label);
+        });
+        holder.notePill.setOnLongClickListener(v -> holder.itemView.performLongClick());
     }
 
     /**
@@ -767,54 +781,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         // just re-applies the same italic/normal as before).
         FontUtil.apply(holder.label, FontPrefs.LABEL);
         holder.label.setTypeface(holder.label.getTypeface(), dormantItalic ? Typeface.ITALIC : Typeface.NORMAL);
-        // Fork: per-app note affordance. Mutually exclusive per row —
-        //   has a note -> note glyph as a compound drawableEnd hugging the app
-        //                 name (tap the glyph to view/edit); top-right "+" hidden
-        //   no note    -> top-right "+" to create a note; no glyph
-        // The glyph is a compound drawable rather than a sibling view so it hugs
-        // the label text (a weighted sibling gets pushed to the far edge of the
-        // row, next to the "+" slot) and stays visible when the name ellipsizes.
-        // Only the glyph's hit region opens the dialog; every other touch on the
-        // label falls through to the card (open details / select). ViewHolder is
-        // recycled, so BOTH branches set the label drawable + touch listener AND
-        // the "+" visibility + click listener. Tint tracks the fork theme colour.
-        final String notePkg = item.packageName;
-        final CharSequence noteLabel = item.label;
-        int noteTint = ForkThemeUtils.getTextColor();
-        if (AppNotesManager.hasNote(context, notePkg)) {
-            int sz = Math.round(18 * context.getResources().getDisplayMetrics().density);
-            Drawable noteGlyph = ContextCompat.getDrawable(context, R.drawable.ic_note_24dp);
-            if (noteGlyph != null) {
-                noteGlyph = noteGlyph.mutate();
-                noteGlyph.setBounds(0, 0, sz, sz);
-                noteGlyph.setTintList(ColorStateList.valueOf(noteTint));
-            }
-            // Gap between the app name and the glyph: 0.7× the glyph width.
-            holder.label.setCompoundDrawablePadding(Math.round(sz * 0.7f));
-            holder.label.setCompoundDrawablesRelative(null, null, noteGlyph, null);
-            holder.label.setOnTouchListener((v, event) -> {
-                Drawable end = holder.label.getCompoundDrawablesRelative()[2];
-                if (end == null) return false;
-                boolean inBadge = holder.label.getLayoutDirection() == View.LAYOUT_DIRECTION_RTL
-                        ? event.getX() <= holder.label.getCompoundPaddingLeft()
-                        : event.getX() >= holder.label.getWidth() - holder.label.getCompoundPaddingRight();
-                if (!inBadge) return false;
-                if (event.getAction() == MotionEvent.ACTION_UP) {
-                    v.performClick();
-                    showNoteDialog(holder, notePkg, noteLabel);
-                }
-                return true;
-            });
-            holder.noteAdd.setVisibility(View.GONE);
-            holder.noteAdd.setOnClickListener(null);
-        } else {
-            holder.label.setCompoundDrawablesRelative(null, null, null, null);
-            holder.label.setOnTouchListener(null);
-            holder.noteAdd.setImageTintList(ColorStateList.valueOf(noteTint));
-            holder.noteAdd.setVisibility(View.VISIBLE);
-            holder.noteAdd.setOnClickListener(v -> showNoteDialog(holder, notePkg, noteLabel));
-        }
-        reserveLabelOverlaySpace(context, holder);
+        bindNotePill(holder, item);
         // Set package name
         if (!TextUtils.isEmpty(mSearchQuery) && item.packageName.toLowerCase(Locale.ROOT).contains(mSearchQuery)) {
             // Highlight searched query
@@ -828,44 +795,35 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         } else holder.packageName.setTextColor(mcPackageNormal);
         FontUtil.apply(holder.packageName, FontPrefs.PACKAGE);
         // Populate profile-membership pills (these sit where the cert issuer
-        // and backup info text used to live). Each pill is a Chip styled as
-        // yellow text inside a yellow hairline-stroked transparent oval —
-        // same visual language as the search bar and the installer
-        // master-toggle banner.
+        // and backup info text used to live). Each pill is yellow text inside a
+        // yellow hairline-stroked transparent stadium — same visual language as
+        // the search bar and the installer master-toggle banner, and, since +094,
+        // built by the same RowPills builder as the note pill on the label line,
+        // so the row's two add affordances are uniform by construction rather
+        // than by two blocks of styling agreeing with each other.
+        //
+        // They are RIGHT-aligned, against the note pill's edge (see the layout).
         //
         // Interaction model on this row (per fork spec):
         //   - tap a profile pill        -> filter the main list to apps in that profile
         //   - long-press a profile pill -> remove this app from that profile (saves on disk)
         //   - tap the "+" pill          -> open the add-to-profile dialog for this app
         //   - long-press the "+" pill   -> clear an active profile filter, if any
-        // The "+" pill is a separate Chip declared in item_main.xml, sitting
-        // outside the ChipGroup so it can be right-justified by the wrapping
-        // LinearLayout (ChipGroup has weight=1, "+" sits at the right edge).
-        // It guarantees a tappable surface for the add affordance even when
-        // an app has no profile memberships. The ChipGroup's own empty-space
-        // click/long-click handlers below are kept as a defensive backup —
-        // they fire only when the user lands between or beyond pills, since
-        // each Chip consumes its own touch area.
+        // The "+" pill is declared in item_main.xml, sitting OUTSIDE the
+        // horizontal scroller that holds the memberships so it can never be
+        // scrolled out of reach, and so it stays pinned to the row's right edge
+        // however many pills precede it. It guarantees a tappable surface for
+        // the add affordance even when an app has no profile memberships. The
+        // strip's own empty-space click/long-click handlers below are kept as a
+        // defensive backup — they fire only when the user lands between or
+        // beyond pills, since each pill consumes its own touch area.
         holder.profilePills.removeAllViews();
-        ColorStateList chipStrokeList = ColorStateList.valueOf(mcChip);
-        ColorStateList addPillStrokeList = ColorStateList.valueOf(mcAddPill);
-        ColorStateList transparentList = ColorStateList.valueOf(Color.TRANSPARENT);
         final String pkgForRow = item.packageName;
         // Profile-membership pills.
         List<String> profileNames = mPackageToProfileNames.get(item.packageName);
         if (profileNames != null) {
             for (String name : profileNames) {
-                Chip chip = new Chip(context);
-                chip.setText(name);
-                chip.setTextColor(mcChip);
-                chip.setChipBackgroundColor(transparentList);
-                chip.setChipStrokeColor(chipStrokeList);
-                chip.setChipStrokeWidth(2f);
-                chip.setChipIconVisible(false);
-                chip.setCloseIconVisible(false);
-                chip.setCheckable(false);
-                chip.setClickable(true);
-                chip.setFocusable(true);
+                TextView chip = RowPills.tagPill(context, name, mcChip);
                 final String profileName = name;
                 chip.setOnClickListener(v -> {
                     if (mActivity.viewModel == null) return;
@@ -891,19 +849,11 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                 holder.profilePills.addView(chip);
             }
         }
-        // The XML-declared "+" pill — always shown, right-justified by the
-        // parent LinearLayout's weight distribution. Style applied here
-        // because the chip is the same shape across all rows.
-        holder.addPill.setText("+");
-        holder.addPill.setTextColor(mcAddPill);
-        holder.addPill.setChipBackgroundColor(transparentList);
-        holder.addPill.setChipStrokeColor(addPillStrokeList);
-        holder.addPill.setChipStrokeWidth(2f);
-        holder.addPill.setChipIconVisible(false);
-        holder.addPill.setCloseIconVisible(false);
-        holder.addPill.setCheckable(false);
-        holder.addPill.setClickable(true);
-        holder.addPill.setFocusable(true);
+        // The XML-declared "+" pill — always shown, and pinned to the same width
+        // as the empty note pill above it so the two add affordances line up as
+        // one column. Style applied here because the pill is the same shape
+        // across all rows.
+        RowPills.bindAddTag(holder.addPill, mcAddPill);
         holder.addPill.setOnClickListener(v -> {
             AddToProfileDialogFragment dialog = AddToProfileDialogFragment.getInstance(
                     new String[]{pkgForRow});
@@ -1411,10 +1361,11 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         TextView backupVersion;
         TextView backupDate;
         TextView backupTime;
-        ChipGroup profilePills;
-        Chip addPill;
-        AppCompatImageView noteAdd;   // Fork: top-right "+" (no-note). The has-note
-                                      // badge is a compound drawable on `label`.
+        LinearLayoutCompat profilePills;
+        TextView addPill;
+        // Fork (+094): one pill for the note in both states. How wide it may
+        // grow is LabelLineLayout's business, not the holder's.
+        TextView notePill;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -1440,7 +1391,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             backupTime = itemView.findViewById(R.id.backup_time);
             profilePills = itemView.findViewById(R.id.profile_pills);
             addPill = itemView.findViewById(R.id.profile_add_pill);
-            noteAdd = itemView.findViewById(R.id.note_add);
+            notePill = itemView.findViewById(R.id.note_pill);
         }
     }
 }
