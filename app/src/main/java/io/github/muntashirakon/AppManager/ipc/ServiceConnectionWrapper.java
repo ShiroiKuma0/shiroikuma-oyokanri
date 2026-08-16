@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 import io.github.muntashirakon.AppManager.logs.Log;
 import io.github.muntashirakon.AppManager.misc.NoOps;
 import io.github.muntashirakon.AppManager.settings.Ops;
+import io.github.muntashirakon.AppManager.settings.PrivilegeWatchdog;
 import io.github.muntashirakon.AppManager.settings.ShizukuOps;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 
@@ -75,6 +76,10 @@ class ServiceConnectionWrapper {
             Log.d(TAG, "service onServiceDisconnected: %s", name);
             onBinderLost();
             onResponseReceived();
+            // Fork: this used to be the whole reaction to losing the privileged session — the field
+            // went null and the app carried on silently on the no-root shell. See PrivilegeWatchdog;
+            // a drop that happens inside Ops.init is a deliberate teardown and is ignored there.
+            PrivilegeWatchdog.onServiceLost();
         }
 
         @Override
@@ -82,6 +87,7 @@ class ServiceConnectionWrapper {
             Log.d(TAG, "service onBindingDied: %s", name);
             onBinderLost();
             onResponseReceived();
+            PrivilegeWatchdog.onServiceLost();
         }
 
         @Override
@@ -89,6 +95,7 @@ class ServiceConnectionWrapper {
             Log.d(TAG, "service onNullBinding: %s", name);
             onBinderLost();
             onResponseReceived();
+            PrivilegeWatchdog.onServiceLost();
         }
 
         private void onBinderLost() {

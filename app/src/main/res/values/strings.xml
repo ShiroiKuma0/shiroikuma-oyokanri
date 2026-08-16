@@ -2321,6 +2321,13 @@
     <string name="warning_working_on_system_mode_shizuku">Warning: Working on system instead of Shizuku mode.</string>
     <string name="shizuku_not_authorised">Shizuku did not authorise 白い熊 応用管理. Make sure the server is running, then allow the request when it appears.</string>
 
+    <!-- Fork: privilege alarm on the main list. A Shizuku server restart takes the
+         privileged session with it; the app used to carry on silently on the no-root
+         shell with nothing on screen to say so. -->
+    <string name="privilege_alarm_lost">Mode of operation is no longer %1$s — tap to reconnect</string>
+    <string name="privilege_alarm_reclaiming">Reconnecting to %1$s…</string>
+    <string name="privilege_alarm_failed">Could not reconnect to %1$s.</string>
+
     <!-- Fork: the main list's right-hand backup column. A simple tap opens app
          info like the rest of the row; the backup actions live on a long-press,
          which opens one dialog holding all of them (AppBackupDialogFragment). -->

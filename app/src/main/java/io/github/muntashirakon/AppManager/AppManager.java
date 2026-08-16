@@ -21,6 +21,7 @@ import java.security.Security;
 import dalvik.system.ZipPathValidator;
 import io.github.muntashirakon.AppManager.misc.AMExceptionHandler;
 import io.github.muntashirakon.AppManager.compat.ProcessCompat;
+import io.github.muntashirakon.AppManager.settings.PrivilegeWatchdog;
 import io.github.muntashirakon.AppManager.utils.Utils;
 import io.github.muntashirakon.AppManager.utils.appearance.AppearanceUtils;
 
@@ -44,6 +45,10 @@ public class AppManager extends Application {
         PermissionOverrideManager.reconcileAll();
         Thread.setDefaultUncaughtExceptionHandler(new AMExceptionHandler(this));
         AppearanceUtils.init(this);
+        // Fork: a Shizuku server pushes its binder whenever it likes, including while no activity of
+        // ours exists, so the listeners that notice a lost/returned server have to be registered for
+        // the life of the process rather than by a screen.
+        PrivilegeWatchdog.install(this);
         Security.removeProvider(BouncyCastleProvider.PROVIDER_NAME);
         Security.addProvider(new JavaKeyStoreProvider());
         Security.addProvider(new BouncyCastleProvider());

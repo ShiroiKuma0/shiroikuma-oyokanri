@@ -2,6 +2,8 @@
 
 package io.github.muntashirakon.AppManager.main;
 
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.BroadcastReceiver;
@@ -106,6 +108,7 @@ import io.github.muntashirakon.AppManager.processreaper.ProcessMonitorActivity;
 import io.github.muntashirakon.AppManager.self.life.FundingCampaignChecker;
 import io.github.muntashirakon.AppManager.settings.FeatureController;
 import io.github.muntashirakon.AppManager.settings.Prefs;
+import io.github.muntashirakon.AppManager.settings.PrivilegeWatchdog;
 import io.github.muntashirakon.AppManager.settings.SettingsActivity;
 import io.github.muntashirakon.AppManager.usage.AppUsageActivity;
 import io.github.muntashirakon.AppManager.users.Users;
@@ -159,6 +162,13 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
     private TextView mSelectionReminderText;
     @Nullable
     private SelectionListBottomSheet mSelectionSheet;
+    // Fork: the privilege alarm — a red bar under the toolbar when the privileged
+    // session has been lost (see PrivilegeWatchdog).
+    private View mPrivilegeAlarm;
+    private TextView mPrivilegeAlarmText;
+    private ImageView mPrivilegeAlarmIcon;
+    @Nullable
+    private ObjectAnimator mPrivilegeAlarmPulse;
 
     private final StoragePermission mStoragePermission = StoragePermission.init(this);
 
@@ -404,6 +414,7 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             return refresh;
         });
         setupSelectionReminder();
+        setupPrivilegeAlarm();
         // Override the XML-inflated selection toolbar with the user's
         // customised order from MainToolbarPrefs, and wire each visible
         // toolbar button to open the same prefs screen on long-press.
@@ -998,6 +1009,10 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         // identical menu, which the widget renders without flicker).
         rebuildSelectionToolbarFromPrefs();
         refreshForkAppearanceIfChanged();
+        // Fork: re-check the privileged session. The binder-death listener covers a
+        // server that dies while we are on screen; this covers everything that
+        // happened while we were away — including a death our process slept through.
+        PrivilegeWatchdog.refresh();
         // Fork: also listen for batch-op START so the in-app progress dialog can
         // open; COMPLETED dismisses it.
         IntentFilter batchOpsFilter = new IntentFilter();
@@ -1108,6 +1123,8 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         if (mSearchDebouncer != null) {
             mSearchDebouncer.unbind();
         }
+        // Fork: an INFINITE animator holds a strong reference to its target view.
+        stopPrivilegeAlarmPulse();
     }
 
     private void displayChangelogIfRequired() {
@@ -1308,6 +1325,98 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         if (lp.bottomMargin != desired) {
             lp.bottomMargin = desired;
             mSelectionReminder.setLayoutParams(lp);
+        }
+    }
+
+    // Fork: the privilege alarm's palette — the same pair the Snooping page gives an
+    // allowed capability (AppDetailsSnoopingFragment): filled blood red with
+    // near-white text, this fork's mark for the state that actually matters. NOT the
+    // theme yellow, which here would read as one more piece of ordinary furniture.
+    private static final int PRIVILEGE_ALARM_BG = 0xFF6E0B14;
+    private static final int PRIVILEGE_ALARM_FG = 0xFFFFD9DC;
+
+    @PrivilegeWatchdog.State
+    private int mLastPrivilegeState = PrivilegeWatchdog.STATE_OK;
+
+    // Fork: one-time setup of the privilege alarm — the red bar that says the
+    // privileged session is gone. Before this existed, a Shizuku server restart took
+    // the AM service binder with it and the app carried on silently on the no-root
+    // shell: privileged operations quietly did nothing and the window looked exactly
+    // like a working one. See PrivilegeWatchdog for what raises and clears this.
+    private void setupPrivilegeAlarm() {
+        mPrivilegeAlarm = findViewById(R.id.privilege_alarm);
+        if (mPrivilegeAlarm == null) {
+            return;
+        }
+        mPrivilegeAlarmText = mPrivilegeAlarm.findViewById(R.id.privilege_alarm_text);
+        mPrivilegeAlarmIcon = mPrivilegeAlarm.findViewById(R.id.privilege_alarm_icon);
+        GradientDrawable background = new GradientDrawable();
+        background.setShape(GradientDrawable.RECTANGLE);
+        background.setColor(PRIVILEGE_ALARM_BG);
+        background.setStroke(Math.round(ForkThemeUtils.dpToPx(this, 1f)), PRIVILEGE_ALARM_FG);
+        mPrivilegeAlarm.setBackground(background);
+        mPrivilegeAlarmText.setTextColor(PRIVILEGE_ALARM_FG);
+        mPrivilegeAlarmIcon.setImageTintList(ColorStateList.valueOf(PRIVILEGE_ALARM_FG));
+        // The one path allowed to prompt: 白い熊 asked for it by tapping. Everything
+        // automatic gates itself on an already-authorised server instead.
+        mPrivilegeAlarm.setOnClickListener(v -> PrivilegeWatchdog.reclaimAsync(this, true));
+        PrivilegeWatchdog.getState().observe(this, state ->
+                updatePrivilegeAlarm(state == null ? PrivilegeWatchdog.STATE_OK : state));
+    }
+
+    private void updatePrivilegeAlarm(@PrivilegeWatchdog.State int state) {
+        if (mPrivilegeAlarm == null) {
+            return;
+        }
+        if (state == PrivilegeWatchdog.STATE_OK) {
+            if (mPrivilegeAlarm.getVisibility() != View.GONE) {
+                mPrivilegeAlarm.setVisibility(View.GONE);
+            }
+            stopPrivilegeAlarmPulse();
+            mLastPrivilegeState = state;
+            return;
+        }
+        CharSequence mode = PrivilegeWatchdog.expectedModeLabel(this);
+        if (state == PrivilegeWatchdog.STATE_RECLAIMING) {
+            mPrivilegeAlarmText.setText(getString(R.string.privilege_alarm_reclaiming, mode));
+            stopPrivilegeAlarmPulse();
+        } else {
+            mPrivilegeAlarmText.setText(getString(R.string.privilege_alarm_lost, mode));
+            startPrivilegeAlarmPulse();
+            if (mLastPrivilegeState == PrivilegeWatchdog.STATE_RECLAIMING) {
+                // An attempt 白い熊 asked for came back empty. Say so — the bar alone
+                // would look as though the tap had done nothing at all.
+                UIUtils.displayLongToast(R.string.privilege_alarm_failed, mode);
+            }
+        }
+        if (mPrivilegeAlarm.getVisibility() != View.VISIBLE) {
+            mPrivilegeAlarm.setVisibility(View.VISIBLE);
+        }
+        mLastPrivilegeState = state;
+    }
+
+    // Fork: the icon pulses while privileges are actually lost, and only then — a
+    // still bar is easy to stop seeing, and the reclaiming state is a wait rather
+    // than an alarm. Cancelled on destroy: an infinite animator holds its view.
+    private void startPrivilegeAlarmPulse() {
+        if (mPrivilegeAlarmIcon == null || mPrivilegeAlarmPulse != null) {
+            return;
+        }
+        ObjectAnimator pulse = ObjectAnimator.ofFloat(mPrivilegeAlarmIcon, View.ALPHA, 1f, 0.25f);
+        pulse.setDuration(750L);
+        pulse.setRepeatCount(ValueAnimator.INFINITE);
+        pulse.setRepeatMode(ValueAnimator.REVERSE);
+        pulse.start();
+        mPrivilegeAlarmPulse = pulse;
+    }
+
+    private void stopPrivilegeAlarmPulse() {
+        if (mPrivilegeAlarmPulse != null) {
+            mPrivilegeAlarmPulse.cancel();
+            mPrivilegeAlarmPulse = null;
+        }
+        if (mPrivilegeAlarmIcon != null) {
+            mPrivilegeAlarmIcon.setAlpha(1f);
         }
     }
 
