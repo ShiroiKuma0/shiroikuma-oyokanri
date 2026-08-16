@@ -18,9 +18,9 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+2026-06-29.21-57.gfc1e7007+096`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+2026-06-29.21-57.gfc1e7007+097`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
-<sub>Version reads as **upstream `4.1.0`**, rebased onto upstream commit **`fc1e7007` of 2026-06-29 21:57 UTC**, fork build **096**.</sub>
+<sub>Version reads as **upstream `4.1.0`**, rebased onto upstream commit **`fc1e7007` of 2026-06-29 21:57 UTC**, fork build **097**.</sub>
 
 </div>
 
@@ -312,6 +312,14 @@ mode explicitly shuts the ADB path down, because leaving a TCP listener up would
 
 When it can't connect it says which of the three things is actually wrong — *not installed*, *not
 running*, *not authorised* — since those send you to three different places.
+
+**It also survives the server going away.** Updating or restarting a Shizuku server takes the
+privileged session with it, and an app manager that quietly drops to no-root is worse than one that
+never had privileges: every operation still looks like it worked. So the fork listens for the server
+leaving *and* coming back, and rebinds by itself — authorisation is held by the server and survives
+the restart, so there is nothing to approve. When it can't be recovered — a server that stays down, a
+revoked authorisation — a **red bar** appears across the top of the app list saying the mode of
+operation is no longer Shizuku, and tapping it retries.
 
 ---
 
