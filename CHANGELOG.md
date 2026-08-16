@@ -10,6 +10,22 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.0+2026-06-29.21-57.gfc1e7007+098 — 2026-08-16
+
+The privilege alarm speaks Japanese. (Built on upstream App Manager `4.1.0`, commit `fc1e7007` of
+2026-06-29 21:57 UTC.)
+
+### 🇯🇵 動作モードが失われたことを日本語で
+
+The alarm added in +097 shipped English-only, which on a Japanese phone made the one bar that has to
+be read at a glance the only thing on screen that could not be.
+
+The three strings follow terms already in use rather than inventing their own: **動作モード** is
+upstream's own name for the mode of operation, so the bar names it exactly as the settings screen
+does, and **タップして…** is how every other tappable hint in the app is phrased. The failure line
+takes its shape from the existing app-op failure message, and a full stop separates the two halves of
+the alarm instead of the em dash the English uses — the Japanese resources have never used one.
+
 ## 4.1.0+2026-06-29.21-57.gfc1e7007+097 — 2026-08-16
 
 Losing the privileged session is no longer silent, and mostly no longer permanent. (Built on upstream

@@ -18,9 +18,9 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+2026-06-29.21-57.gfc1e7007+097`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+2026-06-29.21-57.gfc1e7007+098`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
-<sub>Version reads as **upstream `4.1.0`**, rebased onto upstream commit **`fc1e7007` of 2026-06-29 21:57 UTC**, fork build **097**.</sub>
+<sub>Version reads as **upstream `4.1.0`**, rebased onto upstream commit **`fc1e7007` of 2026-06-29 21:57 UTC**, fork build **098**.</sub>
 
 </div>
 
