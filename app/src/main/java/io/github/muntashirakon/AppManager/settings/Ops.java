@@ -383,18 +383,34 @@ public class Ops {
         setMode(MODE_AUTO);
     }
 
+    /**
+     * Fork: bracketed so {@link PrivilegeWatchdog} can tell a deliberate teardown from a loss.
+     * <p>
+     * Every {@code LocalServices.stopServices()} / {@code unbindServices()} in the app is reached
+     * from inside this method, and each makes the AM service binder die in exactly the way a Shizuku
+     * server restart does. There is no timer that separates the two — but "it happened while init
+     * was running" does, precisely.
+     */
     @WorkerThread
     @NoOps // Although we've used Ops checks, its overall usage does not affect anything
     @Status
     public static int init(@NonNull Context context, boolean force) {
+        // Fork + upstream 4.1.1 compose here: the watchdog bracket must ENCLOSE the whole locked
+        // region, because every deliberate teardown happens inside it. sInitDepth is an
+        // AtomicInteger and sTransitionLock is reentrant, so nesting is safe. The lock is released
+        // before noteInitFinished(), which calls PrivilegeWatchdog.refresh().
+        PrivilegeWatchdog.noteInitStarted();
         sTransitionLock.lock();
         try {
             return initLocked(context, force);
         } finally {
             sTransitionLock.unlock();
+            PrivilegeWatchdog.noteInitFinished();
         }
     }
 
+    @WorkerThread
+    @NoOps // Although we've used Ops checks, its overall usage does not affect anything
     @Status
     private static int initLocked(@NonNull Context context, boolean force) {
         String mode = getMode();

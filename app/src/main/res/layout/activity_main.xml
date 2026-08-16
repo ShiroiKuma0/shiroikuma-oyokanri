@@ -53,6 +53,44 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 
+        <!-- Fork: privilege alarm. Shown when the session held privileges and lost
+             them — a Shizuku server restart takes the AM service binder with it and
+             the app would otherwise go on looking exactly like a working one. Pinned
+             (no scroll flags) so it cannot be scrolled away, tappable to reconnect.
+             Colours are applied in code; see MainActivity.setupPrivilegeAlarm. -->
+        <LinearLayout
+            android:id="@+id/privilege_alarm"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="14dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="8dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <ImageView
+                android:id="@+id/privilege_alarm_icon"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_marginEnd="10dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_alert_24dp" />
+
+            <TextView
+                android:id="@+id/privilege_alarm_text"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                tools:text="Mode of operation is no longer Shizuku — tap to reconnect" />
+        </LinearLayout>
+
     </io.github.muntashirakon.widget.AppBarLayout>
 
     <io.github.muntashirakon.widget.SwipeRefreshLayout
