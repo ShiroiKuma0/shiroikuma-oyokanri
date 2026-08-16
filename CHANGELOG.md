@@ -10,6 +10,46 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.0+2026-06-29.21-57.gfc1e7007+097 — 2026-08-16
+
+Losing the privileged session is no longer silent, and mostly no longer permanent. (Built on upstream
+App Manager `4.1.0`, commit `fc1e7007` of 2026-06-29 21:57 UTC.)
+
+### 🔌 A restarted Shizuku server is reclaimed by itself
+
+Every privileged call in the app runs through one binder, and restarting a Shizuku server — updating
+白い熊 雫, stopping the server, killing its user-service process — takes that binder with it. The
+**entire** reaction to that was a field being set to `null`: from then on the app quietly fell back
+to the **no-root shell**, nothing threw, nothing was shown, and privileged operations silently did
+nothing while the window looked exactly like a working one. The only cure was restarting the app.
+
+It is now reclaimed automatically, because reclaiming is free when it is possible at all:
+authorisation is held by the **server's** own persisted list and survives its restart, and a
+returning server *tells us it is back* by pushing a fresh binder at us. Both that notice and the
+death notice already existed and were simply never listened for. Now they are, for the life of the
+process rather than by a screen — so a server that comes back while the app sits in the background is
+picked up without a prompt, without a tap, and without anything to approve. **Starting the server
+after opening the app** works the same way, which is the ordinary way round.
+
+The recovery goes through the app's existing mode-initialisation rather than a private rebind, so it
+lands on the same flags, the same uid check and the same permission re-grant that a cold start would
+— and announces itself with the usual *Working on Shizuku mode*.
+
+### 🚨 A red alarm when it cannot be reclaimed
+
+Auto-recovery can only fix the recoverable half: a server that stays down, a withdrawn
+authorisation, or an update that changes what the server will start are real losses — and there was
+**no indicator of any kind**, the mode of operation being visible only in settings and in a one-shot
+toast at startup. An app manager silently running unprivileged is worse than one that never had
+privileges.
+
+So a **red bar** now sits across the top of the app list: *Mode of operation is no longer Shizuku —
+tap to reconnect*, with a pulsing warning mark. It is pinned rather than scrolled with the list, it
+shows the attempt while it runs and reports one that failed instead of leaving the tap looking inert,
+and it is the only path allowed to raise a prompt — everything automatic waits for a server that
+already trusts us. It can never appear on an install that has always run unprivileged: it is armed
+only once privileges have actually been held.
+
 ## 4.1.0+2026-06-29.21-57.gfc1e7007+096 — 2026-08-14
 
 The kernel UID moves to the front of the app ID. (Built on upstream App Manager `4.1.0`, commit
