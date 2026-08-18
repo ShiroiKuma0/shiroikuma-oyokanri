@@ -10,6 +10,56 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.0+2026-06-29.21-57.gfc1e7007+099 — 2026-08-18
+
+The Snooping page now says when each capability was last used, and last refused. (Built on upstream
+App Manager `4.1.0`, commit `fc1e7007` of 2026-06-29 21:57 UTC.)
+
+### 🕵️ Used / denied, per capability
+
+Every app-op-backed row gains a third line: *Used 3 hours ago · Denied under a minute ago*. The
+numbers are the platform's own per-op bookkeeping, which the row already held — so this costs no
+extra privilege and no extra work when the page loads.
+
+**In the background** is called out separately, because an app reaching for the microphone while it is
+not on screen is a different fact from one doing it while you watch — and when the most recent use was
+on screen but there is an older unseen one, that is named too rather than dropped. It is gated on
+Android 9+, below which the platform keeps a single undifferentiated timestamp and a "background"
+marker would be invented rather than measured.
+
+A **recorded denial is the only part drawn in the theme yellow**: it is the plainest proof that a
+block is doing work, and the one line here you would act on. A capability last touched four months
+ago is the argument for turning it off.
+
+### ❓ Three answers, never a blank
+
+A blank line reads as *clean*, and for the cases that matter that would be a lie. So each half of the
+line always says which of three things it means:
+
+- **a time** — the system recorded it;
+- **never used / never denied** — the system keeps that record for this capability and it is empty. A
+  fact, not a gap;
+- **not recorded** — there is nothing to read, and the row names which of three reasons applies.
+
+The three reasons are distinct on purpose. A **lever or permission-only row** (a network policy, a
+system list, a role) has no app-op behind it and nothing anywhere counts it. An **unreadable app-ops
+query** is a gap in what we could see, not in what the app did — previously indistinguishable from an
+app that had genuinely never touched anything, which would have had the whole page quietly reporting
+"never used".
+
+The third is the one worth understanding: **a denial is only counted when the app-op is what refuses
+the call**. That holds for the capabilities needing no permission — clipboard reads, screen capture,
+running in the background — which are blocked at the op itself. But a permission-gated capability is
+blocked by revoking the permission, and the refusal then happens one layer earlier: the app never
+reaches the app-op, so nothing is ever counted however hard it tries. Such a row now reads *"Denials
+not recorded (stopped at the permission)"* rather than the page's most misleading sentence. A denial
+that *was* recorded always wins over that reasoning — a legacy app revoked compat-style keeps its
+grant and is stopped by the op, which is exactly the case that does count.
+
+⋮ → *What the marks mean* gained a **Used / denied line** section covering all of it, including the
+caveats that these are last events rather than tallies, and that a shared user ID reports for the
+whole group.
+
 ## 4.1.0+2026-06-29.21-57.gfc1e7007+098 — 2026-08-16
 
 The privilege alarm speaks Japanese. (Built on upstream App Manager `4.1.0`, commit `fc1e7007` of

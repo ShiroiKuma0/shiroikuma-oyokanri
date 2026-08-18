@@ -18,9 +18,9 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+2026-06-29.21-57.gfc1e7007+098`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+2026-06-29.21-57.gfc1e7007+099`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
-<sub>Version reads as **upstream `4.1.0`**, rebased onto upstream commit **`fc1e7007` of 2026-06-29 21:57 UTC**, fork build **098**.</sub>
+<sub>Version reads as **upstream `4.1.0`**, rebased onto upstream commit **`fc1e7007` of 2026-06-29 21:57 UTC**, fork build **099**.</sub>
 
 </div>
 
@@ -81,6 +81,17 @@ capability refuses to turn on at all, it is permanently safe — the row says so
 **Colour tells the story at a glance.** Red means the app can do this *right now*. A thick frame marks
 a state you chose — red where you opened something the platform keeps shut, yellow where you closed
 something it leaves open. Grey means off, and off is simply what a fresh install gives you.
+
+**Every row says when it was last used — and when it was last refused.** *Used 3 hours ago · Denied
+under a minute ago*, with **in the background** called out, because an app reaching for the microphone
+while it is not on screen is a different fact from one doing it while you watch. A recorded denial is
+the plainest proof a block is doing work, so it is the one thing on the row drawn in the theme colour;
+a capability last touched four months ago is the argument for turning it off. And because a blank line
+would read as *clean*, there are no blanks: each half says a time, or **never** — the system keeps that
+record and it is empty — or **not recorded**, naming which of three reasons applies. The subtle one is
+worth knowing: a denial is only counted when the app-op itself refuses, so where blocking works by
+revoking a permission the refusal happens one layer earlier and can never be counted, however often the
+app tries. The row says exactly that instead of claiming the app never tried.
 
 It also lists what an app can reach **without asking for anything** — screen capture, clipboard reads,
 assistant screen reads, VPN, accessibility, background activity — because "never requested" is not the
