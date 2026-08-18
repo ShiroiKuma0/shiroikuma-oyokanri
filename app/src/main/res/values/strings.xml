@@ -2001,6 +2001,21 @@
     <string name="snooping_status_drifted">you set: %s</string>
     <string name="snooping_tier_not_requested">not requested</string>
     <string name="snooping_app_op_only">App op %1$s</string>
+    <!-- Fork: the per-row "used / denied" line. Three distinct answers per question:
+         a time, never, or we-cannot-tell — a blank would read as "clean". -->
+    <string name="snooping_activity_moments">under a minute</string>
+    <string name="snooping_activity_used">Used %1$s ago</string>
+    <string name="snooping_activity_used_background">Used %1$s ago, in the background</string>
+    <string name="snooping_activity_used_also_background">background %1$s ago</string>
+    <string name="snooping_activity_used_never">Never used</string>
+    <string name="snooping_activity_used_unknown">Use not recorded</string>
+    <string name="snooping_activity_denied">Denied %1$s ago</string>
+    <string name="snooping_activity_denied_background">Denied %1$s ago, in the background</string>
+    <string name="snooping_activity_denied_never">Never denied</string>
+    <string name="snooping_activity_denied_unknown">Denials not recorded</string>
+    <string name="snooping_activity_denied_unknown_permission">Denials not recorded (stopped at the permission)</string>
+    <string name="snooping_activity_no_app_ops">Could not read the usage record</string>
+    <string name="snooping_activity_none">No usage record for this kind of capability</string>
     <string name="snooping_not_saved_explanation">This capability is not saved. Flip its switch to record the decision — it will then survive a reinstall, travel in a settings export, and be re-applied when this app turns up on another phone.</string>
     <string name="snooping_saved_allowed_explanation">Saved as allowed. This is re-applied when the app is installed or updated, and it travels in a settings export.</string>
     <string name="snooping_saved_blocked_explanation">Saved as blocked. This is re-applied when the app is installed or updated, and it travels in a settings export.</string>
@@ -2383,6 +2398,17 @@
     <string name="snooping_legend_padlock_ring_red_mark">Red ring on a hollow padlock</string>
     <string name="snooping_legend_padlock_ring_red">remembered, and gone. The lock you set is not in force — the app was uninstalled and installed again, or 白い熊 雫 stopped being Device Owner and took every lock it held with it. Nothing else on this page can tell you that. Tap the padlock to put it back.</string>
     <string name="snooping_legend_padlock_ring_note">Tapping the padlock to lock also remembers it, and releasing forgets it; long-press the padlock to change that on its own. A lock cannot drift the way a capability can — Settings will not lift it and the app cannot — so the memory is only ever about a lock that has gone missing entirely. Unlike a remembered capability, it does not travel in a settings export: a Device Owner belongs to one phone, and so does everything it holds.</string>
+
+    <string name="snooping_legend_activity">Used / denied line</string>
+    <string name="snooping_legend_activity_sub">The bottom line of a row is what the system itself recorded, not a decision of ours.</string>
+    <string name="snooping_legend_activity_time_mark">A time</string>
+    <string name="snooping_legend_activity_time">the capability was used, or refused, that long ago. “In the background” means the app was not on screen at the time — the reading this page exists for. A recorded denial is the plainest proof a block is doing work.</string>
+    <string name="snooping_legend_activity_never_mark">Never used / Never denied</string>
+    <string name="snooping_legend_activity_never">the system keeps this record for this capability and it is empty. A fact, not a gap.</string>
+    <string name="snooping_legend_activity_unknown_mark">Not recorded</string>
+    <string name="snooping_legend_activity_unknown">there is nothing to read. Either the capability is not an app op at all — a network policy, a system list, a role — and nothing anywhere counts it, or the app ops could not be read for this app.</string>
+    <string name="snooping_legend_activity_note">“Denials not recorded (stopped at the permission)” is the case worth understanding. A denial is only counted when the app op is what refuses the call. Where a capability is gated by a permission, blocking it revokes that permission, and the refusal then happens one layer earlier — the app never reaches the app op, so nothing is ever counted, however often it tries. That row can show you use, but never denial. Capabilities that need no permission (clipboard, screen capture, running in the background) are blocked at the app op itself and do count their denials.</string>
+    <string name="snooping_legend_activity_note_2">Times survive a reboot but only the latest of each is kept — this is the last event, never a tally. A shared user ID reports for the whole group rather than this app alone.</string>
 
     <string name="snooping_legend_locking">What locking actually does</string>
     <string name="snooping_legend_locking_1">The permission is denied by device policy. The app cannot request it, and its switch in Settings is greyed out \u2014 so nothing outside this page can put it back, not you and not the app.</string>

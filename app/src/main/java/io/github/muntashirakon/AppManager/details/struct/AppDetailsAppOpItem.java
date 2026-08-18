@@ -128,6 +128,45 @@ public class AppDetailsAppOpItem extends AppDetailsItem<Integer> {
         return 0L;
     }
 
+    /**
+     * Fork: whether the platform holds a record for this op at all.
+     * <p>
+     * Load-bearing for the Snooping tab's "used / denied" line: with an entry, a
+     * zero time means <i>never</i>; without one it may mean never or it may mean we
+     * never got to ask. The two must not render the same — see
+     * {@code SnoopingActivityTimes}.
+     */
+    public boolean hasOpEntry() {
+        return mOpEntry != null;
+    }
+
+    /**
+     * Fork: whether foreground and background can be told apart for this op.
+     * <p>
+     * Below Android P an {@code OpEntry} carries one undifferentiated timestamp and
+     * {@link AppOpsManagerCompat.OpEntry#getLastAccessBackgroundTime} answers with
+     * it, so a "(background)" marker there would be invented rather than measured.
+     */
+    public boolean hasBackgroundTimeSplit() {
+        return mOpEntry != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P;
+    }
+
+    /** Fork: last use while the app was in a background uid state. See {@link #hasBackgroundTimeSplit}. */
+    public long getLastAccessBackgroundTime() {
+        if (hasBackgroundTimeSplit()) {
+            return mOpEntry.getLastAccessBackgroundTime(AppOpsManagerCompat.OP_FLAGS_ALL);
+        }
+        return 0L;
+    }
+
+    /** Fork: last denial while the app was in a background uid state. */
+    public long getLastRejectBackgroundTime() {
+        if (hasBackgroundTimeSplit()) {
+            return mOpEntry.getLastRejectBackgroundTime(AppOpsManagerCompat.OP_FLAGS_ALL);
+        }
+        return 0L;
+    }
+
     public boolean isRunning() {
         return mOpEntry != null && mOpEntry.isRunning();
     }

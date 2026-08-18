@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
+import android.content.res.Resources;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.Typeface;
@@ -71,6 +72,7 @@ import io.github.muntashirakon.AppManager.logs.Log;
 import io.github.muntashirakon.AppManager.profiles.ProtectedAppsProfile;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
 import io.github.muntashirakon.AppManager.settings.Prefs;
+import io.github.muntashirakon.AppManager.snooping.SnoopingActivityTimes;
 import io.github.muntashirakon.AppManager.snooping.SnoopingCatalog;
 import io.github.muntashirakon.AppManager.snooping.SnoopingEnforcer;
 import io.github.muntashirakon.AppManager.snooping.SnoopingPrefs;
@@ -129,6 +131,16 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
     }
     @ColorInt
     private static final int DETAIL_COLOR = 0xFFD0D6DC;
+    /**
+     * The "used / denied" line sits below the detail chip and reads quieter than
+     * it: this is what the system recorded, not what the row is or what we did.
+     * The one part that takes the theme yellow is a recorded denial — evidence
+     * that a block is actually biting, which is the whole reason to show any of it.
+     */
+    @ColorInt
+    private static final int ACTIVITY_COLOR = 0xFF9AA3AC;
+    private static final int ACTIVITY_CHIP_ALPHA = 0x14;
+    private static final String ACTIVITY_SEPARATOR = " · ";
     /** Blocked chip fill = its text colour at this alpha, i.e. a wash of its own hue. */
     private static final int STATUS_CHIP_ALPHA = 0x3D;
     private static final int DETAIL_CHIP_ALPHA = 0x1F;
@@ -476,6 +488,17 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         addLegendMark(root, context, R.string.snooping_legend_box_none_mark, DETAIL_COLOR,
                 R.string.snooping_legend_box_none);
         addLegendParagraph(root, context, R.string.snooping_legend_box_note, 10f);
+
+        addLegendHeading(root, context, R.string.snooping_legend_activity, false);
+        addLegendParagraph(root, context, R.string.snooping_legend_activity_sub, 2f);
+        addLegendMark(root, context, R.string.snooping_legend_activity_time_mark,
+                ForkThemeUtils.getTextColor(), R.string.snooping_legend_activity_time);
+        addLegendMark(root, context, R.string.snooping_legend_activity_never_mark, DETAIL_COLOR,
+                R.string.snooping_legend_activity_never);
+        addLegendMark(root, context, R.string.snooping_legend_activity_unknown_mark, ACTIVITY_COLOR,
+                R.string.snooping_legend_activity_unknown);
+        addLegendParagraph(root, context, R.string.snooping_legend_activity_note, 10f);
+        addLegendParagraph(root, context, R.string.snooping_legend_activity_note_2, 10f);
 
         addLegendHeading(root, context, R.string.snooping_legend_padlock, false);
         addLegendParagraph(root, context, R.string.snooping_legend_padlock_sub, 2f);
@@ -1784,6 +1807,7 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             final TextView label;
             final TextView status;
             final TextView detail;
+            final TextView activity;
             final ImageView lock;
             final MaterialSwitch toggle;
             /** The card's own outline, captured before we ever override it. */
@@ -1804,6 +1828,7 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 label = itemView.findViewById(R.id.snooping_label);
                 status = itemView.findViewById(R.id.snooping_status);
                 detail = itemView.findViewById(R.id.snooping_detail);
+                activity = itemView.findViewById(R.id.snooping_activity);
                 lock = itemView.findViewById(R.id.snooping_lock);
                 lockDefaultBackground = lock.getBackground();
                 toggle = itemView.findViewById(R.id.snooping_toggle);
@@ -1839,6 +1864,13 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 detail.setTextColor(DETAIL_COLOR);
                 detail.setBackgroundTintList(ColorStateList.valueOf(
                         ColorUtils.setAlphaComponent(DETAIL_COLOR, DETAIL_CHIP_ALPHA)));
+                // What the system recorded: last use, last denial. Never hidden —
+                // every row can say which of "nothing happened" and "we cannot
+                // tell" it means, and a blank line would say neither.
+                activity.setText(activityText(context, item));
+                activity.setTextColor(ACTIVITY_COLOR);
+                activity.setBackgroundTintList(ColorStateList.valueOf(
+                        ColorUtils.setAlphaComponent(DETAIL_COLOR, ACTIVITY_CHIP_ALPHA)));
                 // One colour language for the whole row:
                 //   red    — the app can do this right now
                 //   yellow — you closed something the platform leaves open
@@ -2154,5 +2186,101 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         return opName != null
                 ? context.getString(R.string.snooping_app_op_only, opName)
                 : "";
+    }
+
+    /**
+     * Fork: the row's bottom line — when the capability was last <b>used</b> and
+     * last <b>denied</b>, as recorded by the platform itself (白い熊, +99).
+     * <p>
+     * Two segments, always both, and never empty: a blank line would read as
+     * "clean", and for the cases that matter it would be a lie. Each segment is
+     * one of three answers — a time, <i>never</i>, or <i>not recorded</i> — and
+     * {@link SnoopingActivityTimes} is where the difference is worked out. A
+     * recorded denial is drawn in the theme yellow because it is the one thing
+     * here you would act on: it means a block is being hit.
+     */
+    @NonNull
+    private CharSequence activityText(@NonNull Context context, @NonNull AppDetailsSnoopingItem item) {
+        SnoopingActivityTimes times = SnoopingActivityTimes.forItem(item);
+        if (!times.isSupported()) {
+            // A lever or a permission-only row: nothing anywhere counts these.
+            return context.getString(R.string.snooping_activity_none);
+        }
+        if (times.reason == SnoopingActivityTimes.REASON_NO_APP_OPS) {
+            // Said once, rather than twice as "not recorded · not recorded".
+            return context.getString(R.string.snooping_activity_no_app_ops);
+        }
+        long now = System.currentTimeMillis();
+        SpannableStringBuilder sb = new SpannableStringBuilder();
+        if (times.access == SnoopingActivityTimes.KNOWN) {
+            sb.append(context.getString(times.lastAccessWasBackground()
+                            ? R.string.snooping_activity_used_background
+                            : R.string.snooping_activity_used,
+                    agoText(context, now - times.lastAccess)));
+            if (times.hasEarlierBackgroundAccess()) {
+                // The latest use was on screen, but it has also used it unseen —
+                // which is the reading this page exists for, so it gets said even
+                // when it is not the most recent thing that happened.
+                sb.append(ACTIVITY_SEPARATOR).append(context.getString(
+                        R.string.snooping_activity_used_also_background,
+                        agoText(context, now - times.lastAccessBackground)));
+            }
+        } else if (times.access == SnoopingActivityTimes.NEVER) {
+            sb.append(context.getString(R.string.snooping_activity_used_never));
+        } else {
+            sb.append(context.getString(R.string.snooping_activity_used_unknown));
+        }
+        sb.append(ACTIVITY_SEPARATOR);
+        int denialStart = sb.length();
+        if (times.reject == SnoopingActivityTimes.KNOWN) {
+            sb.append(context.getString(times.lastRejectWasBackground()
+                            ? R.string.snooping_activity_denied_background
+                            : R.string.snooping_activity_denied,
+                    agoText(context, now - times.lastReject)));
+            sb.setSpan(new ForegroundColorSpan(ForkThemeUtils.getTextColor()), denialStart, sb.length(),
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            sb.setSpan(new StyleSpan(Typeface.BOLD), denialStart, sb.length(),
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        } else if (times.reject == SnoopingActivityTimes.NEVER) {
+            sb.append(context.getString(R.string.snooping_activity_denied_never));
+        } else if (times.reason == SnoopingActivityTimes.REASON_PERMISSION_GATE) {
+            // The row can never fill this in: the permission refuses the call
+            // before app-ops sees it. Saying "never denied" here would be the
+            // page's most misleading sentence — see SnoopingActivityTimes.
+            sb.append(context.getString(R.string.snooping_activity_denied_unknown_permission));
+        } else {
+            sb.append(context.getString(R.string.snooping_activity_denied_unknown));
+        }
+        return sb;
+    }
+
+    /**
+     * How long ago, in the largest unit that fits — "3 hours", not "3 hours 12
+     * minutes 4 seconds". {@code DateUtils.getFormattedDuration} concatenates
+     * every non-zero unit, which is right for a duration and far too long for a
+     * chip; {@code getFormattedDurationSingle} is compact but writes its units in
+     * untranslated English. This keeps the platform's own localised plurals.
+     */
+    @NonNull
+    private static String agoText(@NonNull Context context, long millis) {
+        Resources res = context.getResources();
+        long seconds = Math.max(0L, millis) / 1000L;
+        long months = seconds / 2_592_000L;
+        if (months > 0) {
+            return res.getQuantityString(R.plurals.usage_months, (int) months, months);
+        }
+        long days = seconds / 86_400L;
+        if (days > 0) {
+            return res.getQuantityString(R.plurals.usage_days, (int) days, days);
+        }
+        long hours = seconds / 3_600L;
+        if (hours > 0) {
+            return res.getQuantityString(R.plurals.usage_hours, (int) hours, hours);
+        }
+        long minutes = seconds / 60L;
+        if (minutes > 0) {
+            return res.getQuantityString(R.plurals.usage_minutes, (int) minutes, minutes);
+        }
+        return context.getString(R.string.snooping_activity_moments);
     }
 }

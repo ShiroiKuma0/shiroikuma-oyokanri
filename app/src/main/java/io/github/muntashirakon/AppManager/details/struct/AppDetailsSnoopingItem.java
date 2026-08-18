@@ -81,6 +81,18 @@ public class AppDetailsSnoopingItem extends AppDetailsItem<String> {
     public Integer storedState;
 
     /**
+     * Fork: whether app-ops answered when this row was built (白い熊, +99).
+     * <p>
+     * Set by {@code SnoopingResolver}, and the difference between <i>this app has
+     * never used the capability</i> and <i>we could not find out</i>. When the
+     * per-package op query throws, every row's entry is missing for the same
+     * reason, and without this flag the page would quietly report "never used" for
+     * the whole app. Defaults to false so anything that builds a row without
+     * asking is treated as blind rather than as evidence.
+     */
+    public boolean opStateReadable;
+
+    /**
      * The mode the platform actually enforces, from
      * {@link AppOpsManagerCompat#checkOperation} — <b>not</b> the stored per-op
      * entry. The two disagree more often than is comfortable (the stored entry is

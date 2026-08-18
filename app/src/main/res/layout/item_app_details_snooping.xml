@@ -61,6 +61,23 @@
                 android:textSize="13sp"
                 tools:text="ACCESS_FINE_LOCATION" />
 
+        <!-- Fork: when the capability was last used and last denied (白い熊, +99).
+             Never hidden on a row that could carry it: a blank line reads as
+             "clean", and the whole point is that "nothing recorded" and "we
+             cannot tell" must not look alike. Smaller and dimmer than the detail
+             chip above it — it is evidence, not a title. -->
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/snooping_activity"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_snooping_chip"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="3dp"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textSize="12sp"
+                tools:text="Used 3 minutes ago · Denied 1 minute ago" />
+
         </androidx.appcompat.widget.LinearLayoutCompat>
 
         <!-- Fork: the device-policy padlock, in a column of its own to the LEFT of
