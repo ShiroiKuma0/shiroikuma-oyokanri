@@ -1148,6 +1148,20 @@
     <string name="snooping_tier_ungated">権限不要</string>
     <string name="snooping_tier_not_requested">未要求</string>
     <string name="snooping_app_op_only">App op %1$s</string>
+    <!-- Fork: 行の「使用・拒否」欄。答えは三種類 — 時刻・一度もなし・記録なし。空欄は「異常なし」と読まれてしまう。 -->
+    <string name="snooping_activity_moments">1 分未満</string>
+    <string name="snooping_activity_used">%1$s前に使用</string>
+    <string name="snooping_activity_used_background">%1$s前にﾊﾞｯｸｸﾞﾗｳﾝﾄﾞで使用</string>
+    <string name="snooping_activity_used_also_background">ﾊﾞｯｸｸﾞﾗｳﾝﾄﾞでは %1$s前</string>
+    <string name="snooping_activity_used_never">使用歴なし</string>
+    <string name="snooping_activity_used_unknown">使用は記録されません</string>
+    <string name="snooping_activity_denied">%1$s前に拒否</string>
+    <string name="snooping_activity_denied_background">%1$s前にﾊﾞｯｸｸﾞﾗｳﾝﾄﾞで拒否</string>
+    <string name="snooping_activity_denied_never">拒否歴なし</string>
+    <string name="snooping_activity_denied_unknown">拒否は記録されません</string>
+    <string name="snooping_activity_denied_unknown_permission">拒否は記録されません（権限の段階で遮断）</string>
+    <string name="snooping_activity_no_app_ops">使用記録を読み取れませんでした</string>
+    <string name="snooping_activity_none">この種の項目に使用記録はありません</string>
     <string name="snooping_not_saved_explanation">この項目はまだ保存されていません。ｽｲｯﾁを切り替えると判断が記録され、再ｲﾝｽﾄｰﾙしても残り、設定のｴｸｽﾎﾟｰﾄに含まれ、別の端末にこのアプリが現れたときに再適用されます。</string>
     <string name="snooping_saved_allowed_explanation">「許可」として保存済み。ｲﾝｽﾄｰﾙ時と更新時に再適用され、設定のｴｸｽﾎﾟｰﾄに含まれます。</string>
     <string name="snooping_saved_blocked_explanation">「遮断」として保存済み。ｲﾝｽﾄｰﾙ時と更新時に再適用され、設定のｴｸｽﾎﾟｰﾄに含まれます。</string>

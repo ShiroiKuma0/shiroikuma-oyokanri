@@ -91,6 +91,11 @@ public final class SnoopingResolver {
         // something other than its default is a decision somebody made, so the
         // row is relevant even when the permission was never requested.
         Map<Integer, AppOpsManagerCompat.OpEntry> configuredOps = new HashMap<>();
+        // Whether the query answered at all. An empty result and a failed one are
+        // the same map but not the same fact: the first says this package has no
+        // op state, the second says we cannot see it. The rows' "used / denied"
+        // line must tell those apart — see SnoopingActivityTimes.
+        boolean opStateReadable = false;
         try {
             for (AppOpsManagerCompat.OpEntry entry : AppOpsManagerCompat
                     .getConfiguredOpsForPackage(appOpsManager, packageName, uid)) {
@@ -98,6 +103,7 @@ public final class SnoopingResolver {
                     configuredOps.put(entry.getOp(), entry);
                 }
             }
+            opStateReadable = true;
         } catch (Throwable ignore) {
             // No app-ops visibility; op rows fall back to their default modes.
         }
@@ -132,6 +138,7 @@ public final class SnoopingResolver {
             item.refreshLeverState(packageInfo, userId);
             item.refreshPolicyLock(packageInfo, requestedPermissions);
             item.storedState = stored.get(capability.entry.id);
+            item.opStateReadable = opStateReadable;
             if (!includeNotRequested && !item.isAllowed()
                     && SnoopingImmovable.isMarked(packageName, capability.entry.id)) {
                 // Blocked, and a previous attempt proved it cannot be turned on
