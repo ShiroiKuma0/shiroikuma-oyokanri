@@ -5,6 +5,7 @@ package io.github.muntashirakon.AppManager.backup;
 import static io.github.muntashirakon.AppManager.backup.BackupManager.KEYSTORE_PREFIX;
 
 import android.annotation.UserIdInt;
+import android.net.Uri;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -277,6 +278,30 @@ public class BackupItems {
         @NonNull
         public Path getBackupPath() {
             return mBackupMode ? mTempBackupPath : mBackupPath;
+        }
+
+        /**
+         * Fork: the directory this backup will finally occupy — not the hidden
+         * ".{name}" staging directory {@link #getBackupPath()} hands out while a
+         * backup is running, which is renamed away by {@link #commit()}. Shown by
+         * the batch-progress dialog, so it must be the path the user will actually
+         * find the backup at.
+         */
+        @NonNull
+        public Path getDestinationPath() {
+            return mBackupPath;
+        }
+
+        /**
+         * Fork: {@link #getDestinationPath()} as something readable — the raw
+         * filesystem path where there is one (which is the normal case: the fork
+         * writes backups to a plain directory it holds MANAGE_EXTERNAL_STORAGE
+         * for), otherwise the decoded content URI.
+         */
+        @NonNull
+        public String getDestinationPathString() {
+            String filePath = mBackupPath.getFilePath();
+            return filePath != null ? filePath : Uri.decode(mBackupPath.getUri().toString());
         }
 
         public Path getUnencryptedBackupPath() throws IOException {

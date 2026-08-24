@@ -25,6 +25,7 @@ import android.os.RemoteException;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
 import androidx.annotation.WorkerThread;
 import androidx.core.content.pm.PackageInfoCompat;
 import androidx.core.content.pm.PermissionInfoCompat;
@@ -42,6 +43,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
+import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.apk.ApkFile;
 import io.github.muntashirakon.AppManager.apk.ApkSource;
 import io.github.muntashirakon.AppManager.backup.struct.BackupMetadataV5;
@@ -151,6 +153,15 @@ class BackupOp implements Closeable {
     }
 
     void runBackup(@Nullable ProgressHandler progressHandler) throws BackupException {
+        runBackup(progressHandler, null);
+    }
+
+    // Fork: the listener narrates the stages within this one app. Each stage is
+    // announced BEFORE the work it names, so a slow step (a multi-gigabyte data
+    // directory) is visible for the whole time it is running rather than named
+    // only once it is over.
+    void runBackup(@Nullable ProgressHandler progressHandler, @Nullable BackupProgressListener listener)
+            throws BackupException {
         try {
             // Fail backup if the app has items in Android KeyStore and backup isn't enabled
             if (mBackupFlags.backupData() && mMetadata.metadata.keyStore && !Prefs.BackupRestore.backupAppsWithKeyStore()) {
@@ -158,31 +169,37 @@ class BackupOp implements Closeable {
             }
             incrementProgress(progressHandler);
             // Backup icon
+            stage(listener, null, R.string.backup_stage_preparing);
             backupIcon();
             // Backup source
             if (mBackupFlags.backupApkFiles()) {
-                backupApkFiles();
+                stage(listener, mMetadata.metadata.apkName, R.string.backup_stage_apk);
+                backupApkFiles(listener);
                 incrementProgress(progressHandler);
             }
             // Backup data
             if (mBackupFlags.backupData()) {
-                backupData();
+                backupData(listener);
                 // Backup KeyStore
                 if (mMetadata.metadata.keyStore) {
-                    backupKeyStore();
+                    stage(listener, null, R.string.backup_stage_keystore);
+                    backupKeyStore(listener);
                 }
                 incrementProgress(progressHandler);
             }
             // Backup extras
             if (mBackupFlags.backupExtras()) {
+                stage(listener, null, R.string.backup_stage_extras);
                 backupExtras();
                 incrementProgress(progressHandler);
             }
             // Export rules
             if (mMetadata.metadata.hasRules) {
+                stage(listener, null, R.string.backup_stage_rules);
                 backupRules();
                 incrementProgress(progressHandler);
             }
+            stage(listener, null, R.string.backup_stage_finalising);
             // Write modified metadata
             try {
                 Map<String, String> filenameChecksumMap = MetadataManager.writeMetadata(mMetadata, mBackupItem);
@@ -200,6 +217,7 @@ class BackupOp implements Closeable {
                 throw new BackupException("Failed to write checksums.txt", e);
             }
             // Replace current backup
+            stage(listener, null, R.string.backup_stage_committing);
             try {
                 mBackupItem.commit();
             } catch (IOException e) {
@@ -218,6 +236,38 @@ class BackupOp implements Closeable {
         }
         float current = progressHandler.getLastProgress() + 1;
         progressHandler.postUpdate(current);
+    }
+
+    // Fork: name the stage this app's backup has reached. Formatted here rather
+    // than at the listener, since only this class knows the counts involved.
+    private static void stage(@Nullable BackupProgressListener listener, @Nullable CharSequence detail,
+                              @StringRes int stageRes, @Nullable Object... args) {
+        if (listener == null) {
+            return;
+        }
+        Context context = ContextUtils.getContext();
+        CharSequence stage = args == null || args.length == 0
+                ? context.getText(stageRes)
+                : context.getString(stageRes, args);
+        listener.onStage(stage, detail);
+    }
+
+    // Fork: report the bytes a step just produced. Sizes come from the archive
+    // members themselves, so what is reported is what actually landed on disk —
+    // compressed, encrypted, and after exclusions — rather than the size of the
+    // source directory, which would over-report by a wide and varying margin.
+    private static void reportBytes(@Nullable BackupProgressListener listener, @Nullable Path[] files) {
+        if (listener == null || files == null) {
+            return;
+        }
+        long total = 0;
+        for (Path file : files) {
+            try {
+                total += file.length();
+            } catch (Throwable ignore) {
+            }
+        }
+        listener.onBytesWritten(total);
     }
 
     public BackupMetadataV5 setupMetadataAndCrypto() throws CryptoException {
@@ -309,7 +359,7 @@ class BackupOp implements Closeable {
         }
     }
 
-    private void backupApkFiles() throws BackupException {
+    private void backupApkFiles(@Nullable BackupProgressListener listener) throws BackupException {
         Path dataAppPath = OsEnvironment.getDataAppDirectory();
         final String sourceBackupFilePrefix = BackupUtils.getSourceFilePrefix(getExt(mMetadata.info.tarType));
         Path sourceDir = Paths.get(PackageUtils.getSourceDir(mApplicationInfo));
@@ -334,15 +384,18 @@ class BackupOp implements Closeable {
         } catch (IOException e) {
             throw new BackupException("Failed to encrypt " + Arrays.toString(sourceFiles), e);
         }
+        reportBytes(listener, sourceFiles);
         for (Path file : sourceFiles) {
             mChecksum.add(file.getName(), DigestUtils.getHexDigest(mMetadata.info.checksumAlgo, file));
         }
     }
 
-    private void backupData() throws BackupException {
-        for (int i = 0; i < mMetadata.metadata.dataDirs.length; ++i) {
+    private void backupData(@Nullable BackupProgressListener listener) throws BackupException {
+        int dirCount = mMetadata.metadata.dataDirs.length;
+        for (int i = 0; i < dirCount; ++i) {
             Path[] dataFiles;
             String backupDataDir = mMetadata.metadata.dataDirs[i];
+            stage(listener, backupDataDir, R.string.backup_stage_data, i + 1, dirCount);
             if (backupDataDir.equals(BackupManager.DATA_BACKUP_SPECIAL_ADB)) {
                 // ADB backup
                 dataFiles = backupAdb(i);
@@ -350,6 +403,7 @@ class BackupOp implements Closeable {
                 // Regular directory backup
                 dataFiles = backupDirectory(backupDataDir, i);
             }
+            reportBytes(listener, dataFiles);
             try {
                 dataFiles = mBackupItem.encrypt(dataFiles);
             } catch (IOException e) {
@@ -392,7 +446,7 @@ class BackupOp implements Closeable {
         }
     }
 
-    private void backupKeyStore() throws BackupException {  // Called only when the app has an keystore item
+    private void backupKeyStore(@Nullable BackupProgressListener listener) throws BackupException {  // Called only when the app has an keystore item
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             // keystore v2 is not supported.
             Log.w(TAG, "Ignoring KeyStore backups for %s", mPackageName);
@@ -445,6 +499,7 @@ class BackupOp implements Closeable {
         } catch (IOException e) {
             throw new BackupException("Failed to encrypt " + Arrays.toString(backedUpKeyStoreFiles), e);
         }
+        reportBytes(listener, backedUpKeyStoreFiles);
         for (Path file : backedUpKeyStoreFiles) {
             mChecksum.add(file.getName(), DigestUtils.getHexDigest(mMetadata.info.checksumAlgo, file));
         }

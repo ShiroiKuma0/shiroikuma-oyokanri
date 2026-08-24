@@ -24,6 +24,7 @@ import io.github.muntashirakon.AppManager.filters.options.BackupOption;
 import io.github.muntashirakon.AppManager.filters.options.ComponentsOption;
 import io.github.muntashirakon.AppManager.filters.options.FreezeOption;
 import io.github.muntashirakon.AppManager.filters.options.InstalledOption;
+import io.github.muntashirakon.AppManager.filters.options.NoteOption;
 import io.github.muntashirakon.AppManager.filters.options.RunningAppsOption;
 import io.github.muntashirakon.AppManager.ipc.LocalServices;
 import io.github.muntashirakon.AppManager.misc.ListOptions;
@@ -101,6 +102,7 @@ public class MainListOptions extends ListOptions {
             FILTER_APPS_WITH_SAF,
             FILTER_APPS_WITH_SSAID,
             FILTER_STOPPED_APPS,
+            FILTER_APPS_WITH_NOTES,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface Filter {
@@ -123,6 +125,8 @@ public class MainListOptions extends ListOptions {
     public static final int FILTER_APPS_WITH_SSAID = 1 << 13;
     public static final int FILTER_STOPPED_APPS = 1 << 14;
     public static final int FILTER_UNFROZEN_APPS = 1 << 15;
+    // Fork: apps carrying a free-text note (AppNotesManager).
+    public static final int FILTER_APPS_WITH_NOTES = 1 << 16;
 
     // For now, just generate FilterItem
     @NonNull
@@ -193,6 +197,11 @@ public class MainListOptions extends ListOptions {
         }
         if ((flags & FILTER_STOPPED_APPS) != 0) {
             appTypeWithFlags |= AppTypeOption.APP_TYPE_STOPPED;
+        }
+        if ((flags & FILTER_APPS_WITH_NOTES) != 0) {
+            NoteOption option = new NoteOption();
+            option.setKeyValue("with_note", null);
+            filterItem.addFilterOption(option);
         }
         if (appTypeWithFlags > 0) {
             AppTypeOption appTypeWithFlagsOption = new AppTypeOption();
@@ -326,6 +335,7 @@ public class MainListOptions extends ListOptions {
             put(FILTER_APPS_WITH_ACTIVITIES, R.string.filter_apps_with_activities);
             put(FILTER_APPS_WITH_BACKUPS, R.string.filter_apps_with_backups);
             put(FILTER_APPS_WITHOUT_BACKUPS, R.string.filter_apps_without_backups);
+            put(FILTER_APPS_WITH_NOTES, R.string.filter_apps_with_notes);
             put(FILTER_RUNNING_APPS, R.string.filter_running_apps);
             put(FILTER_APPS_WITH_SPLITS, R.string.filter_apps_with_splits);
             if (Ops.isWorkingUidRoot()) {

@@ -304,6 +304,13 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             if (pos != RecyclerView.NO_POSITION) {
                 notifyItemChanged(pos);
             }
+            // Fork: with the "With notes" filter on, whether this row belongs in
+            // the list at all is what just changed — deleting its note must drop
+            // it, not merely un-draw its pill.
+            if (mActivity.viewModel != null
+                    && mActivity.viewModel.hasFilterFlag(MainListOptions.FILTER_APPS_WITH_NOTES)) {
+                mActivity.viewModel.reapplyFilters();
+            }
         });
     }
 

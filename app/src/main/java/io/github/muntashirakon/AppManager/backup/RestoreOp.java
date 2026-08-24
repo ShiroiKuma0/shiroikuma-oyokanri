@@ -18,6 +18,7 @@ import android.system.ErrnoException;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
 import androidx.annotation.WorkerThread;
 
 import java.io.Closeable;
@@ -32,6 +33,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
+import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.apk.ApkFile;
 import io.github.muntashirakon.AppManager.apk.installer.InstallerOptions;
 import io.github.muntashirakon.AppManager.apk.installer.PackageInstallerCompat;
@@ -66,6 +68,7 @@ import io.github.muntashirakon.AppManager.runner.Runner;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
 import io.github.muntashirakon.AppManager.ssaid.SsaidSettings;
 import io.github.muntashirakon.AppManager.uri.UriManager;
+import io.github.muntashirakon.AppManager.utils.ContextUtils;
 import io.github.muntashirakon.AppManager.utils.DigestUtils;
 import io.github.muntashirakon.AppManager.utils.FreezeUtils;
 import io.github.muntashirakon.AppManager.utils.KeyStoreUtils;
@@ -172,28 +175,40 @@ class RestoreOp implements Closeable {
     }
 
     void runRestore(@Nullable ProgressHandler progressHandler) throws BackupException {
+        runRestore(progressHandler, null);
+    }
+
+    // Fork: mirrors BackupOp.runBackup — the listener narrates the stages within
+    // this one app so a long restore has something to say between counter moves.
+    void runRestore(@Nullable ProgressHandler progressHandler, @Nullable BackupProgressListener listener)
+            throws BackupException {
         try {
             if (mRequestedFlags.backupData() && mBackupMetadata.keyStore && !mRequestedFlags.skipSignatureCheck()) {
                 // Check checksum of master key first
+                stage(listener, null, R.string.restore_stage_verifying);
                 checkMasterKey();
             }
             incrementProgress(progressHandler);
             if (mRequestedFlags.backupApkFiles()) {
+                stage(listener, mBackupMetadata.apkName, R.string.restore_stage_apk);
                 restoreApkFiles();
                 incrementProgress(progressHandler);
             }
             if (mRequestedFlags.backupData()) {
-                restoreData();
+                restoreData(listener);
                 if (mBackupMetadata.keyStore) {
+                    stage(listener, null, R.string.restore_stage_keystore);
                     restoreKeyStore();
                 }
                 incrementProgress(progressHandler);
             }
             if (mRequestedFlags.backupExtras()) {
+                stage(listener, null, R.string.restore_stage_extras);
                 restoreExtras();
                 incrementProgress(progressHandler);
             }
             if (mRequestedFlags.backupRules()) {
+                stage(listener, null, R.string.restore_stage_rules);
                 restoreRules();
                 incrementProgress(progressHandler);
             }
@@ -210,6 +225,19 @@ class RestoreOp implements Closeable {
         }
         float current = progressHandler.getLastProgress() + 1;
         progressHandler.postUpdate(current);
+    }
+
+    // Fork: name the stage this app's restore has reached. See BackupOp#stage.
+    private static void stage(@Nullable BackupProgressListener listener, @Nullable CharSequence detail,
+                              @StringRes int stageRes, @Nullable Object... args) {
+        if (listener == null) {
+            return;
+        }
+        Context context = ContextUtils.getContext();
+        CharSequence stage = args == null || args.length == 0
+                ? context.getText(stageRes)
+                : context.getString(stageRes, args);
+        listener.onStage(stage, detail);
     }
 
     public boolean requiresRestart() {
@@ -477,7 +505,7 @@ class RestoreOp implements Closeable {
         Runner.runCommand(new String[]{"restorecon", "-R", keyStorePath.getFilePath()});
     }
 
-    private void restoreData() throws BackupException {
+    private void restoreData(@Nullable BackupProgressListener listener) throws BackupException {
         // Data restore is requested: Data restore is only possible if the app is actually
         // installed. So, check if it's installed first.
         if (mPackageInfo == null) {
@@ -505,8 +533,10 @@ class RestoreOp implements Closeable {
         // Force-stop and clear app data
         PackageManagerCompat.clearApplicationUserData(mPackageName, mUserId);
         // Restore backups
-        for (int i = 0; i < mBackupMetadata.dataDirs.length; ++i) {
+        int dirCount = mBackupMetadata.dataDirs.length;
+        for (int i = 0; i < dirCount; ++i) {
             String backupDataDir = mBackupMetadata.dataDirs[i];
+            stage(listener, backupDataDir, R.string.restore_stage_data, i + 1, dirCount);
             if (backupDataDir.equals(BackupManager.DATA_BACKUP_SPECIAL_ADB)) {
                 // Adb backup restore
                 restoreAdb(i);

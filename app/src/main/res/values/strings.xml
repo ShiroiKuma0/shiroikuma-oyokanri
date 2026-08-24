@@ -2491,4 +2491,49 @@
     <string name="policy_box_clear">Clear all locks</string>
     <string name="policy_box_clear_note">Releases every device-policy lock on this app: permission locks, suspension, the uninstall block and the force-stop block. Nothing breaks — this only gives control back, and you can re-apply any of them afterwards.</string>
     <string name="policy_box_unreadable">Held by 白い熊 雫, which offers this side no way to read it back: the switch shows what we last applied, not what the platform confirms.</string>
+
+    <!-- Fork, +101: the batch-progress dialog. A 550-app backup used to show
+         nothing but "52 / 550" for an hour; these are the words it says instead —
+         what is being backed up, where it is landing, which stage it has reached,
+         and how long the whole thing still has to run. -->
+    <string name="batch_progress_elapsed">%s elapsed</string>
+    <string name="batch_progress_eta">about %1$s left</string>
+    <string name="batch_progress_eta_unknown">estimating…</string>
+    <string name="batch_progress_running">%d running</string>
+    <string name="batch_progress_failed">%d failed</string>
+    <string name="batch_progress_written">%s written</string>
+    <string name="batch_progress_waiting">Waiting for the next app…</string>
+    <string name="batch_progress_paused_note">Paused — apps already started will finish.</string>
+    <string name="batch_progress_dest">→ %s</string>
+
+    <!-- Fork, +102: the progress dialog's own duration format. DateUtils'
+         getFormattedDuration is shaped for usage statistics — it hides seconds
+         and answers "less than a minute" for everything under one, which is
+         precisely the range a progress readout starts in. Two units at most, and
+         the second one zero-padded, so the width does not jitter once a second. -->
+    <string name="duration_hours_minutes">%1$dh %2$02dm</string>
+    <string name="duration_minutes_seconds">%1$dm %2$02ds</string>
+    <string name="duration_seconds">%ds</string>
+
+    <!-- Fork, +101: the stages a single app's backup passes through. Shown per
+         in-flight app, so they must read as fragments rather than sentences. -->
+    <string name="backup_stage_preparing">Preparing</string>
+    <string name="backup_stage_apk">APK files</string>
+    <string name="backup_stage_data">Data %1$d/%2$d</string>
+    <string name="backup_stage_keystore">KeyStore</string>
+    <string name="backup_stage_extras">Permissions, ops and rules</string>
+    <string name="backup_stage_rules">Blocking rules</string>
+    <string name="backup_stage_finalising">Writing metadata and checksums</string>
+    <string name="backup_stage_committing">Finalising</string>
+    <string name="restore_stage_verifying">Verifying</string>
+    <string name="restore_stage_apk">Reinstalling APK files</string>
+    <string name="restore_stage_data">Restoring data %1$d/%2$d</string>
+    <string name="restore_stage_keystore">Restoring KeyStore</string>
+    <string name="restore_stage_extras">Restoring permissions, ops and rules</string>
+    <string name="restore_stage_rules">Restoring blocking rules</string>
+
+    <!-- Fork, +103: main-list filter for apps carrying a per-app note. A note is
+         written because the app needed remembering, so the set of apps holding one
+         is worth being able to summon rather than scroll for. -->
+    <string name="filter_apps_with_notes">With notes</string>
 </resources>

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Fork: one app currently being processed by a batch operation. Several of
+     these are shown at once during backup/restore, which run one app per CPU
+     core. Every colour is applied at runtime from the configurable fork theme
+     (ForkThemeUtils), so none is hard-coded here; the alpha values ARE here,
+     because they carry the hierarchy — the app's name is the fact, the id, the
+     destination and the stage are supporting detail. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="10dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:baselineAligned="true"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/batch_item_label"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            tools:text="白い熊 応用管理" />
+
+        <TextView
+            android:id="@+id/batch_item_elapsed"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:alpha="0.7"
+            android:maxLines="1"
+            android:textSize="13sp"
+            tools:text="2m 14s" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/batch_item_package"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:alpha="0.75"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textSize="13sp"
+        android:textStyle="italic"
+        tools:text="io.github.muntashirakon.AppManager" />
+
+    <!-- Ellipsized in the MIDDLE so both ends survive: the volume it is going to
+         and the per-app folder it will land in are the two halves worth reading. -->
+    <TextView
+        android:id="@+id/batch_item_dest"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:alpha="0.65"
+        android:ellipsize="middle"
+        android:maxLines="2"
+        android:textSize="12sp"
+        tools:text="→ /storage/emulated/0/AppManager/io.github.muntashirakon.AppManager/0" />
+
+    <TextView
+        android:id="@+id/batch_item_stage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:ellipsize="end"
+        android:maxLines="2"
+        android:textSize="13sp"
+        tools:text="Data 2/4 · /data/user/0/io.github.muntashirakon.AppManager" />
+</LinearLayout>

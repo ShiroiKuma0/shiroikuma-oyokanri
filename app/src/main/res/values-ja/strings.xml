@@ -1244,4 +1244,40 @@
     <string name="privilege_alarm_lost">動作モードが%1$sではなくなりました。タップして再接続</string>
     <string name="privilege_alarm_reclaiming">%1$sに再接続しています…</string>
     <string name="privilege_alarm_failed">%1$sに再接続できませんでした。</string>
+
+    <!-- Fork, +101: バッチ進捗ダイアログ。カウンタだけでは、1つのアプリのデータ書庫に
+         数分かかる間ずっと同じ数字のままで、停止したのと見分けがつかなかった。 -->
+    <string name="batch_progress_elapsed">%s経過</string>
+    <string name="batch_progress_eta">残り約%1$s</string>
+    <string name="batch_progress_eta_unknown">残り時間を計算中…</string>
+    <string name="batch_progress_running">%d個処理中</string>
+    <string name="batch_progress_failed">%d個失敗</string>
+    <string name="batch_progress_written">%s書き込み済み</string>
+    <string name="batch_progress_waiting">次のアプリを待機中…</string>
+    <string name="batch_progress_paused_note">一時停止中。開始済みのアプリは最後まで処理されます。</string>
+
+    <!-- Fork, +102: 進捗表示専用の経過時間。単位は詰めて書く（12分04秒）。 -->
+    <string name="duration_hours_minutes">%1$d時間%2$02d分</string>
+    <string name="duration_minutes_seconds">%1$d分%2$02d秒</string>
+    <string name="duration_seconds">%d秒</string>
+
+    <!-- Fork, +101: バックアップ／復元の各段階。1行に収まる短い断片であること。
+         AppOps は upstream の app_ops に合わせてそのまま。 -->
+    <string name="backup_stage_preparing">準備中</string>
+    <string name="backup_stage_apk">APKﾌｧｲﾙ</string>
+    <string name="backup_stage_data">ﾃﾞｰﾀ %1$d/%2$d</string>
+    <string name="backup_stage_keystore">ｷｰｽﾄｱ</string>
+    <string name="backup_stage_extras">権限・AppOps・ﾙｰﾙ</string>
+    <string name="backup_stage_rules">ﾌﾞﾛｯｸﾙｰﾙ</string>
+    <string name="backup_stage_finalising">ﾒﾀﾃﾞｰﾀとﾁｪｯｸｻﾑを書き込み中</string>
+    <string name="backup_stage_committing">最終処理中</string>
+    <string name="restore_stage_verifying">検証中</string>
+    <string name="restore_stage_apk">APKﾌｧｲﾙを再ｲﾝｽﾄｰﾙ中</string>
+    <string name="restore_stage_data">ﾃﾞｰﾀを復元中 %1$d/%2$d</string>
+    <string name="restore_stage_keystore">ｷｰｽﾄｱを復元中</string>
+    <string name="restore_stage_extras">権限・AppOps・ﾙｰﾙを復元中</string>
+    <string name="restore_stage_rules">ﾌﾞﾛｯｸﾙｰﾙを復元中</string>
+
+    <!-- Fork, +103: メモ付きアプリの絞り込み。メモ機能自身の語（note = メモ、全角）に合わせる。 -->
+    <string name="filter_apps_with_notes">メモ付き</string>
 </resources>
