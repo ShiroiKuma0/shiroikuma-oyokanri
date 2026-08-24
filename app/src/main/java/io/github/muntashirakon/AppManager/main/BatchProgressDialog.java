@@ -153,6 +153,10 @@ public class BatchProgressDialog {
 
         DisplayMetrics metrics = mActivity.getResources().getDisplayMetrics();
         mItemScroller.setMaxHeight((int) (metrics.heightPixels * ITEM_LIST_MAX_HEIGHT_FRACTION));
+        // Only two or three blocks fit under that ceiling while eight apps are in
+        // flight, and this is a readout to be watched rather than operated — so
+        // it walks through them on its own until someone touches it.
+        mItemScroller.setAutoScrollEnabled(true);
 
         applyTheme(view.findViewById(R.id.batch_progress_container), cancelButton);
 
@@ -195,6 +199,9 @@ public class BatchProgressDialog {
     public void dismiss() {
         mMonitor.getState().removeObserver(mObserver);
         mHandler.removeCallbacks(mTicker);
+        if (mItemScroller != null) {
+            mItemScroller.setAutoScrollEnabled(false);
+        }
         if (mDialog != null) {
             if (mDialog.isShowing()) {
                 mDialog.dismiss();
