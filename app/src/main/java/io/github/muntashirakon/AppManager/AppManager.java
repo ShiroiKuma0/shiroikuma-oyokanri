@@ -21,6 +21,7 @@ import java.security.Security;
 import dalvik.system.ZipPathValidator;
 import io.github.muntashirakon.AppManager.misc.AMExceptionHandler;
 import io.github.muntashirakon.AppManager.compat.ProcessCompat;
+import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.settings.PrivilegeWatchdog;
 import io.github.muntashirakon.AppManager.utils.Utils;
 import io.github.muntashirakon.AppManager.utils.appearance.AppearanceUtils;
@@ -45,6 +46,9 @@ public class AppManager extends Application {
         PermissionOverrideManager.reconcileAll();
         Thread.setDefaultUncaughtExceptionHandler(new AMExceptionHandler(this));
         AppearanceUtils.init(this);
+        // Fork: AppPref writes every default into preferences.xml on first run, so a
+        // changed default never reaches an existing install on its own.
+        Prefs.Blocking.migrateDefaultFreezingMethod();
         // Fork: a Shizuku server pushes its binder whenever it likes, including while no activity of
         // ours exists, so the listeners that notice a lost/returned server have to be registered for
         // the life of the process rather than by a screen.

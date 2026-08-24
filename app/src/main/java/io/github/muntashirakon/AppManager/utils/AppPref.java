@@ -90,6 +90,9 @@ public class AppPref {
         PREF_ENCRYPTION_STR,
 
         PREF_FREEZE_TYPE_INT,
+        // Fork: one-shot guard for the Disable → Advanced suspend move, see
+        // Prefs.Blocking#migrateDefaultFreezingMethod.
+        PREF_FREEZE_TYPE_MIGRATED_ADV_SUSPEND_BOOL,
         PREF_SKIP_FREEZE_METHOD_DIALOG_BOOL,
         PREF_FM_DISPLAY_IN_LAUNCHER_BOOL,
         PREF_FM_FILENAME_ELLIPSIZE_STR,
@@ -421,6 +424,7 @@ public class AppPref {
             case PREF_ENABLE_PERSISTENT_SESSION_BOOL:
             case PREF_USE_SYSTEM_FONT_BOOL:
             case PREF_SHIZUKU_AUTO_RECHECKED_BOOL:
+            case PREF_FREEZE_TYPE_MIGRATED_ADV_SUSPEND_BOOL:
                 return false;
             case PREF_APP_OP_SHOW_DEFAULT_BOOL:
             case PREF_SHOW_DISCLAIMER_BOOL:
@@ -517,7 +521,13 @@ public class AppPref {
             case PREF_AUTHORIZATION_KEY_STR:
                 return AuthManager.generateKey();
             case PREF_FREEZE_TYPE_INT:
-                return FreezeUtils.FREEZE_DISABLE;
+                // Fork: upstream ships FREEZE_DISABLE here. On EMUI the enabled-state
+                // flag is restored for Huawei's own system packages at boot, so a
+                // disable-freeze does not survive a restart while the per-user
+                // suspension flag is left alone (measured on the Mate XT against
+                // com.huawei.powergenie, 2026-08-24). Advanced suspend also force-stops
+                // first, so the app is not left running until it dies of its own accord.
+                return FreezeUtils.FREEZE_ADV_SUSPEND;
             case PREF_FM_OPTIONS_INT:
                 return FmListOptions.OPTIONS_DISPLAY_DOT_FILES | FmListOptions.OPTIONS_FOLDERS_FIRST;
             case PREF_FM_SORT_ORDER_INT:

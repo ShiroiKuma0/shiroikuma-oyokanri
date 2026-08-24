@@ -62,7 +62,7 @@ public final class BatteryControls {
     public static void setFrozen(@NonNull String packageName, int userId, boolean frozen)
             throws RemoteException {
         if (frozen) {
-            FreezeUtils.freeze(packageName, userId);
+            FreezeUtils.freeze(packageName, userId, FreezeUtils.resolveFreezeMethod(packageName));
         } else {
             FreezeUtils.unfreeze(packageName, userId);
         }

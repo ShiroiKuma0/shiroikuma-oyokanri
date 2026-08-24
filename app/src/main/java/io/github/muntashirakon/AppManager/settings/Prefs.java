@@ -404,6 +404,35 @@ public final class Prefs {
             AppPref.set(AppPref.PrefKey.PREF_FREEZE_TYPE_INT, freezeType);
         }
 
+        /**
+         * Fork: one-time move of the stored default freezing method from <b>Disable</b>
+         * to <b>Advanced suspend</b>.
+         * <p>
+         * <b>LANDMINE</b> — changing {@link AppPref#getDefaultValue} alone would be inert
+         * on every existing install. {@code AppPref.init()} materialises <i>every</i> key
+         * into {@code preferences.xml} on first run, so the old default is already
+         * written and the new one is never consulted again; only a fresh install would
+         * see it. Hence the rewrite.
+         * <p>
+         * It fires once, and only while the value is still exactly the old default, so a
+         * deliberate choice made from this build on is never touched. It cannot tell
+         * "never changed it" from "deliberately chose Disable" <i>before</i> this build —
+         * on this fork those are the same thing, Disable having been the default.
+         * <p>
+         * Reads the raw preference rather than {@link #getDefaultFreezingMethod()}, which
+         * lowers itself to Disable while the needed privileges are down — migrating on
+         * that would depend on whether the service happened to be up at launch.
+         */
+        public static void migrateDefaultFreezingMethod() {
+            if (AppPref.getBoolean(AppPref.PrefKey.PREF_FREEZE_TYPE_MIGRATED_ADV_SUSPEND_BOOL)) {
+                return;
+            }
+            AppPref.set(AppPref.PrefKey.PREF_FREEZE_TYPE_MIGRATED_ADV_SUSPEND_BOOL, true);
+            if (AppPref.getInt(AppPref.PrefKey.PREF_FREEZE_TYPE_INT) == FreezeUtils.FREEZE_DISABLE) {
+                AppPref.set(AppPref.PrefKey.PREF_FREEZE_TYPE_INT, FreezeUtils.FREEZE_ADV_SUSPEND);
+            }
+        }
+
         public static boolean getSkipFreezeMethodDialog() {
             return AppPref.getBoolean(AppPref.PrefKey.PREF_SKIP_FREEZE_METHOD_DIALOG_BOOL);
         }
