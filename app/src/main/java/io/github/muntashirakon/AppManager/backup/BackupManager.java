@@ -61,6 +61,17 @@ public class BackupManager {
 
     public void backup(@NonNull BackupOpOptions options, @Nullable ProgressHandler progressHandler)
             throws BackupException {
+        backup(options, progressHandler, null);
+    }
+
+    // Fork: the listener is told where this backup is landing as soon as the
+    // directory exists, then narrates the stages inside it. Reporting the
+    // destination from here rather than from BackupOp is deliberate — the path is
+    // settled by BackupItems the moment the item is created, and an app that
+    // fails during BackupOp's constructor (bad metadata, missing package) should
+    // still have said where it was trying to write.
+    public void backup(@NonNull BackupOpOptions options, @Nullable ProgressHandler progressHandler,
+                       @Nullable BackupProgressListener listener) throws BackupException {
         if (options.packageName.equals("android")) {
             throw new BackupException("Android System (android) cannot be backed up.");
         }
@@ -77,13 +88,16 @@ public class BackupManager {
         } catch (IOException e) {
             throw new BackupException("Could not create BackupItem.", e);
         }
+        if (listener != null) {
+            listener.onDestination(backupItem.getDestinationPathString());
+        }
         if (progressHandler != null) {
             int max = calculateMaxProgress(options.flags);
             progressHandler.setProgressTextInterface(ProgressHandler.PROGRESS_PERCENT);
             progressHandler.postUpdate(max, 0f);
         }
         try (BackupOp backupOp = new BackupOp(options.packageName, options.flags, backupItem, options.userId)) {
-            backupOp.runBackup(progressHandler);
+            backupOp.runBackup(progressHandler, listener);
             BackupUtils.putBackupToDbAndBroadcast(ContextUtils.getContext(), backupOp.getMetadata());
         }
     }
@@ -93,6 +107,13 @@ public class BackupManager {
      */
     public void restore(@NonNull RestoreOpOptions options, @Nullable ProgressHandler progressHandler)
             throws BackupException {
+        restore(options, progressHandler, null);
+    }
+
+    // Fork: see the backup() overload above. Here the "destination" is where the
+    // backup is being read FROM, which is the same thing worth showing.
+    public void restore(@NonNull RestoreOpOptions options, @Nullable ProgressHandler progressHandler,
+                        @Nullable BackupProgressListener listener) throws BackupException {
         if (options.packageName.equals("android")) {
             throw new BackupException("Android System (android) cannot be restored.");
         }
@@ -115,13 +136,16 @@ public class BackupManager {
         } catch (IOException e) {
             throw new BackupException("Could not get backup files.", e);
         }
+        if (listener != null) {
+            listener.onDestination(backupItem.getDestinationPathString());
+        }
         if (progressHandler != null) {
             int max = calculateMaxProgress(options.flags);
             progressHandler.setProgressTextInterface(ProgressHandler.PROGRESS_PERCENT);
             progressHandler.postUpdate(max, 0f);
         }
         try (RestoreOp restoreOp = new RestoreOp(options.packageName, options.flags, backupItem, options.userId)) {
-            restoreOp.runRestore(progressHandler);
+            restoreOp.runRestore(progressHandler, listener);
             mRequiresRestart |= restoreOp.requiresRestart();
         }
     }

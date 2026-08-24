@@ -255,6 +255,8 @@
         <item>installer</item>
         <item>last_update</item>
         <item>min_sdk</item>
+        <!-- Fork: per-app notes -->
+        <item>note</item>
         <item>permissions</item>
         <item>pkg_name</item>
         <item>running_apps</item>

@@ -517,11 +517,28 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
 
     @AnyThread
     public void onResume() {
-        if ((mFilterFlags & MainListOptions.FILTER_RUNNING_APPS) != 0) {
+        // Fork: the note filter joins the running-apps filter here for the same
+        // reason — its input lives outside the item list and can change while
+        // this screen is not the one on top. A note is editable from app
+        // details, and the whole note store is replaceable by a settings import,
+        // neither of which the list hears about; re-filtering on resume is what
+        // stops a row that no longer carries a note from lingering under it.
+        if ((mFilterFlags & (MainListOptions.FILTER_RUNNING_APPS | MainListOptions.FILTER_APPS_WITH_NOTES)) != 0) {
             // Reload filters to get running apps again
             cancelIfRunning();
             mFilterResult = executor.submit(this::filterItemsByFlags);
         }
+    }
+
+    /**
+     * Fork: re-run the flag filters against the unchanged item list. For the
+     * filters whose input is not a property of the items themselves — today the
+     * note store — so an edit made on this very screen takes effect at once
+     * rather than at the next resume.
+     */
+    public void reapplyFilters() {
+        cancelIfRunning();
+        mFilterResult = executor.submit(this::filterItemsByFlags);
     }
 
     public void saveExportedAppList(@ListExporter.ExportType int exportType, @NonNull Path path) {
