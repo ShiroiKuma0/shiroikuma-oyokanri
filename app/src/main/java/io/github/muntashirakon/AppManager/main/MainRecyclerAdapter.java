@@ -1230,7 +1230,8 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
 
     /**
      * Toggle the freeze state of {@code item} via the freeze-indicator click.
-     * Uses {@link Prefs.Blocking#getDefaultFreezingMethod()} when freezing, and
+     * Uses {@link FreezeUtils#resolveFreezeMethod(String)} when freezing — the
+     * method remembered for this app, else the global default — and
      * the same internal unfreeze path the rest of the app uses when thawing.
      * The PM call runs on a background thread and is followed by a
      * {@code sendPackageAltered} broadcast so the main list re-binds the item
@@ -1256,7 +1257,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                         return;
                     }
                     FreezeUtils.freeze(item.packageName, userId,
-                            Prefs.Blocking.getDefaultFreezingMethod());
+                            FreezeUtils.resolveFreezeMethod(item.packageName));
                 }
                 BroadcastUtils.sendPackageAltered(ctx, new String[]{item.packageName});
             } catch (Throwable th) {

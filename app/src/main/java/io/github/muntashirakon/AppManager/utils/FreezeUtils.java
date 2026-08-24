@@ -75,9 +75,26 @@ public final class FreezeUtils {
         return ApplicationInfoCompat.isHidden(applicationInfo);
     }
 
+    /**
+     * Fork: the freezing method to use for {@code packageName} — the method the user
+     * remembered for this app, else the global default.
+     * <p>
+     * This is the resolution order App info, the 盗み見 tab, the freeze shortcuts and
+     * batch freeze have always applied by open-coding it. It lives here so that the
+     * two snowflakes that used to skip straight to the global default — the main list
+     * and the battery panel — cannot disagree with them.
+     */
+    @WorkerThread
+    @FreezeMethod
+    public static int resolveFreezeMethod(@Nullable String packageName) {
+        Integer stored = loadFreezeMethod(packageName);
+        return stored != null ? stored : Prefs.Blocking.getDefaultFreezingMethod();
+    }
+
     @Deprecated
+    @WorkerThread
     public static void freeze(@NonNull String packageName, @UserIdInt int userId) throws RemoteException {
-        freeze(packageName, userId, Prefs.Blocking.getDefaultFreezingMethod());
+        freeze(packageName, userId, resolveFreezeMethod(packageName));
     }
 
     public static void freeze(@NonNull String packageName, @UserIdInt int userId, @FreezeMethod int freezeType)
