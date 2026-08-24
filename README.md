@@ -18,9 +18,9 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+2026-06-29.21-57.gfc1e7007+100`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+2026-06-29.21-57.gfc1e7007+104`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
-<sub>Version reads as **upstream `4.1.0`**, rebased onto upstream commit **`fc1e7007` of 2026-06-29 21:57 UTC**, fork build **100**.</sub>
+<sub>Version reads as **upstream `4.1.0`**, rebased onto upstream commit **`fc1e7007` of 2026-06-29 21:57 UTC**, fork build **104**.</sub>
 
 </div>
 
@@ -249,11 +249,26 @@ A from-scratch replacement for the legacy "Running apps" screen, built for actua
   media, a **per-process detail page** (memory / CPU / scheduling / lifecycle / security / app
   metadata), a **faceted filter** (killability × type) and a **toolbar search**.
 
-## ⏯️ Batch-op progress dialog
+## ⏯️ Batch-op progress dialog that says what it is doing
 
-Long batch operations get an in-app pop-up that mirrors the notification, with **Pause / Continue**
-and **Cancel** — so you can hold a freeze/backup mid-run or stop it cleanly. On completion the main
-list **snaps to its final state in one pass** instead of repainting row-by-row over several seconds.
+Long batch operations get an in-app pop-up with **Pause / Continue** and **Cancel** — so you can hold
+a freeze or a backup mid-run, or stop it cleanly. What it *shows* is the point: a counter alone moves
+once per app, and one app with a large data directory holds it still for minutes, which is
+indistinguishable from a hung operation.
+
+So it lists **every app in flight** — a backup runs one app per CPU core, so "the current app" never
+existed — each with its label, its id, the **full destination directory** it is writing to, and the
+**stage inside that app** (APK files, Data 2/4, KeyStore, metadata, finalising). Over them sits a
+summary: elapsed time, an **estimate drawn from the rate actually achieved**, how many are running,
+how much has been written, and how many failed. The clocks are redrawn once a second, because the
+interesting moment is precisely the one where no progress event has arrived.
+
+The list **walks itself** while nobody touches it — a row at a time, wrapping at the end — so the
+apps below the fold are seen without a finger. Touching it stops the walk for six seconds and it
+resumes from where you left it.
+
+On completion the main list **snaps to its final state in one pass** instead of repainting row-by-row
+over several seconds.
 
 ## ❌ Main-list quick actions
 
@@ -273,7 +288,9 @@ The app list does more without a trip into details:
   battery panel's snowflake and plain batch freeze resolve it the same way now.
 - Free-text **per-app notes**, shown on the row as a pill carrying the note's **first line** — you
   read the note without opening it. The app name keeps its full width and the note takes whatever is
-  left, so it says as much as the row can fit. Also in app-details, and included in settings
+  left, so it says as much as the row can fit. A **“With notes” filter** summons exactly the apps
+  carrying one, and the same condition is available to Finder and filter profiles with
+  contains/regex matching over the note text. Also in app-details, and included in settings
   export/import.
 - Per-row **profile pills**, right-aligned against the note's own edge — tap to filter, long-press to
   remove, "+" to add to a profile. More pills than fit scroll sideways instead of costing the row a

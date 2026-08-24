@@ -10,6 +10,87 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.0+2026-06-29.21-57.gfc1e7007+104 — 2026-08-24
+
+The batch-progress dialog now says what it is actually doing, and the app list can be narrowed to
+the apps you left a note on. (Built on upstream App Manager `4.1.0`, commit `fc1e7007` of
+2026-06-29 21:57 UTC.)
+
+### ⏯️ The batch dialog stops being a counter
+
+A 550-app backup moved `52 / 550` once per app, and a single app with a large data directory held it
+still for minutes — indistinguishable from a hung operation. The dialog now carries four layers:
+
+- **The counter**, with a percentage beside it.
+- **A summary line** — elapsed time, an estimate, how many apps are running, how much has been
+  written, how many failed. The estimate comes from the rate the batch has actually achieved and is
+  withheld ("estimating…") until two apps have finished: before that the "rate" is one sample of a
+  quantity that varies a thousandfold between a stub app and a game, and a wildly wrong number is
+  worse than none.
+- **One block per app in flight**, with its label, its package id, the **full destination directory**
+  it is writing to, the **stage inside that app** (APK files · Data 2/4 · KeyStore · permissions,
+  ops and rules · metadata and checksums · finalising) and how long that app has been going.
+  Deliberately plural: backup runs one app per CPU core, so "the current app" never existed — the
+  monitor now holds a keyed list of in-flight items rather than a single label, which the sequential
+  ops (freeze, uninstall, block trackers, …) fill with exactly one entry, so **every** batch
+  operation gained the app's name along the way.
+- **A note line** — "Waiting for the next app…", and while paused, "Paused — apps already started
+  will finish." Pause has always been a checkpoint *between* apps; without saying so, the apps that
+  keep completing after the tap read as a broken button.
+
+The clocks are redrawn once a second. Progress events alone cannot do it: they arrive when something
+happens, and the interesting case is precisely when nothing has happened for a while.
+
+### 🚶 The in-flight list walks itself
+
+Under its height ceiling only two or three blocks fit, so with eight apps in flight the rest were
+reachable only by dragging — which defeats a readout meant to be watched rather than operated. It now
+steps one row at a time, holds each for 2.5 seconds and wraps to the top at the end. Rows rather than
+pixels: a crawl is hard to read and parks text mid-line, whereas stepping to a row's own top edge
+always presents a whole block, and the step finds the *next row* rather than advancing a fixed
+distance, because rows genuinely differ in height. Any touch stops the walk for six seconds — the one
+that starts a fling included, since a fling settles long after the finger is gone — and it then
+resumes from where you left it rather than jumping back to the top.
+
+The ceiling itself is new too: the list is one block on a small device and eight on this one, so
+`wrap_content` would push Pause and Cancel off the screen while a fixed height would leave a hole.
+
+### 🔩 How the detail reaches the dialog
+
+`ProgressHandler` can only carry a number and a notification title, which is why there was nothing to
+show. A new `BackupProgressListener` carries the rest — the destination from `BackupManager` the
+moment the backup directory exists, the stages and byte counts from `BackupOp` and `RestoreOp`. Byte
+counts are read off the archive members themselves, so what is reported is what landed on disk
+(compressed, encrypted, after exclusions) rather than the size of the source directory, which would
+over-report by a wide and varying margin. The destination is the backup's **final** directory, never
+the hidden `.{name}` staging directory that the engine hands out mid-backup and renames away at the
+end — showing that would name a path the backup can never be found at.
+
+### ⏱️ Durations are localized
+
+The dialog's own duration format is a resource, so a Japanese reader gets `12分04秒` rather than
+`12m 04s`. App Manager's `DateUtils.getFormattedDuration` is deliberately not reused for this: it is
+built for usage statistics, drops seconds, answers "less than a minute" below one — exactly the range
+a progress readout opens in — and varies its unit count with the value, so the field would jitter
+every second. Two units at most, the second zero-padded, so the width stands still.
+
+### 📝 "With notes" filter on the app list
+
+A note is written because the app needed remembering — *keep frozen*, *breaks banking*, *needed by
+the launcher* — so the set of apps carrying one is a list worth being able to summon, and until now
+the only way to find them was to scroll for the pill. The filter sits with the other "With …" rows.
+
+It is a real filter option rather than a main-list special case, so **Finder and filter profiles get
+the same condition**, with `contains` and `regex` keys over the note text — which is where it earns
+its keep: a saved profile for every app whose note mentions something. The note store is read live
+rather than snapshotted, because a filter profile holds its options between runs and a cached key set
+would go stale on the next edit.
+
+Because the filter's input is not a property of the apps themselves, it re-applies after a note is
+saved (deleting a note must drop the row, not merely un-draw its pill) and on resume — notes are
+editable from app details, and the whole store is replaceable by a settings import, neither of which
+the list otherwise hears about.
+
 ## 4.1.0+2026-06-29.21-57.gfc1e7007+100 — 2026-08-24
 
 Freezing now survives a restart on EMUI, and the snowflake freezes the way you chose. (Built on
