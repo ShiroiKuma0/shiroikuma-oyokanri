@@ -10,6 +10,41 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.0+2026-06-29.21-57.gfc1e7007+100 — 2026-08-24
+
+Freezing now survives a restart on EMUI, and the snowflake freezes the way you chose. (Built on
+upstream App Manager `4.1.0`, commit `fc1e7007` of 2026-06-29 21:57 UTC.)
+
+### ❄️ Advanced suspend is the default freezing method
+
+Stock App Manager defaults to **Disable** — `pm disable-user` — and calls it the recommended method.
+On this phone it is the wrong one. EMUI restores the enabled-state flag for Huawei's own system
+packages at boot, so a disable-freeze quietly comes undone at the next restart; the per-user
+*suspension* flag is left alone and survives. Measured on the Mate XT against `com.huawei.powergenie`,
+which is exactly the sort of package you freeze and expect to stay frozen.
+
+The default is now **Advanced suspend**: force-stop, then suspend. The force-stop matters as much as
+the suspension — without it the app is left running until it dies of its own accord.
+
+Existing installs are moved across by a **one-time migration**, because a changed default would
+otherwise never reach them: App Manager writes every preference default into `preferences.xml` on
+first run, so the old value is already stored and the new default is never consulted again. The
+migration fires once, and only while the stored value is still exactly the old default — a method you
+pick from this build on is never overwritten. Anyone who prefers the old behaviour can simply set
+*Disable* back under Settings → Rules → Default freezing method.
+
+### 🎯 The snowflake freezes the way you chose
+
+App info has always offered a **freeze method picker with "remember this option for this app"**, and
+the app-details freeze, the freeze shortcuts and batch freeze all honoured what it stored. The two
+**snowflakes did not**: the main-list row icon and the battery panel's row icon went straight to the
+global default. So remembering "suspend" for one package changed nothing about what its row icon
+actually did — a setting that appeared to be ignored, with no way to tell from the screen.
+
+One place now decides the method for everyone — the method remembered for the app, else the global
+default — and both snowflakes use it. Plain batch freeze picks it up by the same route. Nothing that
+was already correct changed behaviour.
+
 ## 4.1.0+2026-06-29.21-57.gfc1e7007+099 — 2026-08-18
 
 The Snooping page now says when each capability was last used, and last refused. (Built on upstream

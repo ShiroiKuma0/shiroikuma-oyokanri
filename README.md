@@ -18,9 +18,9 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+2026-06-29.21-57.gfc1e7007+099`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+2026-06-29.21-57.gfc1e7007+100`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
-<sub>Version reads as **upstream `4.1.0`**, rebased onto upstream commit **`fc1e7007` of 2026-06-29 21:57 UTC**, fork build **099**.</sub>
+<sub>Version reads as **upstream `4.1.0`**, rebased onto upstream commit **`fc1e7007` of 2026-06-29 21:57 UTC**, fork build **100**.</sub>
 
 </div>
 
@@ -264,6 +264,13 @@ The app list does more without a trip into details:
   freeze/unfreeze toggle, with an at-a-glance snowflake indicator.
 - **Suspended apps read apart from merely frozen ones** at a glance: a violet padlock in place of the
   snowflake, the app's name struck through, and a heavier film over the row.
+- **Freezing survives a restart, by the method you chose.** The default freezing method is **Advanced
+  suspend** — force-stop, then suspend — rather than stock's *Disable*: on EMUI the disabled flag is
+  restored for the vendor's own system packages at boot, so a disable-freeze quietly comes undone,
+  while the per-user suspension flag is left alone. And the snowflake now honours the method
+  **remembered for that app** in App info before falling back to the global default. The two used to
+  disagree, so remembering "suspend" for one package changed nothing about what its row icon did; the
+  battery panel's snowflake and plain batch freeze resolve it the same way now.
 - Free-text **per-app notes**, shown on the row as a pill carrying the note's **first line** — you
   read the note without opening it. The app name keeps its full width and the note takes whatever is
   left, so it says as much as the row can fit. Also in app-details, and included in settings
