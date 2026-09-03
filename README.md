@@ -18,9 +18,9 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+2026-06-29.21-57.gfc1e7007+104`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+2026-06-29.21-57.gfc1e7007+105`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
-<sub>Version reads as **upstream `4.1.0`**, rebased onto upstream commit **`fc1e7007` of 2026-06-29 21:57 UTC**, fork build **104**.</sub>
+<sub>Version reads as **upstream `4.1.0`**, rebased onto upstream commit **`fc1e7007` of 2026-06-29 21:57 UTC**, fork build **105**.</sub>
 
 </div>
 
@@ -310,6 +310,9 @@ The app list does more without a trip into details:
   rest of the row; a **long-press opens one dialog holding every backup action** — the app's backups
   as a tick list, with Restore, Delete, freeze/unfreeze and *Back up* all on it, so nothing drills
   down into a second screen.
+- **A “Backup older than app” filter** on the main list, so re-backing up is a two-tap job: it lists
+  exactly the installed apps whose every backup predates the version now installed. An app that
+  already holds a current backup stays out of the way, however many stale ones sit beside it.
 - **Category-based settings Export/Import** at the top of the UI page: pick a directory once, see the
   latest export at a glance, then export or restore any mix of seven categories (general settings,
   colours & fonts, monitor, toolbar & filters, notes, anti-snooping settings, profiles) — so a new install comes up looking

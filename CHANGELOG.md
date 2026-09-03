@@ -10,6 +10,31 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.0+2026-06-29.21-57.gfc1e7007+105 — 2026-09-03
+
+The app list can now be narrowed to the apps whose backup is out of date — the set a re-backup would
+actually change. (Built on upstream App Manager `4.1.0`, commit `fc1e7007` of 2026-06-29 21:57 UTC.)
+
+### 💾 “Backup older than app”
+
+The main list could already answer *has a backup* and *has no backup*, but not the question that
+decides whether backing up again is worth the minutes: **is the backup I hold older than the app that
+is installed now?** Answering it meant reading the backup column row by row.
+
+The filter sheet gains **Backup older than app** (バックアップが古い), directly under *Without backups*.
+Tick it, select all, back up — the list is exactly the apps a re-backup would change.
+
+An app is listed only when all three hold: it is **installed**, it has **at least one** backup, and
+**none** of those backups reaches the installed version. The third condition is the point, and it is
+deliberately stricter than the “some backup is outdated” test the filter engine already carried: that
+one lists an app holding a *current* backup as well as an older named one, which is precisely an app
+that needs nothing done to it. One up-to-date backup clears an app, however many stale ones sit
+beside it.
+
+Nothing has to be refreshed by hand. Writing or deleting a backup already tells the list its database
+changed, so a row leaves the filtered view the moment its new backup lands; an app *update* arrives on
+the ordinary package broadcast, which refreshes the version the comparison reads.
+
 ## 4.1.0+2026-06-29.21-57.gfc1e7007+104 — 2026-08-24
 
 The batch-progress dialog now says what it is actually doing, and the app list can be narrowed to
