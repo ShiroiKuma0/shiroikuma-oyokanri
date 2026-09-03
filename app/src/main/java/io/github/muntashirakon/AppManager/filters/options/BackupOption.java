@@ -34,6 +34,9 @@ public class BackupOption extends FilterOption {
         put("no_backups", TYPE_NONE);
         put("latest_backup", TYPE_NONE);
         put("outdated_backup", TYPE_NONE);
+        // Fork: installed, has backups, and NONE of them is of the installed
+        // version — i.e. exactly the apps that need backing up again.
+        put("no_current_backup", TYPE_NONE);
         put("made_before", TYPE_TIME_MILLIS);
         put("made_after", TYPE_TIME_MILLIS);
         put("with_flags", TYPE_INT_FLAGS);
@@ -118,6 +121,23 @@ public class BackupOption extends FilterOption {
                 return result.setMatched(!matchedBackups.isEmpty())
                         .setMatchedBackups(matchedBackups);
             }
+            case "no_current_backup": {
+                // Fork: unlike "outdated_backup", a single up-to-date backup is
+                // enough to clear the app — an app carrying both a current and
+                // an older backup does not need re-backing up.
+                if (!info.isInstalled() || backups.isEmpty()) {
+                    return result.setMatched(false).setMatchedBackups(backups);
+                }
+                long versionCode = info.getVersionCode();
+                List<Backup> matchedBackups = new ArrayList<>();
+                for (Backup backup : backups) {
+                    if (backup.versionCode >= versionCode) {
+                        return result.setMatched(false).setMatchedBackups(backups);
+                    }
+                    matchedBackups.add(backup);
+                }
+                return result.setMatched(true).setMatchedBackups(matchedBackups);
+            }
             case "made_before": {
                 List<Backup> matchedBackups = new ArrayList<>();
                 for (Backup backup : backups) {
@@ -179,6 +199,8 @@ public class BackupOption extends FilterOption {
                 return "Only the apps having the latest backups";
             case "outdated_backup":
                 return "Only the apps having some outdated backups";
+            case "no_current_backup":
+                return "Only the apps whose backups are all older than the installed version";
             case "made_before":
                 return sb.append("Only the apps with backups made before ").append(DateUtils.formatDate(context, longValue));
             case "made_after":

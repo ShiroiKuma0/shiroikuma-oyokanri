@@ -103,6 +103,7 @@ public class MainListOptions extends ListOptions {
             FILTER_APPS_WITH_SSAID,
             FILTER_STOPPED_APPS,
             FILTER_APPS_WITH_NOTES,
+            FILTER_APPS_WITH_OUTDATED_BACKUPS,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface Filter {
@@ -127,6 +128,8 @@ public class MainListOptions extends ListOptions {
     public static final int FILTER_UNFROZEN_APPS = 1 << 15;
     // Fork: apps carrying a free-text note (AppNotesManager).
     public static final int FILTER_APPS_WITH_NOTES = 1 << 16;
+    // Fork: installed apps whose every backup predates the installed version.
+    public static final int FILTER_APPS_WITH_OUTDATED_BACKUPS = 1 << 17;
 
     // For now, just generate FilterItem
     @NonNull
@@ -201,6 +204,11 @@ public class MainListOptions extends ListOptions {
         if ((flags & FILTER_APPS_WITH_NOTES) != 0) {
             NoteOption option = new NoteOption();
             option.setKeyValue("with_note", null);
+            filterItem.addFilterOption(option);
+        }
+        if ((flags & FILTER_APPS_WITH_OUTDATED_BACKUPS) != 0) {
+            BackupOption option = new BackupOption();
+            option.setKeyValue("no_current_backup", null);
             filterItem.addFilterOption(option);
         }
         if (appTypeWithFlags > 0) {
@@ -335,6 +343,7 @@ public class MainListOptions extends ListOptions {
             put(FILTER_APPS_WITH_ACTIVITIES, R.string.filter_apps_with_activities);
             put(FILTER_APPS_WITH_BACKUPS, R.string.filter_apps_with_backups);
             put(FILTER_APPS_WITHOUT_BACKUPS, R.string.filter_apps_without_backups);
+            put(FILTER_APPS_WITH_OUTDATED_BACKUPS, R.string.filter_apps_with_outdated_backups);
             put(FILTER_APPS_WITH_NOTES, R.string.filter_apps_with_notes);
             put(FILTER_RUNNING_APPS, R.string.filter_running_apps);
             put(FILTER_APPS_WITH_SPLITS, R.string.filter_apps_with_splits);

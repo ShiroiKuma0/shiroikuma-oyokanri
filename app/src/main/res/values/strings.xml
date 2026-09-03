@@ -2536,4 +2536,9 @@
          written because the app needed remembering, so the set of apps holding one
          is worth being able to summon rather than scroll for. -->
     <string name="filter_apps_with_notes">With notes</string>
+    <!-- Fork, +105: main-list filter for installed apps whose every backup was
+         taken from an older version than the one installed now — i.e. the apps a
+         re-backup would actually change. An app that also holds a backup of the
+         current version is NOT listed, however many stale ones sit beside it. -->
+    <string name="filter_apps_with_outdated_backups">Backup older than app</string>
 </resources>

@@ -1280,4 +1280,5 @@
 
     <!-- Fork, +103: メモ付きアプリの絞り込み。メモ機能自身の語（note = メモ、全角）に合わせる。 -->
     <string name="filter_apps_with_notes">メモ付き</string>
+    <string name="filter_apps_with_outdated_backups">バックアップが古い</string>
 </resources>
