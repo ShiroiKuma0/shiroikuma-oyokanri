@@ -42,6 +42,11 @@
         <attr name="android:dropDownSelector" />
         <!-- Horizontal margin of the edit frame -->
         <attr name="frameMarginHorizontal" format="dimension" />
+        <!-- Fork: the widget builds its own MaterialShapeDrawable and calls setBackground() with
+             it, so an android:background in a style is discarded and the fill comes from
+             android:backgroundTint. A border therefore has to be set on that shape. -->
+        <attr name="strokeColor" />
+        <attr name="strokeWidth" />
     </declare-styleable>
     <declare-styleable name="FlowLayout">
         <!-- Constrains items to a single horizontal line. By default, this is false and items will reflow to multiple

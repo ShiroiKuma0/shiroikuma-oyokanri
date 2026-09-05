@@ -678,12 +678,8 @@
     <string name="set_mode_for_app_ops_dots">AppOpsモードをセット…</string>
     <string name="backup_apk_files_description">APKファイルのみをバックアップします <b>ソース</b> を指定する必要があります。</string>
     <string name="backup_internal_data_description">データフォルダをバックアップします。選択した場合内部データフォルダのバックアップは標準で有効になります。</string>
-    <string name="backup_external_data_description">外部データフォルダをバックアップします。</string>
     <string name="backup_obb_media_description">OBBとmediaフォルダをバックアップします</string>
-    <string name="backup_cache_description">「no_cache」と「no_backup」フォルダのキャッシュをバックアップしません。</string>
     <string name="backup_extras">その他</string>
-    <string name="backup_extras_description">アプリ権限、バッテリーセーバー設定、データ使用設定、MagiskHideの状態、SSAIDをバックアップします。</string>
-    <string name="backup_rules_description">App Manager内で構成されたルールをバックアップします。</string>
     <string name="backup_multiple_description">基本バックアップの代わりに<i>名前付き</i>バックアップを作成する</string>
     <string name="backup_skip_signature_checks_description">チェックサム認証に失敗したり、インストール済みのものと異なる署名を持つバックアップを復元します。</string>
     <string name="patch_level">セキュリティパッチレベル</string>
@@ -1079,6 +1075,18 @@
     <string name="sort_by_installation_date">インストール日時</string>
     <string name="netpolicy_cannot_be_modified_for_core_apps">ネットポリシーは、Androidコアアプリでは変更できません。</string>
     <!-- Fork: user-supplied Japanese translations -->
+    <string name="appdata_categories">アプリデータの区分</string>
+    <string name="appdata_categories_asking">書き出せる内容をアプリに問い合わせています…</string>
+    <string name="appdata_categories_unavailable">このアプリは区分の一覧を返しませんでした。</string>
+    <string name="appdata_categories_use_defaults">アプリの既定を使う</string>
+    <string name="backup_external_data_description">共有ストレージ上にあるアプリ自身のフォルダー — 作業ファイル、ダウンロードした内容、保存されたデータ。</string>
+    <string name="backup_cache_description">上記フォルダーの <b>cache</b>、<b>code_cache</b>、<b>no_backup</b> サブフォルダーも含めます。Android はこの三つを破棄可能として扱い、<b>no_backup</b> はアプリ自身がバックアップ不要と明示しているものです。</string>
+    <string name="backup_extras_description">ファイルではなく、システムに対するアプリの設定です。付与された権限とそのフラグ、アプリ操作の状態、バックグラウンド通信の制限、通知リスナーの許可、電池最適化の除外、付与された URI 権限、凍結方法。<font fgcolor="#ff0000">権限によっては、すべてを復元できるとは限りません。</font></string>
+    <string name="backup_rules_description">このアプリが対象アプリに対して保持しているブロック規則です。無効化した構成要素 — アクティビティ、サービス、レシーバー、プロバイダー — と、ここで管理している権限およびアプリ操作の判断。アプリ自身のデータは含みません。<font fgcolor="#ff0000">権限によっては、すべての規則を復元時に再適用できるとは限りません。</font></string>
+    <string name="backup_app_data">アプリ提供データ</string>
+    <string name="backup_app_data_description">各アプリに自身のデータを書き出させます。root なしでアプリデータを保存できる唯一の方法で、対応しているアプリだけが対象です。</string>
+    <string name="backup_stage_app_data">アプリ提供データ</string>
+    <string name="restore_stage_app_data">アプリ提供データを復元しています</string>
     <string name="selection_reminder_count">%1$d個選択中</string>
     <string name="selection_reminder_hidden_suffix"> ・%1$d個非表示</string>
     <string name="selected_apps_title">選択中のアプリ (%1$d)</string>

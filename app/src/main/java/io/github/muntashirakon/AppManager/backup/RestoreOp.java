@@ -24,8 +24,10 @@ import androidx.annotation.WorkerThread;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -76,6 +78,9 @@ import io.github.muntashirakon.AppManager.utils.PackageUtils;
 import io.github.muntashirakon.AppManager.utils.ParcelFileDescriptorUtil;
 import io.github.muntashirakon.AppManager.utils.TarUtils;
 import io.github.muntashirakon.AppManager.utils.Utils;
+import io.github.muntashirakon.AppManager.appdata.AppDataHeader;
+import io.github.muntashirakon.AppManager.appdata.AppDataTransfer;
+import io.github.muntashirakon.io.IoUtils;
 import io.github.muntashirakon.io.Path;
 import io.github.muntashirakon.io.Paths;
 import io.github.muntashirakon.io.UidGidPair;
@@ -205,6 +210,13 @@ class RestoreOp implements Closeable {
             if (mRequestedFlags.backupExtras()) {
                 stage(listener, null, R.string.restore_stage_extras);
                 restoreExtras();
+                incrementProgress(progressHandler);
+            }
+            // Fork: app-supplied data, handed back to the app itself. Runs AFTER the APK is in
+            // place and deliberately without launching the app in between — many apps write
+            // defaults on first run and would then merge badly against them.
+            if (mRequestedFlags.backupAppData()) {
+                restoreAppData(listener);
                 incrementProgress(progressHandler);
             }
             if (mRequestedFlags.backupRules()) {
@@ -776,6 +788,78 @@ class RestoreOp implements Closeable {
             rules.loadExternalEntries(miscFile);
         } catch (Throwable e) {
             throw new BackupException("Failed to load rules from misc.", e);
+        }
+    }
+
+    // Fork: hand this backup's app-supplied archive back to the app through the sister-app
+    // contract. Everything the contract puts on our side of the line — the thaw, the permission
+    // grant, and the force-stop strictly AFTER a successful reply — lives in AppDataTransfer.
+    private void restoreAppData(@Nullable BackupProgressListener listener) throws BackupException {
+        Path headerFile;
+        Path dataFile;
+        try {
+            headerFile = mBackupItem.getAppDataHeaderFile();
+            dataFile = mBackupItem.getAppDataFile();
+        } catch (IOException e) {
+            // This backup simply carries no app-supplied data. Never an error.
+            return;
+        }
+        if (!mIsInstalled) {
+            throw new BackupException("App-supplied data restore is requested but the app isn't installed.");
+        }
+        stage(listener, null, R.string.restore_stage_app_data);
+        // Verify BEFORE use: these two files are in checksums.txt like every other member, and a
+        // corrupted archive must never reach the app that would import it.
+        if (!mRequestedFlags.skipSignatureCheck()) {
+            verifyAppDataFile(headerFile);
+            verifyAppDataFile(dataFile);
+        }
+        try {
+            headerFile = mBackupItem.decrypt(new Path[]{headerFile})[0];
+            dataFile = mBackupItem.decrypt(new Path[]{dataFile})[0];
+        } catch (IOException | IndexOutOfBoundsException e) {
+            throw new BackupException("Failed to decrypt app-supplied data.", e);
+        }
+        AppDataHeader header = AppDataHeader.parse(headerFile.getContentAsString(null));
+        if (header == null) {
+            throw new BackupException("App-supplied data header is missing or malformed.");
+        }
+        // Fork: the header's requires_launch_first is parsed but deliberately NOT acted on
+        // (白い熊, +107). An app is running when it imports — the provider call starts its
+        // process — so "launched" could only mean a person had opened it and its first-run
+        // initialisation had happened, which is the very thing install → do-not-launch → import
+        // exists to avoid. Measured to work without it.
+        Context context = ContextUtils.getContext();
+        File staging = new File(new File(context.getCacheDir(), "appdata"), mPackageName + ".restore.bin");
+        try {
+            File parent = staging.getParentFile();
+            if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                throw new BackupException("Could not stage app-supplied data.");
+            }
+            try (InputStream is = dataFile.openInputStream(); OutputStream os = new FileOutputStream(staging)) {
+                IoUtils.copy(is, os);
+            }
+            AppDataTransfer.Outcome outcome = new AppDataTransfer(context).importData(mPackageName,
+                    mUserId, staging, header, null);
+            if (!outcome.ok) {
+                throw new BackupException("App-supplied data restore failed: " + outcome.message);
+            }
+        } catch (BackupException e) {
+            throw e;
+        } catch (Throwable th) {
+            throw new BackupException("App-supplied data restore failed.", th);
+        } finally {
+            staging.delete();
+        }
+    }
+
+    private void verifyAppDataFile(@NonNull Path file) throws BackupException {
+        String checksum = DigestUtils.getHexDigest(mBackupInfo.checksumAlgo, file);
+        if (!checksum.equals(mChecksum.get(file.getName()))) {
+            throw new BackupException("Couldn't verify app-supplied data." +
+                    "\nFile: " + file +
+                    "\nFound: " + checksum +
+                    "\nRequired: " + mChecksum.get(file.getName()));
         }
     }
 

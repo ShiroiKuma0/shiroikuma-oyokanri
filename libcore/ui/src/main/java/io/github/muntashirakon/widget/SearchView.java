@@ -4,6 +4,7 @@ package io.github.muntashirakon.widget;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.view.ViewGroup;
@@ -80,8 +81,17 @@ public class SearchView extends androidx.appcompat.widget.SearchView implements 
 
         int frameMarginHorizontal = a.getDimensionPixelSize(R.styleable.SearchView_frameMarginHorizontal, 0);
 
+        // Fork: an outline for the field. The shape below is what actually gets drawn, so a
+        // border cannot come from android:background in a style — it must be set on the shape.
+        ColorStateList strokeColor = MaterialResources.getColorStateList(context, a,
+                R.styleable.SearchView_strokeColor);
+        int strokeWidth = a.getDimensionPixelSize(R.styleable.SearchView_strokeWidth, 0);
+
         a.recycle();
         mExpandedSearchViewShapeDrawable = new MaterialShapeDrawable(context, attrs, defStyleAttr, DEF_STYLE_RES);
+        if (strokeColor != null && strokeWidth > 0) {
+            mExpandedSearchViewShapeDrawable.setStroke(strokeWidth, strokeColor);
+        }
         ViewGroup.MarginLayoutParams layoutParams = (MarginLayoutParams) mSearchEditFrame.getLayoutParams();
         layoutParams.setMarginStart(frameMarginHorizontal);
         layoutParams.setMarginEnd(frameMarginHorizontal);

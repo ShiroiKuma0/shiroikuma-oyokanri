@@ -805,12 +805,19 @@
     <string name="set_mode_for_app_ops_dots">Set mode for app ops…</string>
     <string name="backup_apk_files_description">Back up APK files from the source directory, including splits.</string>
     <string name="backup_internal_data_description">Back up internal data folders.</string>
-    <string name="backup_external_data_description">Back up external data folders.</string>
+    <string name="backup_external_data_description">Back up the app\'s own folder on shared storage — its working files, downloaded content and saved data.</string>
+    <!-- Fork: rendered small beside the title, so the option names the directory it means. -->
+    <string name="backup_external_data_path">/storage/emulated/0/Android/data/</string>
+    <!-- Fork: the per-app category picker for App-supplied data. -->
+    <string name="appdata_categories">App data categories</string>
+    <string name="appdata_categories_asking">Asking the app what it can export…</string>
+    <string name="appdata_categories_unavailable">This app would not list its data categories.</string>
+    <string name="appdata_categories_use_defaults">Use app\'s defaults</string>
     <string name="backup_obb_media_description">Back up OBB and media folders.</string>
-    <string name="backup_cache_description">Back up <b>cache</b>, <b>no_cache</b> and <b>no_backup</b> folders.</string>
+    <string name="backup_cache_description">Also include the <b>cache</b>, <b>code_cache</b> and <b>no_backup</b> subfolders of the folders above. Android treats all three as disposable, and <b>no_backup</b> is the app explicitly asking not to have it backed up.</string>
     <string name="backup_extras">Extras</string>
-    <string name="backup_extras_description">Back up app permissions, battery saving and data usage options, MagiskHide status, SSAID, etc. <font fgcolor="#ff0000">Depending on the permissions, not all extras can be restored.</font></string>
-    <string name="backup_rules_description">Back up rules configured within App Manager. <font fgcolor="#ff0000">Depending on the permissions, not all rules can be reapplied during restore.</font></string>
+    <string name="backup_extras_description">The app\'s settings around the system, not its files: granted permissions and their flags, app-op modes, background data restrictions, notification-listener access, battery-optimisation exemption, granted URI permissions, and the freeze method. <font fgcolor="#ff0000">Depending on the permissions, not all extras can be restored.</font></string>
+    <string name="backup_rules_description">The blocking rules this app holds for it: blocked components — activities, services, receivers and providers — together with the permission and app-op decisions managed here. Nothing of the app\'s own data. <font fgcolor="#ff0000">Depending on the permissions, not all rules can be reapplied during restore.</font></string>
     <string name="backup_multiple_description">Create a separate <i>named</i> backup instead of the base backup.</string>
     <string name="backup_skip_signature_checks_description">Restore backups that either fail checksum verification or have different APK signatures than their prior backups.</string>
     <string name="patch_level">Patch level</string>
@@ -1696,6 +1703,9 @@
     <string name="pref_disable_apk_verification_description">Ask the installer to skip running the package verifier (e.g., Play Protect) during the installation.</string>
     <string name="adb_data">ADB data</string>
     <string name="adb_data_description">Back up data in ADB format. This option supersedes \"Internal data\" and \"External data\" options.</string>
+    <!-- Fork: app-supplied data, fetched from each app through the sister-app automation contract. -->
+    <string name="backup_app_data">App-supplied data</string>
+    <string name="backup_app_data_description">Ask each app to export its own data. This is the only way to back up app data without root, and it affects only apps that support it.</string>
     <string name="filter_unfrozen_apps">Unfrozen apps</string>
     <string name="goto_previous">Previous</string>
     <string name="usage_this_week">This week</string>
@@ -2523,6 +2533,8 @@
     <string name="backup_stage_keystore">KeyStore</string>
     <string name="backup_stage_extras">Permissions, ops and rules</string>
     <string name="backup_stage_rules">Blocking rules</string>
+    <string name="backup_stage_app_data">App-supplied data</string>
+    <string name="restore_stage_app_data">Restoring app-supplied data</string>
     <string name="backup_stage_finalising">Writing metadata and checksums</string>
     <string name="backup_stage_committing">Finalising</string>
     <string name="restore_stage_verifying">Verifying</string>

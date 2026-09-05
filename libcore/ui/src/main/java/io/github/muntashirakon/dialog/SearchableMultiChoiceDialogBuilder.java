@@ -9,7 +9,9 @@ import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.content.res.ColorStateList;
 import android.widget.CheckedTextView;
+import android.widget.TextView;
 
 import androidx.annotation.ArrayRes;
 import androidx.annotation.LayoutRes;
@@ -17,6 +19,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.graphics.ColorUtils;
 import androidx.core.widget.TextViewCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.ListAdapter;
@@ -105,6 +108,15 @@ public class SearchableMultiChoiceDialogBuilder<T> {
         recyclerView.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false));
         mSearchView = mView.findViewById(R.id.action_search);
         mSelectAll = mView.findViewById(android.R.id.checkbox);
+        // Fork: the query text and its hint come from the AppCompat SearchView's own inner
+        // EditText, which does not read the colours off the SearchView's style — so on a
+        // yellow-on-black dialog the field stayed grey text on a grey slab. Set directly.
+        TextView queryText = mSearchView.findViewById(androidx.appcompat.R.id.search_src_text);
+        if (queryText != null) {
+            int accent = MaterialColors.getColor(context, androidx.appcompat.R.attr.colorPrimary, -1);
+            queryText.setTextColor(accent);
+            queryText.setHintTextColor(ColorUtils.setAlphaComponent(accent, 0x8A));
+        }
         mSearchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
@@ -289,6 +301,19 @@ public class SearchableMultiChoiceDialogBuilder<T> {
                     && oldItem.isDisabled == newItem.isDisabled
                     && Objects.equals(oldItem.name.toString(), newItem.name.toString());
         }
+    }
+
+    /**
+     * Fork: give a CheckedTextView's tick the theme's own accent, checked and unchecked.
+     */
+    @SuppressLint("RestrictedApi")
+    static void tintCheckMark(@NonNull CheckedTextView item) {
+        int checked = MaterialColors.getColor(item.getContext(), androidx.appcompat.R.attr.colorPrimary, -1);
+        int unchecked = MaterialColors.getColor(item.getContext(),
+                com.google.android.material.R.attr.colorOnSurfaceVariant, -1);
+        TextViewCompat.setCompoundDrawableTintList(item, new ColorStateList(
+                new int[][]{new int[]{android.R.attr.state_checked}, new int[0]},
+                new int[]{checked, unchecked}));
     }
 
     class SearchableRecyclerViewAdapter extends ListAdapter<MultiChoiceItem<T>, SearchableRecyclerViewAdapter.ViewHolder> {
@@ -494,6 +519,11 @@ public class SearchableMultiChoiceDialogBuilder<T> {
                 TextViewCompat.setTextAppearance(item, textAppearanceBodyLarge);
                 item.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
                 item.setTextColor(MaterialColors.getColor(item.getContext(), com.google.android.material.R.attr.colorOnSurfaceVariant, -1));
+                // Fork: the tick is ?android:attr/listChoiceIndicatorMultiple, whose tint chain
+                // does not honour this theme's pinned accent — it came out the Material baseline
+                // lavender on a yellow-on-black dialog. Tinted explicitly instead, so it cannot
+                // depend on which attribute a given platform's drawable happens to read.
+                tintCheckMark(item);
             }
         }
     }

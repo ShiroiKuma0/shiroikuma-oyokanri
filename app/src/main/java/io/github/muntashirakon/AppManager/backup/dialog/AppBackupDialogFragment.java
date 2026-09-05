@@ -41,6 +41,10 @@ import java.util.Objects;
 import java.util.Set;
 
 import io.github.muntashirakon.AppManager.R;
+import io.github.muntashirakon.AppManager.appdata.AppDataCategory;
+import io.github.muntashirakon.AppManager.appdata.AppDataContract;
+import io.github.muntashirakon.AppManager.appdata.AppDataSelection;
+import io.github.muntashirakon.AppManager.appdata.AppDataTransfer;
 import io.github.muntashirakon.AppManager.backup.BackupFlags;
 import io.github.muntashirakon.AppManager.backup.struct.BackupMetadataV5;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsManager;
@@ -51,6 +55,7 @@ import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.types.UserPackagePair;
 import io.github.muntashirakon.AppManager.users.UserInfo;
 import io.github.muntashirakon.AppManager.utils.ArrayUtils;
+import io.github.muntashirakon.AppManager.utils.ContextUtils;
 import io.github.muntashirakon.AppManager.utils.DateUtils;
 import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.StoragePermission;
@@ -110,6 +115,9 @@ public class AppBackupDialogFragment extends DialogFragment {
     private BackupRestoreDialogViewModel mViewModel;
     private AlertDialog mDialog;
     private Context mDialogContext;
+    // Fork: kept for the app-data category picker, which needs both after onCreateDialog.
+    private String mPackageName;
+    private int mUserId;
     private TextView mMessageView;
     private View mListContainer;
     private LinearLayout mBackupListView;
@@ -162,6 +170,8 @@ public class AppBackupDialogFragment extends DialogFragment {
         Bundle args = requireArguments();
         String packageName = Objects.requireNonNull(args.getString(ARG_PACKAGE_NAME));
         int userId = args.getInt(ARG_USER_ID, UserHandleHidden.myUserId());
+        mPackageName = packageName;
+        mUserId = userId;
         CharSequence label = args.getCharSequence(ARG_LABEL);
 
         MaterialAlertDialogBuilder builder = ForkDialog.builder(requireContext());
@@ -382,8 +392,8 @@ public class AppBackupDialogFragment extends DialogFragment {
             supportedFlags &= ~BackupFlags.BACKUP_CUSTOM_USERS;
         }
         List<Integer> supported = BackupFlags.getBackupFlagsAsArray(supportedFlags);
-        new SearchableFlagsDialogBuilder<>(mDialogContext, supported,
-                BackupFlags.getFormattedFlagNames(mDialogContext, supported), flags.getFlags())
+        SearchableFlagsDialogBuilder<Integer> builder = new SearchableFlagsDialogBuilder<>(mDialogContext,
+                supported, BackupFlags.getFormattedFlagNames(mDialogContext, supported), flags.getFlags())
                 .setTitle(R.string.backup_options)
                 .setPositiveButton(R.string.back_up, (dialog, which, selections) -> {
                     int newFlags = 0;
@@ -392,7 +402,75 @@ public class AppBackupDialogFragment extends DialogFragment {
                     }
                     handleBackup(new BackupFlags(newFlags));
                 })
-                .setNegativeButton(R.string.cancel, null)
+                .setNegativeButton(R.string.cancel, null);
+        // Fork: the sub-level for App-supplied data. It is a second dialog rather than a nested
+        // list because this builder is typed on flag ints and category ids are per-app strings —
+        // there is nothing to nest them into. Offered only for an app that implements the contract.
+        if (AppDataContract.isSupported(mDialogContext, mPackageName)) {
+            builder.setNeutralButton(R.string.appdata_categories, (dialog, which, selections) ->
+                    showAppDataCategoryPicker());
+        }
+        builder.show();
+    }
+
+    /**
+     * Fork: ask this app what it can export and let 白い熊 tick a subset, remembered per package.
+     * <p>
+     * The listing is a broadcast round trip and may require thawing the app, so it happens only
+     * when this is opened — never while drawing a list. What is chosen here is also what a BULK
+     * backup will silently apply for this app, which is the whole point: per-app control inside a
+     * batch, with no batch UI.
+     */
+    private void showAppDataCategoryPicker() {
+        UIUtils.displayShortToast(R.string.appdata_categories_asking);
+        String packageName = mPackageName;
+        int userId = mUserId;
+        ThreadUtils.postOnBackgroundThread(() -> {
+            AppDataTransfer transfer = new AppDataTransfer(ContextUtils.getContext());
+            List<AppDataCategory> categories = transfer.listCategories(packageName, userId);
+            ThreadUtils.postOnMainThread(() -> {
+                if (isDetached() || getContext() == null) {
+                    return;
+                }
+                if (categories == null || categories.isEmpty()) {
+                    UIUtils.displayLongToast(R.string.appdata_categories_unavailable);
+                    handleBackupClicked();
+                    return;
+                }
+                showAppDataCategoryDialog(packageName, categories);
+            });
+        });
+    }
+
+    private void showAppDataCategoryDialog(@NonNull String packageName,
+                                           @NonNull List<AppDataCategory> categories) {
+        List<String> ids = new ArrayList<>(categories.size());
+        List<CharSequence> labels = new ArrayList<>(categories.size());
+        List<String> offered = new ArrayList<>(categories.size());
+        for (AppDataCategory category : categories) {
+            ids.add(category.id);
+            offered.add(category.id);
+            // Children are indented under their parent; the app sends parents first.
+            labels.add(category.isChild() ? "    " + category.label : category.label);
+        }
+        AppDataSelection.Stored stored = AppDataSelection.get(mDialogContext, packageName);
+        List<String> ticked = stored != null
+                ? AppDataSelection.reconcile(stored, categories)
+                : AppDataCategory.defaultIds(categories);
+        new SearchableMultiChoiceDialogBuilder<>(mDialogContext, ids, labels)
+                .setTitle(R.string.appdata_categories)
+                .addSelections(ticked)
+                .setPositiveButton(R.string.save, (dialog, which, selections) -> {
+                    AppDataSelection.set(mDialogContext, packageName, selections, offered);
+                    handleBackupClicked();
+                })
+                // Forget the choice entirely, so the app goes back to exporting what IT recommends
+                // — which is not the same as ticking everything.
+                .setNeutralButton(R.string.appdata_categories_use_defaults, (dialog, which, selections) -> {
+                    AppDataSelection.clear(mDialogContext, packageName);
+                    handleBackupClicked();
+                })
+                .setNegativeButton(R.string.cancel, (dialog, which, selections) -> handleBackupClicked())
                 .show();
     }
 
