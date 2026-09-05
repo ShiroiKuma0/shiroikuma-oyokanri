@@ -45,6 +45,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
+import io.github.muntashirakon.AppManager.appdata.AppDataTransfer;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.adb.AdbConnectionManager;
 import io.github.muntashirakon.AppManager.adb.AdbPairingService;
@@ -275,6 +276,11 @@ public class Ops {
             // has had its chance to grant BATTERY_STATS by now, so this is the
             // first moment the periodic job can actually read anything.
             BatterySamplerJob.schedule(context.getApplicationContext());
+            // Fork: put back anything an interrupted app-data transfer left changed. A crash
+            // between the thaw and the refreeze would otherwise leave 白い熊's frozen apps
+            // quietly running, which is invisible until something drains the battery.
+            final Context appContext = context.getApplicationContext();
+            ThreadUtils.postOnBackgroundThread(() -> AppDataTransfer.reconcile(appContext));
         }
     }
 

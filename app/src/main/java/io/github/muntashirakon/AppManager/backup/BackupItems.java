@@ -43,6 +43,10 @@ public class BackupItems {
     private static final String RULES_TSV = "rules.am.tsv";
     private static final String MISC_TSV = "misc.am.tsv";
     private static final String CHECKSUMS_TXT = "checksums.txt";
+    // Fork: the sister-app data contract's two files. The archive is opaque; the header sits
+    // beside it so a restore can judge compatibility without decrypting the archive at all.
+    public static final String APP_DATA_BIN = "appdata.am.bin";
+    public static final String APP_DATA_JSON = "appdata.am.json";
     private static final String FREEZE = ".freeze";
     private static final String NO_MEDIA = ".nomedia";
 
@@ -456,6 +460,27 @@ public class BackupItems {
             } else {
                 // Needs to be decrypted in restore mode
                 return getBackupPath().findFile(MISC_TSV + CryptoUtils.getExtension(mCryptoMode));
+            }
+        }
+
+        // Fork: app-supplied data written through the sister-app contract. Both follow the
+        // rules-file pattern exactly, so they are encrypted on the way out and decrypted on the
+        // way back in like every other member of the backup.
+        @NonNull
+        public Path getAppDataFile() throws IOException {
+            if (mBackupMode) {
+                return getUnencryptedBackupPath().findOrCreateFile(APP_DATA_BIN, null);
+            } else {
+                return getBackupPath().findFile(APP_DATA_BIN + CryptoUtils.getExtension(mCryptoMode));
+            }
+        }
+
+        @NonNull
+        public Path getAppDataHeaderFile() throws IOException {
+            if (mBackupMode) {
+                return getUnencryptedBackupPath().findOrCreateFile(APP_DATA_JSON, null);
+            } else {
+                return getBackupPath().findFile(APP_DATA_JSON + CryptoUtils.getExtension(mCryptoMode));
             }
         }
 

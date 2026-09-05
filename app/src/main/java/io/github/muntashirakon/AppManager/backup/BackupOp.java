@@ -32,9 +32,12 @@ import androidx.core.content.pm.PermissionInfoCompat;
 
 import java.io.Closeable;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.InputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -57,9 +60,6 @@ import io.github.muntashirakon.AppManager.compat.PermissionCompat;
 import io.github.muntashirakon.AppManager.crypto.CryptoException;
 import io.github.muntashirakon.AppManager.ipc.ProxyBinder;
 import io.github.muntashirakon.AppManager.logs.Log;
-import io.github.muntashirakon.AppManager.magisk.MagiskDenyList;
-import io.github.muntashirakon.AppManager.magisk.MagiskHide;
-import io.github.muntashirakon.AppManager.magisk.MagiskProcess;
 import io.github.muntashirakon.AppManager.misc.OsEnvironment;
 import io.github.muntashirakon.AppManager.progress.ProgressHandler;
 import io.github.muntashirakon.AppManager.rules.PseudoRules;
@@ -67,7 +67,6 @@ import io.github.muntashirakon.AppManager.rules.compontents.ComponentUtils;
 import io.github.muntashirakon.AppManager.rules.compontents.ComponentsBlocker;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
 import io.github.muntashirakon.AppManager.settings.Prefs;
-import io.github.muntashirakon.AppManager.ssaid.SsaidSettings;
 import io.github.muntashirakon.AppManager.uri.UriManager;
 import io.github.muntashirakon.AppManager.utils.ArrayUtils;
 import io.github.muntashirakon.AppManager.utils.BitmapRandomizer;
@@ -82,6 +81,7 @@ import io.github.muntashirakon.AppManager.utils.ParcelFileDescriptorUtil;
 import io.github.muntashirakon.AppManager.utils.TarUtils;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 import io.github.muntashirakon.AppManager.utils.Utils;
+import io.github.muntashirakon.AppManager.appdata.AppDataTransfer;
 import io.github.muntashirakon.io.IoUtils;
 import io.github.muntashirakon.io.Path;
 import io.github.muntashirakon.io.Paths;
@@ -89,6 +89,7 @@ import io.github.muntashirakon.io.Paths;
 @WorkerThread
 class BackupOp implements Closeable {
     static final String TAG = BackupOp.class.getSimpleName();
+
 
     @NonNull
     private final String mPackageName;
@@ -191,6 +192,12 @@ class BackupOp implements Closeable {
             if (mBackupFlags.backupExtras()) {
                 stage(listener, null, R.string.backup_stage_extras);
                 backupExtras();
+                incrementProgress(progressHandler);
+            }
+            // Fork: app-supplied data, fetched from the app itself. Skipped silently for every
+            // app that does not implement the contract, which is most of them.
+            if (mBackupFlags.backupAppData()) {
+                backupAppData(listener);
                 incrementProgress(progressHandler);
             }
             // Export rules
@@ -505,6 +512,66 @@ class BackupOp implements Closeable {
         }
     }
 
+    // Fork: ask the app for its own data through the sister-app contract, then fold the result
+    // into this backup the same way every other file is folded in — checksummed, then encrypted,
+    // then committed. The app never writes into the backup directory itself: that directory is a
+    // temporary path about to be renamed, encryption is applied per known file, and checksums.txt
+    // is built per known file, so a foreign file dropped in would be unencrypted, unverified, and
+    // about to move.
+    private void backupAppData(@Nullable BackupProgressListener listener) throws BackupException {
+        Context context = ContextUtils.getContext();
+        if (!io.github.muntashirakon.AppManager.appdata.AppDataContract.isSupported(context, mPackageName)) {
+            // Not an error: an app that declares nothing is simply not offered.
+            return;
+        }
+        stage(listener, null, R.string.backup_stage_app_data);
+        File staging = new File(new File(context.getCacheDir(), "appdata"), mPackageName + ".bin");
+        try {
+            AppDataTransfer.Outcome outcome = new AppDataTransfer(context).export(mPackageName, mUserId,
+                    staging, (label, current, total, unit) -> stage(listener,
+                            progressDetail(label, current, total, unit), R.string.backup_stage_app_data));
+            if (outcome.skipped) {
+                // Not a failure: every category was unticked for this app, so there is nothing to
+                // write and nothing to complain about.
+                return;
+            }
+            if (!outcome.ok || outcome.header == null) {
+                throw new BackupException("App-supplied data export failed: " + outcome.message);
+            }
+            Path dataFile = mBackupItem.getAppDataFile();
+            try (InputStream is = new FileInputStream(staging); OutputStream os = dataFile.openOutputStream()) {
+                IoUtils.copy(is, os);
+            }
+            Path headerFile = mBackupItem.getAppDataHeaderFile();
+            try (OutputStream os = headerFile.openOutputStream()) {
+                os.write(outcome.header.toJson().getBytes(StandardCharsets.UTF_8));
+            }
+            Path[] files = mBackupItem.encrypt(new Path[]{dataFile, headerFile});
+            reportBytes(listener, files);
+            for (Path file : files) {
+                mChecksum.add(file.getName(), DigestUtils.getHexDigest(mMetadata.info.checksumAlgo, file));
+            }
+        } catch (BackupException e) {
+            throw e;
+        } catch (Throwable th) {
+            throw new BackupException("App-supplied data backup failed.", th);
+        } finally {
+            // The staging copy holds a second copy of the whole archive; never leave it behind.
+            staging.delete();
+        }
+    }
+
+    // Fork: real counts, never a percentage — 白い熊's standing requirement for progress.
+    @Nullable
+    private static CharSequence progressDetail(@Nullable String label, long current, long total,
+                                               @Nullable String unit) {
+        if (current < 0 || total < 0) {
+            return label;
+        }
+        String counts = current + "/" + total + (unit != null ? " " + unit : "");
+        return label != null ? label + " " + counts : counts;
+    }
+
     private void backupExtras() throws BackupException {
         PseudoRules rules = new PseudoRules(mPackageName, mUserId);
         Path miscFile;
@@ -549,20 +616,9 @@ class BackupOp implements Closeable {
         for (AppOpsManagerCompat.OpEntry entry : opEntries) {
             rules.setAppOp(entry.getOp(), entry.getMode());
         }
-        // Backup MagiskHide data
-        Collection<MagiskProcess> magiskHiddenProcesses = MagiskHide.getProcesses(mPackageInfo);
-        for (MagiskProcess magiskProcess : magiskHiddenProcesses) {
-            if (magiskProcess.isEnabled()) {
-                rules.setMagiskHide(magiskProcess);
-            }
-        }
-        // Backup Magisk DenyList data
-        Collection<MagiskProcess> magiskDeniedProcesses = MagiskDenyList.getProcesses(mPackageInfo);
-        for (MagiskProcess magiskProcess : magiskDeniedProcesses) {
-            if (magiskProcess.isEnabled()) {
-                rules.setMagiskDenyList(magiskProcess);
-            }
-        }
+        // Fork (白い熊, +109): MagiskHide and the Magisk DenyList are no longer collected. Both
+        // are root-only features of a root manager this phone does not have, so every backup was
+        // paying two package queries to record nothing.
         // Backup allowed notification listeners aka BIND_NOTIFICATION_LISTENER_SERVICE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1 && SelfPermissions.checkNotificationListenerAccess()) {
             try {
@@ -603,16 +659,9 @@ class BackupOp implements Closeable {
                 }
             }
         }
-        // Backup SSAID
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            try {
-                String ssaid = new SsaidSettings(mUserId).getSsaid(mPackageName, mApplicationInfo.uid);
-                if (ssaid != null) rules.setSsaid(ssaid);
-            } catch (IOException e) {
-                // Ignore exception
-                Log.e(TAG, e);
-            }
-        }
+        // Fork (白い熊, +109): the SSAID is no longer collected. It lives in
+        // /data/system/users/<id>/settings_ssaid.xml, which is -rw------- system:system — measured
+        // unreadable as the shell, so under Shizuku this only ever logged a failure.
         // Backup freezeType
         Integer freezeType = FreezeUtils.loadFreezeMethod(mPackageName);
         if (freezeType != null) {

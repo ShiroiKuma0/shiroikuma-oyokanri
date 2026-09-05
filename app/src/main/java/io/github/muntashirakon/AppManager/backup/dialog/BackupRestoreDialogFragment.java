@@ -8,16 +8,20 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.TypedArray;
+import android.app.Dialog;
 import android.os.Bundle;
 import android.os.UserHandleHidden;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.widget.FrameLayout;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.ViewCompat;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 import androidx.core.content.ContextCompat;
@@ -296,6 +300,7 @@ public class BackupRestoreDialogFragment extends CapsuleBottomSheetDialogFragmen
         viewPager.setAdapter(new BackupDialogFragmentPagerAdapter(this));
         new TabLayoutMediator(tabLayout, viewPager, (tab, position) -> tab.setText(mTabTitles.getString(position)))
                 .attach();
+        fillAvailableHeight(viewPager);
     }
 
     public void updateMultipleRestoreHeader() {
@@ -341,6 +346,7 @@ public class BackupRestoreDialogFragment extends CapsuleBottomSheetDialogFragmen
         viewPager.setAdapter(new BackupDialogFragmentPagerAdapter(this));
         new TabLayoutMediator(tabLayout, viewPager, (tab, position) -> tab.setText(mTabTitles.getString(position)))
                 .attach();
+        fillAvailableHeight(viewPager);
     }
 
     private void updateSingleBackupHeader() {
@@ -422,6 +428,73 @@ public class BackupRestoreDialogFragment extends CapsuleBottomSheetDialogFragmen
         public int getItemCount() {
             return mTabTitles.length();
         }
+    }
+
+    /**
+     * Fork (白い熊, +111): make the sheet reach full height instead of freezing part-way.
+     * <p>
+     * Everything from the sheet down to the options list is {@code wrap_content}, so the sheet is
+     * supposed to size itself to its content — but the content is a {@link ViewPager2} whose pages
+     * come from a {@code FragmentStateAdapter}. {@code finishLoading()} expands the sheet
+     * <b>before</b> the adapter is set, so the pager is measured with no pages at all, and
+     * ViewPager2 never re-measures for {@code wrap_content} once a page arrives. The sheet
+     * therefore froze at whatever that first empty pass produced and clipped the options list —
+     * which only became visible when an option's description grew to two lines.
+     * <p>
+     * Rather than chase a re-measure that ViewPager2 does not support, the pager is given the
+     * height the sheet may actually occupy, and its own scroll view handles anything longer. The
+     * figure comes from settled on-screen positions — the pager's top against the bottom of the
+     * sheet's parent, less the navigation-bar inset — so there are no magic numbers to drift and
+     * the tab's own bottom-pinned button stays reachable.
+     */
+    private void fillAvailableHeight(@NonNull ViewPager2 viewPager) {
+        Dialog dialog = getDialog();
+        if (dialog == null) {
+            return;
+        }
+        View sheet = dialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
+        if (!(sheet != null && sheet.getParent() instanceof View)) {
+            return;
+        }
+        View parent = (View) sheet.getParent();
+        // Measured from settled on-screen positions rather than from the sheet's own height: at
+        // the moment this is first called the sheet has been expanded around an EMPTY pager, so
+        // every height it reports is about to change. A global-layout pass sees the real numbers,
+        // and converges in one step because the pager's top depends only on the chrome above it.
+        final int[] attempts = new int[]{0};
+        ViewTreeObserver.OnGlobalLayoutListener listener = new ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override
+            public void onGlobalLayout() {
+                if (!isAdded() || attempts[0] > 8) {
+                    viewPager.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                    return;
+                }
+                int[] parentPos = new int[2];
+                int[] pagerPos = new int[2];
+                parent.getLocationOnScreen(parentPos);
+                viewPager.getLocationOnScreen(pagerPos);
+                // Keep clear of the navigation bar, or the tab's own bottom-pinned button — the
+                // one that starts the backup — sits underneath it and cannot be reached.
+                int bottomInset = 0;
+                WindowInsetsCompat insets = ViewCompat.getRootWindowInsets(parent);
+                if (insets != null) {
+                    bottomInset = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom;
+                }
+                int target = (parentPos[1] + parent.getHeight() - bottomInset) - pagerPos[1];
+                if (target <= 0) {
+                    return;
+                }
+                ViewGroup.LayoutParams lp = viewPager.getLayoutParams();
+                if (lp.height == target) {
+                    return;
+                }
+                attempts[0]++;
+                lp.height = target;
+                viewPager.setLayoutParams(lp);
+                getBehavior().updateScrollingChild();
+            }
+        };
+        viewPager.getViewTreeObserver().addOnGlobalLayoutListener(listener);
     }
 
     private static class ViewPagerUpdateScrollingChildListener extends ViewPager2.OnPageChangeCallback {

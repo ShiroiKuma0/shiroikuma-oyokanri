@@ -4,6 +4,7 @@ package io.github.muntashirakon.AppManager.backup.dialog;
 
 import android.content.Context;
 import android.os.Bundle;
+import android.os.UserHandleHidden;
 import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
@@ -17,9 +18,11 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.util.List;
 import java.util.Set;
 
 import io.github.muntashirakon.AppManager.R;
+import io.github.muntashirakon.AppManager.appdata.AppDataCategoryPicker;
 import io.github.muntashirakon.AppManager.backup.BackupFlags;
 import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsManager;
@@ -85,6 +88,19 @@ public class BackupFragment extends Fragment {
         }
         FlagsAdapter adapter = new FlagsAdapter(mContext, BackupFlags.fromPref().getFlags(), supportedFlags);
         recyclerView.setAdapter(adapter);
+        // Fork (白い熊, +112): the per-app category picker belongs ON the App-supplied data row,
+        // not on a button elsewhere in the dialog. Offered only for a single app that implements
+        // the contract — the choice is per package, so it is meaningless for a batch, which
+        // instead applies silently whatever was chosen for each of its apps.
+        List<BackupInfo> backupInfoList = mViewModel.getBackupInfoList();
+        if (backupInfoList != null && backupInfoList.size() == 1) {
+            BackupInfo info = backupInfoList.get(0);
+            if (AppDataCategoryPicker.isAvailable(mContext, info.packageName)) {
+                int userId = info.userIds.isEmpty() ? UserHandleHidden.myUserId() : info.userIds.valueAt(0);
+                adapter.setFlagAction(BackupFlags.BACKUP_APP_DATA, R.string.appdata_categories,
+                        flag -> AppDataCategoryPicker.show(mContext, info.packageName, userId, null));
+            }
+        }
 
         Set<CharSequence> uninstalledApps = mViewModel.getUninstalledApps();
         if (!uninstalledApps.isEmpty()) {

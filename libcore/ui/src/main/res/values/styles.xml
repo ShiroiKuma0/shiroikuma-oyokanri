@@ -393,6 +393,16 @@
         <item name="android:textAppearance">?attr/textAppearanceBodyMedium</item>
     </style>
 
+    <!-- Fork: the same field, but drawn as a pill on the dialog's own ground rather than as a
+         grey surface-variant slab, which reads as a foreign control on a yellow-on-black
+         dialog. -->
+    <style name="Widget.AppTheme.SearchView.Small.Fork" parent="Widget.AppTheme.SearchView.Small">
+        <item name="android:backgroundTint">@android:color/black</item>
+        <item name="strokeColor">?attr/colorPrimary</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="closeIconTint">?attr/colorPrimary</item>
+    </style>
+
     <!-- MaterialAlertView -->
     <style name="Widget.AppTheme.MaterialAlertView" parent="Widget.AppTheme.TextInputLayout">
         <item name="boxBackgroundColor">?attr/colorPrimaryContainer</item>
