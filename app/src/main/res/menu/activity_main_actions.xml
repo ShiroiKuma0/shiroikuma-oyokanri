@@ -40,18 +40,20 @@
         android:title="@string/app_usage"
         app:showAsAction="always" />
 
-    <!-- Fork: clear-all-filters, immediately LEFT of the filter funnel it
-         undoes, so the pair reads as set/reset. -->
+    <!-- Fork (白い熊, +119): the filter FIRST and its reset immediately right of
+         it, so the pair reads set-then-reset in the order you would use them.
+         Both icons are swapped between traced and solid in code — see
+         MainActivity#updateFilterIcon. -->
     <item
-        android:id="@+id/action_clear_filters"
-        android:icon="@drawable/ic_filter_clear"
-        android:title="@string/clear_all_filters"
+        android:id="@+id/action_list_options"
+        android:icon="@drawable/ic_filter_traced"
+        android:title="@string/list_options"
         app:showAsAction="always" />
 
     <item
-        android:id="@+id/action_list_options"
-        android:icon="@drawable/ic_filter"
-        android:title="@string/list_options"
+        android:id="@+id/action_clear_filters"
+        android:icon="@drawable/ic_filter_clear_traced"
+        android:title="@string/clear_all_filters"
         app:showAsAction="always" />
 
     <!-- Fork: copy-displayed-app-IDs moved off the top toolbar into the

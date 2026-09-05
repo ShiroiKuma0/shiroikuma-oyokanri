@@ -24,6 +24,7 @@ import java.util.Set;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.appdata.AppDataCategoryPicker;
 import io.github.muntashirakon.AppManager.backup.BackupFlags;
+import io.github.muntashirakon.AppManager.backup.BackupUtils;
 import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsManager;
 import io.github.muntashirakon.AppManager.utils.DateUtils;
@@ -55,6 +56,12 @@ public class BackupFragment extends Fragment {
 
     private BackupRestoreDialogViewModel mViewModel;
     private Context mContext;
+    // Fork (白い熊, +133): the picker's run-scoped answer, when OK was pressed. Null means the
+    // app's stored choice stands — which is what Save and Use-app's-defaults leave behind.
+    @Nullable
+    private List<String> mAppDataCategories;
+    @Nullable
+    private String mAppDataPackage;
 
     @Nullable
     @Override
@@ -97,8 +104,10 @@ public class BackupFragment extends Fragment {
             BackupInfo info = backupInfoList.get(0);
             if (AppDataCategoryPicker.isAvailable(mContext, info.packageName)) {
                 int userId = info.userIds.isEmpty() ? UserHandleHidden.myUserId() : info.userIds.valueAt(0);
+                mAppDataPackage = info.packageName;
                 adapter.setFlagAction(BackupFlags.BACKUP_APP_DATA, R.string.appdata_categories,
-                        flag -> AppDataCategoryPicker.show(mContext, info.packageName, userId, null));
+                        flag -> AppDataCategoryPicker.show(mContext, info.packageName, userId,
+                                picked -> mAppDataCategories = picked));
             }
         }
 
@@ -122,33 +131,30 @@ public class BackupFragment extends Fragment {
         operationInfo.mode = BackupRestoreDialogFragment.MODE_BACKUP;
         operationInfo.flags = flags.getFlags();
         operationInfo.op = BatchOpsManager.OP_BACKUP;
+        if (mAppDataCategories != null && mAppDataPackage != null) {
+            operationInfo.perPackageAppData = java.util.Collections.singletonMap(mAppDataPackage,
+                    mAppDataCategories.toArray(new String[0]));
+        }
         if (flags.backupMultiple()) {
-            // Multiple backup is requested, no need to warn users about backups since the
-            // user has a choice between overwriting the existing backup or create a new one
-            // TODO(18/9/20): Add overwrite option
-            new TextInputDialogBuilder(mContext, R.string.input_backup_name)
-                    .setTitle(R.string.backup)
-                    .setHelperText(R.string.input_backup_name_description)
-                    .setPositiveButton(R.string.ok, (dialog, which, input, isChecked) -> {
-                        String backupName;
-                        if (TextUtils.isEmpty(input)) {
-                            backupName = DateUtils.formatMediumDateTime(mContext, System.currentTimeMillis());
-                        } else {
-                            backupName = input.toString();
-                        }
-                        operationInfo.backupNames = new String[]{backupName};
-                        mViewModel.prepareForOperation(operationInfo);
-                    })
-                    .show();
+            // Fork (白い熊, +126): named automatically, never asked for. A named backup does not
+            // overwrite anything, so the only thing the prompt ever achieved was standing between
+            // you and the backup — and a name typed by hand is a name that does not sort next to
+            // the others. See BackupUtils#timestampBackupName.
+            operationInfo.backupNames = new String[]{BackupUtils.timestampBackupName()};
+            mViewModel.prepareForOperation(operationInfo);
         } else {
             // Base backup requested
             int baseBackupCount = mViewModel.getBackupInfoList().size() - mViewModel.getAppsWithoutBackups().size();
             if (baseBackupCount > 0) {
                 // One or more app has backups, warn users
                 // Fork: yellow-on-black + bordered like every other fork dialog.
+                // Fork (白い熊, +137): see the same warning in AppBackupDialogFragment.
                 ForkDialog.present(ForkDialog.builder(mContext)
                         .setTitle(R.string.backup)
-                        .setMessage(getResources().getQuantityString(R.plurals.backup_exists_are_you_sure, baseBackupCount))
+                        .setMessage(getResources().getQuantityString(
+                                R.plurals.backup_replace_warning_multiple, baseBackupCount,
+                                baseBackupCount, getString(R.string.backup_multiple),
+                                getString(R.string.backup_options)))
                         .setPositiveButton(R.string.yes, (dialog, which) -> mViewModel.prepareForOperation(operationInfo))
                         .setNegativeButton(R.string.no, null));
             } else {

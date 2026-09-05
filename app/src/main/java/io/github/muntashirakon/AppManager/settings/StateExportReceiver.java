@@ -155,9 +155,13 @@ public class StateExportReceiver extends BroadcastReceiver {
      * fourth would otherwise be read as the parent. The fourth states whether
      * the item starts ticked, so 自由作業盤's picker takes the default from this
      * app rather than assuming one.
+     *
+     * <p>Public since +134: {@code AppDataTransfer} answers its own category listing with this
+     * rather than broadcasting to itself past its own token gate. One renderer, so the two
+     * contracts can never describe this app differently.
      */
     @NonNull
-    private static String listCategories(@NonNull Context context) {
+    public static String listCategories(@NonNull Context context) {
         StringBuilder sb = new StringBuilder("OK:");
         boolean first = true;
         for (SettingsBackupManager.Category cat : SettingsBackupManager.Category.values()) {

@@ -35,6 +35,7 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
 import io.github.muntashirakon.AppManager.R;
+import io.github.muntashirakon.AppManager.backup.BackupCleanupDialog;
 import io.github.muntashirakon.AppManager.backup.BackupFlags;
 import io.github.muntashirakon.AppManager.backup.BackupUtils;
 import io.github.muntashirakon.AppManager.backup.CryptoUtils;
@@ -237,6 +238,12 @@ public class BackupRestorePreferences extends PreferenceFragment {
         ((Preference) Objects.requireNonNull(findPreference("backup_volume")))
                 .setOnPreferenceClickListener(preference -> {
                     mModel.loadStorageVolumes();
+                    return true;
+                });
+        // Fork (白い熊, +137): clean the wreckage out of the backup directory.
+        ((Preference) Objects.requireNonNull(findPreference("clean_broken_backups")))
+                .setOnPreferenceClickListener(preference -> {
+                    BackupCleanupDialog.show(mActivity);
                     return true;
                 });
         // Import backups

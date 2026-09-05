@@ -278,6 +278,31 @@ public class FontsPreferences extends Fragment {
         monContent.addView(buildMonitorSeparatorElement(inflater, monContent, true));
         monContent.addView(buildMonitorSeparatorElement(inflater, monContent, false));
         container.addView(monGroup);
+        // Fork (白い熊, +116): the batch operation log — text size, the timestamp column, and a
+        // colour per kind of line. The colours are the orientation: what a page of ten thousand
+        // lines is scanned for is where each app starts and which of them went red.
+        View logGroup = inflater.inflate(R.layout.view_font_group, container, false);
+        ((AppCompatTextView) logGroup.findViewById(R.id.group_header)).setText(R.string.pref_oplog_group);
+        LinearLayoutCompat logContent = logGroup.findViewById(R.id.group_content);
+        logContent.addView(buildOpLogTextSizeElement(inflater, logContent));
+        logContent.addView(buildOpLogTimestampElement(inflater, logContent));
+        View logColors = inflater.inflate(R.layout.view_font_element, logContent, false);
+        ((AppCompatTextView) logColors.findViewById(R.id.element_label)).setText(R.string.pref_oplog_colors);
+        logColors.findViewById(R.id.font_controls).setVisibility(View.GONE);
+        LinearLayoutCompat logCr = logColors.findViewById(R.id.color_rows);
+        addColorRow(logCr, new ColorSpec(ColorPrefs.OPLOG_BATCH, R.string.pref_oplog_batch), () -> {});
+        addColorRow(logCr, new ColorSpec(ColorPrefs.OPLOG_APP, R.string.pref_oplog_app), () -> {});
+        addColorRow(logCr, new ColorSpec(ColorPrefs.OPLOG_STAGE, R.string.pref_oplog_stage), () -> {});
+        addColorRow(logCr, new ColorSpec(ColorPrefs.OPLOG_ITEM, R.string.pref_oplog_item), () -> {});
+        addColorRow(logCr, new ColorSpec(ColorPrefs.OPLOG_DETAIL, R.string.pref_oplog_detail), () -> {});
+        addColorRow(logCr, new ColorSpec(ColorPrefs.OPLOG_OK, R.string.pref_oplog_ok), () -> {});
+        addColorRow(logCr, new ColorSpec(ColorPrefs.OPLOG_FAIL, R.string.pref_oplog_fail), () -> {});
+        addColorRow(logCr, new ColorSpec(ColorPrefs.OPLOG_SKIP, R.string.pref_oplog_skip), () -> {});
+        addColorRow(logCr, new ColorSpec(ColorPrefs.OPLOG_WARN, R.string.pref_oplog_warn), () -> {});
+        addColorRow(logCr, new ColorSpec(ColorPrefs.OPLOG_TIME, R.string.pref_oplog_time), () -> {});
+        addColorRow(logCr, new ColorSpec(ColorPrefs.OPLOG_GUIDE, R.string.pref_oplog_guide), () -> {});
+        logContent.addView(logColors);
+        container.addView(logGroup);
         // Fork: process detail page — icon size, line padding, and the five text
         // surfaces (each: font family/weight/size + colour, via bindElement).
         View detGroup = inflater.inflate(R.layout.view_font_group, container, false);
@@ -797,6 +822,52 @@ public class FontsPreferences extends Fragment {
             @Override public void onStartTrackingTouch(SeekBar sb) {}
             @Override public void onStopTrackingTouch(SeekBar sb) {}
         });
+        return element;
+    }
+
+    /** Fork (+116): text size of the batch operation log. */
+    @NonNull
+    private View buildOpLogTextSizeElement(@NonNull LayoutInflater inflater, @NonNull LinearLayoutCompat parent) {
+        View element = inflater.inflate(R.layout.view_separator_element, parent, false);
+        ((AppCompatTextView) element.findViewById(R.id.element_label)).setText(R.string.pref_oplog_text_size);
+        element.findViewById(R.id.sep_sublabel).setVisibility(View.GONE);
+        final AppCompatTextView valueView = element.findViewById(R.id.sep_width_value);
+        final AppCompatSeekBar seek = element.findViewById(R.id.sep_width_seek);
+        seek.setMax(OpLogPrefs.MAX_TEXT_SIZE_SP - OpLogPrefs.MIN_TEXT_SIZE_SP);
+        final Runnable render = () -> {
+            int sp = OpLogPrefs.getTextSizeSp(requireContext());
+            valueView.setText(String.format(Locale.US, "%d sp", sp));
+            seek.setProgress(sp - OpLogPrefs.MIN_TEXT_SIZE_SP);
+        };
+        render.run();
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                OpLogPrefs.setTextSizeSp(requireContext(), OpLogPrefs.MIN_TEXT_SIZE_SP + progress);
+                render.run();
+            }
+            @Override public void onStartTrackingTouch(SeekBar sb) {}
+            @Override public void onStopTrackingTouch(SeekBar sb) {}
+        });
+        return element;
+    }
+
+    /** Fork (+116): whether the log carries its timestamp column. */
+    @NonNull
+    private View buildOpLogTimestampElement(@NonNull LayoutInflater inflater, @NonNull LinearLayoutCompat parent) {
+        View element = inflater.inflate(R.layout.view_font_element, parent, false);
+        ((AppCompatTextView) element.findViewById(R.id.element_label)).setText(R.string.pref_oplog_timestamps);
+        element.findViewById(R.id.font_controls).setVisibility(View.GONE);
+        LinearLayoutCompat rows = element.findViewById(R.id.color_rows);
+        MaterialSwitch sw = (MaterialSwitch) View.inflate(requireContext(), R.layout.item_switch, null);
+        sw.setLayoutParams(new LinearLayoutCompat.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        int[][] states = {{android.R.attr.state_checked}, {}};
+        sw.setThumbTintList(new ColorStateList(states, new int[]{0xFF000000, 0xFF808000}));
+        sw.setChecked(OpLogPrefs.showTimestamps(requireContext()));
+        sw.setOnCheckedChangeListener((v, checked) -> OpLogPrefs.setShowTimestamps(requireContext(), checked));
+        rows.addView(sw);
         return element;
     }
 

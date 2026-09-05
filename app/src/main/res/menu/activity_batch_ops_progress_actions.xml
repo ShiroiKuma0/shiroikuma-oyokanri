@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Fork (白い熊, +116): actions on the batch operation log page. -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_scroll_latest"
+        android:title="@string/op_log_latest"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_copy_log"
+        android:title="@string/op_log_copy"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_save_log"
+        android:title="@string/op_log_save"
+        app:showAsAction="never" />
+
+</menu>

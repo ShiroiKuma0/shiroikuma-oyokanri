@@ -1,0 +1,23 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Fork (白い熊, +119): clear-all-filters TRACED — what it looks like when there
+     is nothing to clear. Filled and red is the other state, and the two together
+     say whether pressing it would do anything. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="@color/theme_bright_yellow">
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineJoin="round"
+        android:pathData="M3,4h18l-7.2,8.5v3.2l-3.6,2.1v-5.3z" />
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M17.4,14.2 L22.2,19M22.2,14.2 L17.4,19" />
+</vector>

@@ -193,6 +193,107 @@ public final class RowPills {
         return has;
     }
 
+    // ── Action pills (白い熊, +118) ──────────────────────────────────────────
+    //
+    // The same stadium, one size up, for a pill that DOES something rather than
+    // reporting something: the shelf under the toolbar, the actions inside an
+    // expanded row, the batch actions, and the buttons on the operation-log
+    // page. They are one control in four places, so they are built once here —
+    // the alternative is four styling blocks that agree today and drift on the
+    // first edit, which is exactly the reasoning that created this class.
+
+    private static final float ACTION_TEXT_SP = 13f;
+    private static final float ACTION_PAD_H_DP = 16f;
+    private static final float ACTION_PAD_V_DP = 7f;
+    private static final float ACTION_GLYPH_DP = 16f;
+
+    /**
+     * Style an existing view as an action pill.
+     *
+     * <p>{@code filled} is the on state: a solid accent with the screen's black
+     * back through the text, which is the only way a pill can say "this is the
+     * view you are looking at" without a second control beside it. An off pill
+     * is the ordinary outline.
+     */
+    public static void styleActionPill(@NonNull TextView pill, @ColorInt int ink, boolean filled) {
+        styleActionPill(pill, ink, filled, false);
+    }
+
+    /**
+     * {@code compact} is for a pill that lives in a bar rather than in a pane: the shelf under
+     * the toolbar is one row of furniture above the list, and at the full action size that row
+     * eats a visible slice of the screen for nothing (白い熊, +121).
+     */
+    public static void styleActionPill(@NonNull TextView pill, @ColorInt int ink, boolean filled,
+                                       boolean compact) {
+        Context context = pill.getContext();
+        int padH = Math.round(ForkThemeUtils.dpToPx(context, compact ? 12f : ACTION_PAD_H_DP));
+        int padV = Math.round(ForkThemeUtils.dpToPx(context, compact ? 2f : ACTION_PAD_V_DP));
+        if (filled) {
+            GradientDrawable shape = new GradientDrawable();
+            shape.setShape(GradientDrawable.RECTANGLE);
+            shape.setColor(ink);
+            shape.setCornerRadius(ForkThemeUtils.dpToPx(context, 100f));
+            pill.setBackground(new RippleDrawable(
+                    ColorStateList.valueOf(ColorUtils.setAlphaComponent(Color.BLACK, 0x33)), shape, null));
+            pill.setTextColor(Color.BLACK);
+        } else {
+            pill.setBackground(outline(context, ink));
+            pill.setTextColor(ink);
+        }
+        pill.setPadding(padH, padV, padH, padV);
+        pill.setGravity(Gravity.CENTER);
+        pill.setIncludeFontPadding(false);
+        pill.setSingleLine(true);
+        pill.setEllipsize(TextUtils.TruncateAt.END);
+        pill.setAllCaps(false);
+        pill.setTypeface(Typeface.DEFAULT_BOLD);
+        pill.setTextSize(TypedValue.COMPLEX_UNIT_SP, compact ? 12f : ACTION_TEXT_SP);
+        pill.setClickable(true);
+        pill.setFocusable(true);
+        pill.setMinWidth(0);
+        pill.setMinimumWidth(0);
+        pill.setMinHeight(0);
+        pill.setMinimumHeight(0);
+        pill.setStateListAnimator(null);
+    }
+
+    /**
+     * A new action pill. {@code iconRes} of 0 means no glyph.
+     */
+    @NonNull
+    public static TextView actionPill(@NonNull Context context, @NonNull CharSequence text,
+                                      int iconRes, @ColorInt int ink, boolean filled) {
+        TextView pill = new AppCompatTextView(context);
+        styleActionPill(pill, ink, filled);
+        pill.setText(text);
+        if (iconRes != 0) {
+            setActionGlyph(pill, iconRes, filled ? Color.BLACK : ink);
+        }
+        LinearLayoutCompat.LayoutParams lp = new LinearLayoutCompat.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        // LinearLayoutCompat.LayoutParams for the same reason tagPill uses them:
+        // LinearLayout silently drops the margins of foreign params.
+        lp.setMarginEnd(Math.round(ForkThemeUtils.dpToPx(context, GAP_DP + 2f)));
+        lp.bottomMargin = Math.round(ForkThemeUtils.dpToPx(context, GAP_DP + 2f));
+        pill.setLayoutParams(lp);
+        return pill;
+    }
+
+    /** An action pill's leading glyph — a size up from the row pills' own. */
+    public static void setActionGlyph(@NonNull TextView pill, int drawableRes, @ColorInt int ink) {
+        Context context = pill.getContext();
+        Drawable glyph = ContextCompat.getDrawable(context, drawableRes);
+        if (glyph != null) {
+            glyph = glyph.mutate();
+            int size = Math.round(ForkThemeUtils.dpToPx(context, ACTION_GLYPH_DP));
+            glyph.setBounds(0, 0, size, size);
+            glyph.setTintList(ColorStateList.valueOf(ink));
+        }
+        pill.setCompoundDrawablePadding(Math.round(ForkThemeUtils.dpToPx(context, GAP_DP + 2f)));
+        pill.setCompoundDrawablesRelative(glyph, null, null, null);
+    }
+
     /**
      * The note's first line — a note is free text and may be a paragraph, but
      * the row can only ever show one line of it, and a line break rendered as a

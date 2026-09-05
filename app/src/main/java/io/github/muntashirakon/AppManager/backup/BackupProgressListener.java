@@ -46,4 +46,14 @@ public interface BackupProgressListener {
      * running total, so a listener can simply add.
      */
     void onBytesWritten(long bytes);
+
+    /**
+     * Fork (白い熊, +116): one leaf under the current stage — a file and its size, a category
+     * the app exported, a count of rules applied. The stage says what is being done; this says
+     * what it actually did, which is the half a log is read for.
+     *
+     * <p>A default no-op, so a listener that only wants the stage line stays valid.
+     */
+    default void onItem(@NonNull CharSequence text, @Nullable CharSequence detail) {
+    }
 }

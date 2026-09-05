@@ -60,6 +60,7 @@ import java.util.Set;
 import dev.rikka.tools.refine.Refine;
 import io.github.muntashirakon.AppManager.ipc.ProxyBinder;
 import io.github.muntashirakon.AppManager.logs.Log;
+import io.github.muntashirakon.AppManager.profiles.ProtectedAppsProfile;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
 import io.github.muntashirakon.AppManager.types.UserPackagePair;
 import io.github.muntashirakon.AppManager.users.Users;
@@ -448,6 +449,16 @@ public final class PackageManagerCompat {
     @RequiresApi(Build.VERSION_CODES.N)
     @RequiresPermission(allOf = {"android.permission.SUSPEND_APPS", ManifestCompat.permission.MANAGE_USERS})
     public static void suspendPackages(String[] packageNames, @UserIdInt int userId, boolean suspend) throws RemoteException {
+        // Fork (白い熊, +139): the chokepoint, like uninstall above it. FreezeUtils already
+        // guards its own callers, but suspension is reachable from more than one place and this
+        // is the one they all pass through. Lifting a suspension is never blocked.
+        if (suspend) {
+            for (String packageName : packageNames) {
+                if (ProtectedAppsProfile.isProtected(packageName)) {
+                    throw new RemoteException(packageName + " is protected and cannot be suspended.");
+                }
+            }
+        }
         String callingPackage = SelfPermissions.getCallingPackage(Users.getSelfOrRemoteUid());
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             try {

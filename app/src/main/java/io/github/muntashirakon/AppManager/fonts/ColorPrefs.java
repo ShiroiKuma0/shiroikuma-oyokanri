@@ -104,6 +104,22 @@ public final class ColorPrefs {
     // ---- colour-role key (selected card frame; width/radius in SelectionFramePrefs) ----
     public static final String SELECTED_FRAME = "selected_frame";
 
+    // ---- colour-role keys (batch operation log; text size in OpLogPrefs) ----
+    // Fork (白い熊, +116): the running backup/restore log. Every kind of line is settable,
+    // because the whole point of the colours is orientation while scrolling past thousands of
+    // them — and what reads well is a matter of the eye looking at it.
+    public static final String OPLOG_TIME = "oplog_time";
+    public static final String OPLOG_GUIDE = "oplog_guide";
+    public static final String OPLOG_BATCH = "oplog_batch";
+    public static final String OPLOG_APP = "oplog_app";
+    public static final String OPLOG_STAGE = "oplog_stage";
+    public static final String OPLOG_ITEM = "oplog_item";
+    public static final String OPLOG_DETAIL = "oplog_detail";
+    public static final String OPLOG_OK = "oplog_ok";
+    public static final String OPLOG_FAIL = "oplog_fail";
+    public static final String OPLOG_SKIP = "oplog_skip";
+    public static final String OPLOG_WARN = "oplog_warn";
+
     @NonNull
     private static SharedPreferences sp(@NonNull Context ctx) {
         return ctx.getApplicationContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -167,10 +183,26 @@ public final class ColorPrefs {
             case MONITOR_DETAIL_LABEL:
             case MONITOR_DETAIL_SECTION:
             case MONITOR_DETAIL_ROW_VALUE:
+            case OPLOG_BATCH:
+            case OPLOG_APP:
                 return ContextCompat.getColor(ctx, R.color.theme_bright_yellow);
             case MONITOR_DETAIL_ID:
             case MONITOR_DETAIL_ROW_LABEL:
+            case OPLOG_STAGE:
                 return 0x99FFFF00;  // dim yellow
+            case OPLOG_TIME:
+                return 0xFF6E6E6E;  // dim grey — present, never competing with the line
+            case OPLOG_GUIDE:
+                return 0xFF4A4A4A;  // the indent ladder: structure, not content
+            case OPLOG_DETAIL:
+            case OPLOG_SKIP:
+                return 0xFF8A8A8A;  // grey: said, and not worth acting on
+            case OPLOG_OK:
+                return 0xFF4CD07A;  // green — the only colour here that means "nothing to do"
+            case OPLOG_FAIL:
+                return 0xFFFF0028;  // the fork's alarm red, shared with the Snooping page
+            case OPLOG_WARN:
+                return ContextCompat.getColor(ctx, R.color.theme_bright_orange);
             case VERSION_INACTIVE:
                 return ContextCompat.getColor(ctx, io.github.muntashirakon.ui.R.color.stopped);
             case APPTYPE_PERSISTENT:
@@ -198,6 +230,7 @@ public final class ColorPrefs {
             case DETAIL_LABEL:
             case DETAIL_PACKAGE:
             case DETAIL_VERSION:
+            case OPLOG_ITEM:
             default:
                 return ContextCompat.getColor(ctx, io.github.muntashirakon.ui.R.color.textColorSecondary);
         }

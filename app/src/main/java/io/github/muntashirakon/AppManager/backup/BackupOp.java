@@ -14,6 +14,9 @@ import android.annotation.UserIdInt;
 import android.app.INotificationManager;
 import android.content.ComponentName;
 import android.content.Context;
+import android.text.style.ForegroundColorSpan;
+import android.text.Spanned;
+import android.text.SpannableStringBuilder;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -82,6 +85,9 @@ import io.github.muntashirakon.AppManager.utils.TarUtils;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
 import io.github.muntashirakon.AppManager.utils.Utils;
 import io.github.muntashirakon.AppManager.appdata.AppDataTransfer;
+import io.github.muntashirakon.AppManager.batchops.BatchOpsProgressMonitor;
+import io.github.muntashirakon.AppManager.batchops.OpLog;
+import io.github.muntashirakon.AppManager.fonts.ColorPrefs;
 import io.github.muntashirakon.io.IoUtils;
 import io.github.muntashirakon.io.Path;
 import io.github.muntashirakon.io.Paths;
@@ -110,10 +116,32 @@ class BackupOp implements Closeable {
     // We don't need privileged package manager here
     @NonNull
     private final PackageManager mPm;
+    // Fork (白い熊, +133): a one-run override of the App-supplied category choice, so narrowing
+    // one backup does not narrow every future one.
+    @Nullable
+    private final String[] mAppDataCategories;
+    /** Fork (白い熊, +140): the stages this run will announce; see {@link #planStages()}. */
+    @Nullable
+    private List<Integer> mStagePlan;
+    /** The stage currently running, so its number can be repeated on the lines beneath it. */
+    @StringRes
+    private int mCurrentStageRes;
 
     BackupOp(@NonNull String packageName, @NonNull BackupFlags backupFlags,
              @NonNull BackupItems.BackupItem backupItem, @UserIdInt int userId)
             throws BackupException {
+        this(packageName, backupFlags, backupItem, userId, null);
+    }
+
+    /**
+     * @param appDataCategories the App-supplied categories to export this once, or {@code null}
+     *                          to use the app's stored choice — see BackupOpOptions.
+     */
+    BackupOp(@NonNull String packageName, @NonNull BackupFlags backupFlags,
+             @NonNull BackupItems.BackupItem backupItem, @UserIdInt int userId,
+             @Nullable String[] appDataCategories)
+            throws BackupException {
+        mAppDataCategories = appDataCategories;
         mPackageName = packageName;
         mBackupItem = backupItem;
         mUserId = userId;
@@ -163,6 +191,7 @@ class BackupOp implements Closeable {
     // only once it is over.
     void runBackup(@Nullable ProgressHandler progressHandler, @Nullable BackupProgressListener listener)
             throws BackupException {
+        mStagePlan = planStages();
         try {
             // Fail backup if the app has items in Android KeyStore and backup isn't enabled
             if (mBackupFlags.backupData() && mMetadata.metadata.keyStore && !Prefs.BackupRestore.backupAppsWithKeyStore()) {
@@ -191,7 +220,7 @@ class BackupOp implements Closeable {
             // Backup extras
             if (mBackupFlags.backupExtras()) {
                 stage(listener, null, R.string.backup_stage_extras);
-                backupExtras();
+                backupExtras(listener);
                 incrementProgress(progressHandler);
             }
             // Fork: app-supplied data, fetched from the app itself. Skipped silently for every
@@ -232,6 +261,11 @@ class BackupOp implements Closeable {
             }
         } catch (BackupException e) {
             throw e;
+        } catch (BatchOpsProgressMonitor.OperationCancelledException e) {
+            // Fork (白い熊, +143): a cancel is an answer, not an error. Wrapped as a
+            // BackupException it would be reported as "could not back up" and counted as a
+            // failure by the batch that asked for it to stop.
+            throw e;
         } catch (Throwable th) {
             throw new BackupException("Unknown error occurred.", th);
         }
@@ -247,32 +281,168 @@ class BackupOp implements Closeable {
 
     // Fork: name the stage this app's backup has reached. Formatted here rather
     // than at the listener, since only this class knows the counts involved.
-    private static void stage(@Nullable BackupProgressListener listener, @Nullable CharSequence detail,
-                              @StringRes int stageRes, @Nullable Object... args) {
+    /**
+     * Fork (白い熊, +140): every stage says which of how many it is.
+     *
+     * <p>A backup that spends twenty-three minutes inside one app said only "0 / 1" — the app
+     * count — and the stage name, with nothing to say whether that was the second step of eight
+     * or the last one. The number is composed here rather than counted as we go, so a stage
+     * announced repeatedly (the data directories) keeps ONE number instead of walking the total.
+     *
+     * <p>The counter is drawn in its own colour, so it reads as position rather than as part of
+     * the stage's name — in the log and, because the same CharSequence feeds it, in the header
+     * line naming the app currently in flight.
+     */
+    private void stage(@Nullable BackupProgressListener listener, @Nullable CharSequence detail,
+                       @StringRes int stageRes, @Nullable Object... args) {
         if (listener == null) {
             return;
         }
         Context context = ContextUtils.getContext();
+        checkCancelled();
+        mCurrentStageRes = stageRes;
         CharSequence stage = args == null || args.length == 0
                 ? context.getText(stageRes)
                 : context.getString(stageRes, args);
-        listener.onStage(stage, detail);
+        listener.onStage(numbered(context, stage, stageRes), detail);
+    }
+
+    /**
+     * Fork (白い熊, +143): the stage number, repeated on a line beneath it.
+     *
+     * <p>Putting it on the stage heading alone was enough for a short backup and useless for the
+     * one that needed it: a 6 GB export writes thousands of progress lines, and by the time you
+     * look, the heading that said which stage this is has scrolled hours out of reach. Every
+     * line that reports progress carries the number, so the answer is wherever you happen to be
+     * looking rather than somewhere you have to scroll back to.
+     */
+    @NonNull
+    private CharSequence marked(@Nullable CharSequence text) {
+        if (text == null || mStagePlan == null || mCurrentStageRes == 0) {
+            return text == null ? "" : text;
+        }
+        return numbered(ContextUtils.getContext(), text, mCurrentStageRes);
+    }
+
+    /** The stages this run will actually announce, in order. Built once, before any of them. */
+    @NonNull
+    private List<Integer> planStages() {
+        List<Integer> plan = new ArrayList<>();
+        plan.add(R.string.backup_stage_preparing);
+        if (mBackupFlags.backupApkFiles()) {
+            plan.add(R.string.backup_stage_apk);
+        }
+        if (mBackupFlags.backupData()) {
+            plan.add(R.string.backup_stage_data);
+            if (mMetadata.metadata.keyStore) {
+                plan.add(R.string.backup_stage_keystore);
+            }
+        }
+        if (mBackupFlags.backupExtras()) {
+            plan.add(R.string.backup_stage_extras);
+        }
+        // Planned only when the app really has a door: an app without one returns before it
+        // announces anything, and a plan that counted it would leave a gap in the numbering.
+        if (mBackupFlags.backupAppData() && io.github.muntashirakon.AppManager.appdata.AppDataContract
+                .isSupported(ContextUtils.getContext(), mPackageName)) {
+            plan.add(R.string.backup_stage_app_data);
+            // The three passes that follow the app handing its archive over. They sit here, in
+            // the order they run, so the numbering stays monotone as it climbs.
+            plan.add(R.string.backup_stage_storing);
+            if (isEncrypted()) {
+                plan.add(R.string.backup_stage_encrypting);
+            }
+            plan.add(R.string.backup_stage_checksumming);
+        }
+        if (mMetadata.metadata.hasRules) {
+            plan.add(R.string.backup_stage_rules);
+        }
+        plan.add(R.string.backup_stage_finalising);
+        plan.add(R.string.backup_stage_committing);
+        return plan;
+    }
+
+    /**
+     * Fork (白い熊, +143): the cancel checkpoint <em>inside</em> one app's backup.
+     *
+     * <p>{@code BatchOpsManager.updateProgress} checks once per app, before that app's work —
+     * which is the right place for a batch and no place at all for a single app that takes
+     * twenty minutes. Cancel had nothing to reach until the app finished, so on a one-app batch
+     * it did nothing whatever and the only way out was to kill the process.
+     */
+    private void checkCancelled() {
+        if (BatchOpsProgressMonitor.getInstance().isCancelled()) {
+            throw new BatchOpsProgressMonitor.OperationCancelledException();
+        }
+    }
+
+    /** Whether this backup is being written encrypted, so the pass is worth announcing. */
+    private boolean isEncrypted() {
+        String crypto = mMetadata.info.crypto;
+        return crypto != null && !CryptoUtils.MODE_NO_ENCRYPTION.equals(crypto);
+    }
+
+    @NonNull
+    private CharSequence numbered(@NonNull Context context, @NonNull CharSequence stage,
+                                  @StringRes int stageRes) {
+        List<Integer> plan = mStagePlan;
+        if (plan == null) {
+            return stage;
+        }
+        int index = plan.indexOf(stageRes);
+        if (index < 0) {
+            return stage;
+        }
+        SpannableStringBuilder sb = new SpannableStringBuilder(stage);
+        int start = sb.length();
+        sb.append("  ").append(String.valueOf(index + 1)).append("/").append(String.valueOf(plan.size()));
+        try {
+            sb.setSpan(new ForegroundColorSpan(ColorPrefs.getColor(context, ColorPrefs.OPLOG_BATCH)),
+                    start, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        } catch (Throwable ignore) {
+            // A colour we could not read is not a reason to lose the number.
+        }
+        return sb;
     }
 
     // Fork: report the bytes a step just produced. Sizes come from the archive
     // members themselves, so what is reported is what actually landed on disk —
     // compressed, encrypted, and after exclusions — rather than the size of the
     // source directory, which would over-report by a wide and varying margin.
-    private static void reportBytes(@Nullable BackupProgressListener listener, @Nullable Path[] files) {
+    /**
+     * A copy that can be given up on. {@link IoUtils#copy} cannot: it is one call over gigabytes,
+     * and a cancel raised during it is not seen until it returns.
+     */
+    private void copyCancellable(@NonNull InputStream is, @NonNull OutputStream os) throws IOException {
+        byte[] buffer = new byte[64 * 1024];
+        int read;
+        int sinceCheck = 0;
+        while ((read = is.read(buffer)) > 0) {
+            os.write(buffer, 0, read);
+            // Every few megabytes: often enough to feel immediate, rarely enough to cost nothing.
+            if (++sinceCheck >= 64) {
+                sinceCheck = 0;
+                checkCancelled();
+            }
+        }
+    }
+
+    private void reportBytes(@Nullable BackupProgressListener listener, @Nullable Path[] files) {
         if (listener == null || files == null) {
             return;
         }
         long total = 0;
         for (Path file : files) {
+            long length = 0;
             try {
-                total += file.length();
+                length = file.length();
             } catch (Throwable ignore) {
             }
+            total += length;
+            // Fork (+116): every archive member is named as it lands, with the size it actually
+            // occupies. This is the one place that knows both, so the log is built here rather
+            // than guessed at by the listener.
+            listener.onItem(marked(file.getName()), length > 0 ? OpLog.formatSize(length) : null);
         }
         listener.onBytesWritten(total);
     }
@@ -525,29 +695,75 @@ class BackupOp implements Closeable {
             return;
         }
         stage(listener, null, R.string.backup_stage_app_data);
+        // Fork (白い熊, +136): say what was asked for. A run-scoped choice that gets dropped on
+        // the way here is otherwise invisible — the export simply uses the app's stored set and
+        // the log reads exactly as it would have anyway, which is how +133's choice went missing
+        // for a whole build. Nothing is logged when there is no override: the stored choice
+        // applying is the ordinary case, not news.
+        if (mAppDataCategories != null && listener != null) {
+            listener.onItem(context.getString(R.string.appdata_categories_chosen,
+                    mAppDataCategories.length), null);
+        }
         File staging = new File(new File(context.getCacheDir(), "appdata"), mPackageName + ".bin");
+        // [0] = the highest count seen, [1] = how many times it has started over.
+        final long[] pass = {0, 0};
         try {
             AppDataTransfer.Outcome outcome = new AppDataTransfer(context).export(mPackageName, mUserId,
-                    staging, (label, current, total, unit) -> stage(listener,
-                            progressDetail(label, current, total, unit), R.string.backup_stage_app_data));
+                    staging, mAppDataCategories, (label, current, total, unit) -> {
+                        // Fork (+116): a progress tick is a leaf, not a new stage. Re-announcing
+                        // the stage per tick filled the log with identical headings.
+                        // Fork (白い熊, +140): except when the app takes its own counter back to
+                        // the start. That is a second pass over the same data — packing, then
+                        // streaming, or a verify — and from here the passes are indistinguishable
+                        // because the app sends no label with these ticks. Twenty-three minutes
+                        // of a counter climbing to 6 GB and starting again with nothing said
+                        // about it is the case this line exists for.
+                        if (current >= 0 && current < pass[0]) {
+                            ++pass[1];
+                            if (listener != null) {
+                                listener.onItem(ContextUtils.getContext().getString(
+                                        R.string.appdata_second_pass, pass[1]), null);
+                            }
+                        }
+                        pass[0] = Math.max(current, 0);
+                        CharSequence detail = progressDetail(label, current, total, unit);
+                        if (listener != null && detail != null) {
+                            listener.onItem(marked(detail), null);
+                        }
+                    }, () -> BatchOpsProgressMonitor.getInstance().isCancelled());
             if (outcome.skipped) {
                 // Not a failure: every category was unticked for this app, so there is nothing to
                 // write and nothing to complain about.
+                if (listener != null) {
+                    listener.onItem(outcome.message, null);
+                }
                 return;
             }
             if (!outcome.ok || outcome.header == null) {
                 throw new BackupException("App-supplied data export failed: " + outcome.message);
             }
+            // Fork (白い熊, +141): three more full passes over the archive, and until now every
+            // one of them was silent. For a 6 GB export that is minutes each — copying it into
+            // the backup directory, encrypting it, hashing it — with the log frozen on the last
+            // byte count the app sent. Each is announced with the size it is about to walk, so a
+            // long quiet stretch is a stated amount of work rather than a suspected hang.
+            CharSequence archiveSize = OpLog.formatSize(staging.length());
+            stage(listener, archiveSize, R.string.backup_stage_storing);
+            checkCancelled();
             Path dataFile = mBackupItem.getAppDataFile();
             try (InputStream is = new FileInputStream(staging); OutputStream os = dataFile.openOutputStream()) {
-                IoUtils.copy(is, os);
+                copyCancellable(is, os);
             }
             Path headerFile = mBackupItem.getAppDataHeaderFile();
             try (OutputStream os = headerFile.openOutputStream()) {
                 os.write(outcome.header.toJson().getBytes(StandardCharsets.UTF_8));
             }
+            if (isEncrypted()) {
+                stage(listener, archiveSize, R.string.backup_stage_encrypting);
+            }
             Path[] files = mBackupItem.encrypt(new Path[]{dataFile, headerFile});
             reportBytes(listener, files);
+            stage(listener, archiveSize, R.string.backup_stage_checksumming);
             for (Path file : files) {
                 mChecksum.add(file.getName(), DigestUtils.getHexDigest(mMetadata.info.checksumAlgo, file));
             }
@@ -568,11 +784,13 @@ class BackupOp implements Closeable {
         if (current < 0 || total < 0) {
             return label;
         }
-        String counts = current + "/" + total + (unit != null ? " " + unit : "");
+        // Fork (白い熊, +132): grouped digits — see OpLog#formatCount.
+        String counts = OpLog.formatCount(current) + "/" + OpLog.formatCount(total)
+                + (unit != null ? " " + unit : "");
         return label != null ? label + " " + counts : counts;
     }
 
-    private void backupExtras() throws BackupException {
+    private void backupExtras(@Nullable BackupProgressListener listener) throws BackupException {
         PseudoRules rules = new PseudoRules(mPackageName, mUserId);
         Path miscFile;
         try {
@@ -593,6 +811,7 @@ class BackupOp implements Closeable {
         PermissionInfo info;
         int basePermissionType;
         int protectionLevels;
+        int permissionCount = 0;
         for (int i = 0; i < permissions.length; ++i) {
             try {
                 info = mPm.getPermissionInfo(permissions[i], 0);
@@ -609,12 +828,20 @@ class BackupOp implements Closeable {
                     permFlags = PermissionCompat.getPermissionFlags(info.name, mPackageName, mUserId);
                 } else permFlags = PermissionCompat.FLAG_PERMISSION_NONE;
                 rules.setPermission(permissions[i], isGranted, permFlags);
+                ++permissionCount;
             } catch (PackageManager.NameNotFoundException ignore) {
             }
         }
         // Backup app ops
         for (AppOpsManagerCompat.OpEntry entry : opEntries) {
             rules.setAppOp(entry.getOp(), entry.getMode());
+        }
+        // Fork (+116): say what was actually collected. "Extras" alone says nothing about
+        // whether anything was found, and an app with no recordable permission looks identical
+        // to one whose collection failed.
+        if (listener != null) {
+            listener.onItem(ContextUtils.getContext().getString(R.string.backup_item_permissions,
+                    permissionCount, opEntries.size()), null);
         }
         // Fork (白い熊, +109): MagiskHide and the Magisk DenyList are no longer collected. Both
         // are root-only features of a root manager this phone does not have, so every backup was

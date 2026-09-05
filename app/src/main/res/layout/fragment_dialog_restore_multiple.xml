@@ -29,11 +29,13 @@
                 tools:visibility="visible"
                 tools:text="Some apps cannot be backed up." />
 
-            <io.github.muntashirakon.widget.RecyclerView
-                android:id="@android:id/list"
+            <!-- Fork (白い熊, +132): the per-app restore table is built into this, replacing the
+                 single grey flag list that could only describe the worst backup in the set. -->
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:id="@+id/restore_table"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:overScrollMode="never" />
+                android:orientation="vertical" />
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 

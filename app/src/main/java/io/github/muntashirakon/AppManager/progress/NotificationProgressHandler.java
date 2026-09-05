@@ -25,6 +25,9 @@ import java.util.ArrayList;
 import java.util.Objects;
 
 import io.github.muntashirakon.AppManager.R;
+import android.view.View;
+import android.widget.RemoteViews;
+import io.github.muntashirakon.AppManager.utils.ForkThemeUtils;
 import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.types.ForegroundService;
 import io.github.muntashirakon.AppManager.utils.NotificationUtils;
@@ -148,9 +151,10 @@ public class NotificationProgressHandler extends QueuedProgressHandler {
             return;
         }
         NotificationInfo info = (NotificationInfo) message;
-        Notification notification = info
-                .getBuilder(mContext, mCompletionNotificationManagerInfo)
-                .build();
+        NotificationCompat.Builder builder = info.getBuilder(mContext, mCompletionNotificationManagerInfo);
+        // Fork (白い熊, +138): the completion flash, in the fork's colours.
+        info.applyForkTheme(mContext, builder);
+        Notification notification = builder.build();
         notify(mContext, mCompletionNotificationManager, TAG_ALERT, NotificationUtils.nextNotificationId(TAG_ALERT), notification);
     }
 
@@ -369,6 +373,57 @@ public class NotificationProgressHandler extends QueuedProgressHandler {
                 builder.setShowWhen(true);
             }
             return builder;
+        }
+
+        /**
+         * Fork (白い熊, +138): the completion flash in the fork's colours — black field, yellow
+         * frame, yellow text.
+         *
+         * <p>It is drawn as a {@link RemoteViews} because there is no other way: a notification
+         * is rendered by the system, in the system's palette, and the only part an app owns is a
+         * custom view. The frame is a box painted the ink colour with the field painted inside
+         * it, since RemoteViews can set a background colour at runtime but cannot construct a
+         * bordered drawable — and the colours must follow the configurable theme rather than a
+         * static resource.
+         *
+         * <p><b>What this cannot reach:</b> since Android 12 the platform decorates every custom
+         * notification with its own header strip — the app name and "Just now" — and that strip
+         * is the system's. Only the body below it is ours. Skipped entirely when a notification
+         * has actions to draw ("tap to see details", "restart"), because a custom view replaces
+         * the template that would have laid them out.
+         *
+         * <p><b>Called for the completion notification only.</b> The ongoing one carries a
+         * progress BAR, which lives in the system template a custom view would replace — the
+         * running notification would lose the one thing it is read for.
+         */
+        void applyForkTheme(@NonNull Context context, @NonNull NotificationCompat.Builder builder) {
+            if (!actions.isEmpty()) {
+                return;
+            }
+            try {
+                int ink = ForkThemeUtils.getTextColor();
+                int field = ForkThemeUtils.getBackgroundColor();
+                RemoteViews views = new RemoteViews(context.getPackageName(),
+                        R.layout.notification_shiroikuma);
+                views.setInt(R.id.notification_frame, "setBackgroundColor", ForkThemeUtils.getBorderColor());
+                views.setInt(R.id.notification_field, "setBackgroundColor", field);
+                views.setTextViewText(R.id.notification_title, title != null ? title : "");
+                views.setTextColor(R.id.notification_title, ink);
+                CharSequence sub = body != null ? body : operationName;
+                views.setTextViewText(R.id.notification_text, sub != null ? sub : "");
+                views.setTextColor(R.id.notification_text, ink);
+                views.setViewVisibility(R.id.notification_text,
+                        sub == null || sub.length() == 0 ? View.GONE : View.VISIBLE);
+                // All three, or the heads-up banner and the expanded shade fall back to the
+                // system template and the theming applies only where nobody was looking.
+                builder.setCustomContentView(views);
+                builder.setCustomBigContentView(views);
+                builder.setCustomHeadsUpContentView(views);
+                // A style and a custom view are two answers to the same question.
+                builder.setStyle(null);
+            } catch (Throwable ignore) {
+                // A notification that fails to theme itself must still be a notification.
+            }
         }
     }
 }

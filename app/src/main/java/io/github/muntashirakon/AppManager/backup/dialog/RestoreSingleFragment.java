@@ -34,7 +34,6 @@ import io.github.muntashirakon.AppManager.backup.struct.BackupMetadataV5;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsManager;
 import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
-import io.github.muntashirakon.dialog.SearchableFlagsDialogBuilder;
 import io.github.muntashirakon.util.AdapterUtils;
 
 public class RestoreSingleFragment extends Fragment {
@@ -111,38 +110,30 @@ public class RestoreSingleFragment extends Fragment {
         });
     }
 
+    /**
+     * Fork (白い熊, +132): the same coloured "what to restore" chooser the app's own backup
+     * dialog uses — one decision, drawn one way, wherever it is made.
+     */
     private void handleRestore(@NonNull BackupMetadataV5 selectedBackup) {
-        BackupFlags flags = selectedBackup.info.flags;
-        BackupFlags enabledFlags = BackupFlags.fromPref();
-        enabledFlags.setFlags(flags.getFlags() & enabledFlags.getFlags());
-        List<Integer> supportedBackupFlags = BackupFlags.getBackupFlagsAsArray(flags.getFlags());
-        // Inject no signatures
-        supportedBackupFlags.add(BackupFlags.BACKUP_NO_SIGNATURE_CHECK);
-        supportedBackupFlags.add(BackupFlags.BACKUP_CUSTOM_USERS);
-        List<Integer> disabledFlags = new ArrayList<>();
-        if (!mViewModel.getBackupInfo().isInstalled()) {
-            enabledFlags.addFlag(BackupFlags.BACKUP_APK_FILES);
-            disabledFlags.add(BackupFlags.BACKUP_APK_FILES);
+        int available = selectedBackup.info.flags.getFlags();
+        int checked = available & BackupFlags.fromPref().getFlags();
+        int locked = 0;
+        CharSequence lockedNote = null;
+        if (!mViewModel.getBackupInfo().isInstalled()
+                && (available & BackupFlags.BACKUP_APK_FILES) != 0) {
+            locked = BackupFlags.BACKUP_APK_FILES;
+            lockedNote = getString(R.string.restore_apk_forced);
         }
-        new SearchableFlagsDialogBuilder<>(mContext, supportedBackupFlags, BackupFlags.getFormattedFlagNames(mContext, supportedBackupFlags), enabledFlags.getFlags())
-                .setTitle(R.string.backup_options)
-                .addDisabledItems(disabledFlags)
-                .setPositiveButton(R.string.restore, (dialog, which, selections) -> {
-                    int newFlags = 0;
-                    for (int flag : selections) {
-                        newFlags |= flag;
-                    }
-                    enabledFlags.setFlags(newFlags);
-
+        BackupPartRows.showRestoreOptions(mContext, available, checked, locked, lockedNote,
+                BackupFlags.BACKUP_NO_SIGNATURE_CHECK | BackupFlags.BACKUP_CUSTOM_USERS,
+                newFlags -> {
                     BackupRestoreDialogViewModel.OperationInfo operationInfo = new BackupRestoreDialogViewModel.OperationInfo();
                     operationInfo.mode = BackupRestoreDialogFragment.MODE_RESTORE;
                     operationInfo.op = BatchOpsManager.OP_RESTORE_BACKUP;
-                    operationInfo.flags = enabledFlags.getFlags();
+                    operationInfo.flags = newFlags;
                     operationInfo.relativeDirs = new String[]{selectedBackup.info.getRelativeDir()};
                     mViewModel.prepareForOperation(operationInfo);
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                });
     }
 
     private void handleDelete(List<BackupMetadataV5> selectedBackups) {

@@ -11,19 +11,25 @@ import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.widget.LinearLayoutCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.Set;
 
 import io.github.muntashirakon.AppManager.R;
-import io.github.muntashirakon.AppManager.backup.BackupFlags;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsManager;
 import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.widget.MaterialAlertView;
 
+/**
+ * Fork (白い熊, +132): batch restore asks what to put back, per app.
+ *
+ * <p>What stood here was one flag list built from {@code getWorstBackupFlag()} — the
+ * intersection of every selected backup — so a part that only some archives carried could not be
+ * chosen at all, and the apps that had it silently did not get it back. See
+ * {@link RestorePartsTable} for what replaces it.
+ */
 public class RestoreMultipleFragment extends Fragment {
     @NonNull
     public static RestoreMultipleFragment getInstance() {
@@ -32,6 +38,7 @@ public class RestoreMultipleFragment extends Fragment {
 
     private BackupRestoreDialogViewModel mViewModel;
     private Context mContext;
+    private RestorePartsTable mTable;
 
     @Nullable
     @Override
@@ -45,20 +52,11 @@ public class RestoreMultipleFragment extends Fragment {
         mContext = requireContext();
 
         MaterialAlertView messageView = view.findViewById(R.id.message);
-        RecyclerView recyclerView = view.findViewById(android.R.id.list);
-        recyclerView.setLayoutManager(new LinearLayoutManager(mContext, LinearLayoutManager.VERTICAL, false));
-        int supportedFlags = mViewModel.getWorstBackupFlag();
-        // Inject no signatures
-        supportedFlags |= BackupFlags.BACKUP_NO_SIGNATURE_CHECK;
-        supportedFlags |= BackupFlags.BACKUP_CUSTOM_USERS;
-        int checkedFlags = BackupFlags.fromPref().getFlags() & supportedFlags;
-        int disabledFlags = 0;
-        if (!mViewModel.getUninstalledApps().isEmpty()) {
-            checkedFlags |= BackupFlags.BACKUP_APK_FILES;
-            disabledFlags |= BackupFlags.BACKUP_APK_FILES;
-        }
-        FlagsAdapter adapter = new FlagsAdapter(mContext, checkedFlags, supportedFlags, disabledFlags);
-        recyclerView.setAdapter(adapter);
+        LinearLayoutCompat tableContainer = view.findViewById(R.id.restore_table);
+        mTable = new RestorePartsTable(mContext, mViewModel.getBackupInfoList(),
+                !mViewModel.getUninstalledApps().isEmpty());
+        tableContainer.removeAllViews();
+        tableContainer.addView(mTable.build());
 
         Set<CharSequence> appsWithoutBackups = mViewModel.getAppsWithoutBackups();
         if (!appsWithoutBackups.isEmpty()) {
@@ -69,13 +67,13 @@ public class RestoreMultipleFragment extends Fragment {
             messageView.setText(sb);
             messageView.setVisibility(View.VISIBLE);
         }
-        view.findViewById(R.id.action_restore).setOnClickListener(v -> {
-            int newFlags = adapter.getSelectedFlags();
-            handleRestore(newFlags);
-        });
+        view.findViewById(R.id.action_restore).setOnClickListener(v -> handleRestore());
     }
 
-    private void handleRestore(int flags) {
+    private void handleRestore() {
+        if (mTable == null || mTable.isEmpty()) {
+            return;
+        }
         // Fork: yellow-on-black + bordered like every other fork dialog.
         ForkDialog.present(ForkDialog.builder(mContext)
                 .setTitle(R.string.restore)
@@ -84,7 +82,9 @@ public class RestoreMultipleFragment extends Fragment {
                     BackupRestoreDialogViewModel.OperationInfo operationInfo = new BackupRestoreDialogViewModel.OperationInfo();
                     operationInfo.mode = BackupRestoreDialogFragment.MODE_RESTORE;
                     operationInfo.op = BatchOpsManager.OP_RESTORE_BACKUP;
-                    operationInfo.flags = flags;
+                    operationInfo.flags = mTable.fallbackFlags();
+                    operationInfo.perPackageFlags = mTable.perPackageFlags();
+                    operationInfo.perPackageRelativeDirs = mTable.perPackageRelativeDirs();
                     mViewModel.prepareForOperation(operationInfo);
                 })
                 .setNegativeButton(R.string.no, null));

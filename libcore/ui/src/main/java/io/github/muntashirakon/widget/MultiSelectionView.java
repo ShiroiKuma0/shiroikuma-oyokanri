@@ -96,6 +96,9 @@ public class MultiSelectionView extends MaterialCardView implements OnApplyWindo
     private OnSelectionChangeListener mSelectionChangeListener;
     @Nullable
     private OnSelectionModeChangeListener mSelectionModeChangeListener;
+    /** Fork (+118): the bar is hidden but the bookkeeping continues. */
+    private boolean mBarSuppressed;
+    private int mExternalBottomPadding;
     @Nullable
     private WindowInsetsCompat mLastInsets;
 
@@ -323,10 +326,43 @@ public class MultiSelectionView extends MaterialCardView implements OnApplyWindo
         adapter.setOnSelectionChangeListener(() -> updateCounter(false));
     }
 
+    /**
+     * Fork (白い熊, +118): keep every bit of the selection bookkeeping and never show the bar.
+     *
+     * <p>The main window replaced this bar with its own pill panel, but the selection state,
+     * the range selection and the mode listeners all live in {@link Adapter} here and are worth
+     * keeping exactly as they are. So the widget stays in the tree doing its work with its own
+     * face hidden. {@code externalBottomPadding} is the height of whatever replaced it, fed back
+     * through the same path so the last row still clears it.
+     *
+     * <p>Screens that use the bar normally are untouched: the flag defaults to off.
+     */
+    public void setBarSuppressed(boolean suppressed, int externalBottomPadding) {
+        mBarSuppressed = suppressed;
+        mExternalBottomPadding = externalBottomPadding;
+        if (suppressed) {
+            setVisibility(GONE);
+            if (mInSelectionMode && mAdapter != null) {
+                mSelectionBottomPadding = externalBottomPadding;
+                mAdapter.setSelectionBottomPadding(mSelectionBottomPadding);
+            }
+        }
+    }
+
     @UiThread
     public void show() {
         if (mSelectionModeChangeListener != null) {
             mSelectionModeChangeListener.onSelectionModeEnabled();
+        }
+        if (mBarSuppressed) {
+            // No transition and no visibility change; only the state below matters.
+            mSelectionBottomPadding = mExternalBottomPadding;
+            mInSelectionMode = true;
+            if (mAdapter != null) {
+                mAdapter.setInSelectionMode(true);
+                mAdapter.setSelectionBottomPadding(mSelectionBottomPadding);
+            }
+            return;
         }
         Transition sharedAxis = new MaterialSharedAxis(MaterialSharedAxis.Y, true);
         TransitionManager.beginDelayedTransition(this, sharedAxis);
@@ -347,8 +383,10 @@ public class MultiSelectionView extends MaterialCardView implements OnApplyWindo
     @SuppressWarnings("deprecation")
     @UiThread
     public void hide() {
-        Transition sharedAxis = new MaterialSharedAxis(MaterialSharedAxis.Y, false);
-        TransitionManager.beginDelayedTransition(this, sharedAxis);
+        if (!mBarSuppressed) {
+            Transition sharedAxis = new MaterialSharedAxis(MaterialSharedAxis.Y, false);
+            TransitionManager.beginDelayedTransition(this, sharedAxis);
+        }
         setVisibility(GONE);
         mSelectionBottomPadding = 0;
         mInSelectionMode = false;

@@ -15,6 +15,7 @@ import java.util.Collections;
 import java.util.List;
 
 import io.github.muntashirakon.AppManager.logs.Log;
+import io.github.muntashirakon.AppManager.profiles.ProtectedAppsProfile;
 import io.github.muntashirakon.AppManager.utils.ContextUtils;
 
 /**
@@ -209,6 +210,14 @@ public final class DevicePolicyBridge {
     @WorkerThread
     public static boolean setSuspended(@NonNull String packageName, boolean suspended) {
         if (!canSuspend()) return false;
+        // Fork (白い熊, +139): suspension is a harder freeze than hiding, and it reached the
+        // platform without ever passing the guard FreezeUtils applies - the Snooping card's
+        // switch calls this directly. Lifting one is always allowed: a protected app that
+        // somehow got suspended must still be recoverable.
+        if (suspended && ProtectedAppsProfile.isProtected(packageName)) {
+            Log.w(TAG, "%s is protected and will not be suspended", packageName);
+            return false;
+        }
         try {
             DevicePolicyManager dpm = dpm();
             if (dpm == null) return false;

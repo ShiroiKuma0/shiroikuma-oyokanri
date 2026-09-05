@@ -18,6 +18,35 @@ import android.widget.CheckedTextView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.text.format.Formatter;
+import android.view.ViewGroup;
+import androidx.appcompat.widget.AppCompatTextView;
+import java.util.Locale;
+import io.github.muntashirakon.AppManager.backup.BackupUtils;
+import io.github.muntashirakon.AppManager.backup.CryptoUtils;
+import io.github.muntashirakon.AppManager.main.RowPills;
+import io.github.muntashirakon.AppManager.utils.ForkThemeUtils;
+import io.github.muntashirakon.AppManager.utils.LangUtils;
+import io.github.muntashirakon.AppManager.appdata.AppDataHeader;
+import io.github.muntashirakon.AppManager.backup.BackupItems;
+import io.github.muntashirakon.io.Path;
+import androidx.annotation.StringRes;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.StyleSpan;
+import androidx.core.graphics.ColorUtils;
+import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
@@ -61,7 +90,6 @@ import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.StoragePermission;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
-import io.github.muntashirakon.dialog.SearchableFlagsDialogBuilder;
 import io.github.muntashirakon.dialog.SearchableMultiChoiceDialogBuilder;
 import io.github.muntashirakon.dialog.TextInputDialogBuilder;
 
@@ -86,6 +114,14 @@ import io.github.muntashirakon.dialog.TextInputDialogBuilder;
  * because it walks the backup directory to size it.
  */
 public class AppBackupDialogFragment extends DialogFragment {
+    /** Fork (+121): what marks a line as belonging to the part above it. */
+    private static final String SUB_LINE_INDENT = "      ";
+    /**
+     * Above this the archive is not measured per category. Counting means reading every byte
+     * (see {@link #measureAppDataCategories}), and half a gigabyte of it to label four lines is
+     * not a trade worth making while somebody waits for a dialog.
+     */
+    private static final long APP_DATA_MEASURE_LIMIT = 512L * 1024 * 1024;
     public static final String TAG = AppBackupDialogFragment.class.getSimpleName();
 
     private static final String ARG_PACKAGE_NAME = "pkg";
@@ -120,6 +156,9 @@ public class AppBackupDialogFragment extends DialogFragment {
     private int mUserId;
     private TextView mMessageView;
     private View mListContainer;
+    // Fork (+119): "Existing backups" — the list needs to say what it is a list OF.
+    @Nullable
+    private android.widget.TextView mBackupsHeader;
     private LinearLayout mBackupListView;
     private View mActionsView;
     private MaterialButton mRestoreButton;
@@ -185,6 +224,7 @@ public class AppBackupDialogFragment extends DialogFragment {
 
         View body = LayoutInflater.from(mDialogContext).inflate(R.layout.dialog_app_backup, null);
         mMessageView = body.findViewById(R.id.message);
+        mBackupsHeader = body.findViewById(R.id.backups_header);
         mListContainer = body.findViewById(R.id.list_container);
         mBackupListView = body.findViewById(R.id.backup_list);
         mActionsView = body.findViewById(R.id.backup_actions);
@@ -250,7 +290,7 @@ public class AppBackupDialogFragment extends DialogFragment {
             mInstalled = false;
             mBackups.clear();
             mSelected.clear();
-            renderRows(new CharSequence[0]);
+            renderRows(new ArrayList<>());
             mMessageView.setText(R.string.backup_dialog_unavailable);
             mMessageView.setVisibility(View.VISIBLE);
             updateBackUpButton();
@@ -276,35 +316,335 @@ public class AppBackupDialogFragment extends DialogFragment {
     /** Format the row labels off the main thread, then rebuild the tick list. */
     private void reloadRows() {
         if (mBackups.isEmpty()) {
-            renderRows(new CharSequence[0]);
+            renderRows(new ArrayList<>());
             return;
         }
         List<BackupMetadataV5> snapshot = new ArrayList<>(mBackups);
         ThreadUtils.postOnBackgroundThread(() -> {
-            CharSequence[] labels = formatLabels(snapshot);
+            List<CharSequence[]> rows = formatRows(snapshot);
             ThreadUtils.postOnMainThread(() -> {
                 if (!isAdded()) return;
-                renderRows(labels);
+                renderRows(rows);
             });
         });
     }
 
+    /**
+     * Fork (白い熊, +119/+120): each backup as separate lines, and each PART of it named with
+     * its own size.
+     *
+     * <p>{@code toLocalizedString} joined everything with commas under a "Base backup" heading:
+     * one run-on sentence whose most useful facts — what is actually in this archive, and how
+     * much of it is the APK versus the data — were not in it at all. "APK+Ext+AppData+OBB" tells
+     * you which boxes were ticked; it does not tell you that the APK is 20 MB and the app's own
+     * data is 25 MB, which is what you are choosing between when there are several.
+     *
+     * <p>Sizes are read from the files on disk rather than from the metadata: what is there is
+     * what you would get back. Worker thread, because that walks the backup directory.
+     */
     @WorkerThread
     @NonNull
-    private CharSequence[] formatLabels(@NonNull List<BackupMetadataV5> backups) {
-        CharSequence[] labels = new CharSequence[backups.size()];
-        for (int i = 0; i < backups.size(); ++i) {
-            labels[i] = backups.get(i).toLocalizedString(mDialogContext);
+    private List<CharSequence[]> formatRows(@NonNull List<BackupMetadataV5> backups) {
+        List<CharSequence[]> rows = new ArrayList<>(backups.size());
+        for (BackupMetadataV5 backup : backups) {
+            List<CharSequence> lines = new ArrayList<>();
+            // 1. When — the line people pick a backup by.
+            CharSequence when = DateUtils.formatDateTime(mDialogContext, backup.info.backupTime);
+            if (!TextUtils.isEmpty(backup.metadata.backupName) && !backup.isBaseBackup()) {
+                when = backup.metadata.backupName + "  ·  " + when;
+            }
+            lines.add(when);
+            // 2. What is inside it, part by part, each with its size.
+            lines.addAll(partLines(backup));
+            // 3. Which version, and whose.
+            lines.add(mDialogContext.getString(R.string.version) + LangUtils.getSeparatorString()
+                    + backup.metadata.versionName + "   "
+                    + mDialogContext.getString(R.string.user_id) + LangUtils.getSeparatorString()
+                    + backup.info.userId);
+            // 4. How it is stored, and how big the whole thing is.
+            StringBuilder stored = new StringBuilder();
+            if (CryptoUtils.MODE_NO_ENCRYPTION.equals(backup.info.crypto)) {
+                stored.append(mDialogContext.getString(R.string.no_encryption));
+            } else {
+                stored.append(mDialogContext.getString(R.string.pgp_aes_rsa_encrypted,
+                        backup.info.crypto.toUpperCase(Locale.ROOT)));
+            }
+            stored.append("   ").append(Formatter.formatFileSize(mDialogContext,
+                    backup.info.getBackupSize()));
+            if (backup.info.isFrozen()) {
+                stored.append("   ").append(mDialogContext.getText(R.string.frozen));
+            }
+            lines.add(stored);
+            rows.add(lines.toArray(new CharSequence[0]));
         }
-        return labels;
+        return rows;
     }
 
+    /**
+     * One line per part that is actually present: APK, each data directory, the app's own data,
+     * the KeyStore, rules and extras — with what each occupies.
+     *
+     * <p>A part with no files is not listed. The flags say what was <em>asked</em> for; these
+     * lines say what is <em>there</em>, and for an app that had nothing to back up in a category
+     * those are not the same thing.
+     */
+    @WorkerThread
+    @NonNull
+    private List<CharSequence> partLines(@NonNull BackupMetadataV5 backup) {
+        List<CharSequence> lines = new ArrayList<>();
+        final int ink = ForkThemeUtils.getTextColor();
+        BackupItems.BackupItem item = backup.info.getBackupItem();
+        if (item == null) {
+            // No handle on the files (an unreadable or half-written backup): fall back to the
+            // flag list, which is at least true about the intent.
+            lines.add(backup.info.flags.toLocalisedString(mDialogContext));
+            return lines;
+        }
+        addPart(lines, R.string.backup_part_apk, colorOf(BackupFlags.BACKUP_APK_FILES, ink),
+                sizeOf(item.getSourceFiles()), null);
+        String[] dataDirs = backup.metadata.dataDirs;
+        if (dataDirs != null) {
+            long dataSize = 0;
+            for (int i = 0; i < dataDirs.length; ++i) {
+                dataSize += sizeOf(item.getDataFiles(i));
+            }
+            addPart(lines, R.string.backup_part_data, colorOf(BackupFlags.BACKUP_INT_DATA, ink),
+                    dataSize, dataDirs.length > 1
+                            ? mDialogContext.getString(R.string.backup_part_dirs, dataDirs.length) : null);
+        }
+        try {
+            long appData = sizeOf(new Path[]{item.getAppDataFile()});
+            addPart(lines, R.string.backup_part_app_data,
+                    colorOf(BackupFlags.BACKUP_APP_DATA, ink), appData, null);
+            // What the app actually put in there, one indented line each. The archive is a
+            // single opaque blob the app wrote, so there is no size per category to report and
+            // none is invented — the names and the format are what the header knows.
+            lines.addAll(appDataSubLines(item));
+        } catch (Throwable ignore) {
+        }
+        addPart(lines, R.string.keystore, ink, sizeOf(item.getKeyStoreFiles()), null);
+        try {
+            addPart(lines, R.string.backup_part_rules, colorOf(BackupFlags.BACKUP_RULES, ink),
+                    sizeOf(new Path[]{item.getRulesFile()}), null);
+        } catch (Throwable ignore) {
+        }
+        try {
+            addPart(lines, R.string.backup_part_extras, colorOf(BackupFlags.BACKUP_EXTRAS, ink),
+                    sizeOf(new Path[]{item.getMiscFile()}), null);
+        } catch (Throwable ignore) {
+        }
+        if (lines.isEmpty()) {
+            lines.add(backup.info.flags.toLocalisedString(mDialogContext));
+        }
+        return lines;
+    }
+
+    /**
+     * Fork (白い熊, +121): a part line carries its part's COLOUR.
+     *
+     * <p>Every surface that shows what a backup is made of uses the same palette — the options
+     * chooser, the batch table and this list — so the APK is always the same blue and the app's
+     * own data always the same green. A column of identical yellow lines made you read every one
+     * to find the part you cared about; a colour is read without reading.
+     *
+     * <p>The span wins over the row renderer's {@code setTextColor}, which is exactly why the
+     * colour is attached here rather than passed alongside.
+     */
+    private void addPart(@NonNull List<CharSequence> lines, @StringRes int labelRes, int color,
+                         long size, @Nullable CharSequence detail) {
+        if (size <= 0) {
+            return;
+        }
+        SpannableStringBuilder sb = new SpannableStringBuilder();
+        int start = sb.length();
+        sb.append(mDialogContext.getString(labelRes));
+        sb.setSpan(new ForegroundColorSpan(color), start, sb.length(),
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        sb.setSpan(new StyleSpan(Typeface.BOLD), start, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        start = sb.length();
+        sb.append("   ").append(Formatter.formatFileSize(mDialogContext, size));
+        if (!TextUtils.isEmpty(detail)) {
+            sb.append("   ").append(detail);
+        }
+        sb.setSpan(new ForegroundColorSpan(ColorUtils.setAlphaComponent(color, 0xC0)), start,
+                sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        lines.add(sb);
+    }
+
+    /** The colour a part is drawn in, from the one palette. */
+    private static int colorOf(int flag, int fallback) {
+        for (BackupParts.Part part : BackupParts.contentParts()) {
+            if (part.flag == flag) {
+                return part.color;
+            }
+        }
+        return fallback;
+    }
+
+    /**
+     * The app-supplied archive's contents, indented under it — <b>each with its own size</b>.
+     *
+     * <p>The sizes are real, not apportioned. The archive an app hands over is a zip, and the
+     * entries inside it are named after the categories the app exported: {@code accounts/…},
+     * {@code ui.json}, {@code app_settings.json}. Its {@code manifest.json} lists those category
+     * ids in the same order as the header's human labels, so each label can be given the bytes
+     * that actually belong to it.
+     *
+     * <p><b>LANDMINE — the sizes are not in the stream's entry headers.</b> The apps write with a
+     * data descriptor (general-purpose bit 3), which means {@code ZipEntry.getSize()} answers −1
+     * until the entry has been read. So each entry is drained to count it; that is a read of the
+     * whole archive, which is why this is worker-thread only and skipped above
+     * {@link #APP_DATA_MEASURE_LIMIT}.
+     */
+    @WorkerThread
+    @NonNull
+    private List<CharSequence> appDataSubLines(@NonNull BackupItems.BackupItem item) {
+        List<CharSequence> lines = new ArrayList<>();
+        AppDataHeader header;
+        try {
+            header = AppDataHeader.parse(item.getAppDataHeaderFile().getContentAsString(null));
+        } catch (Throwable th) {
+            // Encrypted, or written by a build that did not store one.
+            return lines;
+        }
+        if (header == null) {
+            return lines;
+        }
+        int appDataColor = colorOf(BackupFlags.BACKUP_APP_DATA, ForkThemeUtils.getTextColor());
+        Map<String, Long> sizes = measureAppDataCategories(item);
+        List<String> ids = sizes.isEmpty() ? Collections.emptyList()
+                : new ArrayList<>(sizes.keySet());
+        for (int i = 0; i < header.contains.size(); ++i) {
+            SpannableStringBuilder line = new SpannableStringBuilder(SUB_LINE_INDENT);
+            line.append(header.contains.get(i));
+            // The ids and the labels are parallel lists in the same order — that is the contract
+            // the exporters are built to. When they are not, the label still stands on its own
+            // and only the size is missing.
+            Long size = i < ids.size() ? sizes.get(ids.get(i)) : null;
+            if (size != null && size > 0) {
+                int start = line.length();
+                line.append("   ").append(Formatter.formatFileSize(mDialogContext, size));
+                line.setSpan(new ForegroundColorSpan(appDataColor), start, line.length(),
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+            lines.add(line);
+        }
+        // What wrote it and what can read it — the archive's own version, which is the thing that
+        // decides whether a restore into a future build will be accepted.
+        StringBuilder about = new StringBuilder(SUB_LINE_INDENT)
+                .append(mDialogContext.getString(R.string.backup_part_written_by,
+                        TextUtils.isEmpty(header.versionName) ? "?" : header.versionName,
+                        header.format));
+        lines.add(about);
+        return lines;
+    }
+
+    /**
+     * Bytes per category id, in the archive's own order. Empty when the archive cannot be read as
+     * a zip — an encrypted one, or an app that writes something else entirely.
+     */
+    @WorkerThread
+    @NonNull
+    private Map<String, Long> measureAppDataCategories(@NonNull BackupItems.BackupItem item) {
+        Map<String, Long> sizes = new LinkedHashMap<>();
+        Path file;
+        try {
+            file = item.getAppDataFile();
+            if (file.length() > APP_DATA_MEASURE_LIMIT) {
+                return sizes;
+            }
+        } catch (Throwable th) {
+            return sizes;
+        }
+        List<String> categories = new ArrayList<>();
+        Map<String, Long> byEntry = new LinkedHashMap<>();
+        byte[] buffer = new byte[8192];
+        try (ZipInputStream zis = new ZipInputStream(new BufferedInputStream(file.openInputStream()))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                long counted = 0;
+                int read;
+                while ((read = zis.read(buffer)) > 0) {
+                    counted += read;
+                }
+                byEntry.put(entry.getName(), counted);
+            }
+        } catch (Throwable th) {
+            return sizes;
+        }
+        // The manifest names the categories and their order. A second pass just for it is cheap:
+        // it is a few hundred bytes and the stream is sequential.
+        try (ZipInputStream zis = new ZipInputStream(new BufferedInputStream(file.openInputStream()))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                if (!"manifest.json".equals(entry.getName())) {
+                    continue;
+                }
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                int read;
+                while ((read = zis.read(buffer)) > 0) {
+                    out.write(buffer, 0, read);
+                }
+                JSONArray array = new JSONObject(out.toString("UTF-8")).optJSONArray("categories");
+                if (array != null) {
+                    for (int i = 0; i < array.length(); ++i) {
+                        String id = array.optString(i, null);
+                        if (id != null) categories.add(id);
+                    }
+                }
+                break;
+            }
+        } catch (Throwable ignore) {
+        }
+        for (String id : categories) {
+            long total = 0;
+            for (Map.Entry<String, Long> e : byEntry.entrySet()) {
+                String name = e.getKey();
+                // An entry belongs to a category when it IS that category — "ui.json" — or lives
+                // under it — "accounts/2.tar". Prefix alone would let "app_settings" swallow
+                // "app_settings_old".
+                if (name.equals(id) || name.startsWith(id + "/") || name.startsWith(id + ".")) {
+                    total += e.getValue();
+                }
+            }
+            sizes.put(id, total);
+        }
+        return sizes;
+    }
+
+    @WorkerThread
+    private static long sizeOf(@Nullable Path[] files) {
+        if (files == null) {
+            return 0;
+        }
+        long total = 0;
+        for (Path file : files) {
+            if (file == null) continue;
+            try {
+                total += file.length();
+            } catch (Throwable ignore) {
+            }
+        }
+        return total;
+    }
+
+    /**
+     * Fork (白い熊, +119): one bordered box per backup, in the fork's own pill language.
+     *
+     * <p>The multi-choice row this replaced was a single line of text on black — nothing marked
+     * where one backup ended and the next began, and a list you choose from has to be a list of
+     * THINGS. Each box now carries its own frame; a ticked one is filled with a faint wash of the
+     * theme colour, so the selection is visible without hunting for a check mark.
+     */
     @UiThread
-    private void renderRows(@NonNull CharSequence[] labels) {
+    private void renderRows(@NonNull List<CharSequence[]> rows) {
         mBackupListView.removeAllViews();
-        boolean hasBackups = labels.length > 0;
+        boolean hasBackups = !rows.isEmpty();
         mListContainer.setVisibility(hasBackups ? View.VISIBLE : View.GONE);
         mActionsView.setVisibility(hasBackups ? View.VISIBLE : View.GONE);
+        if (mBackupsHeader != null) {
+            mBackupsHeader.setVisibility(hasBackups ? View.VISIBLE : View.GONE);
+        }
         if (!hasBackups) {
             if (mLoaded && mInstalled) {
                 mMessageView.setText(R.string.backup_dialog_no_backups);
@@ -313,24 +653,58 @@ public class AppBackupDialogFragment extends DialogFragment {
             return;
         }
         mMessageView.setVisibility(View.GONE);
-        LayoutInflater inflater = LayoutInflater.from(mDialogContext);
-        for (int i = 0; i < labels.length; ++i) {
+        int ink = ForkThemeUtils.getTextColor();
+        float density = mDialogContext.getResources().getDisplayMetrics().density;
+        for (int i = 0; i < rows.size(); ++i) {
             final int position = i;
-            View row = inflater.inflate(mMultiChoiceItemLayout, mBackupListView, false);
-            CheckedTextView item = row.findViewById(android.R.id.text1);
-            item.setText(labels[i]);
-            item.setTextColor(ContextCompat.getColor(mDialogContext, R.color.theme_bright_yellow));
-            item.setChecked(mSelected.contains(position));
-            item.setOnClickListener(v -> {
+            CharSequence[] lines = rows.get(i);
+            LinearLayout box = new LinearLayout(mDialogContext);
+            box.setOrientation(LinearLayout.VERTICAL);
+            int padH = Math.round(12 * density);
+            int padV = Math.round(9 * density);
+            box.setPadding(padH, padV, padH, padV);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.bottomMargin = Math.round(8 * density);
+            box.setLayoutParams(lp);
+            for (int line = 0; line < lines.length; ++line) {
+                AppCompatTextView view = new AppCompatTextView(mDialogContext);
+                view.setText(lines[line]);
+                if (line == 0) {
+                    view.setTextSize(15f);
+                    view.setTypeface(Typeface.DEFAULT_BOLD);
+                    view.setTextColor(ink);
+                } else {
+                    view.setTextSize(12f);
+                    // The contents line is the one you compare backups by, so it keeps full
+                    // strength; the rest are supporting facts and step back.
+                    view.setTextColor(line == 1 ? ink : RowPills.withAlpha(ink, 0.65f));
+                }
+                box.addView(view);
+            }
+            applyBackupBoxStyle(box, ink, mSelected.contains(position));
+            box.setOnClickListener(v -> {
                 if (!mSelected.remove(position)) {
                     mSelected.add(position);
                 }
-                item.setChecked(mSelected.contains(position));
+                applyBackupBoxStyle(box, ink, mSelected.contains(position));
                 updateSelectionActions();
             });
-            mBackupListView.addView(row);
+            mBackupListView.addView(box);
         }
         updateSelectionActions();
+    }
+
+    /** Outline when untouched, a faint wash of the theme colour when ticked. */
+    private void applyBackupBoxStyle(@NonNull View box, int ink, boolean selected) {
+        float density = mDialogContext.getResources().getDisplayMetrics().density;
+        GradientDrawable shape = new GradientDrawable();
+        shape.setShape(GradientDrawable.RECTANGLE);
+        shape.setCornerRadius(14 * density);
+        shape.setColor(selected ? RowPills.withAlpha(ink, 0.16f) : Color.TRANSPARENT);
+        shape.setStroke(Math.max(1, Math.round((selected ? 2f : 1.2f) * density)),
+                RowPills.withAlpha(ink, selected ? 1f : 0.5f));
+        box.setBackground(shape);
     }
 
     @UiThread
@@ -381,127 +755,78 @@ public class AppBackupDialogFragment extends DialogFragment {
         if (!mLoaded || !mInstalled) {
             return;
         }
+        // Fork (白い熊, +120): this dialog ALWAYS asks what goes into the backup.
+        //
+        // "Skip backup method dialog" exists for a batch of five hundred apps, where being asked
+        // once per app would be unusable. Here you have opened one app on purpose and pressed
+        // Back up on purpose, and choosing what to include is the thing you came to do — so the
+        // preference is deliberately not consulted on this path. The batch flow
+        // (BackupRestoreDialogFragment) still honours it.
         BackupFlags flags = BackupFlags.fromPref();
-        if (Prefs.Storage.getSkipBackupMethodDialog()) {
-            handleBackup(flags);
-            return;
-        }
         int supportedFlags = BackupFlags.getSupportedBackupFlags();
         supportedFlags &= ~BackupFlags.BACKUP_NO_SIGNATURE_CHECK;
         if (!mViewModel.allowCustomUsersInBackup()) {
             supportedFlags &= ~BackupFlags.BACKUP_CUSTOM_USERS;
         }
-        List<Integer> supported = BackupFlags.getBackupFlagsAsArray(supportedFlags);
-        SearchableFlagsDialogBuilder<Integer> builder = new SearchableFlagsDialogBuilder<>(mDialogContext,
-                supported, BackupFlags.getFormattedFlagNames(mDialogContext, supported), flags.getFlags())
-                .setTitle(R.string.backup_options)
-                .setPositiveButton(R.string.back_up, (dialog, which, selections) -> {
-                    int newFlags = 0;
-                    for (int flag : selections) {
-                        newFlags |= flag;
-                    }
-                    handleBackup(new BackupFlags(newFlags));
-                })
-                .setNegativeButton(R.string.cancel, null);
-        // Fork: the sub-level for App-supplied data. It is a second dialog rather than a nested
-        // list because this builder is typed on flag ints and category ids are per-app strings —
-        // there is nothing to nest them into. Offered only for an app that implements the contract.
-        if (AppDataContract.isSupported(mDialogContext, mPackageName)) {
-            builder.setNeutralButton(R.string.appdata_categories, (dialog, which, selections) ->
-                    showAppDataCategoryPicker());
-        }
-        builder.show();
-    }
-
-    /**
-     * Fork: ask this app what it can export and let 白い熊 tick a subset, remembered per package.
-     * <p>
-     * The listing is a broadcast round trip and may require thawing the app, so it happens only
-     * when this is opened — never while drawing a list. What is chosen here is also what a BULK
-     * backup will silently apply for this app, which is the whole point: per-app control inside a
-     * batch, with no batch UI.
-     */
-    private void showAppDataCategoryPicker() {
-        UIUtils.displayShortToast(R.string.appdata_categories_asking);
-        String packageName = mPackageName;
-        int userId = mUserId;
-        ThreadUtils.postOnBackgroundThread(() -> {
-            AppDataTransfer transfer = new AppDataTransfer(ContextUtils.getContext());
-            List<AppDataCategory> categories = transfer.listCategories(packageName, userId);
-            ThreadUtils.postOnMainThread(() -> {
-                if (isDetached() || getContext() == null) {
-                    return;
-                }
-                if (categories == null || categories.isEmpty()) {
-                    UIUtils.displayLongToast(R.string.appdata_categories_unavailable);
-                    handleBackupClicked();
-                    return;
-                }
-                showAppDataCategoryDialog(packageName, categories);
-            });
+        // Fork (白い熊, +126): "Back up multiple" is offered again now that it no longer stops to
+        // ask for a name (+125 hid it because it did). Ticked, it writes a second backup stamped
+        // with the date and time beside the base one; unticked, it replaces the base one.
+        // Fork (白い熊, +121): coloured part rows rather than a column of identical checkbox
+        // labels — see BackupPartRows. Each part keeps its colour everywhere it appears.
+        BackupPartRows.showOptions(mDialogContext, supportedFlags, flags.getFlags(),
+                mPackageName, mUserId, (newFlags, categories) -> {
+            BackupFlags chosen = new BackupFlags(newFlags);
+            // Fork (白い熊, +145): "Back up multiple" is a decision about THIS backup and is not
+            // written back to the preference. Ticking it once meant every later backup of every
+            // app quietly kept its predecessor instead of replacing it — the backup directory
+            // filling up from one tap made for one app. The other parts still persist: they say
+            // what a backup is made of, which is a standing preference, while this one says
+            // whether to keep the last one, which is a decision you make in front of an app.
+            // Settings → Backup/restore → Backup options remains the one place that sets it.
+            int persisted = (chosen.getFlags() & ~BackupFlags.BACKUP_MULTIPLE)
+                    | (Prefs.BackupRestore.getBackupFlags() & BackupFlags.BACKUP_MULTIPLE);
+            Prefs.BackupRestore.setBackupFlags(persisted);
+            handleBackup(chosen, categories);
         });
     }
 
-    private void showAppDataCategoryDialog(@NonNull String packageName,
-                                           @NonNull List<AppDataCategory> categories) {
-        List<String> ids = new ArrayList<>(categories.size());
-        List<CharSequence> labels = new ArrayList<>(categories.size());
-        List<String> offered = new ArrayList<>(categories.size());
-        for (AppDataCategory category : categories) {
-            ids.add(category.id);
-            offered.add(category.id);
-            // Children are indented under their parent; the app sends parents first.
-            labels.add(category.isChild() ? "    " + category.label : category.label);
-        }
-        AppDataSelection.Stored stored = AppDataSelection.get(mDialogContext, packageName);
-        List<String> ticked = stored != null
-                ? AppDataSelection.reconcile(stored, categories)
-                : AppDataCategory.defaultIds(categories);
-        new SearchableMultiChoiceDialogBuilder<>(mDialogContext, ids, labels)
-                .setTitle(R.string.appdata_categories)
-                .addSelections(ticked)
-                .setPositiveButton(R.string.save, (dialog, which, selections) -> {
-                    AppDataSelection.set(mDialogContext, packageName, selections, offered);
-                    handleBackupClicked();
-                })
-                // Forget the choice entirely, so the app goes back to exporting what IT recommends
-                // — which is not the same as ticking everything.
-                .setNeutralButton(R.string.appdata_categories_use_defaults, (dialog, which, selections) -> {
-                    AppDataSelection.clear(mDialogContext, packageName);
-                    handleBackupClicked();
-                })
-                .setNegativeButton(R.string.cancel, (dialog, which, selections) -> handleBackupClicked())
-                .show();
+    private void handleBackup(@NonNull BackupFlags flags) {
+        handleBackup(flags, null);
     }
 
-    private void handleBackup(@NonNull BackupFlags flags) {
+    /**
+     * @param appDataCategories what the category picker chose for <b>this</b> backup, or
+     *                          {@code null} to use the app's stored choice (白い熊, +133)
+     */
+    private void handleBackup(@NonNull BackupFlags flags, @Nullable List<String> appDataCategories) {
         BackupRestoreDialogViewModel.OperationInfo operationInfo = new BackupRestoreDialogViewModel.OperationInfo();
         operationInfo.mode = BackupRestoreDialogFragment.MODE_BACKUP;
         operationInfo.flags = flags.getFlags();
         operationInfo.op = BatchOpsManager.OP_BACKUP;
+        if (appDataCategories != null) {
+            operationInfo.perPackageAppData = java.util.Collections.singletonMap(mPackageName,
+                    appDataCategories.toArray(new String[0]));
+        }
         if (flags.backupMultiple()) {
-            // A named backup never overwrites anything, so there is nothing to warn about.
-            new TextInputDialogBuilder(mDialogContext, R.string.input_backup_name)
-                    .setTitle(R.string.backup)
-                    .setHelperText(R.string.input_backup_name_description)
-                    .setPositiveButton(R.string.ok, (dialog, which, input, isChecked) -> {
-                        String backupName = !TextUtils.isEmpty(input)
-                                ? input.toString()
-                                : DateUtils.formatMediumDateTime(mDialogContext, System.currentTimeMillis());
-                        operationInfo.backupNames = new String[]{backupName};
-                        mViewModel.prepareForOperation(operationInfo);
-                    })
-                    .setNegativeButton(R.string.cancel, null)
-                    .show();
+            // Fork (白い熊, +126): a named backup overwrites nothing, so there is nothing to warn
+            // about — and nothing to ask, either. It is stamped with the date and time so the
+            // backup directory reads chronologically when browsed from outside this app.
+            operationInfo.backupNames = new String[]{BackupUtils.timestampBackupName()};
+            mViewModel.prepareForOperation(operationInfo);
             return;
         }
         List<BackupInfo> backupInfoList = mViewModel.getBackupInfoList();
         boolean hasBaseBackup = !backupInfoList.isEmpty() && backupInfoList.get(0).hasBaseBackup();
         if (hasBaseBackup) {
             // A base backup exists and is about to be overwritten.
+            // Fork (白い熊, +137): say what this will actually do, and where to change it.
+            // "Backup already exists. Are you sure?" answered neither question — it did not say
+            // that the old backup is deleted, and it did not say that "Back up multiple" is the
+            // switch that would have kept both.
             ForkDialog.present(ForkDialog.builder(mDialogContext)
                     .setTitle(R.string.backup)
-                    .setMessage(getResources().getQuantityString(R.plurals.backup_exists_are_you_sure, 1))
+                    .setMessage(getString(R.string.backup_replace_warning,
+                            getString(R.string.backup_multiple), getString(R.string.backup_options)))
                     .setPositiveButton(R.string.yes, (dialog, which) -> mViewModel.prepareForOperation(operationInfo))
                     .setNegativeButton(R.string.no, null));
             return;
@@ -509,40 +834,32 @@ public class AppBackupDialogFragment extends DialogFragment {
         mViewModel.prepareForOperation(operationInfo);
     }
 
+    /**
+     * Fork (白い熊, +132): choose what to put back, in the same coloured parts the backup was
+     * chosen in. The flag list this replaces was the pre-+121 grey checkbox column, and the
+     * decision here is the same one — only its direction differs.
+     */
     private void handleRestore(@NonNull BackupMetadataV5 selectedBackup) {
-        BackupFlags flags = selectedBackup.info.flags;
-        BackupFlags enabledFlags = BackupFlags.fromPref();
-        enabledFlags.setFlags(flags.getFlags() & enabledFlags.getFlags());
-        List<Integer> supportedBackupFlags = BackupFlags.getBackupFlagsAsArray(flags.getFlags());
-        // Inject no signatures
-        supportedBackupFlags.add(BackupFlags.BACKUP_NO_SIGNATURE_CHECK);
-        supportedBackupFlags.add(BackupFlags.BACKUP_CUSTOM_USERS);
-        List<Integer> disabledFlags = new ArrayList<>();
-        if (!mInstalled) {
-            enabledFlags.addFlag(BackupFlags.BACKUP_APK_FILES);
-            disabledFlags.add(BackupFlags.BACKUP_APK_FILES);
+        int available = selectedBackup.info.flags.getFlags();
+        int checked = available & BackupFlags.fromPref().getFlags();
+        int locked = 0;
+        CharSequence lockedNote = null;
+        if (!mInstalled && (available & BackupFlags.BACKUP_APK_FILES) != 0) {
+            // Without the APK there is nothing to restore the data into.
+            locked = BackupFlags.BACKUP_APK_FILES;
+            lockedNote = getString(R.string.restore_apk_forced);
         }
-        new SearchableFlagsDialogBuilder<>(mDialogContext, supportedBackupFlags,
-                BackupFlags.getFormattedFlagNames(mDialogContext, supportedBackupFlags), enabledFlags.getFlags())
-                .setTitle(R.string.backup_options)
-                .addDisabledItems(disabledFlags)
-                .setPositiveButton(R.string.restore, (dialog, which, selections) -> {
-                    int newFlags = 0;
-                    for (int flag : selections) {
-                        newFlags |= flag;
-                    }
-                    enabledFlags.setFlags(newFlags);
-
+        BackupPartRows.showRestoreOptions(mDialogContext, available, checked, locked, lockedNote,
+                BackupFlags.BACKUP_NO_SIGNATURE_CHECK | BackupFlags.BACKUP_CUSTOM_USERS,
+                newFlags -> {
                     BackupRestoreDialogViewModel.OperationInfo operationInfo =
                             new BackupRestoreDialogViewModel.OperationInfo();
                     operationInfo.mode = BackupRestoreDialogFragment.MODE_RESTORE;
                     operationInfo.op = BatchOpsManager.OP_RESTORE_BACKUP;
-                    operationInfo.flags = enabledFlags.getFlags();
+                    operationInfo.flags = newFlags;
                     operationInfo.relativeDirs = new String[]{selectedBackup.info.getRelativeDir()};
                     mViewModel.prepareForOperation(operationInfo);
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                });
     }
 
     private void handleDelete(@NonNull List<BackupMetadataV5> selectedBackups) {
@@ -666,8 +983,7 @@ public class AppBackupDialogFragment extends DialogFragment {
         }
         ContextCompat.registerReceiver(mActivity, mBatchOpsBroadCastReceiver,
                 new IntentFilter(BatchOpsService.ACTION_BATCH_OPS_COMPLETED), ContextCompat.RECEIVER_NOT_EXPORTED);
-        BatchBackupOptions options = new BatchBackupOptions(operationInfo.flags, operationInfo.backupNames,
-                operationInfo.relativeDirs);
+        BatchBackupOptions options = operationInfo.toBatchOptions();
         BatchQueueItem queueItem = BatchQueueItem.getBatchOpQueue(operationInfo.op, operationInfo.packageList,
                 operationInfo.userIdListMappedToPackageList, options);
         Intent intent = BatchOpsService.getServiceIntent(mActivity, queueItem);

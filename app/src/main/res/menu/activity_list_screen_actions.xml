@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Fork (白い熊, +118): actions shared by every sibling screen. -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_sort"
+        android:icon="@drawable/ic_sort"
+        android:title="@string/sort"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_layout_columns"
+        android:icon="@drawable/ic_grid_3x3"
+        android:title="@string/list_layout"
+        app:showAsAction="always" />
+    <!-- Fork (白い熊, +137): shown on 保存一覧 only — the other screens have no backup
+         directory to clean. -->
+    <item
+        android:id="@+id/action_clean_backups"
+        android:title="@string/backup_clean_title"
+        android:visible="false"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_refresh"
+        android:title="@string/refresh"
+        app:showAsAction="never" />
+
+</menu>

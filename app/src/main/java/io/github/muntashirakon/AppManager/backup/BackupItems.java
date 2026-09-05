@@ -61,17 +61,38 @@ public class BackupItems {
     }
 
     /**
-     * Fork: create a fresh, readable per-package backup directory directly under
-     * the base directory — {base}/{packageName}/{userId[_backupName]} — adding a
-     * numeric suffix on collision. Replaces the upstream {base}/backups/{uuid}
-     * layout so backups land in human-readable app-id folders inside the chosen
-     * backup directory. The v5 metadata format written inside is unchanged.
+     * Fork: create a fresh, readable per-package backup directory directly under the base
+     * directory, adding a numeric suffix on collision. Replaces the upstream
+     * {base}/backups/{uuid} layout so backups land in human-readable app-id folders inside the
+     * chosen backup directory. The v5 metadata format written inside is unchanged.
+     *
+     * <p><b>Every directory is named by date and time</b> (白い熊, +127):
+     * {base}/{packageName}/{yyyy-MM-dd_HH-mm-ss}. It used to be the user id — a folder called
+     * {@code 0} for the replaceable backup and {@code 0_<name>} for a kept one — which told you
+     * nothing while standing in the directory deciding what was stale, and sorted by nothing at
+     * all. Now the folder name IS the answer to "when was this made", and a package's folders
+     * sort oldest to newest as plain text.
+     *
+     * <p><b>The metadata's backup name is untouched, and that is deliberate.</b> "Replaceable"
+     * versus "kept" is still recorded there — an unnamed backup is the base one, which the next
+     * backup replaces, and a named one is kept beside it (see
+     * {@link #findOrCreateBackupItem}, whose previous-backup lookup keys on exactly that). So
+     * restore and delete, which resolve "the base backup" through the database, keep working
+     * while the folder on disk says something useful.
+     *
+     * <p>A non-zero user is suffixed, since two users' backups of one app would otherwise be
+     * told apart only by the second in which they were taken.
      */
     @NonNull
     private static Path createPerPackageBackupPath(@UserIdInt int userId, @Nullable String backupName,
                                                    @NonNull String packageName) throws IOException {
         Path baseDir = getBaseDirectory().findOrCreateDirectory(packageName);
-        String backupItemName = BackupUtils.getV4BackupName(userId, backupName);
+        // A kept backup already carries a stamp as its name; the replaceable one has no name, so
+        // it is stamped here. Both end up looking the same in a file browser, which is the point.
+        String stamp = backupName != null
+                ? BackupUtils.getV4SanitizedBackupName(backupName)
+                : BackupUtils.timestampBackupName();
+        String backupItemName = userId == 0 ? stamp : stamp + "_u" + userId;
         String newBackupName = backupItemName;
         int i = 0;
         while (baseDir.hasFile(newBackupName)) {
@@ -564,6 +585,20 @@ public class BackupItems {
                 if (!mBackupSuccess) {
                     // Backup wasn't successful, delete the directory
                     mTempBackupPath.delete();
+                    // Fork (白い熊, +137): and the REAL directory, which the constructor created
+                    // up front and nothing ever removed. Every failed, cancelled or killed
+                    // backup left one of these standing, empty, for ever — which is where the
+                    // rogue folders in the backup directory came from. Only when it is empty:
+                    // an unexpectedly non-empty one is not ours to throw away, and the whole
+                    // point of the staging directory is that the real one stays untouched until
+                    // there is something finished to put in it.
+                    try {
+                        Path[] left = mBackupPath.listFiles();
+                        if (left == null || left.length == 0) {
+                            mBackupPath.delete();
+                        }
+                    } catch (Throwable ignore) {
+                    }
                 }
             }
             for (Path file : mTemporaryFiles) {

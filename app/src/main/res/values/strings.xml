@@ -1936,8 +1936,10 @@
     <string name="pref_font_add_custom">Add custom font…</string>
     <string name="font_preview_text">AaIiMmOoQqWw 012 白い熊相撲道 áÁčČďĎéÉěĚíÍňŇóÓrŘŠŠťŤúÚůŮÝÝžŽ</string>
     <!-- Fork: protected ("必要") profile messages -->
-    <string name="protected_profile_block">%s is protected by the 「必要」 profile and can\'t be frozen or uninstalled.</string>
-    <string name="protected_profile_block_multiple">These apps are protected by the 「必要」 profile and can\'t be frozen or uninstalled: %s</string>
+    <!-- Fork (白い熊, +139): two reasons now, so the sentence names both rather than asserting
+         the wrong one. See ProtectedAppsProfile#ALWAYS_PROTECTED. -->
+    <string name="protected_profile_block">%s is protected and can\'t be frozen or uninstalled — by the 「必要」 profile, or because 白い熊 応用管理 cannot work without it.</string>
+    <string name="protected_profile_block_multiple">These apps are protected and can\'t be frozen or uninstalled — by the 「必要」 profile, or because 白い熊 応用管理 cannot work without them: %s</string>
 
     <!-- Fork: batch-operation confirmation dialog (large, themed, lists every app) -->
     <plurals name="confirm_uninstall_count">
@@ -1961,8 +1963,8 @@
     <string name="pause">Pause</string>
     <string name="continue_operation">Continue</string>
     <string name="operation_cancelled">Cancelled</string>
-    <string name="pref_batch_progress_dialog">In-app batch progress dialog</string>
-    <string name="pref_batch_progress_dialog_msg">Show batch operations (freeze, uninstall, …) as a pop-up in the main window — with Pause/Continue and Cancel — instead of only the notification.</string>
+    <string name="pref_batch_progress_dialog">Open the batch progress page</string>
+    <string name="pref_batch_progress_dialog_msg">Open the full-page running log when a batch operation starts — with Pause/Continue and Cancel. Always for a backup or a restore; for other operations only when more than one app is involved. The notification opens it too, so turning this off only stops it opening by itself.</string>
     <string name="pref_theme_text_color">Text colour</string>
     <string name="pref_theme_background_color">Background colour</string>
     <string name="pref_theme_border_color">Border colour</string>
@@ -2515,6 +2517,102 @@
     <string name="batch_progress_waiting">Waiting for the next app…</string>
     <string name="batch_progress_paused_note">Paused — apps already started will finish.</string>
     <string name="batch_progress_dest">→ %s</string>
+    <!-- Fork (白い熊, +118): the pill shelf and the sibling screens. -->
+    <string name="pref_app_pane">Row actions</string>
+    <string name="pref_app_pane_description">Which action pills appear when a row is tapped open, and in what order</string>
+    <string name="pref_app_pane_summary">Tick the actions that should appear in a row\'s pane, and drag to reorder them. Unticked actions are not shown.</string>
+    <string name="batch_pane_count">%1$d / %2$d selected</string>
+    <string name="pane_last_used">Last used</string>
+    <string name="pane_installed">Installed</string>
+    <string name="pane_target_sdk">Target SDK</string>
+    <string name="pane_blocked">Blocked</string>
+    <string name="batch_backup_restore_delete">Restore / delete…</string>
+    <string name="batch_backup_table_title">Back up %d apps</string>
+    <string name="batch_backup_all_apps">Every app</string>
+    <string name="backup_part_apk">APK</string>
+    <string name="backup_part_data">App data</string>
+    <string name="backup_part_app_data">App-supplied data</string>
+    <string name="backup_part_rules">Rules</string>
+    <string name="backup_part_extras">Permissions, ops and rules</string>
+    <string name="backup_part_dirs">%d directories</string>
+    <string name="backup_part_written_by">Written by %1$s · archive format %2$d</string>
+    <string name="backup_part_categories">%d categories</string>
+    <string name="backup_part_format">format %d</string>
+    <string name="backups_existing">Existing backups</string>
+    <string name="shelf_section_filters">Filters</string>
+    <string name="shelf_section_profiles">Profiles</string>
+    <string name="shelf_section_sort">Sort by</string>
+    <string name="shelf_section_screens">Or a screen</string>
+    <string name="shelf_also_carries">Also carries: %s</string>
+    <string name="shelf_add">Add a pill</string>
+    <string name="shelf_name">Name</string>
+    <string name="shelf_save_current_view">Save this view</string>
+    <string name="shelf_new_view">View</string>
+    <string name="shelf_screen_item">Screen: %s</string>
+    <string name="shelf_rename">Rename</string>
+    <string name="shelf_update_to_current">Update to the current view</string>
+    <string name="shelf_remove">Remove</string>
+    <string name="screen_row_count">%d rows</string>
+    <string name="screen_delete_confirm">Delete every backup of %1$d apps — %2$d backups in all. This cannot be undone.</string>
+    <string name="screen_backups">Backups</string>
+    <string name="screen_backups_empty">No backups yet.</string>
+    <string name="screen_backups_orphan">%s · app not installed</string>
+    <string name="screen_backups_count">%d backups</string>
+    <string name="screen_backups_part_apk">APK</string>
+    <string name="screen_backups_part_data">data</string>
+    <string name="screen_backups_part_extras">extras</string>
+    <string name="screen_backups_part_rules">rules</string>
+    <string name="screen_backups_part_app_data">応用</string>
+    <string name="screen_snooping">Snooping</string>
+    <string name="screen_snooping_empty">Nothing can snoop right now.</string>
+    <string name="screen_snooping_allowed">%d allowed</string>
+    <string name="screen_snooping_narrowed">%d only while in use</string>
+    <string name="filter_sister_apps">Sister apps</string>
+    <string name="screen_sister">Sister apps</string>
+    <string name="screen_sister_empty">No app here implements the data contract.</string>
+    <string name="screen_sister_contract">contract %1$d · format %2$d · reads %3$d+</string>
+    <string name="screen_sister_unusable">not supported by this build</string>
+    <string name="screen_sister_has_data">app data: %s</string>
+    <string name="screen_sister_backup_without_data">backed up without its own data</string>
+    <string name="screen_sister_never_backed_up">never backed up</string>
+    <string name="screen_sister_default_categories">the app\'s own default categories</string>
+    <string name="screen_sister_chosen_categories">%1$d of %2$d categories chosen</string>
+    <string name="screen_sort_name">Name</string>
+    <string name="screen_sort_backup_date">Backup date</string>
+    <string name="screen_sort_backup_count">Number of backups</string>
+    <string name="screen_sort_size">Size on disk</string>
+    <string name="screen_sort_stale_first">Stale first</string>
+    <string name="screen_sort_allowed_count">Allowed capabilities</string>
+    <string name="screen_sort_format">Format</string>
+    <!-- Fork (白い熊, +117): an import may tighten a security setting, never loosen one. -->
+    <string name="settings_eim_import_held">These settings were kept as they are, because the archive would have weakened them: %s</string>
+    <!-- Fork (白い熊, +116): the batch operation log page. -->
+    <string name="op_log_app_count">%d apps</string>
+    <string name="op_log_end">Finished — %1$d of %2$d</string>
+    <string name="op_log_end_cancelled">Cancelled — %1$d of %2$d finished</string>
+    <string name="op_log_follow">↓ Latest</string>
+    <string name="op_log_latest">Scroll to latest</string>
+    <string name="op_log_copy">Copy log</string>
+    <string name="op_log_save">Save log</string>
+    <string name="op_log_saved">Log saved: %s</string>
+    <string name="op_log_save_failed">Could not save the log.</string>
+    <string name="backup_item_permissions">%1$d permissions · %2$d app ops</string>
+    <string name="restore_item_rules">%1$d of %2$d rules applied</string>
+    <string name="pref_oplog_group">Batch operation log</string>
+    <string name="pref_oplog_text_size">Text size</string>
+    <string name="pref_oplog_timestamps">Show the time of each line</string>
+    <string name="pref_oplog_colors">Log colours</string>
+    <string name="pref_oplog_batch">Batch heading</string>
+    <string name="pref_oplog_app">App</string>
+    <string name="pref_oplog_stage">Stage</string>
+    <string name="pref_oplog_item">Item</string>
+    <string name="pref_oplog_detail">Detail (size, counts)</string>
+    <string name="pref_oplog_ok">Succeeded</string>
+    <string name="pref_oplog_fail">Failed</string>
+    <string name="pref_oplog_skip">Skipped</string>
+    <string name="pref_oplog_warn">Warning</string>
+    <string name="pref_oplog_time">Timestamp</string>
+    <string name="pref_oplog_guide">Indent guides</string>
 
     <!-- Fork, +102: the progress dialog's own duration format. DateUtils'
          getFormattedDuration is shaped for usage statistics — it hides seconds
@@ -2553,4 +2651,55 @@
          re-backup would actually change. An app that also holds a backup of the
          current version is NOT listed, however many stale ones sit beside it. -->
     <string name="filter_apps_with_outdated_backups">Backup older than app</string>
+    <!-- Fork (白い熊, +132): leaving the progress page, and the way back to it. -->
+    <string name="op_leave_running">Leave running</string>
+    <string name="op_bar_counts">%1$d / %2$d</string>
+    <string name="op_bar_running">%1$s · %2$s — tap to watch</string>
+    <string name="op_bar_paused">%1$s · %2$s — paused, tap to watch</string>
+    <string name="op_bar_finished">%1$s finished · %2$s — tap for the log</string>
+    <string name="op_bar_finished_failed">%1$s finished · %2$s, %3$d failed — tap for the log</string>
+    <!-- Fork (白い熊, +132): choosing what to restore. -->
+    <string name="restore_what_title">What to restore</string>
+    <string name="restore_table_title">Restore %1$d apps</string>
+    <string name="restore_all_apps">Every app</string>
+    <string name="restore_no_backup">No backup to restore</string>
+    <string name="restore_from_backup">From: %1$s</string>
+    <string name="restore_pick_backup">Which backup</string>
+    <string name="restore_skip_signature">Skip signature check</string>
+    <string name="restore_apk_forced">Not installed — the APK has to be restored</string>
+    <!-- Fork (白い熊, +134): 応用管理's own state, restored and waiting. -->
+    <string name="pending_state_import_title">Restored settings are waiting</string>
+    <string name="pending_state_import_message">A backup restored 白い熊 応用管理\'s own settings, profiles, notes and fonts. They cannot be applied while the app is running, so applying them restarts it.</string>
+    <!-- Fork (白い熊, +136): what the log says the category choice was. -->
+    <string name="appdata_categories_chosen">%1$d categories chosen for this backup</string>
+    <!-- Fork (白い熊, +137): the overwrite warning says what it will actually do, and where to
+         change it. "Backup already exists. Are you sure?" said neither. -->
+    <string name="backup_replace_warning">Multiple backups is off, so this replaces the existing backup — the old one is deleted once the new one has been written.\n\nTo keep both, turn on “%1$s” in %2$s (the Back up button here), or in Settings → Backup/restore → %2$s.</string>
+    <plurals name="backup_replace_warning_multiple">
+        <item quantity="one">Multiple backups is off, so this replaces the existing backup of %1$d app — the old one is deleted once the new one has been written.\n\nTo keep both, turn on “%2$s” in %3$s, here or in Settings → Backup/restore.</item>
+        <item quantity="other">Multiple backups is off, so this replaces the existing backups of %1$d apps — each old one is deleted once its replacement has been written.\n\nTo keep both, turn on “%2$s” in %3$s, here or in Settings → Backup/restore.</item>
+    </plurals>
+    <!-- Fork (白い熊, +137): cleaning the wreckage out of the backup directory. -->
+    <string name="backup_clean_title">Clean up broken backups</string>
+    <string name="backup_clean_summary">Remove empty and half-written backup folders left by runs that failed or were cancelled</string>
+    <string name="backup_clean_scanning">Checking the backup directory…</string>
+    <string name="backup_clean_none">Nothing to clean up — every folder in the backup directory holds a readable backup.</string>
+    <string name="backup_clean_found">%1$d folders, %2$s. A folder with readable metadata is never listed here.</string>
+    <string name="backup_clean_removed">Removed %1$d of %2$d</string>
+    <string name="backup_clean_staging">Half-written, never finished</string>
+    <string name="backup_clean_empty">Empty</string>
+    <string name="backup_clean_no_metadata">No metadata — nothing can be restored from it</string>
+    <string name="backup_clean_empty_package">No backups left in this app\'s folder</string>
+    <!-- Fork (白い熊, +140): the app took its own byte counter back to the start. -->
+    <string name="appdata_second_pass">The app started its count again — pass %1$d over the same data</string>
+    <!-- Fork (白い熊, +141): the three passes after the app hands its archive over. -->
+    <string name="backup_stage_storing">Storing the archive</string>
+    <string name="backup_stage_encrypting">Encrypting</string>
+    <string name="backup_stage_checksumming">Checksumming</string>
+    <!-- Fork (白い熊, +141): the restore side of the same three passes. -->
+    <string name="restore_stage_verifying_archive">Checking the archive</string>
+    <string name="restore_stage_decrypting">Decrypting</string>
+    <string name="restore_stage_staging">Unpacking the archive</string>
+    <!-- Fork (白い熊, +143): Cancel, once it has been heard. -->
+    <string name="op_cancelling">Cancelling…</string>
 </resources>

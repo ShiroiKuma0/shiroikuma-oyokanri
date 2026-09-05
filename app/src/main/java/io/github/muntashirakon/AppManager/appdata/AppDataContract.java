@@ -7,6 +7,10 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 
+import android.os.SystemClock;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
@@ -128,18 +132,31 @@ public final class AppDataContract {
         } catch (Throwable th) {
             return null;
         }
-        if (info == null || info.metaData == null) {
+        return fromMetaData(info == null ? null : info.metaData);
+    }
+
+    /**
+     * The same read, for a caller that already holds the {@code metaData} bundle.
+     * <p>
+     * Fork (+118): 仲間 lists every app that implements the contract, and querying each package
+     * again one at a time would be hundreds of package-manager calls to re-read a bundle it
+     * already has. Sharing this method rather than copying four lines is what keeps the
+     * {@code getInt} landmine below in one place.
+     */
+    @Nullable
+    public static Support fromMetaData(@Nullable Bundle metaData) {
+        if (metaData == null) {
             return null;
         }
-        int contract = info.metaData.getInt(META_CONTRACT, -1);
+        int contract = metaData.getInt(META_CONTRACT, -1);
         if (contract < 0) {
             // Declares nothing: not offered. This is the opt-out, not a failure.
             return null;
         }
         // format is PER-APP and not a contract constant — sister apps ship 1, 2 and 3, each bound
         // to their own export version so the door cannot drift from the file. Never assume 1.
-        int format = info.metaData.getInt(META_FORMAT, -1);
-        int minFormat = info.metaData.getInt(META_MIN_FORMAT, -1);
+        int format = metaData.getInt(META_FORMAT, -1);
+        int minFormat = metaData.getInt(META_MIN_FORMAT, -1);
         if (format < 0 || minFormat < 0) {
             return null;
         }
@@ -150,5 +167,49 @@ public final class AppDataContract {
     public static boolean isSupported(@NonNull Context context, @NonNull String packageName) {
         Support support = read(context, packageName);
         return support != null && support.isUsable();
+    }
+
+    // ── Every supported app at once (白い熊, +124) ────────────────────────────
+    //
+    // The main-list filter asks this of several hundred apps in one pass, and one package-manager
+    // query per app turns a list refresh into a visible stall. One query answers for all of them.
+    // Cached only for seconds: installing or updating an app changes the answer, and a filter that
+    // needed a restart to notice a new sister app would be worse than a slow one.
+    private static final long SUPPORTED_CACHE_MS = 5_000L;
+    @Nullable
+    private static volatile Set<String> sSupported;
+    private static volatile long sSupportedAt;
+
+    /**
+     * Every installed package declaring a contract this build can speak.
+     * <p>
+     * Frozen and disabled apps are included, for the same reason {@link #read} includes them:
+     * they are exactly the ones that must stay listed.
+     */
+    @NonNull
+    public static Set<String> supportedPackages(@NonNull Context context) {
+        Set<String> cached = sSupported;
+        if (cached != null && SystemClock.elapsedRealtime() - sSupportedAt < SUPPORTED_CACHE_MS) {
+            return cached;
+        }
+        Set<String> supported = new HashSet<>();
+        try {
+            List<ApplicationInfo> apps = context.getPackageManager().getInstalledApplications(
+                    PackageManager.GET_META_DATA
+                            | PackageManager.MATCH_UNINSTALLED_PACKAGES
+                            | PackageManager.MATCH_DISABLED_COMPONENTS);
+            for (ApplicationInfo app : apps) {
+                Support support = fromMetaData(app.metaData);
+                if (support != null && support.isUsable()) {
+                    supported.add(app.packageName);
+                }
+            }
+        } catch (Throwable ignore) {
+            // An unanswerable query is not an empty answer, but there is nothing better to
+            // return; the cache below keeps it from being retried on every one of 700 rows.
+        }
+        sSupported = supported;
+        sSupportedAt = SystemClock.elapsedRealtime();
+        return supported;
     }
 }

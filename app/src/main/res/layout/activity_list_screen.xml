@@ -1,0 +1,126 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!--
+    Fork (白い熊, +118): the shell every sibling screen is drawn in — 保存一覧, 盗み見一覧, 仲間.
+    Pull to refresh, because two of the three read state that changes underneath them.
+-->
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black"
+    tools:context=".screens.ListScreenActivity">
+
+    <include layout="@layout/appbar" />
+
+    <io.github.muntashirakon.widget.SwipeRefreshLayout
+        android:id="@+id/swipe_refresh"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_behavior="com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/screen_list"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@android:color/black"
+                android:scrollbars="vertical"
+                tools:listitem="@layout/item_main" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/screen_empty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:padding="32dp"
+                android:textSize="15sp"
+                android:visibility="gone"
+                tools:text="No backups yet."
+                tools:visibility="visible" />
+
+        </FrameLayout>
+
+    </io.github.muntashirakon.widget.SwipeRefreshLayout>
+
+    <!-- Fork (白い熊, +131): the selection bar. Same pill language as the main list's batch pane,
+         and only the actions this screen can actually perform. -->
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:id="@+id/screen_selection_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="@android:color/black"
+        android:elevation="12dp"
+        android:orientation="vertical"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <View
+            android:id="@+id/screen_selection_rule"
+            android:layout_width="match_parent"
+            android:layout_height="1px" />
+
+        <!-- Fork (白い熊, +142): the count on its own line, the actions wrapping beneath it.
+             Five pills on one row with the count beside them do not fit a folded panel, and the
+             batch pane on the main list already solved this by letting them wrap. -->
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/screen_selection_count"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="12dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="4dp"
+            android:singleLine="true"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            tools:text="3 / 41 selected" />
+
+        <io.github.muntashirakon.widget.FlowLayout
+            android:id="@+id/screen_selection_actions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="8dp">
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/screen_select_all"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/select_all" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/screen_clear_selection"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/clear_all" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/screen_backup_selected"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/backup" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/screen_restore_selected"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/restore" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/screen_delete_selected"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/delete" />
+
+        </io.github.muntashirakon.widget.FlowLayout>
+
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

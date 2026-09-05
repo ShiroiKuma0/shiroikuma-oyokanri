@@ -36,15 +36,32 @@
             android:fillViewport="true"
             android:scrollbars="none">
 
+            <!-- Fork (白い熊, +123): 40dp, pinned.
+                 MEASURED on the phone (dumpsys activity top): the toolbar was 117px = 48dp, and
+                 it was not the icons that made it so — the AdvancedSearchView inside it measures
+                 48dp and drives the row, with its text sitting in the middle and 12dp of black
+                 below it. That band is what read as padding above the pill shelf; there was never
+                 any padding on the shelf to remove, which is why two rounds of trimming it
+                 changed nothing. Constraining the toolbar constrains the search view with it.
+                 40dp keeps the search text (88px = 36dp) with room to spare. -->
             <com.google.android.material.appbar.MaterialToolbar
                 android:id="@+id/toolbar"
                 android:layout_width="wrap_content"
-                android:layout_height="?attr/actionBarSize"
+                android:layout_height="40dp"
                 app:navigationIcon="@null"
                 app:popupTheme="@style/ThemeOverlay.AppManager.PopupMenu"
                 tools:menu="@menu/activity_main_actions" />
 
         </HorizontalScrollView>
+
+        <!-- Fork (白い熊, +118): the pill shelf. Saved views of this list and the sibling
+             screens, in whatever order they were dragged into. Pinned under the toolbar with
+             no scroll flags, like the privilege alarm below it: it is how you move between
+             views, so it must not be scrollable away. -->
+        <io.github.muntashirakon.AppManager.main.ShelfView
+            android:id="@+id/shelf"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
 
         <com.google.android.material.progressindicator.LinearProgressIndicator
             android:id="@+id/progress_linear"
@@ -52,6 +69,55 @@
             android:indeterminate="true"
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
+
+        <!-- Fork (白い熊, +132): the way back into a running or finished operation.
+             Closing the progress page never stopped the work — it runs in a foreground
+             service — but once the page was gone the only route back was the notification,
+             which is the wrong place to have to look for something happening inside this app.
+             Pinned like the privilege alarm below it, and it stays after the batch ends so the
+             log can still be reached; the ✕ is what removes it. -->
+        <LinearLayout
+            android:id="@+id/operation_bar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="14dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="6dp"
+            android:paddingBottom="6dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <ImageView
+                android:id="@+id/operation_bar_icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginEnd="10dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_backup_restore" />
+
+            <TextView
+                android:id="@+id/operation_bar_text"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:maxLines="2"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                tools:text="Backup — 12 / 41 · tap to watch" />
+
+            <ImageView
+                android:id="@+id/operation_bar_dismiss"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/close"
+                android:padding="7dp"
+                android:src="@drawable/ic_close_24dp" />
+        </LinearLayout>
 
         <!-- Fork: privilege alarm. Shown when the session held privileges and lost
              them — a Shizuku server restart takes the AM service binder with it and
@@ -125,6 +191,81 @@
         app:cardBackgroundColor="@android:color/black"
         app:cardElevation="0dp"
         app:menu="@menu/activity_main_selection_actions" />
+
+    <!-- Fork (白い熊, +118): the batch pane. Replaces the legacy selection bar, whose action
+         labels were cut off because it was one row that could not grow. Same pill language as
+         the row pane, wrapping onto as many lines as the actions need, foldable to its header
+         so it never eats more of the list than it is worth. -->
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:id="@+id/batch_pane"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="@android:color/black"
+        android:elevation="12dp"
+        android:orientation="vertical"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <View
+            android:id="@+id/batch_pane_rule"
+            android:layout_width="match_parent"
+            android:layout_height="1px" />
+
+        <LinearLayout
+            android:id="@+id/batch_pane_header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="6dp"
+            android:paddingBottom="4dp">
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/batch_pane_count"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:singleLine="true"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                tools:text="12 / 550 selected" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/batch_pane_select_all"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:text="@string/select_all" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/batch_pane_clear"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:text="@string/clear_all" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/batch_pane_fold"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                tools:text="▾" />
+
+        </LinearLayout>
+
+        <io.github.muntashirakon.widget.FlowLayout
+            android:id="@+id/batch_pane_actions"
+            app:childSpacing="8dp"
+            app:rowSpacing="4dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="8dp" />
+
+    </androidx.appcompat.widget.LinearLayoutCompat>
 
     <!-- Fork: floating selection reminder. Sits just above the selection action
          toolbar (its bottom margin is set in code to the toolbar's height) and is

@@ -34,6 +34,8 @@ import java.lang.ref.WeakReference;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 
+import io.github.muntashirakon.AppManager.batchops.BatchOpsProgressActivity;
+import io.github.muntashirakon.AppManager.screens.ListScreenActivity;
 import io.github.muntashirakon.AppManager.PerProcessActivity;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.details.AppDetailsActivity;
@@ -184,6 +186,8 @@ public final class AppearanceUtils {
          */
         private static boolean isYellowOnBlackActivity(@NonNull Activity activity) {
             return activity instanceof SettingsActivity
+                    || activity instanceof BatchOpsProgressActivity
+                    || activity instanceof ListScreenActivity
                     || activity instanceof ProfilesActivity
                     || activity instanceof AppsBaseProfileActivity
                     || activity instanceof AppDetailsActivity

@@ -10,6 +10,9 @@ import android.app.AppOpsManager;
 import android.app.INotificationManager;
 import android.content.ComponentName;
 import android.content.Context;
+import android.text.style.ForegroundColorSpan;
+import android.text.Spanned;
+import android.text.SpannableStringBuilder;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.os.Build;
@@ -30,6 +33,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -80,6 +84,9 @@ import io.github.muntashirakon.AppManager.utils.TarUtils;
 import io.github.muntashirakon.AppManager.utils.Utils;
 import io.github.muntashirakon.AppManager.appdata.AppDataHeader;
 import io.github.muntashirakon.AppManager.appdata.AppDataTransfer;
+import io.github.muntashirakon.AppManager.batchops.BatchOpsProgressMonitor;
+import io.github.muntashirakon.AppManager.batchops.OpLog;
+import io.github.muntashirakon.AppManager.fonts.ColorPrefs;
 import io.github.muntashirakon.io.IoUtils;
 import io.github.muntashirakon.io.Path;
 import io.github.muntashirakon.io.Paths;
@@ -110,6 +117,12 @@ class RestoreOp implements Closeable {
     private final int mUserId;
     private boolean mIsInstalled;
     private boolean mRequiresRestart;
+    /** Fork (白い熊, +140): the stages this restore will announce; see {@link #planStages()}. */
+    @Nullable
+    private List<Integer> mStagePlan;
+    /** The stage currently running; see {@code BackupOp#marked}. */
+    @StringRes
+    private int mCurrentStageRes;
 
     RestoreOp(@NonNull String packageName, @NonNull BackupFlags requestedFlags,
               @NonNull BackupItems.BackupItem backupItem, int userId) throws BackupException {
@@ -187,6 +200,7 @@ class RestoreOp implements Closeable {
     // this one app so a long restore has something to say between counter moves.
     void runRestore(@Nullable ProgressHandler progressHandler, @Nullable BackupProgressListener listener)
             throws BackupException {
+        mStagePlan = planStages();
         try {
             if (mRequestedFlags.backupData() && mBackupMetadata.keyStore && !mRequestedFlags.skipSignatureCheck()) {
                 // Check checksum of master key first
@@ -196,7 +210,7 @@ class RestoreOp implements Closeable {
             incrementProgress(progressHandler);
             if (mRequestedFlags.backupApkFiles()) {
                 stage(listener, mBackupMetadata.apkName, R.string.restore_stage_apk);
-                restoreApkFiles();
+                restoreApkFiles(listener);
                 incrementProgress(progressHandler);
             }
             if (mRequestedFlags.backupData()) {
@@ -209,7 +223,7 @@ class RestoreOp implements Closeable {
             }
             if (mRequestedFlags.backupExtras()) {
                 stage(listener, null, R.string.restore_stage_extras);
-                restoreExtras();
+                restoreExtras(listener);
                 incrementProgress(progressHandler);
             }
             // Fork: app-supplied data, handed back to the app itself. Runs AFTER the APK is in
@@ -226,6 +240,9 @@ class RestoreOp implements Closeable {
             }
         } catch (BackupException e) {
             throw e;
+        } catch (BatchOpsProgressMonitor.OperationCancelledException e) {
+            // Fork (白い熊, +143): a cancel is an answer, not an error — see BackupOp.
+            throw e;
         } catch (Throwable th) {
             throw new BackupException("Unknown error occurred", th);
         }
@@ -240,16 +257,107 @@ class RestoreOp implements Closeable {
     }
 
     // Fork: name the stage this app's restore has reached. See BackupOp#stage.
-    private static void stage(@Nullable BackupProgressListener listener, @Nullable CharSequence detail,
-                              @StringRes int stageRes, @Nullable Object... args) {
+    /** Fork (白い熊, +140): numbered stages — see {@code BackupOp#stage}. */
+    private void stage(@Nullable BackupProgressListener listener, @Nullable CharSequence detail,
+                       @StringRes int stageRes, @Nullable Object... args) {
         if (listener == null) {
             return;
         }
         Context context = ContextUtils.getContext();
+        checkCancelled();
+        mCurrentStageRes = stageRes;
         CharSequence stage = args == null || args.length == 0
                 ? context.getText(stageRes)
                 : context.getString(stageRes, args);
-        listener.onStage(stage, detail);
+        listener.onStage(numbered(context, stage, stageRes), detail);
+    }
+
+    /** The stage number, repeated on a line beneath it — see {@code BackupOp#marked}. */
+    @NonNull
+    private CharSequence marked(@Nullable CharSequence text) {
+        if (text == null || mStagePlan == null || mCurrentStageRes == 0) {
+            return text == null ? "" : text;
+        }
+        return numbered(ContextUtils.getContext(), text, mCurrentStageRes);
+    }
+
+    /** The stages this restore will actually announce, in order. */
+    @NonNull
+    private List<Integer> planStages() {
+        List<Integer> plan = new ArrayList<>();
+        if (mRequestedFlags.backupData() && mBackupMetadata.keyStore && !mRequestedFlags.skipSignatureCheck()) {
+            plan.add(R.string.restore_stage_verifying);
+        }
+        if (mRequestedFlags.backupApkFiles()) {
+            plan.add(R.string.restore_stage_apk);
+        }
+        if (mRequestedFlags.backupData()) {
+            plan.add(R.string.restore_stage_data);
+            if (mBackupMetadata.keyStore) {
+                plan.add(R.string.restore_stage_keystore);
+            }
+        }
+        if (mRequestedFlags.backupExtras()) {
+            plan.add(R.string.restore_stage_extras);
+        }
+        if (mRequestedFlags.backupAppData()) {
+            plan.add(R.string.restore_stage_app_data);
+            // The passes that run before the app is handed anything, in the order they run.
+            if (!mRequestedFlags.skipSignatureCheck()) {
+                plan.add(R.string.restore_stage_verifying_archive);
+            }
+            if (isEncrypted()) {
+                plan.add(R.string.restore_stage_decrypting);
+            }
+            plan.add(R.string.restore_stage_staging);
+        }
+        if (mRequestedFlags.backupRules()) {
+            plan.add(R.string.restore_stage_rules);
+        }
+        return plan;
+    }
+
+    /** The cancel checkpoint inside one app's restore — see {@code BackupOp#checkCancelled}. */
+    private void checkCancelled() {
+        if (BatchOpsProgressMonitor.getInstance().isCancelled()) {
+            throw new BatchOpsProgressMonitor.OperationCancelledException();
+        }
+    }
+
+    /** Whether this backup was written encrypted, so the pass is worth announcing. */
+    private boolean isEncrypted() {
+        String crypto = mBackupInfo.crypto;
+        return crypto != null && !CryptoUtils.MODE_NO_ENCRYPTION.equals(crypto);
+    }
+
+    private static long sizeOf(@Nullable Path path) {
+        try {
+            return path == null ? 0 : path.length();
+        } catch (Throwable th) {
+            return 0;
+        }
+    }
+
+    @NonNull
+    private CharSequence numbered(@NonNull Context context, @NonNull CharSequence stage,
+                                  @StringRes int stageRes) {
+        List<Integer> plan = mStagePlan;
+        if (plan == null) {
+            return stage;
+        }
+        int index = plan.indexOf(stageRes);
+        if (index < 0) {
+            return stage;
+        }
+        SpannableStringBuilder sb = new SpannableStringBuilder(stage);
+        int start = sb.length();
+        sb.append("  ").append(String.valueOf(index + 1)).append("/").append(String.valueOf(plan.size()));
+        try {
+            sb.setSpan(new ForegroundColorSpan(ColorPrefs.getColor(context, ColorPrefs.OPLOG_BATCH)),
+                    start, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        } catch (Throwable ignore) {
+        }
+        return sb;
     }
 
     public boolean requiresRestart() {
@@ -311,11 +419,12 @@ class RestoreOp implements Closeable {
         }
     }
 
-    private void restoreApkFiles() throws BackupException {
+    private void restoreApkFiles(@Nullable BackupProgressListener listener) throws BackupException {
         if (!mBackupFlags.backupApkFiles()) {
             throw new BackupException("APK restore is requested but backup doesn't contain any source files.");
         }
         Path[] backupSourceFiles = mBackupItem.getSourceFiles();
+        reportFiles(listener, backupSourceFiles);
         if (backupSourceFiles.length == 0) {
             // No source backup found
             throw new BackupException("Source restore is requested but there are no source files.");
@@ -549,6 +658,9 @@ class RestoreOp implements Closeable {
         for (int i = 0; i < dirCount; ++i) {
             String backupDataDir = mBackupMetadata.dataDirs[i];
             stage(listener, backupDataDir, R.string.restore_stage_data, i + 1, dirCount);
+            // Fork (+116): name the archive members going in, the mirror of what the backup log
+            // named coming out — so a restore can be compared against the backup it came from.
+            reportFiles(listener, mBackupItem.getDataFiles(i));
             if (backupDataDir.equals(BackupManager.DATA_BACKUP_SPECIAL_ADB)) {
                 // Adb backup restore
                 restoreAdb(i);
@@ -662,7 +774,7 @@ class RestoreOp implements Closeable {
         }
     }
 
-    private synchronized void restoreExtras() throws BackupException {
+    private synchronized void restoreExtras(@Nullable BackupProgressListener listener) throws BackupException {
         if (!mIsInstalled) {
             throw new BackupException("Misc restore is requested but the app isn't installed.");
         }
@@ -671,6 +783,7 @@ class RestoreOp implements Closeable {
         loadMiscRules(rules);
         // Apply rules
         List<RuleEntry> entries = rules.getAll();
+        int failed = 0;
         AppOpsManagerCompat appOpsManager = new AppOpsManagerCompat();
         INotificationManager notificationManager = INotificationManager.Stub.asInterface(ProxyBinder.getService(Context.NOTIFICATION_SERVICE));
         boolean magiskHideAvailable = MagiskHide.available();
@@ -757,7 +870,15 @@ class RestoreOp implements Closeable {
                 // downgrading from an Android to another. It's better to simply suppress these
                 // exceptions instead of causing a failure or worse, a crash
                 Log.e(TAG, e);
+                ++failed;
             }
+        }
+        // Fork (+116): a count, because "Extras" on its own never said whether anything was put
+        // back — and a rule that threw is swallowed above by design, so a silent stage was the
+        // only trace a half-restored app left.
+        if (listener != null) {
+            listener.onItem(ContextUtils.getContext().getString(R.string.restore_item_rules,
+                    entries.size() - failed, entries.size()), null);
         }
     }
 
@@ -808,13 +929,20 @@ class RestoreOp implements Closeable {
             throw new BackupException("App-supplied data restore is requested but the app isn't installed.");
         }
         stage(listener, null, R.string.restore_stage_app_data);
+        // Fork (白い熊, +141): the three passes before the app ever sees the archive, each one a
+        // full traversal of it and each one silent until now — see the same note in BackupOp.
+        CharSequence archiveSize = OpLog.formatSize(sizeOf(dataFile));
         // Verify BEFORE use: these two files are in checksums.txt like every other member, and a
         // corrupted archive must never reach the app that would import it.
         if (!mRequestedFlags.skipSignatureCheck()) {
+            stage(listener, archiveSize, R.string.restore_stage_verifying_archive);
             verifyAppDataFile(headerFile);
             verifyAppDataFile(dataFile);
         }
         try {
+            if (isEncrypted()) {
+                stage(listener, archiveSize, R.string.restore_stage_decrypting);
+            }
             headerFile = mBackupItem.decrypt(new Path[]{headerFile})[0];
             dataFile = mBackupItem.decrypt(new Path[]{dataFile})[0];
         } catch (IOException | IndexOutOfBoundsException e) {
@@ -836,11 +964,32 @@ class RestoreOp implements Closeable {
             if (parent != null && !parent.exists() && !parent.mkdirs()) {
                 throw new BackupException("Could not stage app-supplied data.");
             }
+            stage(listener, archiveSize, R.string.restore_stage_staging);
             try (InputStream is = dataFile.openInputStream(); OutputStream os = new FileOutputStream(staging)) {
                 IoUtils.copy(is, os);
             }
+            // [0] = the highest count seen, [1] = how many times it has started over.
+            final long[] pass = {0, 0};
             AppDataTransfer.Outcome outcome = new AppDataTransfer(context).importData(mPackageName,
-                    mUserId, staging, header, null);
+                    mUserId, staging, header, (label, current, total, unit) -> {
+                        // Fork (+116): the sister app's own progress, shown as it arrives. The
+                        // import used to pass null here, so the longest step in a restore was
+                        // also the one that said least.
+                        // Fork (白い熊, +140): a counter that goes backwards is a second pass —
+                        // see the same note in BackupOp.
+                        if (current >= 0 && current < pass[0]) {
+                            ++pass[1];
+                            if (listener != null) {
+                                listener.onItem(ContextUtils.getContext().getString(
+                                        R.string.appdata_second_pass, pass[1]), null);
+                            }
+                        }
+                        pass[0] = Math.max(current, 0);
+                        CharSequence detail = progressDetail(label, current, total, unit);
+                        if (listener != null && detail != null) {
+                            listener.onItem(marked(detail), null);
+                        }
+                    }, () -> BatchOpsProgressMonitor.getInstance().isCancelled());
             if (!outcome.ok) {
                 throw new BackupException("App-supplied data restore failed: " + outcome.message);
             }
@@ -851,6 +1000,38 @@ class RestoreOp implements Closeable {
         } finally {
             staging.delete();
         }
+    }
+
+    // Fork (+116): name each archive member and its size, and add it to the operation's byte
+    // total. The mirror of BackupOp#reportBytes, so both directions read alike.
+    private void reportFiles(@Nullable BackupProgressListener listener, @Nullable Path[] files) {
+        if (listener == null || files == null) {
+            return;
+        }
+        long total = 0;
+        for (Path file : files) {
+            long length = 0;
+            try {
+                length = file.length();
+            } catch (Throwable ignore) {
+            }
+            total += length;
+            listener.onItem(marked(file.getName()), length > 0 ? OpLog.formatSize(length) : null);
+        }
+        listener.onBytesWritten(total);
+    }
+
+    // Fork: real counts, never a percentage — 白い熊's standing requirement for progress.
+    @Nullable
+    private static CharSequence progressDetail(@Nullable String label, long current, long total,
+                                               @Nullable String unit) {
+        if (current < 0 || total < 0) {
+            return label;
+        }
+        // Fork (白い熊, +132): grouped digits — see OpLog#formatCount.
+        String counts = OpLog.formatCount(current) + "/" + OpLog.formatCount(total)
+                + (unit != null ? " " + unit : "");
+        return label != null ? label + " " + counts : counts;
     }
 
     private void verifyAppDataFile(@NonNull Path file) throws BackupException {

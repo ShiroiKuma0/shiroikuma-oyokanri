@@ -13,6 +13,7 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
+import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
 import android.net.Uri;
@@ -33,6 +34,7 @@ import android.widget.TextView;
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.PluralsRes;
@@ -44,6 +46,8 @@ import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.appcompat.widget.AppCompatTextView;
+import androidx.appcompat.widget.LinearLayoutCompat;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -81,12 +85,19 @@ import io.github.muntashirakon.AppManager.fonts.SelectionFramePrefs;
 import io.github.muntashirakon.AppManager.fonts.SeparatorPrefs;
 import io.github.muntashirakon.AppManager.backup.dialog.BackupRestoreDialogFragment;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsManager;
+import io.github.muntashirakon.AppManager.batchops.BatchOpsProgressActivity;
+import androidx.core.graphics.ColorUtils;
+import io.github.muntashirakon.AppManager.appdata.self.PendingStateImport;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsProgressMonitor;
+import io.github.muntashirakon.AppManager.batchops.OpLog;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsService;
 import io.github.muntashirakon.AppManager.batchops.BatchQueueItem;
 import io.github.muntashirakon.AppManager.batchops.struct.BatchFreezeOptions;
 import io.github.muntashirakon.AppManager.batchops.struct.BatchNetPolicyOptions;
+import io.github.muntashirakon.AppManager.backup.dialog.BatchBackupTableDialog;
+import io.github.muntashirakon.AppManager.batchops.struct.BatchBackupOptions;
 import io.github.muntashirakon.AppManager.batchops.struct.IBatchOpOptions;
+import io.github.muntashirakon.AppManager.types.UserPackagePair;
 import io.github.muntashirakon.AppManager.changelog.Changelog;
 import io.github.muntashirakon.AppManager.changelog.ChangelogParser;
 import io.github.muntashirakon.AppManager.changelog.ChangelogRecyclerAdapter;
@@ -107,6 +118,8 @@ import io.github.muntashirakon.AppManager.battery.BatteryUsageActivity;
 import io.github.muntashirakon.AppManager.processreaper.ProcessMonitorActivity;
 import io.github.muntashirakon.AppManager.self.life.FundingCampaignChecker;
 import io.github.muntashirakon.AppManager.settings.FeatureController;
+import io.github.muntashirakon.AppManager.screens.ListScreenActivity;
+import io.github.muntashirakon.dialog.TextInputDialogBuilder;
 import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.settings.PrivilegeWatchdog;
 import io.github.muntashirakon.AppManager.settings.SettingsActivity;
@@ -166,6 +179,14 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
     // session has been lost (see PrivilegeWatchdog).
     private View mPrivilegeAlarm;
     private TextView mPrivilegeAlarmText;
+    // Fork (白い熊, +132): the way back into the batch that is running, or the one that just
+    // finished. Dismissed by hand; a new batch brings it back.
+    @Nullable
+    private View mOperationBar;
+    @Nullable
+    private TextView mOperationBarText;
+    private boolean mOperationBarDismissed;
+    private long mOperationBarStartedAt;
     private ImageView mPrivilegeAlarmIcon;
     @Nullable
     private ObjectAnimator mPrivilegeAlarmPulse;
@@ -241,22 +262,39 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
 
     // Fork: the in-app batch-operation progress dialog (mirrors the foreground
     // notification in the main window, with Pause/Continue + Cancel).
+    // Fork (白い熊, +116): that dialog is gone. A batch now opens
+    // BatchOpsProgressActivity — a full page carrying the whole running log —
+    // and this flag only keeps the page from being opened twice for one batch.
+    private boolean mProgressPageOpened;
+    // Fork (白い熊, +134): asked once per visit, not once per resume.
+    private boolean mPendingImportOffered;
+    // Fork (白い熊, +118): the pill shelf under the toolbar.
     @Nullable
-    private BatchProgressDialog mBatchProgressDialog;
+    private ShelfView mShelf;
+    // Fork (白い熊, +118): the batch pane, replacing the legacy selection bar.
+    @Nullable
+    private LinearLayoutCompat mBatchPane;
+    @Nullable
+    private io.github.muntashirakon.widget.FlowLayout mBatchActions;
+    @Nullable
+    private AppCompatTextView mBatchCount;
+    private boolean mBatchPaneFolded;
 
     private final BroadcastReceiver mBatchOpsBroadCastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            // Fork: a batch op has started — surface it in the progress dialog.
+            // Fork: a batch op has started — open the progress page.
             if (BatchOpsService.ACTION_BATCH_OPS_STARTED.equals(intent.getAction())) {
-                showBatchProgressDialog();
+                int startedOp = intent.getIntExtra(BatchOpsService.EXTRA_OP, BatchOpsManager.OP_NONE);
+                String[] packages = intent.getStringArrayExtra(BatchOpsService.EXTRA_OP_PKG);
+                openBatchProgressPage(startedOp, packages != null ? packages.length : 0);
                 return;
             }
             // ACTION_BATCH_OPS_COMPLETED
             showProgressIndicator(false);
-            if (mBatchProgressDialog != null) {
-                mBatchProgressDialog.dismiss();
-            }
+            // The page is NOT closed here: its whole purpose is to still be
+            // there afterwards, holding what happened.
+            mProgressPageOpened = false;
             int op = intent.getIntExtra(BatchOpsService.EXTRA_OP, BatchOpsManager.OP_NONE);
             // Fork: show the completion as our themed toast (the un-themeable
             // system heads-up is suppressed while we're foreground — see
@@ -283,6 +321,10 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
     private final OnBackPressedCallback mOnBackPressedCallback = new OnBackPressedCallback(false) {
         @Override
         public void handleOnBackPressed() {
+            // Fork (+118): an open pane is a state you leave with Back, before the screen is.
+            if (mAdapter != null && mAdapter.collapsePane()) {
+                return;
+            }
             if (mAdapter != null && mMultiSelectionView != null && mAdapter.isInSelectionMode()) {
                 mMultiSelectionView.cancel();
                 return;
@@ -366,6 +408,9 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
 
         mProgressIndicator = findViewById(R.id.progress_linear);
         mProgressIndicator.setVisibilityAfterHide(View.GONE);
+        // Fork (白い熊, +120): and GONE from the start, not just after the first hide() —
+        // otherwise its band sits under the shelf until something happens to run.
+        mProgressIndicator.setVisibility(View.GONE);
         mRecyclerView = findViewById(R.id.item_list);
         mRecyclerView.requestFocus(); // Initially (the view isn't actually focusable)
         mSwipeRefresh = findViewById(R.id.swipe_refresh);
@@ -391,6 +436,7 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                 RemoveFromProfileDialogFragment.RESULT_KEY, this, (key, bundle) -> {
                     if (mAdapter != null) mAdapter.reloadProfileMembership();
                 });
+        setupShelf();
         mMultiSelectionView = findViewById(R.id.selection_view);
         // The MultiSelectionView constructor hardcodes setCardElevation(8dp)
         // after any XML attributes are read, so app:cardElevation="0dp" in
@@ -410,11 +456,14 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         // hides selected apps updates the "· N hidden" count as well.
         mMultiSelectionView.setOnSelectionChangeListener(count -> {
             boolean refresh = mBatchOpsHandler.onSelectionChange(count);
+            updateBatchPane();
             updateSelectionReminder();
             return refresh;
         });
+        setupBatchPane();
         setupSelectionReminder();
         setupPrivilegeAlarm();
+        setupOperationBar();
         // Override the XML-inflated selection toolbar with the user's
         // customised order from MainToolbarPrefs, and wire each visible
         // toolbar button to open the same prefs screen on long-press.
@@ -561,32 +610,37 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
      * invalidateOptionsMenu() calls do not stack badges.
      */
     private void updateFilterIcon(@NonNull Menu menu) {
-        MenuItem item = menu.findItem(R.id.action_list_options);
-        if (item == null) return;
-        Drawable base = ContextCompat.getDrawable(this, R.drawable.ic_filter);
-        if (base == null) return;
-        base = base.mutate();
         boolean active = viewModel != null && viewModel.isFilterActive();
-        if (!active) {
-            base.setColorFilter(ContextCompat.getColor(this, R.color.theme_bright_yellow),
-                    PorterDuff.Mode.SRC_IN);
-            item.setIcon(base);
-            return;
+        int yellow = ContextCompat.getColor(this, R.color.theme_bright_yellow);
+        // The fork's alarm red, the same one the Snooping page and the operation log use.
+        int red = 0xFFFF0028;
+        MenuItem filter = menu.findItem(R.id.action_list_options);
+        if (filter != null) {
+            // Traced when the list is showing everything, solid when something is being held
+            // back — and no badge: a dot on a solid icon was a second thing saying what the
+            // fill already says (白い熊, +119).
+            filter.setIcon(tintedIcon(active ? R.drawable.ic_filter : R.drawable.ic_filter_traced,
+                    yellow));
         }
-        int accent = ContextCompat.getColor(this, R.color.theme_bright_orange);
-        base.setColorFilter(accent, PorterDuff.Mode.SRC_IN);
-        float d = getResources().getDisplayMetrics().density;
-        int box = Math.round(24 * d);
-        int dot = Math.round(9 * d);
-        GradientDrawable badge = new GradientDrawable();
-        badge.setShape(GradientDrawable.OVAL);
-        badge.setColor(accent);
-        badge.setSize(dot, dot);
-        LayerDrawable layer = new LayerDrawable(new Drawable[]{base, badge});
-        // setLayerInset is API 1-safe (setLayerGravity would need API 23).
-        layer.setLayerInset(0, 0, 0, 0, 0);
-        layer.setLayerInset(1, box - dot, 0, 0, box - dot);
-        item.setIcon(layer);
+        MenuItem clear = menu.findItem(R.id.action_clear_filters);
+        if (clear != null) {
+            // Red only when there is something to clear. Traced yellow otherwise, so the icon
+            // says whether pressing it would do anything at all.
+            clear.setIcon(tintedIcon(active ? R.drawable.ic_filter_clear
+                    : R.drawable.ic_filter_clear_traced, active ? red : yellow));
+        }
+    }
+
+    @Nullable
+    private Drawable tintedIcon(@DrawableRes int drawableRes, int color) {
+        Drawable drawable = ContextCompat.getDrawable(this, drawableRes);
+        if (drawable == null) {
+            return null;
+        }
+        // mutate() or the tint leaks into every other user of the shared constant state.
+        drawable = drawable.mutate();
+        drawable.setColorFilter(color, PorterDuff.Mode.SRC_IN);
+        return drawable;
     }
 
     @SuppressLint("InflateParams")
@@ -720,9 +774,36 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         } else {
             mRecyclerView.setLayoutManager(new GridLayoutManager(this, columns));
         }
+        applyPaneSpan();
         // Fork: the pick is per geometry, so remember which one this layout is
         // for — see applyListLayoutIfGeometryChanged().
         mLayoutGeometry = LayoutGeometry.key(this);
+    }
+
+    /**
+     * Fork (白い熊, +118): an unrolled row takes the full width of a grid.
+     *
+     * <p>A span-size lookup is the whole mechanism, and it is why the pane is part of the row
+     * rather than an item of its own: it changes how one position is laid out and touches no
+     * data, so every position, every selection index and the whole
+     * {@code MultiSelectionView.Adapter} contract stay exactly as they were.
+     *
+     * <p>{@code AutoFitGridLayoutManager} recomputes its span count on measure, so the count is
+     * read inside the lookup rather than captured — a captured one would be whatever it was when
+     * the phone was last folded.
+     */
+    private void applyPaneSpan() {
+        RecyclerView.LayoutManager lm = mRecyclerView.getLayoutManager();
+        if (!(lm instanceof GridLayoutManager)) {
+            return;
+        }
+        GridLayoutManager grid = (GridLayoutManager) lm;
+        grid.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
+            @Override
+            public int getSpanSize(int position) {
+                return mAdapter != null && mAdapter.isExpandedAt(position) ? grid.getSpanCount() : 1;
+            }
+        });
     }
 
     /**
@@ -765,6 +846,329 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
     }
 
     /**
+     * Fork (白い熊, +118): the adapter has opened or closed a row's pane.
+     *
+     * <p>Two things follow. The span cache must be dropped, because an open row takes the full
+     * width of a grid and {@code GridLayoutManager} caches span indices; and the open row is
+     * scrolled to, since a pane that unrolls below the fold looks like a tap that did nothing.
+     */
+    public void onPaneToggled(int position, boolean opened) {
+        mOnBackPressedCallback.setEnabled(opened
+                || (mAdapter != null && mAdapter.isInSelectionMode()));
+        RecyclerView.LayoutManager lm = mRecyclerView == null ? null : mRecyclerView.getLayoutManager();
+        if (lm instanceof GridLayoutManager) {
+            ((GridLayoutManager) lm).getSpanSizeLookup().invalidateSpanIndexCache();
+        }
+        // Fork (白い熊, +125): the row STAYS WHERE IT IS. Scrolling the tapped row to the top was
+        // meant to bring the pane into view and instead threw away the thing a tap should never
+        // cost — your place in the list. The pane grows downward from where you tapped; if its
+        // tail is below the fold, that is what scrolling is for.
+    }
+
+    // ── The batch pane (白い熊, +118) ────────────────────────────────────────
+
+    /**
+     * Build the panel that replaces the legacy selection bar.
+     *
+     * <p>The bar's actions were a menu rendered into a strip, so their labels were cut off — the
+     * thing that made it unusable. These are the same actions, in the same configured order
+     * ({@link MainToolbarPrefs}, so the existing settings page keeps working), as pills that wrap
+     * onto as many lines as they need.
+     *
+     * <p><b>Every pill dispatches through {@link #onNavigationItemSelected}</b>, the menu-id
+     * dispatcher that already existed. Not one line of batch logic is duplicated here.
+     */
+    private void setupBatchPane() {
+        mBatchPane = findViewById(R.id.batch_pane);
+        mBatchActions = findViewById(R.id.batch_pane_actions);
+        mBatchCount = findViewById(R.id.batch_pane_count);
+        if (mBatchPane == null || mBatchActions == null || mBatchCount == null) {
+            return;
+        }
+        // The bar keeps doing the bookkeeping; only its face is gone.
+        if (mMultiSelectionView != null) {
+            mMultiSelectionView.setBarSuppressed(true, 0);
+        }
+        int ink = ForkThemeUtils.getTextColor();
+        findViewById(R.id.batch_pane_rule).setBackgroundColor(RowPills.withAlpha(ink, 0.35f));
+        mBatchCount.setTextColor(ink);
+        AppCompatTextView selectAll = findViewById(R.id.batch_pane_select_all);
+        AppCompatTextView clear = findViewById(R.id.batch_pane_clear);
+        AppCompatTextView fold = findViewById(R.id.batch_pane_fold);
+        RowPills.styleActionPill(selectAll, ink, false);
+        RowPills.styleActionPill(clear, ink, false);
+        RowPills.styleActionPill(fold, ink, false);
+        selectAll.setOnClickListener(v -> {
+            if (mAdapter != null) {
+                mAdapter.selectAll();
+            }
+        });
+        clear.setOnClickListener(v -> clearSelection());
+        fold.setOnClickListener(v -> {
+            mBatchPaneFolded = !mBatchPaneFolded;
+            updateBatchPane();
+        });
+        rebuildBatchActions();
+        // Report our height back to the widget so the last row still clears the panel — the same
+        // path the bar used, rather than a second padding mechanism fighting it.
+        mBatchPane.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+            if (mMultiSelectionView != null && mBatchPane != null) {
+                mMultiSelectionView.setBarSuppressed(true,
+                        mBatchPane.getVisibility() == View.VISIBLE ? mBatchPane.getHeight() : 0);
+            }
+        });
+    }
+
+    /** Rebuild the action pills — called on start and whenever the configured order changes. */
+    private void rebuildBatchActions() {
+        if (mBatchActions == null || mMultiSelectionView == null) {
+            return;
+        }
+        mBatchActions.removeAllViews();
+        int ink = ForkThemeUtils.getTextColor();
+        android.view.Menu menu = mMultiSelectionView.getMenu();
+        List<String> placed = new ArrayList<>();
+        for (String key : MainToolbarPrefs.loadVisibleOrder(this)) {
+            int id = MainToolbarPrefs.idForKey(key);
+            int titleRes = MainToolbarPrefs.titleForKey(key);
+            if (id == 0 || titleRes == 0) {
+                continue;
+            }
+            MenuItem menuItem = menu.findItem(id);
+            if (menuItem == null) {
+                continue;
+            }
+            TextView pill = RowPills.actionPill(this, getString(titleRes),
+                    MainToolbarPrefs.iconForKey(key), ink, false);
+            pill.setTag(id);
+            pill.setOnClickListener(v -> onNavigationItemSelected(menuItem));
+            mBatchActions.addView(pill);
+            placed.add(key);
+        }
+        // Fork (白い熊, +121): long-press a pill and drop it on another to reorder them here,
+        // rather than walking to the settings page to rearrange things you are looking at. The
+        // order is the same one the settings page edits, so the two cannot disagree.
+        PillDragReorder.attach(mBatchActions, placed, reordered -> {
+            List<String> hidden = MainToolbarPrefs.loadHiddenOrder(this);
+            MainToolbarPrefs.save(this, reordered, hidden);
+            rebuildBatchActions();
+            updateBatchPane();
+        });
+    }
+
+    /**
+     * Show, hide and refresh the panel. Each pill is enabled exactly when its menu item is —
+     * {@link MainBatchOpsHandler} decides that, so a batch of uninstalled apps still cannot be
+     * force-stopped from here.
+     */
+    private void updateBatchPane() {
+        if (mBatchPane == null || mAdapter == null || mBatchActions == null || mBatchCount == null) {
+            return;
+        }
+        int count = mAdapter.getSelectedItemCount();
+        boolean visible = mAdapter.isInSelectionMode() && count > 0;
+        mBatchPane.setVisibility(visible ? View.VISIBLE : View.GONE);
+        if (!visible) {
+            if (mMultiSelectionView != null) {
+                mMultiSelectionView.setBarSuppressed(true, 0);
+            }
+            return;
+        }
+        mBatchCount.setText(getString(R.string.batch_pane_count, count, mAdapter.getTotalItemCount()));
+        AppCompatTextView fold = findViewById(R.id.batch_pane_fold);
+        fold.setText(mBatchPaneFolded ? "▴" : "▾");
+        mBatchActions.setVisibility(mBatchPaneFolded ? View.GONE : View.VISIBLE);
+        for (int i = 0; i < mBatchActions.getChildCount(); ++i) {
+            View pill = mBatchActions.getChildAt(i);
+            Object tag = pill.getTag();
+            if (!(tag instanceof Integer) || mMultiSelectionView == null) {
+                continue;
+            }
+            MenuItem menuItem = mMultiSelectionView.getMenu().findItem((Integer) tag);
+            boolean enabled = menuItem != null && menuItem.isEnabled() && menuItem.isVisible();
+            pill.setEnabled(enabled);
+            pill.setAlpha(enabled ? 1f : 0.4f);
+        }
+    }
+
+    // ── The pill shelf (白い熊, +118) ────────────────────────────────────────
+
+    private void setupShelf() {
+        mShelf = findViewById(R.id.shelf);
+        if (mShelf == null) {
+            return;
+        }
+        mShelf.setListener(new ShelfView.Listener() {
+            @Override
+            public void onPillClicked(@NonNull ShelfPrefs.Pill pill) {
+                applyShelfPill(pill);
+            }
+
+            @Override
+            public void onPillLongClicked(@NonNull ShelfPrefs.Pill pill) {
+                showShelfPillMenu(pill);
+            }
+
+            @Override
+            public void onAddPill() {
+                showAddShelfPill();
+            }
+        });
+    }
+
+    /**
+     * A screen pill opens its screen; a view pill applies its view — and applying the view that
+     * is already on screen clears it instead, so one pill is both the way in and the way out.
+     * Without that, leaving a saved view means finding the filter dialog again, which is the very
+     * thing the shelf exists to avoid.
+     */
+    private void applyShelfPill(@NonNull ShelfPrefs.Pill pill) {
+        if (pill.isScreen()) {
+            Intent intent = ListScreenActivity.intentFor(this, pill.payload);
+            if (intent != null) {
+                startActivity(intent);
+            }
+            return;
+        }
+        if (viewModel == null) {
+            return;
+        }
+        if (pill.id.equals(mShelf != null ? mShelf.getActiveId() : null)) {
+            viewModel.applyView(0, viewModel.getSortBy(), viewModel.isReverseSort(),
+                    Collections.emptySet(), Collections.emptySet(), null,
+                    AdvancedSearchView.SEARCH_TYPE_CONTAINS);
+            if (mSearchView != null) {
+                mSearchView.setQuery("", false);
+            }
+            if (mShelf != null) mShelf.setActiveId(null);
+            return;
+        }
+        ShelfPrefs.ViewState state = ShelfPrefs.ViewState.fromJson(pill.payload);
+        viewModel.applyView(state.filterFlags, state.sortBy, state.reverseSort,
+                state.profilesInclude, state.profilesExclude, state.query, state.queryType);
+        if (mSearchView != null) {
+            mSearchView.setQuery(state.query == null ? "" : state.query, false);
+        }
+        if (mShelf != null) mShelf.setActiveId(pill.id);
+    }
+
+    /** What the list is showing right now, captured whole. */
+    @NonNull
+    private ShelfPrefs.ViewState currentViewState() {
+        return new ShelfPrefs.ViewState(
+                viewModel.getFilterFlags(),
+                viewModel.getSortBy(),
+                viewModel.isReverseSort(),
+                new java.util.LinkedHashSet<>(viewModel.getProfileFiltersInclude()),
+                new java.util.LinkedHashSet<>(viewModel.getProfileFiltersExclude()),
+                viewModel.getSearchQuery(),
+                AdvancedSearchView.SEARCH_TYPE_CONTAINS);
+    }
+
+    /**
+     * Adding a pill. "Save this view" comes first on purpose: the list in front of you is already
+     * filtered and sorted the way you want it, so capturing it is both the cheapest and the most
+     * honest way to describe what the pill should do.
+     */
+    private void showAddShelfPill() {
+        if (viewModel == null) {
+            return;
+        }
+        // Fork (白い熊, +119): a real filter editor, opened preloaded with what the list is
+        // showing — so "save this view" is simply pressing Save, and anything else is crafted.
+        ShelfPillDialog.show(this, currentViewState(), this::addShelfPill);
+    }
+
+    private void addShelfPill(@NonNull ShelfPrefs.Pill pill) {
+        ShelfPrefs.add(this, pill);
+        if (mShelf != null) mShelf.reload();
+    }
+
+    /**
+     * Rename · re-capture · remove — everything a pill can have done to it, as pills.
+     *
+     * <p>Fork (白い熊, +128): it was a bare list of words on black, which is what a menu looks
+     * like when nobody has designed it. The actions here are the same kind of thing as every
+     * other control in this app, so they are the same kind of control, and the destructive one
+     * says so in the alarm red rather than by being third.
+     */
+    private void showShelfPillMenu(@NonNull ShelfPrefs.Pill pill) {
+        int ink = ForkThemeUtils.getTextColor();
+        int red = 0xFFFF0028;
+        float d = getResources().getDisplayMetrics().density;
+        io.github.muntashirakon.widget.FlowLayout body = new io.github.muntashirakon.widget.FlowLayout(this);
+        body.setChildSpacing(Math.round(8 * d));
+        body.setRowSpacing(Math.round(8 * d));
+        int pad = Math.round(16 * d);
+        body.setPadding(pad, Math.round(8 * d), pad, Math.round(4 * d));
+        final androidx.appcompat.app.AlertDialog[] dialog = new androidx.appcompat.app.AlertDialog[1];
+
+        TextView rename = RowPills.actionPill(this, getString(R.string.shelf_rename),
+                R.drawable.ic_note_24dp, ink, false);
+        rename.setOnClickListener(v -> {
+            if (dialog[0] != null) dialog[0].dismiss();
+            promptShelfName(pill.name, name -> {
+                ShelfPrefs.rename(this, pill.id, name);
+                if (mShelf != null) mShelf.reload();
+            });
+        });
+        body.addView(rename);
+
+        if (!pill.isScreen()) {
+            TextView update = RowPills.actionPill(this, getString(R.string.shelf_update_to_current),
+                    R.drawable.ic_backup_restore, ink, false);
+            update.setOnClickListener(v -> {
+                if (dialog[0] != null) dialog[0].dismiss();
+                // Replaced in place, keeping the id, so the pill stays where it was dragged to
+                // and stays the active one if it is showing.
+                List<ShelfPrefs.Pill> pills = ShelfPrefs.load(this);
+                for (int i = 0; i < pills.size(); ++i) {
+                    if (pills.get(i).id.equals(pill.id)) {
+                        pills.set(i, new ShelfPrefs.Pill(pill.id, pill.name,
+                                ShelfPrefs.KIND_VIEW, currentViewState().toJson()));
+                        break;
+                    }
+                }
+                ShelfPrefs.save(this, pills);
+                if (mShelf != null) mShelf.reload();
+            });
+            body.addView(update);
+        }
+
+        TextView remove = RowPills.actionPill(this, getString(R.string.shelf_remove),
+                R.drawable.ic_trash_can, red, false);
+        remove.setOnClickListener(v -> {
+            if (dialog[0] != null) dialog[0].dismiss();
+            ShelfPrefs.remove(this, pill.id);
+            if (mShelf != null) {
+                if (pill.id.equals(mShelf.getActiveId())) mShelf.setActiveId(null);
+                mShelf.reload();
+            }
+        });
+        body.addView(remove);
+
+        dialog[0] = ForkDialog.present(ForkDialog.builder(this)
+                .setTitle(pill.name)
+                .setView(body)
+                .setNegativeButton(R.string.cancel, null));
+    }
+
+    private void promptShelfName(@NonNull String initial, @NonNull androidx.core.util.Consumer<String> onName) {
+        new TextInputDialogBuilder(this, R.string.shelf_name)
+                .setTitle(R.string.shelf_name)
+                .setInputText(initial)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.save, (dialog, which, inputText, isChecked) -> {
+                    String name = inputText == null ? "" : inputText.toString().trim();
+                    if (name.isEmpty()) {
+                        name = initial;
+                    }
+                    onName.accept(name);
+                })
+                .show();
+    }
+
+    /**
      * Copy the package names of every app currently shown in the list (after
      * search + all active filters), one per line, to the clipboard, and flash
      * a count toast. Writing the primary clip from a foreground activity needs
@@ -785,12 +1189,14 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
     @Override
     public void onSelectionModeEnabled() {
         mOnBackPressedCallback.setEnabled(true);
+        updateBatchPane();
         updateSelectionReminder();
     }
 
     @Override
     public void onSelectionModeDisabled() {
         mOnBackPressedCallback.setEnabled(false);
+        updateBatchPane();
         // Selection cleared/exited — drop the reminder and close its sheet.
         updateSelectionReminder();
     }
@@ -800,11 +1206,26 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         int id = item.getItemId();
         if (id == R.id.action_backup) {
             if (viewModel != null) {
-                BackupRestoreDialogFragment fragment = BackupRestoreDialogFragment.getInstance(viewModel.getSelectedPackagesWithUsers());
-                fragment.setOnActionBeginListener(mode -> showProgressIndicator(true));
-                fragment.setOnActionCompleteListener((mode, failedPackages) -> showProgressIndicator(false));
-                fragment.show(getSupportFragmentManager(), BackupRestoreDialogFragment.TAG);
-                clearSelection();
+                // Fork (白い熊, +121): backing up a batch opens the TABLE — every selected app
+                // with its own parts, and its own app-supplied categories where it has a door.
+                // One set of flags for five hundred apps was only ever right when they were all
+                // the same kind of thing. Restore and delete stay with the dialog that answers
+                // them, reachable from the table's own button.
+                List<UserPackagePair> pairs = viewModel.getSelectedPackagesWithUsers();
+                new BatchBackupTableDialog(this, pairs, new BatchBackupTableDialog.Listener() {
+                    @Override
+                    public void onBackup(@NonNull java.util.Map<String, Integer> perPackageFlags,
+                                         int fallbackFlags,
+                                         @NonNull java.util.Map<String, String[]> perPackageAppData) {
+                        handleBatchOp(BatchOpsManager.OP_BACKUP, new BatchBackupOptions(
+                                fallbackFlags, null, null, perPackageFlags, null, perPackageAppData));
+                    }
+
+                    @Override
+                    public void onRestoreOrDelete() {
+                        openBackupRestoreSheet(pairs);
+                    }
+                }).show();
             }
         } else if (id == R.id.action_save_apk) {
             mStoragePermission.request(granted -> {
@@ -1008,6 +1429,14 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         // change (the clear+rebuild path always runs but produces an
         // identical menu, which the widget renders without flicker).
         rebuildSelectionToolbarFromPrefs();
+        // Fork (+118): the shelf and the batch pills are both configured elsewhere — the shelf
+        // from its own editor dialogs, the pills from the settings page — so both are re-read
+        // here rather than assumed unchanged.
+        if (mShelf != null) {
+            mShelf.reload();
+        }
+        rebuildBatchActions();
+        updateBatchPane();
         refreshForkAppearanceIfChanged();
         // Fork: re-check the privileged session. The binder-death listener covers a
         // server that dies while we are on screen; this covers everything that
@@ -1023,11 +1452,46 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         // Fork: mark the main window foreground so the service suppresses the
         // system completion heads-up (the themed toast covers it here).
         BatchOpsProgressMonitor.getInstance().setHostForeground(true);
-        // Re-attach the progress dialog if an op is still running (e.g. the user
-        // left and came back mid-operation).
-        if (BatchOpsProgressMonitor.getInstance().isActive()) {
-            showBatchProgressDialog();
+        // Re-open the progress page if an op is still running and we have not
+        // already shown it for this batch (e.g. the user left and came back
+        // mid-operation). Reaching the main list mid-batch means the page was
+        // dismissed deliberately, so this only fires once per run.
+        if (BatchOpsProgressMonitor.getInstance().isActive() && !mProgressPageOpened) {
+            openBatchProgressPage(BatchOpsManager.OP_NONE, Integer.MAX_VALUE);
         }
+        offerPendingStateImport();
+    }
+
+    /**
+     * Fork (白い熊, +134): a restore of this app's OWN settings, waiting to be applied.
+     *
+     * <p>It cannot be applied where it arrives — the restore is running inside this process, and
+     * applying it means replacing preference files and then killing the process. So it is staged
+     * and offered here, on the next visit to the list, as a choice: {@link PendingStateImport}
+     * explains why an explicit tap is the only safe moment.
+     */
+    private void offerPendingStateImport() {
+        if (mPendingImportOffered || !PendingStateImport.isPending(this)) {
+            return;
+        }
+        mPendingImportOffered = true;
+        ForkDialog.present(ForkDialog.builder(this)
+                .setTitle(R.string.pending_state_import_title)
+                .setMessage(R.string.pending_state_import_message)
+                .setNegativeButton(R.string.settings_eim_later, null)
+                .setNeutralButton(R.string.discard, (dialog, which) -> PendingStateImport.discard(this))
+                .setPositiveButton(R.string.settings_eim_restart_now, (dialog, which) -> {
+                    try {
+                        PendingStateImport.apply(this);
+                    } catch (Throwable th) {
+                        UIUtils.displayLongToast(R.string.failed);
+                        return;
+                    }
+                    // Hard-kill, never Runtime.exit: cached SharedPreferences would otherwise be
+                    // written back over what was just imported. Same rule as the Export/Import
+                    // panel's "Restart now".
+                    android.os.Process.killProcess(android.os.Process.myPid());
+                }));
     }
 
     /**
@@ -1109,12 +1573,7 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         // Fork: no longer foreground — let the service post the system completion
         // notification again (no themed toast while backgrounded).
         BatchOpsProgressMonitor.getInstance().setHostForeground(false);
-        // Fork: drop the progress dialog while backgrounded; it is re-shown on
-        // resume if the operation is still running. The op itself keeps going in
-        // the foreground service.
-        if (mBatchProgressDialog != null) {
-            mBatchProgressDialog.dismiss();
-        }
+
     }
 
     @Override
@@ -1190,6 +1649,15 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                 }
             });
         });
+    }
+
+    /** The multi-tab sheet, for the questions it answers better than the table does. */
+    private void openBackupRestoreSheet(@NonNull List<UserPackagePair> pairs) {
+        BackupRestoreDialogFragment fragment = BackupRestoreDialogFragment.getInstance(pairs);
+        fragment.setOnActionBeginListener(mode -> showProgressIndicator(true));
+        fragment.setOnActionCompleteListener((mode, failedPackages) -> showProgressIndicator(false));
+        fragment.show(getSupportFragmentManager(), BackupRestoreDialogFragment.TAG);
+        clearSelection();
     }
 
     private void handleBatchOp(@BatchOpsManager.OpType int op) {
@@ -1343,6 +1811,85 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
     // the AM service binder with it and the app carried on silently on the no-root
     // shell: privileged operations quietly did nothing and the window looked exactly
     // like a working one. See PrivilegeWatchdog for what raises and clears this.
+    /**
+     * Fork (白い熊, +132): a pinned line that leads back to the batch operation.
+     *
+     * <p>Back on the progress page has never cancelled anything — the work runs in a foreground
+     * service, and the page is only a window onto it — but once that window was closed the only
+     * route back was the system notification, which is an odd place to look for something
+     * happening inside this app. So the list itself says that a batch is running, and keeps
+     * saying it after the batch ends until dismissed: the finished log is the more valuable of
+     * the two, and it is exactly the one that used to become unreachable.
+     */
+    private void setupOperationBar() {
+        mOperationBar = findViewById(R.id.operation_bar);
+        if (mOperationBar == null) {
+            return;
+        }
+        mOperationBarText = mOperationBar.findViewById(R.id.operation_bar_text);
+        ImageView icon = mOperationBar.findViewById(R.id.operation_bar_icon);
+        View dismiss = mOperationBar.findViewById(R.id.operation_bar_dismiss);
+        int ink = ForkThemeUtils.getTextColor();
+        GradientDrawable background = new GradientDrawable();
+        background.setShape(GradientDrawable.RECTANGLE);
+        background.setColor(Color.BLACK);
+        background.setStroke(Math.round(ForkThemeUtils.dpToPx(this, 1f)),
+                ColorUtils.setAlphaComponent(ink, 0x88));
+        mOperationBar.setBackground(background);
+        mOperationBarText.setTextColor(ink);
+        icon.setImageTintList(ColorStateList.valueOf(ink));
+        ((ImageView) dismiss).setImageTintList(ColorStateList.valueOf(
+                ColorUtils.setAlphaComponent(ink, 0xAA)));
+        mOperationBar.setOnClickListener(v -> {
+            try {
+                startActivity(BatchOpsProgressActivity.getIntent(this));
+            } catch (Throwable ignore) {
+            }
+        });
+        dismiss.setOnClickListener(v -> {
+            mOperationBarDismissed = true;
+            mOperationBar.setVisibility(View.GONE);
+        });
+        BatchOpsProgressMonitor.getInstance().getState().observe(this, this::updateOperationBar);
+    }
+
+    private void updateOperationBar(@Nullable BatchOpsProgressMonitor.State state) {
+        if (mOperationBar == null || mOperationBarText == null) {
+            return;
+        }
+        if (state == null || (!state.active && state.done == 0 && state.max == 0)) {
+            // Nothing has run in this process yet — there is no log to go back to.
+            mOperationBar.setVisibility(View.GONE);
+            return;
+        }
+        if (state.active && state.startedAtRealtime != mOperationBarStartedAt) {
+            // A new batch. Whatever was dismissed was about the previous one.
+            mOperationBarStartedAt = state.startedAtRealtime;
+            mOperationBarDismissed = false;
+        }
+        if (mOperationBarDismissed
+                || (!state.active && BatchOpsProgressMonitor.getInstance().isResultSeen())) {
+            // Dismissed by hand, or already read on the progress page — see noteResultSeen.
+            mOperationBar.setVisibility(View.GONE);
+            return;
+        }
+        CharSequence title = state.title != null ? state.title : OpLog.getInstance().getTitle();
+        String counts = state.max > 0
+                ? getString(R.string.op_bar_counts, state.done, state.max)
+                : String.valueOf(state.done);
+        String text;
+        if (state.active) {
+            text = getString(state.paused ? R.string.op_bar_paused : R.string.op_bar_running,
+                    title, counts);
+        } else if (state.failed > 0) {
+            text = getString(R.string.op_bar_finished_failed, title, counts, state.failed);
+        } else {
+            text = getString(R.string.op_bar_finished, title, counts);
+        }
+        mOperationBarText.setText(text);
+        mOperationBar.setVisibility(View.VISIBLE);
+    }
+
     private void setupPrivilegeAlarm() {
         mPrivilegeAlarm = findViewById(R.id.privilege_alarm);
         if (mPrivilegeAlarm == null) {
@@ -1472,16 +2019,26 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         updateSelectionReminder();
     }
 
-    // Fork: open the in-app batch-progress dialog if the user has it enabled.
-    // Safe to call repeatedly — the dialog ignores a show() while already shown.
-    private void showBatchProgressDialog() {
+    /**
+     * Fork (白い熊, +116): open the batch progress page.
+     *
+     * <p>Backup and restore always open it, whatever their size — those are the operations worth
+     * watching. Everything else opens it only for more than one app: a full screen for a
+     * two-second freeze of a single app is in the way rather than useful.
+     */
+    private void openBatchProgressPage(int op, int packageCount) {
         if (!Prefs.Appearance.showBatchProgressDialog()) {
             return;
         }
-        if (mBatchProgressDialog == null) {
-            mBatchProgressDialog = new BatchProgressDialog(this);
+        if (op != BatchOpsManager.OP_NONE
+                && !BatchOpsProgressActivity.shouldAutoOpen(op, packageCount)) {
+            return;
         }
-        mBatchProgressDialog.show();
+        mProgressPageOpened = true;
+        try {
+            startActivity(BatchOpsProgressActivity.getIntent(this));
+        } catch (Throwable ignore) {
+        }
     }
 
     void showProgressIndicator(boolean show) {

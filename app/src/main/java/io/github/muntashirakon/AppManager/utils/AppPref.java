@@ -193,6 +193,18 @@ public class AppPref {
             return sPrefKeyList.indexOf(key);
         }
 
+        /**
+         * Fork (+117): the string this key is actually stored under — the enum name without its
+         * {@code PREF_} prefix and type suffix, lower-cased. Needed by
+         * {@link io.github.muntashirakon.AppManager.settings.SecurityPrefGuard}, which reads and
+         * writes the preferences XML directly and must name entries exactly as the framework
+         * wrote them.
+         */
+        @NonNull
+        public static String keyOf(@NonNull PrefKey key) {
+            return sKeys[indexOf(key)];
+        }
+
         public static int indexOf(String key) {
             return ArrayUtils.indexOf(sKeys, key);
         }

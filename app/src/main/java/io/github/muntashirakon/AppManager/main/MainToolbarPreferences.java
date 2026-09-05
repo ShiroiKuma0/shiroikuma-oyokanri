@@ -44,6 +44,19 @@ public class MainToolbarPreferences extends Fragment {
 
     public static final String TAG = MainToolbarPreferences.class.getSimpleName();
 
+    /**
+     * Fork (白い熊, +118): which registry this editor is editing.
+     *
+     * <p>The unrolled row's pills are the same kind of setting as the selection toolbar's — a
+     * visible/hidden split with an order — so they get the same editor rather than a second one
+     * for a person to learn. Passed as a preference {@code <extra>}; absent means the toolbar,
+     * which is what every existing entry point wants.
+     */
+    public static final String ARG_REGISTRY = "registry";
+    public static final String REGISTRY_APP_PANE = "app_pane";
+
+    private boolean mIsAppPane;
+
     /** Ordered working copy of all 13 keys. Visible rows must come
      *  first in this list; the {@link #onRowMoved} callback enforces
      *  the order, and the checkbox callback re-classifies a row by
@@ -71,9 +84,19 @@ public class MainToolbarPreferences extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        mIsAppPane = getArguments() != null
+                && REGISTRY_APP_PANE.equals(getArguments().getString(ARG_REGISTRY));
+        AppCompatTextView header = view.findViewById(R.id.header);
+        if (header != null) {
+            header.setText(mIsAppPane ? R.string.pref_app_pane_summary : R.string.pref_main_toolbar_summary);
+        }
         // Load current state into the working lists.
-        List<String> visible = MainToolbarPrefs.loadVisibleOrder(requireContext());
-        List<String> hidden = MainToolbarPrefs.loadHiddenOrder(requireContext());
+        List<String> visible = mIsAppPane
+                ? AppPanePrefs.loadVisibleOrder(requireContext())
+                : MainToolbarPrefs.loadVisibleOrder(requireContext());
+        List<String> hidden = mIsAppPane
+                ? AppPanePrefs.loadHiddenOrder(requireContext())
+                : MainToolbarPrefs.loadHiddenOrder(requireContext());
         mOrder.clear();
         mVisible.clear();
         for (String k : visible) {
@@ -107,7 +130,11 @@ public class MainToolbarPreferences extends Fragment {
             if (v != null && v) visibleNow.add(k);
             else hiddenNow.add(k);
         }
-        MainToolbarPrefs.save(requireContext(), visibleNow, hiddenNow);
+        if (mIsAppPane) {
+            AppPanePrefs.save(requireContext(), visibleNow, hiddenNow);
+        } else {
+            MainToolbarPrefs.save(requireContext(), visibleNow, hiddenNow);
+        }
     }
 
     /** Called by the adapter when a row's checkbox is toggled. */
@@ -144,8 +171,8 @@ public class MainToolbarPreferences extends Fragment {
             // feed back into onVisibilityToggled.
             h.checkbox.setOnCheckedChangeListener(null);
             h.checkbox.setChecked(visible != null && visible);
-            int titleRes = MainToolbarPrefs.titleForKey(key);
-            int iconRes = MainToolbarPrefs.iconForKey(key);
+            int titleRes = mIsAppPane ? AppPanePrefs.titleForKey(key) : MainToolbarPrefs.titleForKey(key);
+            int iconRes = mIsAppPane ? AppPanePrefs.iconForKey(key) : MainToolbarPrefs.iconForKey(key);
             if (titleRes != 0) h.label.setText(titleRes);
             else h.label.setText(key);
             if (iconRes != 0) h.icon.setImageResource(iconRes);

@@ -17,6 +17,7 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import io.github.muntashirakon.AppManager.fonts.MainIconPrefs;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.widget.LinearLayoutCompat;
@@ -54,6 +55,77 @@ import io.github.muntashirakon.AppManager.utils.ForkThemeUtils;
 public final class MainCardBinder {
     private MainCardBinder() {}
 
+    /**
+     * Fork (白い熊, +124): the sibling screens' entry point — the SAME card as the main list,
+     * with the right-hand column carrying that screen's own lines.
+     *
+     * <p>保存一覧, 盗み見一覧 and 仲間 draw a list of apps, so they must be the same list of apps:
+     * same icon at the configured size, same film behind a frozen row, same running box, same
+     * italic, same snowflake. Only what the right column says differs. Going through this binder
+     * rather than a lookalike layout is what makes that true by construction instead of by
+     * inspection — the battery screen learnt the same lesson (+30).
+     */
+    public static void bindLines(@NonNull Context context, @NonNull View card,
+                                 @Nullable ApplicationInfo applicationInfo,
+                                 @Nullable String packageName, int uid, boolean frozen,
+                                 @NonNull List<CharSequence> rightLines, int accent,
+                                 @NonNull View.OnClickListener onCard) {
+        bind(context, card, null, applicationInfo, packageName, uid, frozen,
+                java.util.Collections.emptyList(), null, null, false,
+                onCard, v -> onCard.onClick(v), v -> onCard.onClick(v), rightLines, accent);
+    }
+
+    /**
+     * Fork (白い熊, +124): the configurable icon size, roundness and glyph scale — applied here so
+     * every surface that draws this card agrees. The main list calls this too; before it, the
+     * battery header and the sibling screens showed the layout's default 60dp whatever the
+     * setting said.
+     */
+    public static void applyIconSize(@NonNull Context context, @NonNull View card) {
+        float density = context.getResources().getDisplayMetrics().density;
+        int sizeDp = MainIconPrefs.getSizeDp(context);
+        int iconPx = Math.round(sizeDp * density);
+        int glyphPx = Math.round(sizeDp * density * 0.43f);
+        setViewWidth(card.findViewById(R.id.icon_column), iconPx);
+        setViewSize(card.findViewById(R.id.icon), iconPx, iconPx);
+        setViewSize(card.findViewById(R.id.freeze_indicator), glyphPx, glyphPx);
+        setViewSize(card.findViewById(R.id.kill_badge), glyphPx, glyphPx);
+        View icon = card.findViewById(R.id.icon);
+        int roundPct = MainIconPrefs.getRoundnessPercent(context);
+        if (icon != null) {
+            if (roundPct > 0) {
+                final float radius = iconPx * roundPct / 100f;
+                icon.setOutlineProvider(new android.view.ViewOutlineProvider() {
+                    @Override
+                    public void getOutline(View view, android.graphics.Outline outline) {
+                        outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), radius);
+                    }
+                });
+                icon.setClipToOutline(true);
+            } else {
+                icon.setOutlineProvider(null);
+                icon.setClipToOutline(false);
+            }
+        }
+    }
+
+    private static void setViewWidth(@Nullable View view, int width) {
+        if (view == null) return;
+        ViewGroup.LayoutParams lp = view.getLayoutParams();
+        if (lp == null || lp.width == width) return;
+        lp.width = width;
+        view.setLayoutParams(lp);
+    }
+
+    private static void setViewSize(@Nullable View view, int width, int height) {
+        if (view == null) return;
+        ViewGroup.LayoutParams lp = view.getLayoutParams();
+        if (lp == null || (lp.width == width && lp.height == height)) return;
+        lp.width = width;
+        lp.height = height;
+        view.setLayoutParams(lp);
+    }
+
     public static void bind(@NonNull Context context, @NonNull View card,
                             @Nullable ApplicationItem item,
                             @Nullable ApplicationInfo applicationInfo,
@@ -64,7 +136,23 @@ public final class MainCardBinder {
                             @NonNull View.OnClickListener onCard,
                             @NonNull View.OnClickListener onFreeze,
                             @NonNull View.OnClickListener onKill) {
+        bind(context, card, item, applicationInfo, packageName, uid, frozen, profileTags,
+                batteryRow, windowLabel, allCounters, onCard, onFreeze, onKill, null, 0);
+    }
+
+    public static void bind(@NonNull Context context, @NonNull View card,
+                            @Nullable ApplicationItem item,
+                            @Nullable ApplicationInfo applicationInfo,
+                            @Nullable String packageName, int uid, boolean frozen,
+                            @NonNull List<String> profileTags,
+                            @Nullable BatteryUsageViewModel.Row batteryRow,
+                            @Nullable String windowLabel, boolean allCounters,
+                            @NonNull View.OnClickListener onCard,
+                            @NonNull View.OnClickListener onFreeze,
+                            @NonNull View.OnClickListener onKill,
+                            @Nullable List<CharSequence> customLines, int customAccent) {
         float density = context.getResources().getDisplayMetrics().density;
+        applyIconSize(context, card);
         MaterialCardView cardView = (MaterialCardView) card;
 
         int yellow = ContextCompat.getColor(context, R.color.theme_bright_yellow);
@@ -159,8 +247,9 @@ public final class MainCardBinder {
                     (LinearLayoutCompat.LayoutParams) rightColumn.getLayoutParams();
             centerLp.width = 0;
             rightLp.width = 0;
-            centerLp.weight = batteryRow != null ? 1.35f : 1f;
-            rightLp.weight = batteryRow != null ? 1f : 2f;
+            boolean wideRight = batteryRow != null || customLines != null;
+            centerLp.weight = wideRight ? 1.35f : 1f;
+            rightLp.weight = wideRight ? 1f : 2f;
             centerColumn.setLayoutParams(centerLp);
             rightColumn.setLayoutParams(rightLp);
         }
@@ -232,6 +321,32 @@ public final class MainCardBinder {
                 sha.setEllipsize(null);
                 sha.setSingleLine(false);
                 sha.setMaxLines(allCounters ? 8 : 2);
+            }
+        } else if (customLines != null) {
+            // A sibling screen's own lines, in the main list's own column: first line at the
+            // version's weight (it is the headline of that screen), the rest beneath it.
+            if (barTrack != null) barTrack.setVisibility(View.GONE);
+            version.setText(customLines.isEmpty() ? "" : customLines.get(0));
+            version.setTextColor(customAccent != 0 ? customAccent : ForkThemeUtils.getTextColor());
+            version.setGravity(android.view.Gravity.END);
+            version.setTypeface(null, Typeface.BOLD);
+            isSystem.setText(customLines.size() > 1 ? customLines.get(1) : "");
+            isSystem.setGravity(android.view.Gravity.END);
+            isSystem.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
+            isSystem.setSingleLine(false);
+            isSystem.setMaxLines(2);
+            TextView sha = card.findViewById(R.id.sha);
+            if (sha != null) {
+                StringBuilder rest = new StringBuilder();
+                for (int i = 2; i < customLines.size(); ++i) {
+                    if (rest.length() > 0) rest.append('\n');
+                    rest.append(customLines.get(i));
+                }
+                sha.setText(rest.toString());
+                sha.setGravity(android.view.Gravity.END);
+                sha.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
+                sha.setSingleLine(false);
+                sha.setMaxLines(4);
             }
         } else {
             if (barTrack != null) barTrack.setVisibility(View.GONE);

@@ -798,6 +798,23 @@
             android:enableOnBackInvokedCallback="true"
             android:exported="false"
             android:label="@string/sys_config" />
+        <!-- Fork (白い熊, +118): the sibling list screens — 保存一覧, 盗み見一覧, 仲間.
+             One activity, parameterised by a screen id. -->
+        <activity
+            android:name=".screens.ListScreenActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:exported="false"
+            android:theme="@style/AppTheme.YellowOnBlack" />
+        <!-- Fork (白い熊, +116): the batch operation progress page (black/yellow theme).
+             singleTop, because the main window may ask for it again while it is already
+             on screen and a second copy would split one batch's log across two pages. -->
+        <activity
+            android:name=".batchops.BatchOpsProgressActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:exported="false"
+            android:label="@string/batch_ops"
+            android:launchMode="singleTop"
+            android:theme="@style/AppTheme.YellowOnBlack" />
         <activity
             android:name=".batchops.BatchOpsResultsActivity"
             android:enableOnBackInvokedCallback="true"
@@ -1745,6 +1762,31 @@
             android:exported="true"
             android:multiprocess="false"
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
+        <!-- Fork (白い熊, +134): 応用管理's own door onto the sister-app data contract, so it
+             backs up its own settings, profiles, notes and fonts through the same path as every
+             other family app — and appears under the sister-app filter, which until now it did
+             not, truthfully, because it declared none of this. Exported with no permission for
+             the same reason every sister app's door is: the caller cannot hold one, and the
+             framework identifies it through the binder. See appdata/self/OwnDataProvider. -->
+        <provider
+            android:name=".appdata.self.OwnDataProvider"
+            android:authorities="${applicationId}.automation"
+            android:enabled="true"
+            android:exported="true" />
+
+        <!-- The three values the contract is discovered by. Read with Bundle#getInt — aapt2
+             stores a bare numeric android:value as an int (see AppDataContract#fromMetaData).
+             "format" is per-app and bound to the archive layout, never to the contract. -->
+        <meta-data
+            android:name="shiroikuma.automation.contract"
+            android:value="2" />
+        <meta-data
+            android:name="shiroikuma.automation.format"
+            android:value="1" />
+        <meta-data
+            android:name="shiroikuma.automation.min_format"
+            android:value="1" />
 
         <meta-data
             android:name="android.permission.INTERNET.mode"
