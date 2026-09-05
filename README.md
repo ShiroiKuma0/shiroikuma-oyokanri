@@ -11,7 +11,8 @@
 A fork of [AppManager](https://github.com/MuntashirAkon/AppManager) with **major additions**: a
 **Shizuku mode of operation** that needs no listening `adbd`, a per-app
 **battery history** that survives the charge cycle Android wipes it on, a per-app
-**anti-snooping page** that can cut an app off the network entirely, **device-policy locks** that
+**anti-snooping page** that can cut an app off the network entirely, **app-data backup without
+root** through a contract the sister apps implement, **device-policy locks** that
 Settings cannot undo, a configurable
 **yellow-on-black UI** with a deep customization page, a hard-blocking **protected profile**, a
 from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-tap **main-list quick
@@ -301,6 +302,31 @@ The app list does more without a trip into details:
 - A **copy-all-displayed-IDs** toolbar action, a **multi-profile include/exclude filter** with a
   tri-state picker, and a fully **customisable bottom selection toolbar** (reorder/hide actions;
   long-press any button to open the editor).
+
+## 📦 App data backup without root
+
+An APK is the easy half. What a non-rooted phone cannot reach is each app's **own data** —
+`/data/data` is closed to the shell, and the platform's backup transport refuses release builds — so
+a clean-phone restore has always come back with the apps but not what was in them.
+
+So the app **asks each app for its data instead of taking it**. A sister app that implements the
+contract exposes a small door; 応用管理 hands it a file descriptor, and it writes its own export
+straight into the backup. Nothing is handed a path: a descriptor is a capability that expires when it
+is closed, and the archive is folded in through the ordinary path, so it is checksummed and encrypted
+with everything else — and **verified before it is ever handed back** at restore.
+
+- **Discovery costs nothing.** Support is declared in the manifest, so the list can be built across
+  every installed app without waking any of them — including the frozen ones, which cannot be asked
+  anything.
+- **The awkward parts are handled here, not by forty-two apps.** A frozen app is thawed for the
+  export and re-frozen exactly as it was; a battery-optimisation exemption is granted around the call
+  so the export cannot be refused as a background start; and the app is force-stopped the instant it
+  reports a successful import — otherwise it writes its cached settings back out on the way down and
+  silently undoes the restore.
+- **Pick what goes in, per app.** The **App data categories** button on the row asks that app what it
+  can export and shows its own categories, nested and pre-ticked as it recommends. The choice is
+  remembered per package, so a **bulk backup applies it silently** — per-app control inside a batch,
+  with no batch UI to wade through. Untouched apps simply export what they recommend.
 
 ## 💾 Backups & settings portability
 
