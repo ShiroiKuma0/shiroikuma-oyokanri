@@ -405,7 +405,7 @@ public class BackupRestoreDialogFragment extends CapsuleBottomSheetDialogFragmen
         ContextCompat.registerReceiver(mActivity, mBatchOpsBroadCastReceiver,
                 new IntentFilter(BatchOpsService.ACTION_BATCH_OPS_COMPLETED), ContextCompat.RECEIVER_NOT_EXPORTED);
         // Start batch ops service
-        BatchBackupOptions options = new BatchBackupOptions(operationInfo.flags, operationInfo.backupNames, operationInfo.relativeDirs);
+        BatchBackupOptions options = operationInfo.toBatchOptions();
         BatchQueueItem queueItem = BatchQueueItem.getBatchOpQueue(operationInfo.op,
                 operationInfo.packageList, operationInfo.userIdListMappedToPackageList, options);
         Intent intent = BatchOpsService.getServiceIntent(mActivity, queueItem);

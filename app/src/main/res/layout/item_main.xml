@@ -10,6 +10,17 @@
     android:checkable="true"
     app:cardBackgroundColor="@android:color/black">
 
+    <!-- Fork (白い熊, +118): the card is now a COLUMN — the row itself, and under it the pane
+         that a tap unrolls. The pane is part of the row rather than an extra item inserted into
+         the adapter, because every selection call in MultiSelectionView.Adapter is keyed by
+         ADAPTER POSITION: an inserted row would shift every position after it and quietly
+         corrupt the selection. Width in a grid is handled by a span-size lookup instead, which
+         touches no data at all. -->
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
     <androidx.appcompat.widget.LinearLayoutCompat
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -435,6 +446,20 @@
                 tools:text="SHA256withRSA" />
 
         </androidx.appcompat.widget.LinearLayoutCompat>
+
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
+    <!-- The unrolled pane: facts this row cannot show, the action pills, and the backups.
+         Filled by AppPaneBinder on bind; GONE for every row but the open one. -->
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:id="@+id/app_pane"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="?attr/listItemPaddingHorizontal"
+        android:paddingBottom="10dp"
+        android:visibility="gone"
+        tools:visibility="visible" />
 
     </androidx.appcompat.widget.LinearLayoutCompat>
 

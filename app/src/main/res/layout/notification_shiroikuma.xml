@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!--
+    Fork (白い熊, +138): the completion notification in the fork's own colours.
+
+    Two nested boxes rather than a bordered drawable: RemoteViews can set a background COLOUR at
+    runtime but cannot build a GradientDrawable, and the border has to follow the configurable
+    theme like everything else. The outer box painted the ink colour with 2dp of padding IS the
+    border; the inner box painted the background colour is the field.
+
+    On Android 12 and up the platform wraps every custom notification in its own header strip
+    (app name and time) — that part is the system's and cannot be repainted. This is the body.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/notification_frame"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="2dp">
+
+    <LinearLayout
+        android:id="@+id/notification_field"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="14dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="10dp">
+
+        <TextView
+            android:id="@+id/notification_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            />
+
+        <TextView
+            android:id="@+id/notification_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="3"
+            android:paddingTop="2dp"
+            android:textSize="13sp" />
+
+    </LinearLayout>
+
+</LinearLayout>

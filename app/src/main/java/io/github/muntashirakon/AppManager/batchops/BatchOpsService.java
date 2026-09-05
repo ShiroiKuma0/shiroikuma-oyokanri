@@ -13,6 +13,8 @@ import android.os.PowerManager;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+
+import java.util.List;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.app.PendingIntentCompat;
 import androidx.core.app.ServiceCompat;
@@ -26,6 +28,7 @@ import io.github.muntashirakon.AppManager.batchops.BatchOpsManager.BatchOpsInfo;
 import io.github.muntashirakon.AppManager.history.ops.OpHistoryManager;
 import io.github.muntashirakon.AppManager.intercept.IntentCompat;
 import io.github.muntashirakon.AppManager.main.MainActivity;
+import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.progress.NotificationProgressHandler;
 import io.github.muntashirakon.AppManager.progress.NotificationProgressHandler.NotificationManagerInfo;
 import io.github.muntashirakon.AppManager.progress.ProgressHandler;
@@ -123,7 +126,9 @@ public class BatchOpsService extends ForegroundService {
                 NotificationUtils.HIGH_PRIORITY_NOTIFICATION_INFO,
                 NotificationUtils.HIGH_PRIORITY_NOTIFICATION_INFO);
         mProgressHandler.setProgressTextInterface(ProgressHandler.PROGRESS_REGULAR);
-        Intent notificationIntent = new Intent(this, MainActivity.class);
+        // Fork (+116): the running notification opens the progress page, not the app list —
+        // what a person taps it for is to see how the batch is getting on.
+        Intent notificationIntent = BatchOpsProgressActivity.getIntent(this);
         PendingIntent pendingIntent = PendingIntentCompat.getActivity(this, 0, notificationIntent, 0, false);
         mNotificationInfo = new NotificationProgressHandler.NotificationInfo()
                 .setOperationName(getHeader(item))
@@ -144,8 +149,20 @@ public class BatchOpsService extends ForegroundService {
         // reset its pause/cancel state for this run, before announcing the start
         // so the dialog opens against a populated monitor.
         BatchOpsProgressMonitor monitor = BatchOpsProgressMonitor.getInstance();
-        monitor.begin(getDesiredOpTitle(this, item.getOp()), item.getPackages().size());
+        CharSequence opTitle = getDesiredOpTitle(this, item.getOp());
+        monitor.begin(opTitle, item.getPackages().size());
+        // Fork (+116): open the log for this run. Started BEFORE the announcement, so the page
+        // finds a populated log the instant it opens rather than an empty one that fills in.
+        OpLog.getInstance().begin(opTitle,
+                getString(R.string.op_log_app_count, item.getPackages().size()));
         sendStarted(item);
+        // Fork (+116): open the page from HERE as well as from the main window's broadcast
+        // receiver. That receiver only exists while the app list is resumed, so a backup started
+        // from app details, or from the backup dialog of another screen, would otherwise run
+        // with nothing on screen but a notification. The launch is a no-op when the platform
+        // refuses it (no foreground app, i.e. an automated run), which is the right outcome:
+        // the notification still opens the page.
+        openProgressPage(item);
         // Update progress
         if (mProgressHandler != null) {
             mProgressHandler.postUpdate(item.getPackages().size(), 0);
@@ -157,6 +174,7 @@ public class BatchOpsService extends ForegroundService {
         // user-cancelled run is reported as cancelled rather than failed.
         boolean cancelled = monitor.isCancelled();
         monitor.finish();
+        writeLogSummary(item, result, cancelled);
         OpHistoryManager.addHistoryItem(HISTORY_TYPE_BATCH_OPS, item, result.isSuccessful() && !cancelled);
         if (cancelled) {
             sendResults(Activity.RESULT_CANCELED, item, result);
@@ -207,6 +225,37 @@ public class BatchOpsService extends ForegroundService {
             return null;
         }
         return IntentCompat.getUnwrappedParcelableExtra(intent, EXTRA_QUEUE_ITEM, BatchQueueItem.class);
+    }
+
+    private void openProgressPage(@NonNull BatchQueueItem item) {
+        if (!Prefs.Appearance.showBatchProgressDialog()
+                || !BatchOpsProgressActivity.shouldAutoOpen(item.getOp(), item.getPackages().size())) {
+            return;
+        }
+        try {
+            startActivity(BatchOpsProgressActivity.getIntent(this));
+        } catch (Throwable ignore) {
+        }
+    }
+
+    /**
+     * Fork (+116): the closing block of the log — what got through, what did not, and each
+     * failed package by name. Written after {@code finish()} so the page is already showing its
+     * finished state when the summary lands.
+     */
+    private void writeLogSummary(@NonNull BatchQueueItem queueItem,
+                                 @Nullable BatchOpsManager.Result result, boolean cancelled) {
+        int total = queueItem.getPackages().size();
+        List<String> failed = result != null ? result.getFailedPackages() : null;
+        int failedCount = failed != null ? failed.size() : 0;
+        OpLog log = OpLog.getInstance();
+        log.end(getString(cancelled ? R.string.op_log_end_cancelled : R.string.op_log_end,
+                total - failedCount, total), null);
+        if (failed != null) {
+            for (String packageName : failed) {
+                log.endDetail(packageName, true);
+            }
+        }
     }
 
     private void sendStarted(@NonNull BatchQueueItem queueItem) {

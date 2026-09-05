@@ -14,6 +14,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
 
 import java.io.File;
+import java.util.Collections;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -24,6 +25,7 @@ import io.github.muntashirakon.AppManager.compat.PackageManagerCompat;
 import io.github.muntashirakon.AppManager.compat.PermissionCompat;
 import io.github.muntashirakon.AppManager.devicepolicy.DevicePolicyBridge;
 import io.github.muntashirakon.AppManager.logs.Log;
+import io.github.muntashirakon.AppManager.settings.StateExportReceiver;
 import io.github.muntashirakon.AppManager.utils.FreezeUtils;
 
 /**
@@ -94,6 +96,30 @@ public class AppDataTransfer {
     @NonNull
     public Outcome export(@NonNull String packageName, @UserIdInt int userId,
                           @NonNull File destination, @Nullable AppDataClient.ProgressListener listener) {
+        return export(packageName, userId, destination, null, listener);
+    }
+
+    /**
+     * @param requested the categories to export this once, or {@code null} to use whatever is
+     *                  stored for the app. An <b>empty</b> array means "none of it" and produces
+     *                  the same skip an empty stored choice does — see
+     *                  {@link io.github.muntashirakon.AppManager.appdata.AppDataCategoryPicker}.
+     */
+    @WorkerThread
+    @NonNull
+    public Outcome export(@NonNull String packageName, @UserIdInt int userId,
+                          @NonNull File destination, @Nullable String[] requested,
+                          @Nullable AppDataClient.ProgressListener listener) {
+        return export(packageName, userId, destination, requested, listener, null);
+    }
+
+    /** @param cancellation asked, while waiting, whether the caller has given up — see AppDataClient. */
+    @WorkerThread
+    @NonNull
+    public Outcome export(@NonNull String packageName, @UserIdInt int userId,
+                          @NonNull File destination, @Nullable String[] requested,
+                          @Nullable AppDataClient.ProgressListener listener,
+                          @Nullable AppDataClient.Cancellation cancellation) {
         AppDataContract.Support support = AppDataContract.read(mContext, packageName);
         if (support == null || !support.isUsable()) {
             return new Outcome(false, "does not implement the data contract", null);
@@ -106,7 +132,9 @@ public class AppDataTransfer {
             }
             // Resolved BEFORE the descriptor is opened, so an "export nothing" choice leaves no
             // empty file behind.
-            List<String> items = resolveItems(packageName);
+            List<String> items = requested != null
+                    ? resolveRequested(packageName, requested)
+                    : resolveItems(packageName);
             if (items != null && items.isEmpty()) {
                 return new Outcome(false, true, "every category unticked for this app", null);
             }
@@ -117,7 +145,8 @@ public class AppDataTransfer {
             }
             AppDataClient.Result result;
             try {
-                result = mClient.transfer(packageName, AppDataContract.METHOD_EXPORT, fd, items, listener);
+                result = mClient.transfer(packageName, AppDataContract.METHOD_EXPORT, fd, items,
+                        listener, cancellation);
             } finally {
                 // Our copy must be closed or the file stays open and cannot be checksummed or
                 // encrypted. The callee dups before the call returns, so this is safe.
@@ -138,6 +167,15 @@ public class AppDataTransfer {
     public Outcome importData(@NonNull String packageName, @UserIdInt int userId,
                               @NonNull File source, @NonNull AppDataHeader header,
                               @Nullable AppDataClient.ProgressListener listener) {
+        return importData(packageName, userId, source, header, listener, null);
+    }
+
+    @WorkerThread
+    @NonNull
+    public Outcome importData(@NonNull String packageName, @UserIdInt int userId,
+                              @NonNull File source, @NonNull AppDataHeader header,
+                              @Nullable AppDataClient.ProgressListener listener,
+                              @Nullable AppDataClient.Cancellation cancellation) {
         AppDataContract.Support support = AppDataContract.read(mContext, packageName);
         if (support == null || !support.isUsable()) {
             return new Outcome(false, "does not implement the data contract", null);
@@ -165,7 +203,8 @@ public class AppDataTransfer {
             }
             AppDataClient.Result result;
             try {
-                result = mClient.transfer(packageName, AppDataContract.METHOD_IMPORT, fd, null, listener);
+                result = mClient.transfer(packageName, AppDataContract.METHOD_IMPORT, fd, null,
+                        listener, cancellation);
             } finally {
                 closeQuietly(fd);
             }
@@ -191,6 +230,16 @@ public class AppDataTransfer {
         if (support == null || !support.isUsable()) {
             return null;
         }
+        if (isSelf(packageName)) {
+            // Fork (白い熊, +134): our own categories, answered directly.
+            //
+            // The listing travels on the §1 BROADCAST channel, and this app's receiver for that
+            // action is token-gated (AutomationAuth) — deliberately, so no other app can
+            // enumerate us without being authorised. Broadcasting to ourselves to get past our
+            // own gate would be theatre, and weakening the gate to allow it would be worse. The
+            // renderer is shared with the receiver, so the two answers cannot drift.
+            return AppDataCategory.parseReply(StateExportReceiver.listCategories(mContext));
+        }
         int changed = preflight(packageName, userId);
         try {
             return new AppDataCategoryClient(mContext).list(packageName);
@@ -207,13 +256,51 @@ public class AppDataTransfer {
      * arrive back at the same answer. Only a customised app pays for the listing — and by then the
      * app is already thawed and running for the export itself, so the extra round trip is cheap.
      */
+    /**
+     * What an app says it can export. For ourselves this is answered directly rather than by
+     * broadcasting past our own token gate — see {@link #listCategories}.
+     */
+    @Nullable
+    private List<AppDataCategory> offeredCategories(@NonNull String packageName) {
+        if (isSelf(packageName)) {
+            return AppDataCategory.parseReply(StateExportReceiver.listCategories(mContext));
+        }
+        return new AppDataCategoryClient(mContext).list(packageName);
+    }
+
+    /**
+     * A run-scoped choice, checked against what the app offers right now. The ids came from a
+     * listing taken moments ago, but an app that has been updated in between could refuse the
+     * whole export with "unknown category", and losing a backup over that would be absurd — so
+     * anything it no longer offers is dropped rather than sent.
+     */
+    @Nullable
+    private List<String> resolveRequested(@NonNull String packageName, @NonNull String[] requested) {
+        List<AppDataCategory> offered = offeredCategories(packageName);
+        List<String> effective = new ArrayList<>(requested.length);
+        if (offered == null) {
+            // It would not say; send what was asked for and let the app judge.
+            Collections.addAll(effective, requested);
+            return effective;
+        }
+        for (String id : requested) {
+            for (AppDataCategory category : offered) {
+                if (category.id.equals(id)) {
+                    effective.add(id);
+                    break;
+                }
+            }
+        }
+        return effective;
+    }
+
     @Nullable
     private List<String> resolveItems(@NonNull String packageName) {
         AppDataSelection.Stored stored = AppDataSelection.get(mContext, packageName);
         if (stored == null) {
             return null;
         }
-        List<AppDataCategory> offered = new AppDataCategoryClient(mContext).list(packageName);
+        List<AppDataCategory> offered = offeredCategories(packageName);
         if (offered == null) {
             // It would not say. Sending the remembered ids blind risks
             // "ERROR:unknown category in items" and losing the whole export, so fall back to the
@@ -230,7 +317,19 @@ public class AppDataTransfer {
 
     // ── Pre-flight and its undo ─────────────────────────────────────────────
 
+    /**
+     * Fork (白い熊, +134): we are the ones doing the work, so we are neither frozen nor
+     * suspended — and {@link #restore} would otherwise be entitled to freeze this app the moment
+     * its own backup finished.
+     */
+    private boolean isSelf(@NonNull String packageName) {
+        return mContext.getPackageName().equals(packageName);
+    }
+
     private int preflight(@NonNull String packageName, @UserIdInt int userId) {
+        if (isSelf(packageName)) {
+            return 0;
+        }
         int changed = 0;
         // Record what we are about to lift BEFORE lifting it. setPackagesSuspended answers only
         // with what it could NOT change, so afterwards there is nothing to read back.

@@ -54,6 +54,10 @@ public final class ProcessClassifier {
     // chain (our server / Shizuku) — never offer to kill it.
     private static final String[] SHELL_PROTECT_SUBSTR = {
             "shiroikuma.oyokanri", "appmanager", "am.jar", "main.jar", "shizuku",
+            // Fork (白い熊, +139): the automation app that fires the family's backups. Hard,
+            // not overridable, for the same reason it can never be frozen — it fails silently,
+            // and a backup schedule that has quietly stopped is discovered far too late.
+            "shiroikuma.jiyusagyoban",
             // The ADB-mode bootstrap that launches our privileged server: its
             // children are sh → sh → :priv:0, so it's the true root of the chain.
             "am_local_server"

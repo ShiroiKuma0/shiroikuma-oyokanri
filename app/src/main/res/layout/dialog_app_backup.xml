@@ -26,6 +26,21 @@
         tools:text="No backups yet."
         tools:visibility="visible" />
 
+    <!-- Fork (白い熊, +119): the list has to say what it is a list of. -->
+    <TextView
+        android:id="@+id/backups_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="@dimen/padding_small"
+        android:paddingBottom="6dp"
+        android:text="@string/backups_existing"
+        android:textAllCaps="true"
+        android:textColor="@color/theme_bright_yellow"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        tools:visibility="visible" />
+
     <io.github.muntashirakon.widget.MaxHeightScrollView
         android:id="@+id/list_container"
         android:layout_width="match_parent"

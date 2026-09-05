@@ -96,7 +96,8 @@ public class BackupManager {
             progressHandler.setProgressTextInterface(ProgressHandler.PROGRESS_PERCENT);
             progressHandler.postUpdate(max, 0f);
         }
-        try (BackupOp backupOp = new BackupOp(options.packageName, options.flags, backupItem, options.userId)) {
+        try (BackupOp backupOp = new BackupOp(options.packageName, options.flags, backupItem,
+                options.userId, options.appDataCategories)) {
             backupOp.runBackup(progressHandler, listener);
             BackupUtils.putBackupToDbAndBroadcast(ContextUtils.getContext(), backupOp.getMetadata());
         }

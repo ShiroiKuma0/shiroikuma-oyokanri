@@ -61,6 +61,26 @@ public final class BackupUtils {
         return getV4SanitizedBackupName(backupName);
     }
 
+    /**
+     * Fork (白い熊, +126): the name a "back up multiple" backup gets, when nobody names it.
+     *
+     * <p><b>Sortable, and readable in a file browser.</b> The old auto-name was the locale's
+     * medium date — {@code Sep 5, 2026 12:33 PM} — which became the directory
+     * {@code 0_Sep_5,_2026_12_33_PM}: it sorts alphabetically by MONTH NAME, so April lands
+     * before January and the newest backup is somewhere in the middle. Standing in the backup
+     * directory deciding what is stale is exactly when that matters, so the stamp is
+     * {@code yyyy-MM-dd_HH-mm-ss}, which sorts chronologically as plain text and needs no
+     * sanitising to be a filename.
+     *
+     * <p>{@code Locale.ROOT} on purpose: this is a filename, not something to be read in a
+     * language, and a locale with its own digits would make the directory unsortable again.
+     */
+    @NonNull
+    public static String timestampBackupName() {
+        return new java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", java.util.Locale.ROOT)
+                .format(new java.util.Date());
+    }
+
     @NonNull
     public static String getV4BackupName(@UserIdInt int userId, @Nullable String backupName) {
         if (backupName == null) {

@@ -49,6 +49,17 @@
             app:key="main_toolbar_prefs"
             app:summary="@string/pref_main_toolbar_description"
             app:title="@string/pref_main_toolbar" />
+        <!-- Fork (白い熊, +118): the same editor, pointed at the unrolled row's pills. -->
+        <Preference
+            android:fragment="io.github.muntashirakon.AppManager.main.MainToolbarPreferences"
+            app:icon="@drawable/ic_view_list"
+            app:key="app_pane_prefs"
+            app:summary="@string/pref_app_pane_description"
+            app:title="@string/pref_app_pane">
+            <extra
+                android:name="registry"
+                android:value="app_pane" />
+        </Preference>
 
         <Preference
             android:fragment="io.github.muntashirakon.AppManager.settings.PrivacyPreferences"

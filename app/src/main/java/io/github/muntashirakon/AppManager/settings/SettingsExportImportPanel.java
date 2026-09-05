@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.text.TextUtils;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
@@ -401,8 +402,16 @@ public final class SettingsExportImportPanel {
 
     /** "Later" closes the whole chain; "Restart now" hard-restarts the app. */
     private void showImportDone(int fileCount) {
-        LinearLayout box = infoBox(mActivity.getString(R.string.settings_eim_import_done_title),
-                mActivity.getString(R.string.settings_eim_import_done_body, fileCount));
+        // Fork (+117): if the import would have weakened a security setting, the setting was
+        // kept and SAYING SO is the point — a silent policy is indistinguishable from an import
+        // that did not work, and 白い熊 would go looking for a bug that is not there.
+        String body = mActivity.getString(R.string.settings_eim_import_done_body, fileCount);
+        List<String> held = SecurityPrefGuard.getHeldSettings();
+        if (!held.isEmpty()) {
+            body += "\n\n" + mActivity.getString(R.string.settings_eim_import_held,
+                    TextUtils.join("、", held));
+        }
+        LinearLayout box = infoBox(mActivity.getString(R.string.settings_eim_import_done_title), body);
         AlertDialog info = infoDialog(box, false);
         LinearLayout btns = infoButtonRow(box);
         Button later = pill(mActivity.getString(R.string.settings_eim_later));

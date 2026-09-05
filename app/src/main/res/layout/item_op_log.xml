@@ -1,0 +1,24 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!--
+    Fork (白い熊, +116): one line of the batch operation log.
+
+    Monospaced and single-line on purpose. The indent ladder is drawn with box-drawing
+    characters, so a proportional face would stop the rungs of consecutive lines lining up —
+    which is the whole job of the indentation — and a wrapped line would restart at column 0 and
+    read as a new entry. A line too long for the panel is ellipsized in the MIDDLE, keeping both
+    the name and the size visible; tapping it shows the whole thing.
+-->
+<androidx.appcompat.widget.AppCompatTextView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/op_log_line"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:ellipsize="middle"
+    android:fontFamily="monospace"
+    android:paddingStart="10dp"
+    android:paddingEnd="10dp"
+    android:paddingTop="1dp"
+    android:paddingBottom="1dp"
+    android:singleLine="true"
+    android:textSize="12sp" />

@@ -50,6 +50,13 @@
     </PreferenceCategory>
 
     <PreferenceCategory app:layout="@layout/m3_preference_category_empty">
+        <!-- Fork (白い熊, +137): the wreckage a failed run leaves behind. -->
+        <Preference
+            app:iconSpaceReserved="false"
+            app:key="clean_broken_backups"
+            app:summary="@string/backup_clean_summary"
+            app:title="@string/backup_clean_title" />
+
         <Preference
             app:iconSpaceReserved="false"
             app:key="import_backups"

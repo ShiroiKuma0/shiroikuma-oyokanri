@@ -184,17 +184,47 @@ public final class BatchOpsProgressMonitor {
     // onResume/onPause; read by BatchOpsService to decide whether to post the
     // system completion heads-up (suppressed while foreground, since the in-app
     // themed toast covers it).
-    private volatile boolean mHostForeground;
+    /**
+     * How many of our own windows are in front. Fork (白い熊, +138): a plain boolean was wrong the
+     * moment a second screen wanted a say — moving from the list to the progress page runs the
+     * new screen's onResume before the old one's onPause, so the last write was "background"
+     * while a window of ours was plainly on top, and the un-themeable system banner flashed over
+     * the page you were reading.
+     */
+    /**
+     * Whether the finished result has actually been looked at. Fork (白い熊, +142): the main
+     * list's way-back bar exists for a result nobody has seen — so once the progress page has
+     * DRAWN the finished log, the bar has nothing left to offer and must not be waiting on the
+     * list afterwards. Closing the page and finding a banner about the thing you just closed
+     * reads as a leftover, which is what it was.
+     */
+    private volatile boolean mResultSeen;
+
+    private final java.util.concurrent.atomic.AtomicInteger mForegroundHosts =
+            new java.util.concurrent.atomic.AtomicInteger();
 
     private BatchOpsProgressMonitor() {
     }
 
     public void setHostForeground(boolean foreground) {
-        mHostForeground = foreground;
+        if (foreground) {
+            mForegroundHosts.incrementAndGet();
+        } else {
+            mForegroundHosts.updateAndGet(count -> count > 0 ? count - 1 : 0);
+        }
     }
 
     public boolean isHostForeground() {
-        return mHostForeground;
+        return mForegroundHosts.get() > 0;
+    }
+
+    /** Called by the progress page when it renders a finished operation. */
+    public void noteResultSeen() {
+        mResultSeen = true;
+    }
+
+    public boolean isResultSeen() {
+        return mResultSeen;
     }
 
     @NonNull
@@ -229,6 +259,7 @@ public final class BatchOpsProgressMonitor {
             mPauseLock.notifyAll();
         }
         mActive = true;
+        mResultSeen = false;
         mTitle = title;
         mMax = max;
         mCurrent = 0;

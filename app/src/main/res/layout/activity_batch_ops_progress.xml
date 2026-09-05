@@ -1,0 +1,133 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!--
+    Fork (白い熊, +116): the full-page view of a running batch operation, replacing the one-line
+    progress dialog. Fixed header (counts, current apps, bytes) over a live log that keeps
+    scrolling, and a bottom bar whose buttons change role when the operation ends.
+-->
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black"
+    tools:context=".batchops.BatchOpsProgressActivity">
+
+    <include layout="@layout/appbar" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/black"
+        android:orientation="vertical"
+        app:layout_behavior="com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior">
+
+        <!-- Header: what the batch as a whole is doing. Two rows tall, fixed. -->
+        <LinearLayout
+            android:id="@+id/op_header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="6dp">
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/op_summary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:singleLine="true"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                tools:text="12 / 42 · 3 failed · 4m 18s · 1.2 GB" />
+
+            <!-- Fork (白い熊, +130): NO line cap. One line per app in flight, however many that
+                 is — at maxLines="2" six of eight running apps were silently dropped and a busy
+                 batch looked half-idle. The header grows with the work and shrinks back. -->
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/op_current"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="2dp"
+                android:textSize="13sp"
+                tools:text="白い熊 ArcaneChat · App-supplied data" />
+
+        </LinearLayout>
+
+        <View
+            android:id="@+id/op_header_rule"
+            android:layout_width="match_parent"
+            android:layout_height="1px" />
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/op_log"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingTop="4dp"
+                android:paddingBottom="8dp"
+                android:scrollbars="vertical" />
+
+            <!-- Shown only when the log has been scrolled away from the bottom. -->
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/op_follow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|end"
+                android:layout_margin="12dp"
+                android:text="@string/op_log_follow"
+                android:visibility="gone" />
+
+        </FrameLayout>
+
+        <View
+            android:id="@+id/op_bar_rule"
+            android:layout_width="match_parent"
+            android:layout_height="1px" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="10dp">
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/op_secondary"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="10dp"
+                tools:text="@string/pause" />
+
+            <!-- Fork (白い熊, +132): leaving is not cancelling, and the page has to say so.
+                 Back already only closed the page — the operation runs in a foreground service
+                 and never noticed — but with Cancel as the only visible way out, that was
+                 something you had to risk a backup to find out. -->
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/op_tertiary"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="10dp"
+                android:visibility="gone"
+                tools:text="@string/op_leave_running"
+                tools:visibility="visible" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/op_primary"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                tools:text="@android:string/cancel" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

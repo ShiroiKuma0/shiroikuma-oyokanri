@@ -406,6 +406,57 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
         mFilterResult = executor.submit(this::filterItemsByFlags);
     }
 
+    /**
+     * Fork (白い熊, +118): the filter flags as one value, so a shelf pill can capture the whole
+     * view rather than probing for each flag it might contain.
+     */
+    public int getFilterFlags() {
+        return mFilterFlags;
+    }
+
+    /**
+     * Fork (白い熊, +118): apply a saved view — flags, sort, profile filters and search query —
+     * in ONE pass.
+     *
+     * <p>Doing it through the individual setters would re-run the filter five times and re-sort
+     * twice for a single tap on a pill, and on 550 apps that is visible. Everything is set first
+     * and the pipeline runs once at the end, which is also the only way the result is guaranteed
+     * to reflect all of the parts rather than whichever runs finished last.
+     */
+    public void applyView(int filterFlags, int sortBy, boolean reverseSort,
+                          @NonNull java.util.Set<String> include,
+                          @NonNull java.util.Set<String> exclude,
+                          @Nullable String searchQuery,
+                          @AdvancedSearchView.SearchType int searchType) {
+        boolean sortChanged = mSortBy != sortBy || mReverseSort != reverseSort;
+        mFilterFlags = filterFlags;
+        Prefs.MainPage.setFilters(mFilterFlags);
+        mSortBy = sortBy;
+        Prefs.MainPage.setSortOrder(mSortBy);
+        mReverseSort = reverseSort;
+        Prefs.MainPage.setReverseSort(mReverseSort);
+        mProfileFiltersInclude.clear();
+        mProfileFiltersInclude.addAll(include);
+        mProfileFiltersExclude.clear();
+        mProfileFiltersExclude.addAll(exclude);
+        getApplication().getSharedPreferences(PREFS_PROFILE_FILTER, android.content.Context.MODE_PRIVATE)
+                .edit()
+                .putStringSet(PREF_KEY_INCLUDE, new HashSet<>(mProfileFiltersInclude))
+                .putStringSet(PREF_KEY_EXCLUDE, new HashSet<>(mProfileFiltersExclude))
+                .apply();
+        mSearchQuery = searchQuery == null ? null
+                : (searchType != AdvancedSearchView.SEARCH_TYPE_REGEX
+                ? searchQuery.toLowerCase(Locale.ROOT) : searchQuery);
+        mSearchType = searchType;
+        cancelIfRunning();
+        mFilterResult = executor.submit(() -> {
+            if (sortChanged) {
+                sortApplicationList(mSortBy, mReverseSort);
+            }
+            filterItemsByFlags();
+        });
+    }
+
     @NonNull
     public java.util.Set<String> getProfileFiltersInclude() {
         return Collections.unmodifiableSet(mProfileFiltersInclude);

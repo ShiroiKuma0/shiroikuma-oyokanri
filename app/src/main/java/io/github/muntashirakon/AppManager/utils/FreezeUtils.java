@@ -100,8 +100,13 @@ public final class FreezeUtils {
     public static void freeze(@NonNull String packageName, @UserIdInt int userId, @FreezeMethod int freezeType)
             throws RemoteException {
         if (ProtectedAppsProfile.isProtected(packageName)) {
-            throw new RemoteException(packageName + " is in the " + ProtectedAppsProfile.PROTECTED_PROFILE_NAME
-                    + " profile and is protected from freezing.");
+            // Fork (白い熊, +139): say which of the two blocks it is. Reporting the profile for
+            // an app that is not in it sends the reader to edit a list that would not have
+            // helped.
+            throw new RemoteException(packageName + (ProtectedAppsProfile.isAlwaysProtected(packageName)
+                    ? " is one of the apps 白い熊 応用管理 cannot work without and is protected from freezing."
+                    : " is in the " + ProtectedAppsProfile.PROTECTED_PROFILE_NAME
+                    + " profile and is protected from freezing."));
         }
         if (BuildConfig.APPLICATION_ID.equals(packageName) && userId == UserHandleHidden.myUserId()) {
             throw new RemoteException("Could not freeze myself.");

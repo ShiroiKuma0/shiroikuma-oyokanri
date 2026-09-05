@@ -7,6 +7,7 @@ import android.content.Context;
 import androidx.annotation.NonNull;
 
 import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileFilter;
@@ -31,6 +32,9 @@ import java.util.zip.ZipOutputStream;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 
+import io.github.muntashirakon.AppManager.fonts.OpLogPrefs;
+import io.github.muntashirakon.AppManager.main.AppPanePrefs;
+import io.github.muntashirakon.AppManager.main.ShelfPrefs;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.battery.BatteryPrefs;
 import io.github.muntashirakon.AppManager.devicepolicy.PolicyLockState;
@@ -184,7 +188,11 @@ public final class SettingsBackupManager {
     private static final Set<String> APPEARANCE_PREFS = new HashSet<>(Arrays.asList(
             "shiroikuma_colors", "shiroikuma_fonts", "shiroikuma_main_icon",
             "shiroikuma_main_layout", "shiroikuma_selection_frame",
-            "shiroikuma_separators", "shiroikuma_running_box"));
+            "shiroikuma_separators", "shiroikuma_running_box",
+            // Fork (+118): column count per geometry for the sibling screens.
+            "shiroikuma_screen_layout",
+            // Fork (+116): how the batch operation log is drawn.
+            OpLogPrefs.PREF_FILE));
     private static final Set<String> MONITOR_PREFS = new HashSet<>(Arrays.asList(
             "shiroikuma_monitor", "shiroikuma_monitor_sep", "shiroikuma_reaper",
             // Fork: battery-history *decisions* (sample or not, how often, how
@@ -192,7 +200,10 @@ public final class SettingsBackupManager {
             // EXCLUDED_PREFS above.
             "shiroikuma_battery"));
     private static final Set<String> TOOLBAR_PREFS = new HashSet<>(Arrays.asList(
-            "am_main_toolbar", "am_main_page_profile_filter"));
+            "am_main_toolbar", "am_main_page_profile_filter",
+            // Fork (+118): the pill shelf and the unrolled row's action pills. Both are
+            // "which controls, in what order", which is what this category already is.
+            ShelfPrefs.PREF_FILE, AppPanePrefs.PREF_FILE));
     private static final String NOTES_PREFS = "shiroikuma_notes";
     // Fork: the per-package anti-snooping decisions. Keyed by package name, so the
     // file is meaningful on a phone that does not (yet) have those apps — that is
@@ -365,6 +376,8 @@ public final class SettingsBackupManager {
         //noinspection ResultOfMethodCallIgnored
         fonts.mkdirs();
         int restored = 0;
+        // Fork (+117): findings belong to THIS import, not the previous one.
+        SecurityPrefGuard.reset();
         try (ZipInputStream zis = new ZipInputStream(new BufferedInputStream(zipFile.openInputStream()))) {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
@@ -390,8 +403,21 @@ public final class SettingsBackupManager {
                 if (target == null) {
                     continue;
                 }
-                try (OutputStream os = new BufferedOutputStream(new FileOutputStream(target))) {
-                    copy(zis, os);
+                if (name.startsWith(SP_DIR + "/") && SecurityPrefGuard.guards(target.getName())) {
+                    // Fork (+117): the one file carrying settings that an archive must not be
+                    // able to weaken. Buffered rather than streamed, because the guard has to
+                    // see the whole entry before any of it reaches disk — and it is a few
+                    // kilobytes of preferences, not a backup.
+                    ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                    copy(zis, buffer);
+                    byte[] corrected = SecurityPrefGuard.apply(context, buffer.toByteArray());
+                    try (OutputStream os = new BufferedOutputStream(new FileOutputStream(target))) {
+                        os.write(corrected);
+                    }
+                } else {
+                    try (OutputStream os = new BufferedOutputStream(new FileOutputStream(target))) {
+                        copy(zis, os);
+                    }
                 }
                 ++restored;
             }

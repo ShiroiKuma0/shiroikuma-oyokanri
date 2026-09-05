@@ -8,6 +8,9 @@ import android.os.PowerManager;
 import android.os.UserHandleHidden;
 
 import androidx.annotation.AnyThread;
+import android.content.pm.ApplicationInfo;
+import io.github.muntashirakon.AppManager.compat.ApplicationInfoCompat;
+import io.github.muntashirakon.AppManager.compat.PackageManagerCompat;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
@@ -28,6 +31,7 @@ import java.util.concurrent.Future;
 import io.github.muntashirakon.AppManager.backup.BackupFlags;
 import io.github.muntashirakon.AppManager.backup.struct.BackupMetadataV5;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsManager;
+import io.github.muntashirakon.AppManager.batchops.struct.BatchBackupOptions;
 import io.github.muntashirakon.AppManager.db.entity.App;
 import io.github.muntashirakon.AppManager.db.entity.Backup;
 import io.github.muntashirakon.AppManager.db.utils.AppDb;
@@ -49,6 +53,38 @@ public class BackupRestoreDialogViewModel extends AndroidViewModel {
         public String[] backupNames;
         @Nullable
         public String[] relativeDirs;
+        /**
+         * Fork (白い熊, +132): per-app overrides, for the restore table. One set of flags and one
+         * backup for a whole batch is only right when every app's archive is the same shape.
+         */
+        @Nullable
+        public java.util.Map<String, Integer> perPackageFlags;
+        @Nullable
+        public java.util.Map<String, String[]> perPackageRelativeDirs;
+        /**
+         * Fork (白い熊, +133): App-supplied categories for this run only — see
+         * {@code BatchBackupOptions#mPerPackageAppData}.
+         */
+        @Nullable
+        public java.util.Map<String, String[]> perPackageAppData;
+
+        /**
+         * Fork (白い熊, +136): the ONE place an {@code OperationInfo} becomes the options the
+         * service runs.
+         *
+         * <p><b>This exists because there were two.</b> Both backup dialogs built
+         * {@link BatchBackupOptions} for themselves, and the single-app one still built the
+         * three-argument form — so every per-app field added since (+121 flags, +131 dirs, +133
+         * App-supplied categories) was silently dropped on exactly the path a single app takes.
+         * Choosing every category and pressing OK therefore backed up whatever had been stored
+         * for that app instead, with nothing anywhere saying the choice had been discarded.
+         * A field added here now reaches both callers or neither.
+         */
+        @NonNull
+        public BatchBackupOptions toBatchOptions() {
+            return new BatchBackupOptions(flags, backupNames, relativeDirs, perPackageFlags,
+                    perPackageRelativeDirs, perPackageAppData);
+        }
         @Nullable
         public int[] selectedUsers;
 
@@ -219,6 +255,28 @@ public class BackupRestoreDialogViewModel extends AndroidViewModel {
                     backupInfo.setAppLabel(app.packageLabel);
                     // Installation gets higher priority
                     backupInfo.setInstalled(backupInfo.isInstalled() | app.isInstalled);
+                }
+            }
+            if (!backupInfo.isInstalled()) {
+                // Fork (白い熊, +125) — LANDMINE: a FROZEN app can look uninstalled in the DB.
+                //
+                // Freezing by hiding makes a package invisible to a plain query, and the row this
+                // reads was written from one; the app is then offered Restore and Delete but no
+                // "Back up", for an app that is sitting right there on the phone. Ask the package
+                // manager with the match flags before believing it — the same repair the main
+                // list makes before it decides a row is uninstalled.
+                try {
+                    ApplicationInfo info = PackageManagerCompat.getApplicationInfo(
+                            userPackagePair.getPackageName(),
+                            PackageManagerCompat.MATCH_UNINSTALLED_PACKAGES
+                                    | PackageManagerCompat.MATCH_STATIC_SHARED_AND_SDK_LIBRARIES
+                                    | PackageManagerCompat.MATCH_DISABLED_COMPONENTS,
+                            userPackagePair.getUserId());
+                    if (info != null && ApplicationInfoCompat.isInstalled(info)) {
+                        backupInfo.setInstalled(true);
+                    }
+                } catch (Throwable ignore) {
+                    // Genuinely gone, or unreadable: leave the answer as the database gave it.
                 }
             }
             if (!backupInfo.isInstalled() && backupInfo.getBackupMetadataList().isEmpty()) {

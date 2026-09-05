@@ -372,7 +372,9 @@ public class BatchOpsManager {
                     String key = BatchOpsProgressMonitor.keyOf(pair.getPackageName(), pair.getUserId());
                     BatchOpsProgressMonitor monitor = BatchOpsProgressMonitor.getInstance();
                     monitor.itemStarted(key, appLabel, pair.getPackageName(), pair.getUserId());
+                    OpLog.getInstance().appStarted(key, appLabel, pair.getPackageName(), pair.getUserId());
                     boolean succeeded = false;
+                    CharSequence reason = null;
                     CharSequence title = context.getString(R.string.backing_up_app, appLabel);
                     ProgressHandler subProgressHandler = newSubProgress(operationName, title);
                     try {
@@ -381,9 +383,11 @@ public class BatchOpsManager {
                         succeeded = true;
                     } catch (BackupException e) {
                         log("====> op=BACKUP_RESTORE, mode=BACKUP pkg=" + pair, e);
+                        reason = failureReason(e);
                         failedPackages.add(pair);
                     } finally {
                         monitor.itemFinished(key, succeeded);
+                        OpLog.getInstance().appFinished(key, succeeded, reason);
                     }
                     if (subProgressHandler != null) {
                         ThreadUtils.postOnMainThread(() -> subProgressHandler.onResult(null));
@@ -423,7 +427,9 @@ public class BatchOpsManager {
                     String key = BatchOpsProgressMonitor.keyOf(pair.getPackageName(), pair.getUserId());
                     BatchOpsProgressMonitor monitor = BatchOpsProgressMonitor.getInstance();
                     monitor.itemStarted(key, appLabel, pair.getPackageName(), pair.getUserId());
+                    OpLog.getInstance().appStarted(key, appLabel, pair.getPackageName(), pair.getUserId());
                     boolean succeeded = false;
+                    CharSequence reason = null;
                     CharSequence title = context.getString(R.string.restoring_app, appLabel);
                     ProgressHandler subProgressHandler = newSubProgress(operationName, title);
                     try {
@@ -433,9 +439,11 @@ public class BatchOpsManager {
                         succeeded = true;
                     } catch (Throwable e) {
                         log("====> op=BACKUP_RESTORE, mode=RESTORE pkg=" + pair, e);
+                        reason = failureReason(e);
                         failedPackages.add(pair);
                     } finally {
                         monitor.itemFinished(key, succeeded);
+                        OpLog.getInstance().appFinished(key, succeeded, reason);
                     }
                     if (subProgressHandler != null) {
                         ThreadUtils.postOnMainThread(() -> subProgressHandler.onResult(null));
@@ -500,6 +508,7 @@ public class BatchOpsManager {
                         updateProgress(lastProgress, i.get());
                     }
                     Converter converter = ConvertUtils.getConversionUtil(options.getImportType(), file);
+                    OpLog.getInstance().note(file.getName(), null);
                     try {
                         converter.convert();
                         if (options.isRemoveImportedDirectory()) {
@@ -1051,7 +1060,12 @@ public class BatchOpsManager {
         float progress = last + current;
         mProgressHandler.postUpdate(progress);
         if (packageName != null) {
-            monitor.setCurrentItem(getCurrentItemLabel(packageName, userId), packageName, userId);
+            CharSequence label = getCurrentItemLabel(packageName, userId);
+            monitor.setCurrentItem(label, packageName, userId);
+            // Fork (+116): the ops with no stages of their own — freeze, uninstall, force-stop —
+            // still get one line each, so the page is a record of what a batch touched rather
+            // than a bar that emptied.
+            OpLog.getInstance().appLine(label, packageName, userId);
         }
         monitor.publishProgress(mProgressHandler.getLastMax(), Math.round(progress));
     }
@@ -1063,22 +1077,57 @@ public class BatchOpsManager {
     @NonNull
     private BackupProgressListener itemListener(@NonNull String key) {
         BatchOpsProgressMonitor monitor = BatchOpsProgressMonitor.getInstance();
+        OpLog log = OpLog.getInstance();
+        // Fork (+116): the header wants the CURRENT stage and the log wants EVERY line, so both
+        // are fed from here. The last stage is remembered because a leaf must not blank the
+        // header's stage — the header would then say less the busier the app got.
+        CharSequence[] lastStage = new CharSequence[1];
         return new BackupProgressListener() {
             @Override
             public void onDestination(@NonNull String destination) {
                 monitor.itemDestination(key, destination);
+                log.item(key, "→ " + destination, null);
             }
 
             @Override
             public void onStage(@NonNull CharSequence stage, @Nullable CharSequence detail) {
+                lastStage[0] = stage;
                 monitor.itemStage(key, stage, detail);
+                log.stage(key, stage, detail);
+            }
+
+            @Override
+            public void onItem(@NonNull CharSequence text, @Nullable CharSequence detail) {
+                monitor.itemStage(key, lastStage[0], text);
+                log.item(key, text, detail);
             }
 
             @Override
             public void onBytesWritten(long bytes) {
                 monitor.addBytes(bytes);
+                log.bytes(key, bytes);
             }
         };
+    }
+
+    // Fork (+116): the shortest true statement of why an app failed. The exception chain is
+    // walked because BackupException wraps the cause that actually says something ("No such
+    // file", "no progress for 120s"), and a bare "Backup failed" in the log helps nobody.
+    @Nullable
+    private static CharSequence failureReason(@Nullable Throwable th) {
+        Throwable t = th;
+        String best = null;
+        while (t != null) {
+            String message = t.getMessage();
+            if (message != null && !message.isEmpty()) {
+                best = best == null ? message : best + " — " + message;
+            }
+            t = t.getCause();
+            if (best != null && best.length() > 300) {
+                break;
+            }
+        }
+        return best;
     }
 
     // Fork: best-effort app label for the dialog's current-item line. Includes

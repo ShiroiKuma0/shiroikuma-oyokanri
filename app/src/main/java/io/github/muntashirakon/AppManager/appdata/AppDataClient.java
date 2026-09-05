@@ -17,10 +17,13 @@ import androidx.annotation.WorkerThread;
 import androidx.core.content.ContextCompat;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import io.github.muntashirakon.AppManager.logs.Log;
 
@@ -47,7 +50,25 @@ public class AppDataClient {
      * anything at all.
      */
     private static final long SILENCE_TIMEOUT_MS = 2 * 60 * 1000L;
-    private static final long POLL_MS = 5000L;
+    /**
+     * How often the wait wakes to look around. Fork (白い熊, +143): one second, not five — this
+     * loop is now also where a cancel is noticed, and five seconds of a dead Cancel button is
+     * long enough to conclude it does not work.
+     */
+    private static final long POLL_MS = 1000L;
+
+    /**
+     * Asked whether the operation carrying this transfer has been cancelled.
+     *
+     * <p>Fork (白い熊, +143): a transfer can run for half an hour, and until now nothing inside
+     * it ever looked. The batch's cancel checkpoint fires once per <b>app</b>, before that app's
+     * work — so with one app in the batch, Cancel had nothing left to reach and the only way to
+     * stop a 6 GB export was to kill the app. Passed in rather than read from a singleton, so
+     * the data contract keeps knowing nothing about batch operations.
+     */
+    public interface Cancellation {
+        boolean isCancelled();
+    }
 
     /** Progress is real counts, never a percentage — 白い熊's explicit requirement. */
     public interface ProgressListener {
@@ -109,7 +130,30 @@ public class AppDataClient {
     public Result transfer(@NonNull String packageName, @NonNull String method,
                            @NonNull ParcelFileDescriptor fd, @Nullable List<String> items,
                            @Nullable ProgressListener listener) {
-        String jobId = UUID.randomUUID().toString();
+        return transfer(packageName, method, fd, items, listener, null);
+    }
+
+    @WorkerThread
+    @NonNull
+    public Result transfer(@NonNull String packageName, @NonNull String method,
+                           @NonNull ParcelFileDescriptor fd, @Nullable List<String> items,
+                           @Nullable ProgressListener listener,
+                           @Nullable Cancellation cancellation) {
+        // LANDMINE (白い熊, +116) — THE CALLEE MINTS THE JOB ID, NOT US.
+        // Every sister app answers the call with `OK:<its own job id>` (AutomationJobs.begin())
+        // and broadcasts its completion carrying THAT id. This client used to invent a UUID,
+        // send it, and then filter replies on it — so the reply arrived, failed the correlation,
+        // was dropped, and the transfer sat until the two-minute silence watchdog killed it.
+        // A 22 MB ArcaneChat export that had already finished was reported as "Could not backup".
+        // Our own id is still sent and still accepted (an app that echoes it costs nothing), but
+        // the id the callee hands back is the one that matters.
+        String ourId = UUID.randomUUID().toString();
+        AtomicReference<String> acceptedId = new AtomicReference<>(ourId);
+        // A terminal reply that arrives BEFORE call() returns cannot be correlated yet: at that
+        // instant the callee's id is still unknown to us. Such replies are held here by id and
+        // claimed the moment the id is adopted, or a fast (small) export would fail exactly
+        // where a slow one now succeeds — the worse of the two bugs to ship.
+        Map<String, String> unclaimed = new ConcurrentHashMap<>();
         LinkedBlockingQueue<String> terminal = new LinkedBlockingQueue<>(1);
         AtomicLong lastActivity = new AtomicLong(System.currentTimeMillis());
 
@@ -124,7 +168,17 @@ public class AppDataClient {
                 if (id == null) {
                     id = intent.getStringExtra(AppDataContract.EXTRA_REPLY_ID);
                 }
-                if (!jobId.equals(id)) {
+                if (id == null) {
+                    return;
+                }
+                if (!ourId.equals(id) && !id.equals(acceptedId.get())) {
+                    // Not (yet) ours. Another app's transfer in the same batch has its own
+                    // receiver and will claim it; hold a terminal reply briefly in case this is
+                    // our callee answering before we have learnt its id.
+                    if (AppDataContract.ACTION_REPLY.equals(intent.getAction()) && unclaimed.size() < 32) {
+                        String early = intent.getStringExtra(AppDataContract.EXTRA_RESULT);
+                        unclaimed.put(id, early != null ? early : AppDataContract.ERROR_PREFIX + "empty reply");
+                    }
                     return;
                 }
                 lastActivity.set(System.currentTimeMillis());
@@ -150,7 +204,7 @@ public class AppDataClient {
         try {
             Bundle extras = new Bundle();
             extras.putParcelable(AppDataContract.EXTRA_FD, fd);
-            extras.putString(AppDataContract.EXTRA_JOB_ID, jobId);
+            extras.putString(AppDataContract.EXTRA_JOB_ID, ourId);
             extras.putString(AppDataContract.EXTRA_REPLY_ACTION, AppDataContract.ACTION_REPLY);
             extras.putString(AppDataContract.EXTRA_REPLY_PACKAGE, mContext.getPackageName());
             extras.putString(AppDataContract.EXTRA_PROGRESS_ACTION, AppDataContract.ACTION_PROGRESS);
@@ -174,7 +228,18 @@ public class AppDataClient {
                 // than any change to its code.
                 return new Result(false, accepted != null ? accepted : "no result in reply");
             }
-            return await(packageName, jobId, terminal, lastActivity);
+            // Adopt the callee's job id, then claim anything that arrived under it while we were
+            // still inside call().
+            String theirs = accepted.substring(AppDataContract.OK_PREFIX.length()).trim();
+            if (!theirs.isEmpty()) {
+                acceptedId.set(theirs);
+                String early = unclaimed.remove(theirs);
+                if (early != null) {
+                    terminal.offer(early);
+                }
+            }
+            unclaimed.clear();
+            return await(packageName, acceptedId, terminal, lastActivity, cancellation);
         } finally {
             try {
                 mContext.unregisterReceiver(receiver);
@@ -184,16 +249,23 @@ public class AppDataClient {
     }
 
     @NonNull
-    private Result await(@NonNull String packageName, @NonNull String jobId,
+    private Result await(@NonNull String packageName, @NonNull AtomicReference<String> jobId,
                          @NonNull LinkedBlockingQueue<String> terminal,
-                         @NonNull AtomicLong lastActivity) {
+                         @NonNull AtomicLong lastActivity,
+                         @Nullable Cancellation cancellation) {
         while (true) {
+            if (cancellation != null && cancellation.isCancelled()) {
+                // Tell it to stop before we walk away, or it carries on writing into a
+                // descriptor nobody is waiting for — the same courtesy the watchdog pays.
+                cancel(packageName, jobId.get());
+                return new Result(false, "cancelled");
+            }
             String result;
             try {
                 result = terminal.poll(POLL_MS, TimeUnit.MILLISECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                cancel(packageName, jobId);
+                cancel(packageName, jobId.get());
                 return new Result(false, "interrupted");
             }
             if (result != null) {
@@ -205,7 +277,7 @@ public class AppDataClient {
             if (System.currentTimeMillis() - lastActivity.get() > SILENCE_TIMEOUT_MS) {
                 // Presumed dead. Tell it to stop before giving up, so a job that is merely wedged
                 // does not carry on writing into a descriptor nobody is waiting for.
-                cancel(packageName, jobId);
+                cancel(packageName, jobId.get());
                 return new Result(false, "no progress for " + (SILENCE_TIMEOUT_MS / 1000) + "s");
             }
         }

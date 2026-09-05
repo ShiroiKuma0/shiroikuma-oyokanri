@@ -21,6 +21,7 @@ import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.filters.FilterItem;
 import io.github.muntashirakon.AppManager.filters.options.AppTypeOption;
 import io.github.muntashirakon.AppManager.filters.options.BackupOption;
+import io.github.muntashirakon.AppManager.filters.options.SisterAppOption;
 import io.github.muntashirakon.AppManager.filters.options.ComponentsOption;
 import io.github.muntashirakon.AppManager.filters.options.FreezeOption;
 import io.github.muntashirakon.AppManager.filters.options.InstalledOption;
@@ -104,6 +105,7 @@ public class MainListOptions extends ListOptions {
             FILTER_STOPPED_APPS,
             FILTER_APPS_WITH_NOTES,
             FILTER_APPS_WITH_OUTDATED_BACKUPS,
+            FILTER_SISTER_APPS,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface Filter {
@@ -130,6 +132,12 @@ public class MainListOptions extends ListOptions {
     public static final int FILTER_APPS_WITH_NOTES = 1 << 16;
     // Fork: installed apps whose every backup predates the installed version.
     public static final int FILTER_APPS_WITH_OUTDATED_BACKUPS = 1 << 17;
+    /**
+     * Fork (白い熊, +124): apps implementing the sister-app data contract. A screen lists their
+     * state; this puts them in the list itself, where they can be frozen, backed up and
+     * batch-operated on like anything else.
+     */
+    public static final int FILTER_SISTER_APPS = 1 << 18;
 
     // For now, just generate FilterItem
     @NonNull
@@ -209,6 +217,11 @@ public class MainListOptions extends ListOptions {
         if ((flags & FILTER_APPS_WITH_OUTDATED_BACKUPS) != 0) {
             BackupOption option = new BackupOption();
             option.setKeyValue("no_current_backup", null);
+            filterItem.addFilterOption(option);
+        }
+        if ((flags & FILTER_SISTER_APPS) != 0) {
+            SisterAppOption option = new SisterAppOption();
+            option.setKeyValue("is_sister", null);
             filterItem.addFilterOption(option);
         }
         if (appTypeWithFlags > 0) {
@@ -344,6 +357,7 @@ public class MainListOptions extends ListOptions {
             put(FILTER_APPS_WITH_BACKUPS, R.string.filter_apps_with_backups);
             put(FILTER_APPS_WITHOUT_BACKUPS, R.string.filter_apps_without_backups);
             put(FILTER_APPS_WITH_OUTDATED_BACKUPS, R.string.filter_apps_with_outdated_backups);
+            put(FILTER_SISTER_APPS, R.string.filter_sister_apps);
             put(FILTER_APPS_WITH_NOTES, R.string.filter_apps_with_notes);
             put(FILTER_RUNNING_APPS, R.string.filter_running_apps);
             put(FILTER_APPS_WITH_SPLITS, R.string.filter_apps_with_splits);
@@ -409,194 +423,15 @@ public class MainListOptions extends ListOptions {
      */
     private void openProfileFilterPicker(@NonNull MainActivity activity) {
         if (activity.viewModel == null) return;
-        if (mProfileNames.isEmpty()) {
-            // No profiles known yet (either none defined or background load
-            // not finished). Nothing meaningful to show.
-            return;
-        }
-        // Working copies of the current filter; mutated as the user toggles
-        // rows, then committed on OK.
-        java.util.LinkedHashSet<String> include =
-                new java.util.LinkedHashSet<>(activity.viewModel.getProfileFiltersInclude());
-        java.util.LinkedHashSet<String> exclude =
-                new java.util.LinkedHashSet<>(activity.viewModel.getProfileFiltersExclude());
-        int yellow = androidx.core.content.ContextCompat.getColor(activity, R.color.theme_bright_yellow);
-        android.widget.LinearLayout content = new android.widget.LinearLayout(activity);
-        content.setOrientation(android.widget.LinearLayout.VERTICAL);
-        int pad = (int) (8 * activity.getResources().getDisplayMetrics().density);
-        content.setPadding(pad, pad, pad, pad);
-        android.view.LayoutInflater inflater = android.view.LayoutInflater.from(activity);
-        for (String name : mProfileNames) {
-            android.view.View row = inflater.inflate(
-                    R.layout.dialog_profile_filter_picker_row, content, false);
-            final android.widget.TextView nameTv = row.findViewById(R.id.profile_name);
-            final android.widget.TextView plus = row.findViewById(R.id.btn_include);
-            final android.widget.TextView minus = row.findViewById(R.id.btn_exclude);
-            nameTv.setText(name);
-            final String profileName = name;
-            // Per-row tri-state: 0 = neutral, 1 = include (+), 2 = exclude (-).
-            final int[] st = {include.contains(name) ? PROFILE_ROW_INCLUDE
-                    : (exclude.contains(name) ? PROFILE_ROW_EXCLUDE : PROFILE_ROW_NEUTRAL)};
-            Runnable render = () -> applyProfileRowState(activity, row, nameTv, plus, minus, st[0], yellow);
-            render.run();
-            Runnable sync = () -> {
-                include.remove(profileName);
-                exclude.remove(profileName);
-                if (st[0] == PROFILE_ROW_INCLUDE) include.add(profileName);
-                else if (st[0] == PROFILE_ROW_EXCLUDE) exclude.add(profileName);
-            };
-            // Whole-row tap toggles between neutral and include only; from
-            // "Not in" (exclude) a tap returns to neutral. "Not in" itself is
-            // reached by long-pressing the row (see below).
-            row.setOnClickListener(v -> {
-                st[0] = (st[0] == PROFILE_ROW_NEUTRAL) ? PROFILE_ROW_INCLUDE : PROFILE_ROW_NEUTRAL;
-                sync.run();
-                render.run();
-            });
-            // Whole-row long-press switches the row to "Not in" (exclude).
-            row.setOnLongClickListener(v -> {
-                st[0] = PROFILE_ROW_EXCLUDE;
-                sync.run();
-                render.run();
-                return true;
-            });
-            // The "+" / "-" pills toggle their own polarity directly (tapping
-            // an already-selected pill returns the row to neutral). Their
-            // clicks are consumed here so they don't also fire the row's
-            // cycle handler.
-            plus.setOnClickListener(v -> {
-                st[0] = (st[0] == PROFILE_ROW_INCLUDE) ? PROFILE_ROW_NEUTRAL : PROFILE_ROW_INCLUDE;
-                sync.run();
-                render.run();
-            });
-            minus.setOnClickListener(v -> {
-                st[0] = (st[0] == PROFILE_ROW_EXCLUDE) ? PROFILE_ROW_NEUTRAL : PROFILE_ROW_EXCLUDE;
-                sync.run();
-                render.run();
-            });
-            content.addView(row);
-        }
-        // Wrap in a ScrollView in case the profile count is large.
-        android.widget.ScrollView scroll = new android.widget.ScrollView(activity);
-        scroll.addView(content);
-        new com.google.android.material.dialog.MaterialAlertDialogBuilder(activity)
-                .setTitle(R.string.profile_filter_title)
-                .setView(scroll)
-                .setPositiveButton(R.string.ok, (d, w) -> {
+        // Fork (白い熊, +120): the picker itself now lives in ProfileFilterPicker, so the shelf's
+        // pill editor offers exactly this control rather than a lesser one of its own.
+        ProfileFilterPicker.show(activity, mProfileNames,
+                activity.viewModel.getProfileFiltersInclude(),
+                activity.viewModel.getProfileFiltersExclude(),
+                (include, exclude) -> {
                     activity.viewModel.setProfileFilters(include, exclude);
                     refreshProfileFilterButtonText(activity);
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .setNeutralButton(R.string.profile_filter_clear, (d, w) -> {
-                    activity.viewModel.setProfileFilters(
-                            java.util.Collections.emptySet(),
-                            java.util.Collections.emptySet());
-                    refreshProfileFilterButtonText(activity);
-                })
-                .show();
+                });
     }
 
-    private static final int PROFILE_ROW_NEUTRAL = 0;
-    private static final int PROFILE_ROW_INCLUDE = 1;
-    private static final int PROFILE_ROW_EXCLUDE = 2;
-
-    /**
-     * Paint a profile-filter row for one of the three states. Everything is
-     * built from GradientDrawable / LayerDrawable at runtime because the
-     * yellow-on-black look needs line-fills, thick line-borders and a
-     * double-bordered pill that the Material Chip checked/unchecked states
-     * can't produce.
-     *
-     * neutral : transparent row, yellow name, both pills yellow-outlined.
-     * include : row filled yellow, name black, "+" filled yellow w/ black
-     *           border, "-" black-filled with a yellow border ringed by an
-     *           outer black band so it stays visible on the yellow line.
-     * exclude : transparent row inside a thick yellow rounded border, yellow
-     *           name, "+" yellow-outlined, "-" filled yellow w/ black text.
-     */
-    private void applyProfileRowState(@NonNull android.content.Context ctx,
-                                      @NonNull android.view.View row,
-                                      @NonNull android.widget.TextView name,
-                                      @NonNull android.widget.TextView plus,
-                                      @NonNull android.widget.TextView minus,
-                                      int state, int yellow) {
-        final int black = android.graphics.Color.BLACK;
-        final int transparent = android.graphics.Color.TRANSPARENT;
-        final float d = ctx.getResources().getDisplayMetrics().density;
-        final int rowRadius = (int) (12 * d);
-        final int pillRadius = (int) (100 * d);
-        final int rowStroke = (int) (3 * d);
-        final int pillStroke = Math.max(1, (int) (1.5f * d));
-        final int plusBlackStroke = (int) (2 * d);
-        final int ringInset = (int) (3 * d);
-
-        // Row background + profile-name colour
-        if (state == PROFILE_ROW_INCLUDE) {
-            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
-            bg.setColor(yellow);
-            bg.setCornerRadius(rowRadius);
-            row.setBackground(bg);
-            name.setTextColor(black);
-        } else if (state == PROFILE_ROW_EXCLUDE) {
-            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
-            bg.setColor(transparent);
-            bg.setStroke(rowStroke, yellow);
-            bg.setCornerRadius(rowRadius);
-            row.setBackground(bg);
-            name.setTextColor(yellow);
-        } else {
-            row.setBackground(null);
-            name.setTextColor(yellow);
-        }
-
-        // "+" pill
-        if (state == PROFILE_ROW_INCLUDE) {
-            android.graphics.drawable.GradientDrawable p = new android.graphics.drawable.GradientDrawable();
-            p.setColor(yellow);
-            p.setStroke(plusBlackStroke, black);
-            p.setCornerRadius(pillRadius);
-            plus.setBackground(p);
-            plus.setTextColor(black);
-        } else {
-            plus.setBackground(neutralPill(yellow, pillStroke, pillRadius));
-            plus.setTextColor(yellow);
-        }
-
-        // "-" pill
-        if (state == PROFILE_ROW_EXCLUDE) {
-            android.graphics.drawable.GradientDrawable m = new android.graphics.drawable.GradientDrawable();
-            m.setColor(yellow);
-            m.setCornerRadius(pillRadius);
-            minus.setBackground(m);
-            minus.setTextColor(black);
-        } else if (state == PROFILE_ROW_INCLUDE) {
-            // Double border: outer solid-black band, inner black fill with a
-            // yellow stroke. The band separates the yellow stroke from the
-            // yellow line behind it so the pill reads clearly.
-            android.graphics.drawable.GradientDrawable outer = new android.graphics.drawable.GradientDrawable();
-            outer.setColor(black);
-            outer.setCornerRadius(pillRadius);
-            android.graphics.drawable.GradientDrawable inner = new android.graphics.drawable.GradientDrawable();
-            inner.setColor(black);
-            inner.setStroke(pillStroke, yellow);
-            inner.setCornerRadius(pillRadius);
-            android.graphics.drawable.LayerDrawable layer = new android.graphics.drawable.LayerDrawable(
-                    new android.graphics.drawable.Drawable[]{outer, inner});
-            layer.setLayerInset(1, ringInset, ringInset, ringInset, ringInset);
-            minus.setBackground(layer);
-            minus.setTextColor(yellow);
-        } else {
-            minus.setBackground(neutralPill(yellow, pillStroke, pillRadius));
-            minus.setTextColor(yellow);
-        }
-    }
-
-    @NonNull
-    private android.graphics.drawable.GradientDrawable neutralPill(int yellow, int stroke, int radius) {
-        android.graphics.drawable.GradientDrawable p = new android.graphics.drawable.GradientDrawable();
-        p.setColor(android.graphics.Color.TRANSPARENT);
-        p.setStroke(stroke, yellow);
-        p.setCornerRadius(radius);
-        return p;
-    }
 }

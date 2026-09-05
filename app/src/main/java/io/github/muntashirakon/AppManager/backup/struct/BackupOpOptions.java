@@ -28,13 +28,26 @@ public class BackupOpOptions implements Parcelable, IJsonSerializer {
     @Nullable
     public final String backupName;
     public final boolean override;
+    /**
+     * Fork (白い熊, +133): the App-supplied categories to export <b>this once</b>, or
+     * {@code null} to use whatever is stored for the app. An <b>empty</b> array is a real
+     * answer — "export none of it" — and must never be confused with null.
+     */
+    @Nullable
+    public final String[] appDataCategories;
 
     public BackupOpOptions(@NonNull String packageName, int userId, int flags, @Nullable String backupName, boolean override) {
+        this(packageName, userId, flags, backupName, override, null);
+    }
+
+    public BackupOpOptions(@NonNull String packageName, int userId, int flags, @Nullable String backupName,
+                           boolean override, @Nullable String[] appDataCategories) {
         this.packageName = packageName;
         this.userId = userId;
         this.flags = new BackupFlags(flags);
         this.backupName = backupName;
         this.override = override;
+        this.appDataCategories = appDataCategories;
     }
 
     protected BackupOpOptions(@NonNull Parcel in) {
@@ -43,6 +56,7 @@ public class BackupOpOptions implements Parcelable, IJsonSerializer {
         flags = new BackupFlags(in.readInt());
         backupName = in.readString();
         override = ParcelCompat.readBoolean(in);
+        appDataCategories = in.createStringArray();
     }
 
     public static final Creator<BackupOpOptions> CREATOR = new Creator<BackupOpOptions>() {
@@ -71,6 +85,7 @@ public class BackupOpOptions implements Parcelable, IJsonSerializer {
         dest.writeInt(this.flags.getFlags());
         dest.writeString(backupName);
         ParcelCompat.writeBoolean(dest, override);
+        dest.writeStringArray(appDataCategories);
     }
 
     public BackupOpOptions(@NonNull JSONObject jsonObject) throws JSONException {
@@ -79,6 +94,7 @@ public class BackupOpOptions implements Parcelable, IJsonSerializer {
         flags = new BackupFlags(jsonObject.getInt("flags"));
         backupName = JSONUtils.optString(jsonObject, "backup_name");
         override = jsonObject.getBoolean("override");
+        appDataCategories = JSONUtils.getArray(String.class, jsonObject.optJSONArray("app_data_categories"));
     }
 
     @NonNull
@@ -90,6 +106,9 @@ public class BackupOpOptions implements Parcelable, IJsonSerializer {
         jsonObject.put("flags", flags.getFlags());
         jsonObject.put("backup_name", backupName);
         jsonObject.put("override", override);
+        if (appDataCategories != null) {
+            jsonObject.put("app_data_categories", JSONUtils.getJSONArray(appDataCategories));
+        }
         return jsonObject;
     }
 }

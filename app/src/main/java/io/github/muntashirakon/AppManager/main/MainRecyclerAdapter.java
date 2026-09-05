@@ -543,6 +543,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         MaterialCardView cardView = holder.itemView;
         Context context = cardView.getContext();
         applyColumnProportions(context, holder);
+        bindAppPane(holder, item);
         // Add click listeners
         cardView.setOnClickListener(v -> {
             int currentPos = holder.getBindingAdapterPosition();
@@ -553,7 +554,9 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                 AccessibilityUtils.requestAccessibilityFocus(holder.itemView);
                 return;
             }
-            handleClick(item);
+            // Fork (白い熊, +118): a tap unrolls the pane instead of leaving for App details.
+            // Both of the pages the old tap could reach are pills inside it.
+            toggleExpanded(item, currentPos);
         });
         cardView.setOnLongClickListener(v -> {
             int currentPos = holder.getBindingAdapterPosition();
@@ -754,7 +757,10 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                 AccessibilityUtils.requestAccessibilityFocus(holder.itemView);
                 return;
             }
-            handleClick(item, AppDetailsActivity.TAB_SNOOPING);
+            // Fork (白い熊, +118): the icon opens the same pane as the rest of the row. It
+            // used to jump straight to 盗み見 (+82); one rule for the whole row beats a
+            // shortcut nobody can predict, and 盗み見 is a pill inside the pane.
+            toggleExpanded(item, currentPos);
         });
         holder.icon.setOnLongClickListener(v -> holder.itemView.performLongClick());
         // Fork: italic marks BOTH frozen and uninstalled (dormant) rows.
@@ -1092,6 +1098,149 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
      * to offer, so nothing is gated here beyond the case where the app is
      * neither installed nor backed up and there is nothing to open.
      */
+    // ── The unrolled pane (白い熊, +118) ─────────────────────────────────────
+
+    /** The row that is currently unrolled, as package:user, or null. */
+    @Nullable
+    private String mExpandedKey;
+
+    @NonNull
+    private static String keyOf(@NonNull ApplicationItem item) {
+        return item.packageName + ':' + (item.userIds.length > 0 ? item.userIds[0] : 0);
+    }
+
+    public boolean isPaneOpen() {
+        return mExpandedKey != null;
+    }
+
+    /**
+     * Close whatever is open. Returns whether anything was.
+     * <p>
+     * The Back button uses this: an open pane is a state you should be able to leave without
+     * leaving the screen.
+     */
+    public boolean collapsePane() {
+        if (mExpandedKey == null) {
+            return false;
+        }
+        mExpandedKey = null;
+        notifyDataSetChanged();
+        return true;
+    }
+
+    /**
+     * Unroll this row, or roll it up if it is already open.
+     * <p>
+     * One at a time: two open panes would put the row you tapped second below a screenful of the
+     * first one's actions. Both the old and the new row are redrawn, and the span cache is
+     * invalidated because an open row takes the full width of a grid (see
+     * {@code MainActivity#applyListLayout}).
+     */
+    private void toggleExpanded(@NonNull ApplicationItem item, int position) {
+        String key = keyOf(item);
+        String previous = mExpandedKey;
+        mExpandedKey = key.equals(previous) ? null : key;
+        // notifyDataSetChanged rather than two item changes: the span size of BOTH rows has just
+        // changed, and RecyclerView will not re-run the lookup for a row it thinks is unchanged.
+        notifyDataSetChanged();
+        if (mActivity != null) {
+            mActivity.onPaneToggled(position, mExpandedKey != null);
+        }
+    }
+
+    /** Whether the row at {@code position} is the open one. Used by the span-size lookup. */
+    public boolean isExpandedAt(int position) {
+        if (mExpandedKey == null || position < 0 || position >= getItemCount()) {
+            return false;
+        }
+        try {
+            return isExpanded(getItem(position));
+        } catch (Throwable th) {
+            return false;
+        }
+    }
+
+    /** Whether {@code item} is the open row. Read on every bind — the holder recycles. */
+    public boolean isExpanded(@NonNull ApplicationItem item) {
+        return mExpandedKey != null && mExpandedKey.equals(keyOf(item));
+    }
+
+    private void bindAppPane(@NonNull ViewHolder holder, @NonNull ApplicationItem item) {
+        if (holder.appPane == null) {
+            return;
+        }
+        if (!isExpanded(item)) {
+            holder.appPane.setVisibility(View.GONE);
+            holder.appPane.removeAllViews();
+            return;
+        }
+        holder.appPane.setVisibility(View.VISIBLE);
+        AppPaneBinder.bind(holder.appPane, item, new AppPaneBinder.Host() {
+            @Override
+            public void onPaneAction(@NonNull String key, @NonNull ApplicationItem paneItem) {
+                MainRecyclerAdapter.this.onPaneAction(key, paneItem);
+            }
+
+            @Override
+            public void onPaneReordered() {
+                notifyDataSetChanged();
+            }
+        }, 0);
+    }
+
+    /**
+     * What a pane pill does. Everything routes to the action that already exists — the pane adds
+     * a way to reach them, never a second implementation of them.
+     */
+    private void onPaneAction(@NonNull String key, @NonNull ApplicationItem item) {
+        int userId = item.userIds.length > 0 ? item.userIds[0] : UserHandleHidden.myUserId();
+        switch (key) {
+            case "open": {
+                Intent launch = mActivity.getPackageManager().getLaunchIntentForPackage(item.packageName);
+                if (launch != null) {
+                    mActivity.startActivity(launch);
+                } else {
+                    displayShortToast(R.string.app_not_installed);
+                }
+                break;
+            }
+            case "app_info":
+                handleClick(item);
+                break;
+            case "snooping":
+                handleClick(item, AppDetailsActivity.TAB_SNOOPING);
+                break;
+            case "freeze":
+                toggleFreeze(item);
+                break;
+            case "force_stop":
+                forceStopApp(item);
+                break;
+            case "backup":
+                showBackupDialog(item);
+                break;
+            case "note":
+                AppNotesManager.showNoteDialog(mActivity, item.packageName, item.label,
+                        () -> notifyItemChanged(indexOf(item)));
+                break;
+            case "battery":
+                mActivity.startActivity(new Intent(mActivity,
+                        io.github.muntashirakon.AppManager.battery.BatteryUsageActivity.class));
+                break;
+            case "app_settings":
+                mActivity.startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        android.net.Uri.parse("package:" + item.packageName))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                break;
+            default:
+                // Uninstall, clear data/cache, save APK, profiles, manifest and scanner all have
+                // a single-app home in App details; sending the row there beats a second copy of
+                // each flow living in the list.
+                handleClick(item);
+                break;
+        }
+    }
+
     private void showBackupDialog(@NonNull ApplicationItem item) {
         if (!item.isInstalled && item.backup == null) {
             return;
@@ -1283,22 +1432,10 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
     // the icon corners to a % of its size (0 = square, 50 = circle). Idempotent —
     // only writes LayoutParams when a dimension actually changed.
     private void applyMainIconSize(@NonNull ViewHolder holder) {
-        float density = mActivity.getResources().getDisplayMetrics().density;
-        int sizeDp = MainIconPrefs.getSizeDp(mActivity);
-        int iconPx = Math.round(sizeDp * density);
-        int glyphPx = Math.round(sizeDp * density * 0.43f);
-        setViewWidth(holder.iconColumn, iconPx);
-        setViewSize(holder.icon, iconPx, iconPx);
-        setViewSize(holder.freezeIndicator, glyphPx, glyphPx);
-        setViewSize(holder.killBadge, glyphPx, glyphPx);
-        int roundPct = MainIconPrefs.getRoundnessPercent(mActivity);
-        if (roundPct > 0) {
-            holder.icon.setOutlineProvider(new RoundOutline(iconPx * roundPct / 100f));
-            holder.icon.setClipToOutline(true);
-        } else {
-            holder.icon.setOutlineProvider(null);
-            holder.icon.setClipToOutline(false);
-        }
+        // Fork (白い熊, +124): one owner for this rule. The battery header and the sibling
+        // screens draw the same card, and before this they showed the layout's default 60dp
+        // whatever the setting said.
+        io.github.muntashirakon.AppManager.battery.MainCardBinder.applyIconSize(mActivity, holder.itemView);
     }
 
     /** Fork: rounds the app-icon corners to a fixed radius (px) for the roundness pref. */
@@ -1380,10 +1517,13 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         // Fork (+094): one pill for the note in both states. How wide it may
         // grow is LabelLineLayout's business, not the holder's.
         TextView notePill;
+        // Fork (+118): the pane a tap unrolls. Part of the row, not an inserted item.
+        LinearLayoutCompat appPane;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
             this.itemView = (MaterialCardView) itemView;
+            appPane = itemView.findViewById(R.id.app_pane);
             centerColumn = itemView.findViewById(R.id.main_center_column);
             rightColumn = itemView.findViewById(R.id.main_right_column);
             iconColumn = itemView.findViewById(R.id.icon_column);
