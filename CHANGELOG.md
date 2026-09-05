@@ -10,6 +10,94 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.0+2026-06-29.21-57.gfc1e7007+115 — 2026-09-05
+
+App data can now be backed up without root, by asking each app for it — and the backup options
+dialog was overhauled around that. (Built on upstream App Manager `4.1.0`, commit `fc1e7007` of
+2026-06-29 21:57 UTC.)
+
+### 📦 App-supplied data — the caller half of the sister-app contract
+
+`/data/data` is closed to the shell and the platform's backup transport refuses release builds, so a
+non-rooted phone could never capture an app's own data. Measured on the device rather than assumed:
+`adb backup` is a dead route there, backup is disabled, and `allowBackup` is not even uniform across
+the family. The answer is to **ask the app** instead of taking it.
+
+- **Discovery is a manifest read** — three `<meta-data>` values, so the list is built across every
+  installed app without starting any of them, frozen ones included. Read with `getInt`: `aapt2`
+  stores a bare numeric `android:value` as an int, so `getString` answers null for every correctly
+  built app and the whole mechanism empties silently. Queried with `MATCH_UNINSTALLED_PACKAGES |
+  MATCH_DISABLED_COMPONENTS`, or frozen apps vanish from the query outright.
+- **The payload is a file descriptor, never a path.** The app writes bytes into it and nothing else,
+  and the archive is then folded into the backup through the ordinary path — checksummed, encrypted,
+  committed with everything else, and verified before it is handed back at restore. An app writing
+  into the backup directory itself would be writing into a temporary path about to be renamed, and
+  its file would sit unencrypted and unverified beside files that are neither.
+- **A synchronous door, an asynchronous answer.** The handshake is a `ContentProvider` call, which
+  identifies the caller through the framework and so needs no shared secret; completion arrives as
+  the broadcast this family already proved on EMUI. The watchdog is on **silence**, not duration, so
+  a multi-gigabyte export is not killed for legitimately taking twenty minutes.
+- **The awkward guarantees live here, not in forty-two apps.** A frozen app is thawed and re-frozen
+  exactly as it was; a battery-optimisation exemption is granted around the call so a foreground
+  service started from a binder call cannot be refused; and the app is force-stopped the instant it
+  reports a successful import, because a live process writes its cached `SharedPreferences` back out
+  at orderly shutdown and silently undoes what was just restored. Every change is recorded **before**
+  it is made and reconciled at next launch, so a crash mid-export cannot leave frozen apps running.
+
+### 🗂️ Per-app category picking, applied to bulk backups
+
+The **App data categories** button on the App-supplied data row asks that app what it can export and
+shows its own categories — nested under their parents, pre-ticked as the app recommends. The choice
+is remembered per package and a **bulk backup applies it silently**, which is per-app control inside
+a batch without a batch UI existing at all. An app nobody has customised is sent no selection and
+exports its own recommended set, which is deliberately not the same as everything.
+
+Both the ticked set **and what the app offered at the time** are stored: without the second, a
+category the app adds in a later version is indistinguishable from one deliberately unticked, and
+would stay out of every backup for ever. Unticking everything skips that app cleanly rather than
+failing the backup.
+
+### ✂️ ADB data withdrawn
+
+The option routed app data through the platform's backup transport, which refuses release builds on
+this phone — and when it *did* engage it **superseded the internal and external data flags**, quietly
+replacing a working backup with an empty one. It is gone from the dialog and stripped in
+`getSanitizedFlags`, since a preference saved by an older build still carries the bit and would have
+taken that branch regardless.
+
+### 📋 The backup options say what they actually do
+
+- **External data** names its directory — `/storage/emulated/0/Android/data/` — beside the title, and
+  describes what lives there rather than calling it "external data folders".
+- **Cache** starts unticked, and its description is corrected: the real exclusions are `cache`,
+  `code_cache` and `no_backup`, not the `no_cache` the dialog claimed for years. It now says these
+  are subfolders of the folders above, and that `no_backup` is the app asking not to be backed up.
+- **Extras** lists what it collects — permissions and their flags, app-op modes, background data
+  restrictions, notification-listener access, battery-optimisation exemption, granted URI
+  permissions, the freeze method. It no longer collects the **SSAID**, whose file is `system:system`
+  and unreadable as the shell, nor **MagiskHide / DenyList** state, which is root-only: every backup
+  was paying two package queries to record nothing.
+- **Rules** explains itself — blocked components and the permission and app-op decisions managed
+  here, and explicitly none of the app's own data.
+
+### 🔧 The backup sheet fills the screen again
+
+The bottom sheet sized itself from a `ViewPager2` that was measured **before its adapter was set**,
+so the pager had no pages at all — and ViewPager2 never re-measures for `wrap_content` once one
+arrives. It froze at that empty first pass and clipped the options list, which had been surviving on
+luck until a description grew to two lines. It now fills the height the sheet may occupy, measured
+from settled on-screen positions less the navigation-bar inset, so the tab's own *Back up* button
+stays reachable.
+
+### 🎨 Dialog theming
+
+- **Tick marks are tinted explicitly.** The row's tick is `?android:attr/listChoiceIndicatorMultiple`,
+  a framework drawable whose tint chain ignores this theme's pinned accent — which is why every row
+  rendered Material's baseline lavender while the *Select all* box above it was correctly yellow.
+- **The searchable dialog's field is a pill**: black fill, accent border, accent query text and a
+  dimmed accent placeholder. The border needed a stroke on the widget's own `MaterialShapeDrawable`,
+  since it discards any `android:background` a style sets and paints that shape instead.
+
 ## 4.1.0+2026-06-29.21-57.gfc1e7007+105 — 2026-09-03
 
 The app list can now be narrowed to the apps whose backup is out of date — the set a re-backup would
