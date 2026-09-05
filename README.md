@@ -12,16 +12,18 @@ A fork of [AppManager](https://github.com/MuntashirAkon/AppManager) with **major
 **Shizuku mode of operation** that needs no listening `adbd`, a per-app
 **battery history** that survives the charge cycle Android wipes it on, a per-app
 **anti-snooping page** that can cut an app off the network entirely, **app-data backup without
-root** through a contract the sister apps implement, **device-policy locks** that
+root** through a contract the sister apps implement — and which this app now implements for
+**its own** settings — a **full-page batch operation log**, a **configurable pill shelf** over
+three sibling screens, **per-app backup and restore tables**, **device-policy locks** that
 Settings cannot undo, a configurable
 **yellow-on-black UI** with a deep customization page, a hard-blocking **protected profile**, a
 from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-tap **main-list quick
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+2026-06-29.21-57.gfc1e7007+105`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+2026-06-29.21-57.gfc1e7007+145`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
-<sub>Version reads as **upstream `4.1.0`**, rebased onto upstream commit **`fc1e7007` of 2026-06-29 21:57 UTC**, fork build **105**.</sub>
+<sub>Version reads as **upstream `4.1.0`**, rebased onto upstream commit **`fc1e7007` of 2026-06-29 21:57 UTC**, fork build **145**.</sub>
 
 </div>
 
@@ -250,26 +252,49 @@ A from-scratch replacement for the legacy "Running apps" screen, built for actua
   media, a **per-process detail page** (memory / CPU / scheduling / lifecycle / security / app
   metadata), a **faceted filter** (killability × type) and a **toolbar search**.
 
-## ⏯️ Batch-op progress dialog that says what it is doing
+## ⏯️ A full page for a running batch, and a log that survives it
 
-Long batch operations get an in-app pop-up with **Pause / Continue** and **Cancel** — so you can hold
-a freeze or a backup mid-run, or stop it cleanly. What it *shows* is the point: a counter alone moves
-once per app, and one app with a large data directory holds it still for minutes, which is
-indistinguishable from a hung operation.
+A long batch operation opens a **page**, not a pop-up: a live log that keeps every app, every stage
+and every file it wrote, scrollable back to the beginning, with **Pause · Leave running · Cancel**
+underneath. Leaving is not stopping — the work is a foreground service — and the list itself says so
+now, with a pinned bar on the app list that leads back into a running or finished batch.
 
-So it lists **every app in flight** — a backup runs one app per CPU core, so "the current app" never
-existed — each with its label, its id, the **full destination directory** it is writing to, and the
-**stage inside that app** (APK files, Data 2/4, KeyStore, metadata, finalising). Over them sits a
-summary: elapsed time, an **estimate drawn from the rate actually achieved**, how many are running,
-how much has been written, and how many failed. The clocks are redrawn once a second, because the
-interesting moment is precisely the one where no progress event has arrived.
+What it shows is the point. A counter alone moves once per app, and one app with six gigabytes of
+data holds it still for twenty minutes, which is indistinguishable from a hung operation. So:
 
-The list **walks itself** while nobody touches it — a row at a time, wrapping at the end — so the
-apps below the fold are seen without a finger. Touching it stops the walk for six seconds and it
-resumes from where you left it.
+- **Every app in flight gets a line** — a backup runs one app per CPU core, so "the current app"
+  never existed — with its label, its destination directory and its stage, plus the elapsed time
+  that moves even when nothing else does.
+- **Every stage says which of how many it is**, in its own colour, repeated on *every* progress line
+  rather than only on the heading — because thousands of lines scroll that heading out of reach.
+  The count comes from a plan built before the run, so it never walks upward as you watch.
+- **The passes nobody used to see are stages too** — storing the archive, encrypting it,
+  checksumming it, each with the size it is about to walk.
+- **Cancel reaches inside one app**, not merely between them: stage boundaries, a cancellable copy,
+  and a hook inside the sister-app transfer that tells the app to stop.
 
 On completion the main list **snaps to its final state in one pass** instead of repainting row-by-row
 over several seconds.
+
+---
+
+## 🗂️ A pill shelf, and three screens the list could not be
+
+Under the toolbar sits a configurable, drag-reorderable strip of pills. A pill is either a **saved
+view** — filters, sort, profile membership and search captured together, because they only mean
+anything together — or one of three **sibling screens** that answer what the app list cannot:
+
+- **保存一覧** — every package that has backups, *including ones no longer installed*, with what is
+  inside each, how stale it is, and how much disk it holds. Long-press to multi-select, then back
+  up, restore or delete the lot in one sweep.
+- **盗み見一覧** — every app ranked by what it is allowed to do right now, through the same resolver
+  the per-app page uses, so the two can never disagree.
+- **仲間** — the sister apps, read from their manifests, so nothing is woken and frozen ones still
+  appear.
+
+They share the main list's colours, icon sizes, frames and separators — the same row, different
+columns. And a tap on a row **unrolls a pane inside the list** instead of leaving it, with the
+facts the row has no space for and configurable action pills.
 
 ## ❌ Main-list quick actions
 

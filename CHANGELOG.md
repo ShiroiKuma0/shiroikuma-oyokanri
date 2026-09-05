@@ -10,6 +10,131 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.0+2026-06-29.21-57.gfc1e7007+145 — 2026-09-05
+
+The batch surface rebuilt: a full-page operation log, a pill shelf over three sibling screens, and
+backup and restore chosen per app rather than per batch. (Built on upstream App Manager `4.1.0`,
+commit `fc1e7007` of 2026-06-29 21:57 UTC.)
+
+### 📋 A page for a running batch, and a log that survives it
+
+The one-line progress dialog is gone. A batch now opens a **full page** over a live log that keeps
+every app, stage and file — scrollable back to the beginning, and still there when the operation
+ends. Two singletons sit behind it and the split is the point: one answers *what is happening now*,
+the other keeps *what has happened*.
+
+- **Every app in flight gets a line.** A backup runs one app per core, so "the current app" never
+  existed; the header is as tall as the batch is wide, with each app's stage, its destination and an
+  elapsed clock that moves even when nothing else does.
+- **Every stage says which of how many it is**, in its own colour — and the number is repeated on
+  **every progress line**, not only the heading, because a 6 GB export writes thousands of lines and
+  scrolls that heading hours out of reach. The count comes from a plan built before the run, so a
+  stage announced repeatedly (the data directories) keeps one number instead of walking the total.
+- **The silent passes became stages**: storing the archive, encrypting it and checksumming it, each
+  announced with the size it is about to walk. Restore has the mirror three — checking, decrypting,
+  unpacking.
+- **A sister app whose byte counter goes backwards says so** — that is a second pass over the same
+  data, and nothing else in the log marked the boundary.
+- **Interleaved threads never lie about ownership**: the log re-announces the owning app whenever
+  the emitter changes, so every line belongs to the app named directly above it.
+- Colours, text size and the timestamp column are all settable, and the log copies and saves through
+  the same renderer it draws with, so a saved log matches the one you read.
+
+### ⏹️ Cancel that actually cancels
+
+The batch checkpoint fired once per **app**, before that app's work — right for a batch, no use at
+all for a single app that takes twenty minutes. Cancel had nothing left to reach, and killing the
+process was the only way out of a running backup. It now checks at every stage boundary, every few
+megabytes of the large copy, and inside the sister-app transfer, whose wait loop polls once a second
+and tells the app to stop before walking away. A cancel is also reported as a cancel: both ops
+rethrow it ahead of their catch-all instead of dressing it up as "could not back up".
+
+### 🗂️ A pill shelf, and three screens the list could not be
+
+- A configurable, drag-reorderable strip under the toolbar. A pill is a **saved view** — filters,
+  sort, profile membership and search captured together — or a **screen**.
+- **保存一覧** lists every package with backups, including ones no longer installed: what is inside
+  each, how stale it is, how much disk it holds. Long-press multi-selects; the bar backs up, restores
+  or deletes the selection in one sweep.
+- **盗み見一覧** ranks apps by what they may do right now, through the same resolver the per-app page
+  and the enforcer use.
+- **仲間** lists the sister apps from their manifests — nothing is woken, and frozen ones still appear.
+- All three share the main list's colours, icon sizes, frames and separators: the same row, different
+  columns. A **sister-app filter** puts the same question to the main list.
+
+### 👆 A tap unrolls, it does not leave
+
+- Tapping a row opens a pane **inside the list** with the facts the row has no space for and
+  configurable action pills — 盗み見 and 応用情報 among them, so nothing the old tap reached is lost.
+- The cut-off selection menu became a **batch pane** of wrapping pills, dispatching through the
+  existing menu-id handler so no batch logic is duplicated. Both sets of pills reorder by dragging,
+  and the pill moves with the finger.
+
+### 💾 Backup and restore, chosen per app
+
+- **Parts have colours.** One colour and one glyph each — APK, internal data, external data,
+  app-supplied, OBB/media, cache, extras, rules — used by every surface that chooses between them.
+  The palette is fixed rather than settable: it is a legend, and a per-screen colour picker would
+  make it worth nothing.
+- **Batch backup is a table**, one row per app with its own parts and a foldable app-supplied
+  section. One set of flags for five hundred apps is only right when they are all the same kind of
+  thing.
+- **Batch restore is a table too**, and it had to be: the old chooser built itself from the
+  *intersection* of every selected backup, so a part only some archives carried could not be chosen
+  at all and the apps that had it silently did not get it back. Each app also picks **which** backup
+  to restore from, since the parts are a fact about that archive.
+- **Save versus OK** in the app-supplied category picker. Every close used to write the app's stored
+  preference, so narrowing one backup narrowed every future one; the batch table wrote it forty
+  times over. Save stores and applies, OK applies to this backup only, Use app's defaults forgets
+  the choice.
+- **Per-app flags, directories and categories travel with the operation** — and reach it: the
+  single-app dialog had its own copy of the hand-off that silently dropped all three.
+- **Every backup directory is datetime-stamped**, so the folder name answers "when was this" while
+  you stand in the directory deciding what is stale. No more `0`-named base backup.
+- **The old backup is deleted only after the new one is written** and renamed into place — and a
+  failed run no longer leaves an empty directory behind. **Clean up broken backups** removes the
+  ones already on disk: empty folders, half-written staging directories, directories with no
+  readable metadata. A directory carrying readable metadata is never listed.
+- The overwrite warning says what it will actually do and where "Back up multiple" lives; toggling
+  that switch in the dialog is a decision about *this* backup and is no longer written back to the
+  preference.
+
+### 🤝 応用管理 is a sister app too
+
+It could back up everyone else's data and not its own. It now implements the data contract itself,
+exporting its settings, appearance, monitor, toolbar, notes, snooping decisions and profiles through
+exactly the archive the 保存復元 broadcast already produces — so it appears under the sister-app
+filter and its backups carry an App-supplied part with a category picker. Only its own uid may come
+through the door; a stranger gets a refusal in the contract's grammar rather than a `SecurityException`
+the client would misread as a missing door. Restoring its own state is **staged** and applied on an
+explicit restart, because writing preference files under a running process is how an import silently
+undoes itself.
+
+### 🔒 Protection and safety
+
+- **白い熊 雫, 白い熊 応用管理 and 白い熊 自由作業盤 can never be frozen, suspended or uninstalled**,
+  checked before the profile lookup so the answer never depends on the profiles being readable. The
+  必要 guard fails open by design — right for a list you edit, wrong for the apps that make this one
+  work.
+- **Suspension had escaped both chokepoints.** The Snooping policy card suspends directly, and
+  suspension is the harder freeze; it is guarded now at the bridge and at the compat layer, with
+  lifting never blocked.
+- **A settings import may tighten a security setting and never loosen one** — screen lock, auto-lock,
+  installer verification, tracker blocking, omit-sensitive-info and backup encryption are held when
+  an archive would move them the wrong way, including by omitting them. What was held is named in
+  the success dialog.
+
+### 🔧 Fixes
+
+- **The sister-app transfer correlated on the wrong job id.** The callee mints it; the client
+  invented its own, so a finished 22 MB export was reported as "Could not backup" after a two-minute
+  watchdog. The caller adopts the callee's id and parks replies that arrive before the call returns.
+- Byte counters read `809,500,672` rather than `809500672`.
+- The completion notification is drawn in the fork's colours.
+- The toolbar no longer reserves an empty band above the shelf; the search field drove its height.
+- A backup no longer stops to ask for a name.
+- Restoring an app the database wrongly believed uninstalled offers "Back up" again.
+
 ## 4.1.0+2026-06-29.21-57.gfc1e7007+115 — 2026-09-05
 
 App data can now be backed up without root, by asking each app for it — and the backup options
