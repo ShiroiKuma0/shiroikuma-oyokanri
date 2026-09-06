@@ -87,6 +87,7 @@ import io.github.muntashirakon.AppManager.backup.dialog.BackupRestoreDialogFragm
 import io.github.muntashirakon.AppManager.batchops.BatchOpsManager;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsProgressActivity;
 import androidx.core.graphics.ColorUtils;
+import io.github.muntashirakon.AppManager.appdata.self.MigrationKit;
 import io.github.muntashirakon.AppManager.appdata.self.PendingStateImport;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsProgressMonitor;
 import io.github.muntashirakon.AppManager.batchops.OpLog;
@@ -147,6 +148,20 @@ import io.github.muntashirakon.widget.SwipeRefreshLayout;
 public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnRefreshListener,
         MultiSelectionActionsView.OnItemSelectedListener,
         MultiSelectionView.OnSelectionModeChangeListener {
+    /**
+     * Fork (白い熊, +147): set by {@code SplashActivity} when it hands over, and by nothing else.
+     * It is what tells a launch from an internal start of this window (see reopenLastScreen).
+     */
+    public static final String EXTRA_FROM_SPLASH = "fork_from_splash";
+
+    /** The screen this launch will reopen, held until there is a window to put it over. */
+    @Nullable
+    private Intent mPendingReopen;
+    /** True from starting that screen until it has actually covered this window. */
+    private boolean mReopenInFlight;
+    /** The migration offer is looked for once per window, not once per resume. */
+    private boolean mMigrationOffered;
+
     private static final String PACKAGE_NAME_APK_UPDATER = "com.apkupdater";
     private static final String ACTIVITY_NAME_APK_UPDATER = "com.apkupdater.activity.MainActivity";
 
@@ -341,6 +356,13 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         setSupportActionBar(findViewById(R.id.toolbar));
         getOnBackPressedDispatcher().addCallback(this, mOnBackPressedCallback);
         viewModel = new ViewModelProvider(this).get(MainViewModel.class);
+        // Fork (白い熊, +149): decided BEFORE anything observes the item list, because observing
+        // it is what starts the load, and a window that is about to be covered should not pay for
+        // one. Started at the end of this method, once there is something to cover.
+        mPendingReopen = pendingReopen(savedInstanceState);
+        if (mPendingReopen != null) {
+            viewModel.setLoadDeferred(true);
+        }
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
             actionBar.setDisplayShowCustomEnabled(true);
@@ -504,6 +526,76 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                 UIUtils.displayLongToast(R.string.failed);
             }
         });
+        startPendingReopen();
+    }
+
+    /**
+     * Fork (白い熊, +146): come back to the screen the app was left on.
+     *
+     * <p>Only from a genuinely fresh start: the window must have been handed over by
+     * {@code SplashActivity} ({@link #EXTRA_FROM_SPLASH}), must not be a recreated one (rotation,
+     * a fold — that restores its own state), and must not carry a data URI, or the
+     * {@code market://search} path above would be hijacked. Backing out of the restored screen
+     * cannot loop: returning to this list clears the memory, and {@link LastScreenPrefs#consume}
+     * clears it as it answers.
+     */
+    @Nullable
+    private Intent pendingReopen(@Nullable Bundle savedInstanceState) {
+        Intent intent = getIntent();
+        if (savedInstanceState != null || intent == null || intent.getData() != null) {
+            return null;
+        }
+        // Only a hand-off from the splash screen is a launch. Every other route to this window is
+        // somebody already inside the app asking for the list — AppDetailsActivity's "back to main
+        // page" most of all — and reopening the screen they have just left would fight them.
+        if (!intent.getBooleanExtra(EXTRA_FROM_SPLASH, false)) {
+            return null;
+        }
+        return LastScreenPrefs.consume(this);
+    }
+
+    private void startPendingReopen() {
+        if (mPendingReopen == null) {
+            return;
+        }
+        Intent last = mPendingReopen;
+        mPendingReopen = null;
+        mReopenInFlight = true;
+        try {
+            startActivity(last);
+        } catch (Throwable th) {
+            th.printStackTrace();
+            mReopenInFlight = false;
+        }
+        // Fallback: if the screen never arrives (a refused launch, a screen that finishes itself),
+        // this window is the one in front after all and must stop waiting for a load it deferred.
+        mRecyclerView.postDelayed(() -> {
+            mReopenInFlight = false;
+            // Only when this window is genuinely in front. The handler runs whether or not the
+            // reopened screen arrived, and firing the load underneath it is the very thing the
+            // deferral exists to prevent.
+            if (getLifecycle().getCurrentState().isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+                kickDeferredListLoad();
+            }
+        }, 3000);
+    }
+
+    /**
+     * Fork (白い熊, +149): load the app list once this window is the one being looked at.
+     *
+     * <p>Called when it becomes the top resumed activity, which is exactly the moment the list
+     * stops being invisible — either because the reopened screen was closed, or because there
+     * never was one.
+     */
+    private void kickDeferredListLoad() {
+        if (viewModel == null || !viewModel.isLoadDeferred() || mReopenInFlight) {
+            return;
+        }
+        viewModel.setLoadDeferred(false);
+        if (!viewModel.hasLoadedItems()) {
+            showProgressIndicator(true);
+            viewModel.loadApplicationItems();
+        }
     }
 
     @Override
@@ -759,6 +851,7 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         // the user came back from a side-by-side settings window.
         if (isTopResumedActivity) {
             refreshForkAppearanceIfChanged();
+            kickDeferredListLoad();
         }
     }
 
@@ -1460,6 +1553,87 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             openBatchProgressPage(BatchOpsManager.OP_NONE, Integer.MAX_VALUE);
         }
         offerPendingStateImport();
+        showMigrationReport();
+        offerMigration();
+    }
+
+    /**
+     * Fork (白い熊, +154): what a migration actually restored, shown once, on the start after it.
+     *
+     * <p>It cannot be shown when it happens — applying the archive ends in a hard kill, because
+     * this process holds the preference files it has just replaced. So the counts are written to
+     * a plain file at the moment of the import (when the numbers are true) and rendered here.
+     */
+    private void showMigrationReport() {
+        String[] report = MigrationKit.parseReport(MigrationKit.consumeReport(this));
+        if (report == null) {
+            return;
+        }
+        StringBuilder body = new StringBuilder(getString(R.string.migration_report_counts,
+                report[0], report[1], report[2], report[3]));
+        String dir = report.length > 5 ? report[5] : "";
+        if (!dir.isEmpty()) {
+            body.append("\n\n").append(getString("1".equals(report[4])
+                    ? R.string.migration_report_dir_ok
+                    : R.string.migration_report_dir_missing, dir));
+        }
+        body.append("\n\n").append(getString(R.string.migration_report_not_carried));
+        ForkDialog.present(ForkDialog.builder(this)
+                .setTitle(R.string.migration_report_title)
+                .setMessage(body.toString())
+                .setPositiveButton(R.string.ok, null));
+    }
+
+    /**
+     * Fork (白い熊, +154): on a phone with nothing of 白い熊's own in it, look for a migration kit
+     * and offer to restore from it.
+     *
+     * <p>Gated on {@link MigrationKit#looksUnconfigured} rather than on "first run": a phone that
+     * has been used never sees this, whatever else is lying on its storage. The scan itself is a
+     * directory walk and runs off the main thread, once per window.
+     */
+    private void offerMigration() {
+        if (mMigrationOffered || MigrationKit.isOfferDone(this)
+                || !MigrationKit.looksUnconfigured(this)) {
+            return;
+        }
+        mMigrationOffered = true;
+        ThreadUtils.postOnBackgroundThread(() -> {
+            io.github.muntashirakon.io.Path kit = MigrationKit.find(this);
+            if (kit == null) {
+                return;
+            }
+            ThreadUtils.postOnMainThread(() -> {
+                if (isDestroyed()) return;
+                ForkDialog.present(ForkDialog.builder(this)
+                        .setTitle(R.string.migration_offer_title)
+                        .setMessage(getString(R.string.migration_offer_message, kit.getFilePath()))
+                        .setNegativeButton(R.string.settings_eim_later, null)
+                        .setNeutralButton(R.string.migration_offer_never,
+                                (dialog, which) -> MigrationKit.setOfferDone(this))
+                        .setPositiveButton(R.string.migration_offer_restore,
+                                (dialog, which) -> runMigration(kit)));
+            });
+        });
+    }
+
+    private void runMigration(@NonNull io.github.muntashirakon.io.Path kit) {
+        showProgressIndicator(true);
+        ThreadUtils.postOnBackgroundThread(() -> {
+            try {
+                MigrationKit.restore(this, kit);
+            } catch (Throwable th) {
+                ThreadUtils.postOnMainThread(() -> {
+                    showProgressIndicator(false);
+                    UIUtils.displayLongToast(R.string.failed);
+                });
+                return;
+            }
+            // Hard-kill, never Runtime.exit: the cached preference maps would otherwise be
+            // written back over what was just imported. The same rule as the Export/Import
+            // panel's "Restart now" and PendingStateImport.
+            android.os.Process.killProcess(android.os.Process.myPid());
+        });
     }
 
     /**
@@ -1558,6 +1732,14 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         for (int i = 0; i < vg.getChildCount(); i++) {
             vg.getChildAt(i).setOnLongClickListener(openEditor);
         }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // Covered — by the reopened screen or by anything else. Either way this window is no
+        // longer the one waiting to be drawn, so the next time it is in front it may load.
+        mReopenInFlight = false;
     }
 
     @Override

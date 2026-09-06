@@ -6,30 +6,48 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 
 /**
- * Fork: the automation token that gates {@link StateExportReceiver}.
+ * Fork: the gate on {@link StateExportReceiver} — the <b>v2 shape</b> of the sister-app
+ * contract (白い熊, +151), matching 自由作業盤's own {@code AutomationAuth} so every
+ * 白い熊 app behaves the same.
  * <p>
- * 白い熊's automation app (白い熊 自由作業盤, {@code shiroikuma.jiyusagyoban})
- * backs up every sister app in one run by firing a token-gated broadcast at
- * each of them. This is the shared gate: a master switch that is <b>off by
- * default</b> plus a 24-byte random token that must be presented on every
- * request.
+ * 白い熊's automation app (白い熊 自由作業盤, {@code shiroikuma.jiyusagyoban}) backs up
+ * every sister app in one run by broadcasting at each of them. v1 shipped every app closed:
+ * the master switch was off and a caller had to present a 48-character secret pasted out of
+ * this app's settings.
  * <p>
- * The token lives in its own SharedPreferences file, {@link #PREF_FILE}, which
- * {@link SettingsBackupManager} explicitly excludes from both export and
- * import — a secret must never travel inside a backup archive (nor be
- * overwritten by one).
+ * <b>Why the switch now ships on and the token ships off.</b> A pasted secret cannot survive
+ * a wipe, and the case this family now exists to serve is 応用管理 restoring apps and their
+ * data onto a <em>clean</em> phone, where nothing has been configured and nobody has pasted
+ * anything. A gate that only works once the phone is already set up is no gate for setting
+ * the phone up. The switch stays, because it is the only way to close this app off and a
+ * feature that can be turned on but never off is one 白い熊 cannot retreat from.
+ * <p>
+ * <b>A token sent to an app that does not require one is IGNORED, never refused.</b> Tokens
+ * live in task arguments that outlive the setting they were pasted for, and another app in
+ * the same batch may still want one. Refusing it would turn "白い熊 turned a switch off"
+ * into "half the batch mysteriously fails".
+ * <p>
+ * <b>The whole check lives in {@link #refuse}</b>, in one place — two checks written out at
+ * each entry point is how "disabled" and "bad token" drift apart across forty-odd apps.
+ * <p>
+ * These live in their own SharedPreferences file, {@link #PREF_FILE}, which
+ * {@link SettingsBackupManager} excludes from both export and import — a secret must never
+ * travel inside a backup archive nor be overwritten by one. With the v2 defaults that
+ * exclusion costs nothing on a migration: a fresh install comes up answering the batch.
  */
 public final class AutomationAuth {
     /** Device-local, never exported (see {@code SettingsBackupManager.EXCLUDED_PREFS}). */
     public static final String PREF_FILE = "shiroikuma_automation";
 
     private static final String KEY_ENABLED = "automation_enabled";
+    private static final String KEY_REQUIRE_TOKEN = "automation_require_token";
     private static final String KEY_TOKEN = "automation_token";
     private static final int TOKEN_BYTES = 24;
 
@@ -41,13 +59,53 @@ public final class AutomationAuth {
         return context.getApplicationContext().getSharedPreferences(PREF_FILE, Context.MODE_PRIVATE);
     }
 
-    /** Master switch. Default <b>false</b>: nothing is reachable until 白い熊 turns it on. */
+    /**
+     * Master switch. Default <b>true</b>: this app answers the batch out of the box, which is
+     * what makes a clean phone recoverable without anything having been paired first.
+     */
     public static boolean isEnabled(@NonNull Context context) {
-        return prefs(context).getBoolean(KEY_ENABLED, false);
+        return prefs(context).getBoolean(KEY_ENABLED, true);
     }
 
+    /**
+     * LANDMINE — {@code commit()}, never {@code apply()}. The gate now fails <b>open</b>: the
+     * default is ON, so a write that never reaches disk reverts to "automation allowed", not
+     * to "closed". This app force-stops other apps with SIGKILL, sometimes seconds after a
+     * switch is flipped, and an asynchronous write is exactly what such a kill loses. Same
+     * reasoning as {@link #getToken}, which has always committed; the two flag setters were
+     * the gap (自由作業盤's contract §2, confirmed cross-session, +152).
+     */
     public static void setEnabled(@NonNull Context context, boolean enabled) {
-        prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply();
+        prefs(context).edit().putBoolean(KEY_ENABLED, enabled).commit();
+    }
+
+    /** Default <b>false</b>: the token is an extra a caller may be asked for, not the gate. */
+    public static boolean isTokenRequired(@NonNull Context context) {
+        return prefs(context).getBoolean(KEY_REQUIRE_TOKEN, false);
+    }
+
+    /** Committed, not applied — see {@link #setEnabled}. */
+    public static void setTokenRequired(@NonNull Context context, boolean required) {
+        prefs(context).edit().putBoolean(KEY_REQUIRE_TOKEN, required).commit();
+    }
+
+    /**
+     * The whole gate, in one answer: {@code null} means proceed, anything else is the exact
+     * {@code ERROR:} line to reply with. "automation disabled" and "bad token" stay distinct
+     * because they debug differently.
+     * <p>
+     * The candidate is only looked at when {@link #isTokenRequired} is on; when it is off, a
+     * token that arrived anyway is dropped on the floor rather than refused.
+     */
+    @Nullable
+    public static String refuse(@NonNull Context context, @Nullable String candidate) {
+        if (!isEnabled(context)) {
+            return "ERROR:automation disabled";
+        }
+        if (isTokenRequired(context) && !tokenMatches(context, candidate)) {
+            return "ERROR:bad token";
+        }
+        return null;
     }
 
     /**

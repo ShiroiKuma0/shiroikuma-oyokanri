@@ -53,6 +53,8 @@ public class ScreenRow {
     public long sortKey;
     /** Secondary ordering value, for a source that needs two. */
     public long sortKey2;
+    /** Third ordering value, for a source that needs three. */
+    public long sortKey3;
 
     public ScreenRow(@NonNull String packageName, int userId, @NonNull CharSequence label,
                      @Nullable CharSequence subtitle, long iconVersion) {

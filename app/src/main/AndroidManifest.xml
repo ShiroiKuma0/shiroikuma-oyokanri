@@ -527,8 +527,13 @@
                 <data android:mimeType="application/zip" />
             </intent-filter>
         </activity>
+        <!-- Fork (白い熊, +146): alwaysRetainTaskState, because MainActivity is the task ROOT
+             (SplashActivity is a trampoline and finishes). Without it the system is free to
+             clear everything above the root when the task is returned to after long enough
+             away, which is one of the two ways "reopen where I was" was being lost. -->
         <activity
             android:name=".main.MainActivity"
+            android:alwaysRetainTaskState="true"
             android:enableOnBackInvokedCallback="true"
             android:exported="true">
             <intent-filter android:label="@string/search">

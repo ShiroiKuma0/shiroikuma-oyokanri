@@ -170,9 +170,31 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
         return mApplicationItems.size();
     }
 
+    /**
+     * Fork (白い熊, +149): hold the first load back.
+     *
+     * <p>Reopening onto a sibling screen (+146) creates this window and then covers it, so the
+     * list of every installed app is read, sized and sorted for a screen nobody is looking at —
+     * while the screen that IS on top is waiting for the same threads and the same privileged
+     * server. Deferred, the list loads when this window is actually the one in front.
+     */
+    private boolean mLoadDeferred;
+
+    public void setLoadDeferred(boolean deferred) {
+        mLoadDeferred = deferred;
+    }
+
+    public boolean isLoadDeferred() {
+        return mLoadDeferred;
+    }
+
+    public boolean hasLoadedItems() {
+        return mApplicationItemsLiveData.getValue() != null;
+    }
+
     @NonNull
     public LiveData<List<ApplicationItem>> getApplicationItems() {
-        if (mApplicationItemsLiveData.getValue() == null) {
+        if (mApplicationItemsLiveData.getValue() == null && !mLoadDeferred) {
             loadApplicationItems();
         }
         return mApplicationItemsLiveData;

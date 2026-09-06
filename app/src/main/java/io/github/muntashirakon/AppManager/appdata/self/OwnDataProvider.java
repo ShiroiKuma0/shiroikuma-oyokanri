@@ -85,10 +85,27 @@ public class OwnDataProvider extends ContentProvider {
         if (context == null) {
             return reply(AppDataContract.ERROR_PREFIX + "no context");
         }
-        if (!callerAllowed()) {
-            return reply(AppDataContract.ERROR_PREFIX + "not authorised");
+        // Identity first, then the gate, then the dispatch — in that order, so an unknown
+        // caller gets the same refusal for a bogus method as for a real one and cannot learn
+        // what this door answers by asking.
+        String refusedCaller = AutomationCallers.refuse(context, android.os.Binder.getCallingUid(),
+                getCallingPackage());
+        if (refusedCaller != null) {
+            return reply(AppDataContract.ERROR_PREFIX + refusedCaller);
         }
         Context appContext = context.getApplicationContext();
+        if (android.os.Binder.getCallingUid() != android.os.Process.myUid()) {
+            // Another app's call also passes the automation gate: "turn the switch off to close
+            // this app off entirely" has to mean the door too, or the switch is a half-truth.
+            // Our own calls skip it — backing ourselves up is not automation by anybody else.
+            String refused = io.github.muntashirakon.AppManager.settings.AutomationAuth.refuse(
+                    appContext, extras == null ? null : extras.getString("token"));
+            if (refused != null) {
+                // The gate speaks the receiver's grammar ("ERROR:..."), which is the contract's
+                // too — pass its line through rather than inventing a second wording.
+                return reply(refused);
+            }
+        }
         switch (method) {
             case AppDataContract.METHOD_DESCRIBE:
                 return reply(AppDataContract.OK_PREFIX + describe(appContext));
@@ -111,22 +128,16 @@ public class OwnDataProvider extends ContentProvider {
         }
     }
 
-    /**
-     * Who may come through this door.
+    /*
+     * Who may come through this door now lives in AutomationCallers (白い熊, +153): our own uid,
+     * plus an allowlist of exact package names each cross-checked against the uid the kernel
+     * reports and a pinned signing certificate. It was self-only until 白い熊 authorised
+     * 自由作業盤, which could otherwise not back 応用管理 up through the door at all.
      *
-     * <p>The contract's own answer to authentication is that a provider call carries the caller's
-     * uid through the framework — no shared secret, and nothing a broadcast could spoof. Today the
-     * only caller that has any business here is this app's own backup, so that is all that is
-     * allowed; widening it later is this one predicate, and until then a refusal says so in the
-     * contract's grammar rather than looking like a missing door.
-     *
-     * <p>The provider stays <b>exported</b> for exactly that reason: a non-exported one answers a
-     * stranger with a {@code SecurityException}, which {@code AppDataClient} reports as "frozen,
-     * or no door" — the wrong diagnosis for a deliberate policy.
+     * The provider stays <b>exported</b> either way: a non-exported one answers a stranger with a
+     * {@code SecurityException}, which {@code AppDataClient} reports as "frozen, or no door" — the
+     * wrong diagnosis for a deliberate policy.
      */
-    private boolean callerAllowed() {
-        return android.os.Binder.getCallingUid() == android.os.Process.myUid();
-    }
 
     /** The header the caller stores beside the archive and judges compatibility from. */
     @NonNull

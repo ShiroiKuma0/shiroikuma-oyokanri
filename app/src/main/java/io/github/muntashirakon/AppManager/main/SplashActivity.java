@@ -248,7 +248,11 @@ public class SplashActivity extends AppCompatActivity {
             overridePendingTransition(0, 0);
             return;
         }
-        startActivity(new Intent(this, MainActivity.class));
+        // Fork (白い熊, +147): mark the hand-off. MainActivity reopens the screen the app was left
+        // on only for a window that came through here, so an internal start of the list (the
+        // "back to main page" route out of App details) is never mistaken for a launch.
+        startActivity(new Intent(this, MainActivity.class)
+                .putExtra(MainActivity.EXTRA_FROM_SPLASH, true));
         finish();
     }
 

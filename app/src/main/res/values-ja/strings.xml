@@ -1075,6 +1075,38 @@
     <string name="sort_by_installation_date">インストール日時</string>
     <string name="netpolicy_cannot_be_modified_for_core_apps">ネットポリシーは、Androidコアアプリでは変更できません。</string>
     <!-- Fork: user-supplied Japanese translations -->
+    <!-- Fork (白い熊, +146): 追跡者 -->
+    <string name="trackers_deep_scan">深層走査</string>
+    <string name="trackers_deep_rescan">もう一度走査</string>
+    <string name="trackers_deep_scanning">走査中…</string>
+    <string name="trackers_scan_manifest">目録から — 少なくともこの数</string>
+    <string name="trackers_scan_deep">符号の走査から</string>
+    <string name="tracker_rung_autonomous">自分で起動できる</string>
+    <string name="tracker_rung_with_app">応用と一緒に動く</string>
+    <string name="tracker_rung_passive">自前の画面でのみ</string>
+    <string name="tracker_rung_autonomous_n">自分で起動 %d 件</string>
+    <string name="tracker_rung_with_app_n">応用と一緒 %d 件</string>
+    <string name="tracker_rung_passive_n">受動 %d 件</string>
+    <string name="tracker_second_degree_note">二次追跡者。この追跡者そのものではなく、それを内包する部品です。</string>
+    <string name="tracker_code_only">符号のみ</string>
+    <string name="tracker_code_only_note">符号の中にのみ在り、自前の部品はありません。自分では起動できませんが、応用に同梱されています。</string>
+    <string name="tracker_class_count">符号内の類 %d 件</string>
+    <string name="tracker_components_title">部品 (%d)</string>
+    <string name="tracker_more_components">ほか %d 件</string>
+    <string name="tracker_cannot_block">この端末では部品を遮断できません。Android 8 以降、shell は部品の状態を変更できず、Intent Firewall には root が要ります。実際に効くのは、通信の遮断か凍結です。</string>
+    <string name="tracker_block">この追跡者を遮断</string>
+    <string name="tracker_other_apps">ほかの応用</string>
+    <string name="tracker_exodus">Exodus の報告</string>
+    <string name="screen_trackers_count">追跡者 %d 件</string>
+    <string name="screen_tracker_components">部品 %d 件</string>
+    <string name="screen_tracker_empty">この端末のほかの応用には見当たりません。</string>
+    <string name="screen_sort_tracker_count">追跡者の数</string>
+    <string name="screen_sort_tracker_severity">できること</string>
+    <string name="screen_sort_tracker_components">部品の数</string>
+    <!-- Fork (白い熊, +146): 最後の画面を開き直す -->
+    <string name="pref_screens_group">画面</string>
+    <string name="pref_reopen_last_screen">最後の画面を開き直す</string>
+    <string name="pref_reopen_last_screen_desc">起動器から開いたとき、応用一覧ではなく、最後に見ていた画面（一覧画面や応用の頁）に戻ります。</string>
     <!-- Fork (白い熊, +118): 丸薬棚と姉妹画面 -->
     <string name="pref_app_pane">行の操作</string>
     <string name="pref_app_pane_description">行を開いたときに表示する操作丸薬と、その並び順</string>
@@ -1123,7 +1155,7 @@
     <string name="screen_backups_part_app_data">応用</string>
     <string name="screen_snooping">盗み見一覧</string>
     <string name="screen_snooping_empty">今のところ盗み見できるものはありません。</string>
-    <string name="screen_snooping_allowed">許可 %d 件</string>
+    <string name="screen_snooping_allowed">盗み見できること %d 件</string>
     <string name="screen_snooping_narrowed">使用中のみ %d 件</string>
     <string name="filter_sister_apps">仲間のアプリ</string>
     <string name="screen_sister">仲間</string>

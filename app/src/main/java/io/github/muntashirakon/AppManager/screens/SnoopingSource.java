@@ -16,11 +16,16 @@ import androidx.appcompat.app.AppCompatActivity;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.compat.AppOpsManagerCompat;
+import io.github.muntashirakon.AppManager.db.entity.App;
+import io.github.muntashirakon.AppManager.db.utils.AppDb;
 import io.github.muntashirakon.AppManager.details.AppDetailsActivity;
+import io.github.muntashirakon.AppManager.main.PillSpan;
 import io.github.muntashirakon.AppManager.details.struct.AppDetailsSnoopingItem;
 import io.github.muntashirakon.AppManager.snooping.SnoopingResolver;
 import io.github.muntashirakon.AppManager.snooping.SnoopingState;
@@ -44,6 +49,11 @@ import io.github.muntashirakon.AppManager.snooping.SnoopingState;
 public class SnoopingSource implements ScreenSource {
     private static final int SORT_ALLOWED = 0;
     private static final int SORT_NAME = 1;
+    /**
+     * Fork (白い熊, +146): by how many trackers the app carries. Appended, never inserted — the
+     * index is what the sort menu hands back, and the two existing orders keep theirs.
+     */
+    private static final int SORT_TRACKERS = 2;
 
     @Override
     public int titleRes() {
@@ -59,9 +69,25 @@ public class SnoopingSource implements ScreenSource {
     @Override
     public List<ScreenRow> load(@NonNull Context context) {
         List<ScreenRow> rows = new ArrayList<>();
+        float density = context.getResources().getDisplayMetrics().density;
         PackageManager pm = context.getPackageManager();
         int userId = UserHandleHidden.myUserId();
         AppOpsManagerCompat appOpsManager = new AppOpsManagerCompat();
+        // Fork (白い熊, +146): the tracker count comes from the app database rather than from a
+        // scan of our own. It is filled by App.fromPackageInfo with every component flag set, so
+        // it is the same number the main list sorts by — and this screen already runs a resolver
+        // pass per app without adding a manifest walk to it.
+        Map<String, Integer> trackerCounts = new HashMap<>();
+        try {
+            for (App app : new AppDb().getAllInstalledApplications()) {
+                Integer known = trackerCounts.get(app.packageName);
+                if (known == null || app.trackerCount > known) {
+                    trackerCounts.put(app.packageName, app.trackerCount);
+                }
+            }
+        } catch (Throwable th) {
+            th.printStackTrace();
+        }
         List<PackageInfo> packages;
         try {
             // GET_SERVICES is required, not optional: SnoopingReachability judges the
@@ -114,10 +140,25 @@ public class SnoopingSource implements ScreenSource {
             row.frozen = io.github.muntashirakon.AppManager.utils.FreezeUtils.isFrozen(ai);
             row.sortKey = allowed;
             row.sortKey2 = narrowed;
-            row.accent = allowed > 0 ? 0xFFFF0028 : 0;
-            row.add(context.getString(R.string.screen_snooping_allowed, allowed));
+            Integer trackers = trackerCounts.get(packageInfo.packageName);
+            row.sortKey3 = trackers == null ? 0 : trackers;
+            // Fork (白い熊, +149): the two findings are pills, not coloured text. The red the
+            // headline used to be drawn in is the page's "it can do this right now" colour and it
+            // is nearly unreadable as 12sp text on black; filled, with the Snooping page's own
+            // Allowed pair (#6E0B14 under #FFD9DC), it says the same thing and can be read.
+            if (allowed > 0) {
+                row.add(PillSpan.pill(context.getString(R.string.screen_snooping_allowed, allowed),
+                        0xFF6E0B14, 0xFFFFD9DC, 15f * density, density));
+            }
             if (narrowed > 0) {
                 row.add(context.getString(R.string.screen_snooping_narrowed, narrowed));
+            }
+            // Below the capability lines, and the loudest thing on the row: the trackers are the
+            // finding you cannot reach any other way. Same near-white ink as the pill above it —
+            // one pair of pills, read the same way — over the tracker red, a size up again.
+            if (row.sortKey3 > 0) {
+                row.add(PillSpan.pill(context.getString(R.string.screen_trackers_count, (int) row.sortKey3),
+                        0xFFFF0028, 0xFFFFD9DC, 16f * density, density));
             }
             if (!names.isEmpty()) {
                 row.add(TextUtils.join(" · ", names));
@@ -133,13 +174,19 @@ public class SnoopingSource implements ScreenSource {
     public List<CharSequence> sortLabels(@NonNull Context context) {
         return Arrays.asList(
                 context.getString(R.string.screen_sort_allowed_count),
-                context.getString(R.string.screen_sort_name));
+                context.getString(R.string.screen_sort_name),
+                context.getString(R.string.screen_sort_tracker_count));
     }
 
     @Override
     public void applySort(@NonNull List<ScreenRow> rows, int sortMode) {
         if (sortMode == SORT_NAME) {
             Collections.sort(rows, (a, b) -> a.label.toString().compareToIgnoreCase(b.label.toString()));
+        } else if (sortMode == SORT_TRACKERS) {
+            Collections.sort(rows, (a, b) -> {
+                int byTrackers = Long.compare(b.sortKey3, a.sortKey3);
+                return byTrackers != 0 ? byTrackers : Long.compare(b.sortKey, a.sortKey);
+            });
         } else {
             Collections.sort(rows, (a, b) -> {
                 int byAllowed = Long.compare(b.sortKey, a.sortKey);

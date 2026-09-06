@@ -254,7 +254,21 @@ public final class OpLog {
         } else {
             text = key;
         }
-        append(1, ok ? KIND_OK : KIND_FAIL, text, detail, false);
+        if (!ok && !TextUtils.isEmpty(detail)) {
+            // Fork (白い熊, +157): a failure's reason gets a line of its own.
+            //
+            // Appended to the summary it became the tail of "白い熊 自由作業盤 · 2.1 s · 14.1 MB ·
+            // Row too big to fit into CursorWindow…", and rows here are single-line and
+            // MIDDLE-ellipsized, so what survived on screen was "14.1…to CursorWindow" — the
+            // size and the end of a sentence, with the part that names the failure elided. On
+            // its own line the message starts at column 0, which is the half that must be
+            // readable. Both surfaces follow, because the renderer is shared with asText()
+            // (+140) and neither knows anything about this.
+            append(1, KIND_FAIL, text, null, false);
+            append(2, KIND_FAIL, detail, null, false);
+        } else {
+            append(1, ok ? KIND_OK : KIND_FAIL, text, detail, false);
+        }
     }
 
     /**
