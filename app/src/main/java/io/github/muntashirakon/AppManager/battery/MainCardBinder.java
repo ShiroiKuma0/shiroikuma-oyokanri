@@ -337,12 +337,16 @@ public final class MainCardBinder {
             isSystem.setMaxLines(2);
             TextView sha = card.findViewById(R.id.sha);
             if (sha != null) {
-                StringBuilder rest = new StringBuilder();
+                // LANDMINE (白い熊, +150) — a StringBuilder here, and toString() on the way out,
+                // silently strips every span the screen put on its own lines. The tracker count
+                // is a PillSpan (+149) and rendered as flat text the moment it moved below the
+                // capability lines and into this joined block.
+                android.text.SpannableStringBuilder rest = new android.text.SpannableStringBuilder();
                 for (int i = 2; i < customLines.size(); ++i) {
                     if (rest.length() > 0) rest.append('\n');
                     rest.append(customLines.get(i));
                 }
-                sha.setText(rest.toString());
+                sha.setText(rest);
                 sha.setGravity(android.view.Gravity.END);
                 sha.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
                 sha.setSingleLine(false);

@@ -77,6 +77,7 @@ import io.github.muntashirakon.AppManager.snooping.SnoopingCatalog;
 import io.github.muntashirakon.AppManager.snooping.SnoopingEnforcer;
 import io.github.muntashirakon.AppManager.snooping.SnoopingPrefs;
 import io.github.muntashirakon.AppManager.snooping.SnoopingState;
+import io.github.muntashirakon.AppManager.trackers.TrackerPanel;
 import io.github.muntashirakon.AppManager.utils.BroadcastUtils;
 import io.github.muntashirakon.AppManager.utils.ContextUtils;
 import io.github.muntashirakon.AppManager.utils.ForkDialog;
@@ -1330,24 +1331,27 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         // Fork: the snooping tab is a fixed, grouped catalogue — not searchable.
     }
 
-    /** The device-policy card, a group header, or a capability row. */
+    /** The trackers row, the device-policy card, a group header, or a capability row. */
     private static class Row {
         @Nullable
         final SnoopingCatalog.Group group;
         @Nullable
         final AppDetailsSnoopingItem item;
         final boolean policy;
+        final boolean trackers;
 
         Row(@NonNull SnoopingCatalog.Group group) {
             this.group = group;
             this.item = null;
             this.policy = false;
+            this.trackers = false;
         }
 
         Row(@NonNull AppDetailsSnoopingItem item) {
             this.group = null;
             this.item = item;
             this.policy = false;
+            this.trackers = false;
         }
 
         /** The one policy card, pinned at the top. */
@@ -1355,6 +1359,26 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             this.group = null;
             this.item = null;
             this.policy = true;
+            this.trackers = false;
+        }
+
+        /**
+         * Fork (白い熊, +146): the tracker row, pinned above everything.
+         * <p>
+         * The rest of this page is about what the platform will let an app do; the trackers are
+         * about who is already inside it, which is the first thing to know and therefore the
+         * first thing on the page.
+         */
+        private Row(boolean trackersRow) {
+            this.group = null;
+            this.item = null;
+            this.policy = false;
+            this.trackers = trackersRow;
+        }
+
+        @NonNull
+        static Row trackers() {
+            return new Row(true);
         }
 
         boolean isHeader() {
@@ -1366,14 +1390,22 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         private static final int TYPE_HEADER = 0;
         private static final int TYPE_ITEM = 1;
         private static final int TYPE_POLICY = 2;
+        private static final int TYPE_TRACKERS = 3;
 
         private final List<Row> mRows = new ArrayList<>();
 
-        /** The policy card is row 0 whenever it exists, so this is enough. */
+        /**
+         * LANDMINE — the policy card is no longer row 0: the tracker row (+146) sits above it, so
+         * an index assumed here would refresh the wrong row (or, worse, quietly refresh nothing
+         * and leave a padlock drawing its stale self — the +75 bug, reintroduced by a new row).
+         */
         @UiThread
         void notifyPolicyChanged() {
-            if (!mRows.isEmpty() && mRows.get(0).policy) {
-                notifyItemChanged(0);
+            for (int i = 0; i < mRows.size(); ++i) {
+                if (mRows.get(i).policy) {
+                    notifyItemChanged(i);
+                    return;
+                }
             }
         }
 
@@ -1403,6 +1435,10 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 // always present would silently retire "No capabilities" for the
                 // rare app that has none.
                 mRows.add(0, new Row());
+                // Above even that: who is already inside the app. The same guard applies — it is
+                // added only when there is something to sit above, or it would retire the
+                // "No capabilities" empty view, which is driven by the item count.
+                mRows.add(0, Row.trackers());
             }
             notifyDataSetChanged();
         }
@@ -1414,6 +1450,7 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         @Override
         public int getItemViewType(int position) {
             Row row = mRows.get(position);
+            if (row.trackers) return TYPE_TRACKERS;
             if (row.policy) return TYPE_POLICY;
             return row.isHeader() ? TYPE_HEADER : TYPE_ITEM;
         }
@@ -1427,6 +1464,10 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         @Override
         public ViewHolderBase onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             LayoutInflater inflater = LayoutInflater.from(parent.getContext());
+            if (viewType == TYPE_TRACKERS) {
+                return new TrackersViewHolder(inflater.inflate(
+                        R.layout.item_app_details_snooping_trackers, parent, false));
+            }
             if (viewType == TYPE_POLICY) {
                 return new PolicyViewHolder(inflater.inflate(R.layout.item_app_details_snooping_policy, parent, false));
             }
@@ -1439,7 +1480,9 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         @Override
         public void onBindViewHolder(@NonNull ViewHolderBase holder, int position) {
             Row row = mRows.get(position);
-            if (holder instanceof PolicyViewHolder) {
+            if (holder instanceof TrackersViewHolder) {
+                ((TrackersViewHolder) holder).bind();
+            } else if (holder instanceof PolicyViewHolder) {
                 ((PolicyViewHolder) holder).bind();
             } else if (holder instanceof HeaderViewHolder && row.group != null) {
                 ((HeaderViewHolder) holder).title.setText(row.group.labelRes);
@@ -1451,6 +1494,32 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         abstract class ViewHolderBase extends RecyclerView.ViewHolder {
             ViewHolderBase(@NonNull View itemView) {
                 super(itemView);
+            }
+        }
+
+        /**
+         * Fork (白い熊, +146): the tracker row. All of its content — the count, the breakdown and
+         * the pills — is built by {@link TrackerPanel}, which also owns the background scan, so
+         * this holder is only the container it draws into.
+         */
+        class TrackersViewHolder extends ViewHolderBase {
+            final ViewGroup container;
+
+            TrackersViewHolder(@NonNull View itemView) {
+                super(itemView);
+                container = itemView.findViewById(R.id.trackers_container);
+            }
+
+            void bind() {
+                if (viewModel == null) {
+                    return;
+                }
+                // The frame is painted here, not in the layout: the outlined card style draws a
+                // grey hairline, and the device-policy card below sets its own yellow the same way
+                // (line 1656). A theme colour cannot do it — the fork's ink is configurable and
+                // read at bind time.
+                ((MaterialCardView) itemView).setStrokeColor(ForkThemeUtils.getTextColor());
+                TrackerPanel.bind(container, viewModel.getPackageInfo(), viewModel.getUserId());
             }
         }
 

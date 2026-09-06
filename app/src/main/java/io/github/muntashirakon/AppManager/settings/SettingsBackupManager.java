@@ -33,6 +33,8 @@ import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 
 import io.github.muntashirakon.AppManager.fonts.OpLogPrefs;
+import io.github.muntashirakon.AppManager.main.LastScreenPrefs;
+import io.github.muntashirakon.AppManager.trackers.TrackerScan;
 import io.github.muntashirakon.AppManager.main.AppPanePrefs;
 import io.github.muntashirakon.AppManager.main.ShelfPrefs;
 import io.github.muntashirakon.AppManager.R;
@@ -180,7 +182,13 @@ public final class SettingsBackupManager {
      */
     private static final Set<String> EXCLUDED_PREFS = new HashSet<>(
             Arrays.asList(AutomationAuth.PREF_FILE, SnoopingImmovable.PREF_FILE, NetBlockState.PREF_FILE,
-                    BatteryPrefs.STATE_PREF_FILE, PolicyLockState.PREF_FILE));
+                    BatteryPrefs.STATE_PREF_FILE, PolicyLockState.PREF_FILE,
+                    // Fork (+146): where this phone was last, and a cache of deep tracker scans
+                    // keyed by installed version. Both are derived state about THIS device; a
+                    // remembered screen for an app another phone does not have is worse than none.
+                    LastScreenPrefs.PREF_FILE, TrackerScan.PREF_FILE,
+                    // Fork (+154): whether the migration offer has been made on THIS phone.
+                    io.github.muntashirakon.AppManager.appdata.self.MigrationKit.PREF_FILE));
 
     // Shared-prefs stores per category; anything unlisted falls into GENERAL
     // (the main "preferences" store, backup dirs/options, and any future

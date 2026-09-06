@@ -47,6 +47,8 @@ import java.util.List;
 import java.util.Locale;
 
 import io.github.muntashirakon.AppManager.R;
+import io.github.muntashirakon.AppManager.appdata.self.MigrationKit;
+import io.github.muntashirakon.AppManager.main.LastScreenPrefs;
 import io.github.muntashirakon.AppManager.processreaper.MonitorPrefs;
 import io.github.muntashirakon.AppManager.processreaper.MonitorSeparatorPrefs;
 import io.github.muntashirakon.AppManager.settings.AutomationAuth;
@@ -340,9 +342,25 @@ public class FontsPreferences extends Fragment {
         // section, directly below the Export/Import row — automation is a
         // backup feature, so it belongs where backup lives (never a section
         // of its own; every sister app looks the same here).
+        // Fork (白い熊, +151): master switch, then "use a token?", then the token itself — which
+        // is only shown when it is actually being asked for. Built in that order because the
+        // require-token row has to be able to hide the one below it.
+        View automationTokenRow = buildAutomationTokenRow();
         eimContent.addView(buildAutomationSwitchRow());
-        eimContent.addView(buildAutomationTokenRow());
+        eimContent.addView(buildAutomationRequireTokenRow(automationTokenRow));
+        eimContent.addView(automationTokenRow);
+        // Fork (白い熊, +154): write the migration kit now, rather than waiting for the next
+        // backup run to refresh it.
+        eimContent.addView(buildMigrationKitRow());
         container.addView(eimGroup, 0);
+        // Fork (白い熊, +146): where the app comes back to. One switch, and it sits directly under
+        // Export/Import rather than in a section of its own — it is a page-level habit, not a
+        // colour, and the page has no other home for one.
+        View screensGroup = inflater.inflate(R.layout.view_font_group, container, false);
+        ((AppCompatTextView) screensGroup.findViewById(R.id.group_header)).setText(R.string.pref_screens_group);
+        LinearLayoutCompat screensContent = screensGroup.findViewById(R.id.group_content);
+        screensContent.addView(buildReopenSwitchRow());
+        container.addView(screensGroup, 1);
         // kxkb rhythm: every section except the first is preceded by a
         // full-width 1px hairline (part of view_font_group; hidden on the
         // first section so the page starts flush).
@@ -435,6 +453,95 @@ public class FontsPreferences extends Fragment {
      * Fork: the automation master switch (保存復元 contract). Default OFF —
      * nothing in {@code StateExportReceiver} is reachable until this is on.
      */
+    /**
+     * Fork (白い熊, +146): reopen the screen the app was left on. Default ON — it is what the app
+     * already tries to do while the task survives (+97), and this only makes it survive the task.
+     */
+    @NonNull
+    private View buildReopenSwitchRow() {
+        final Context appContext = requireContext().getApplicationContext();
+        final int yellow = ContextCompat.getColor(requireContext(), R.color.theme_bright_yellow);
+        LinearLayoutCompat texts = new LinearLayoutCompat(requireContext());
+        texts.addView(rowTitle(R.string.pref_reopen_last_screen));
+        texts.addView(rowSummary(R.string.pref_reopen_last_screen_desc));
+        LinearLayoutCompat row = automationRow(texts);
+
+        MaterialSwitch sw = (MaterialSwitch) View.inflate(requireContext(), R.layout.item_switch, null);
+        sw.setLayoutParams(new LinearLayoutCompat.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        int[][] states = {{android.R.attr.state_checked}, {}};
+        sw.setThumbTintList(new ColorStateList(states, new int[]{0xFF000000, 0xFF808000}));
+        sw.setTrackTintList(new ColorStateList(states,
+                new int[]{yellow, ColorUtils.setAlphaComponent(yellow, 0x33)}));
+        sw.setChecked(LastScreenPrefs.isEnabled(appContext));
+        sw.setOnCheckedChangeListener((v, checked) -> LastScreenPrefs.setEnabled(appContext, checked));
+        row.addView(sw);
+        row.setOnClickListener(v -> sw.toggle());
+        return row;
+    }
+
+    /**
+     * Fork (白い熊, +154): deposit the two APKs, the state archive and the marker at the backup
+     * root — the set a clean phone needs before it can read a backup at all.
+     */
+    @NonNull
+    private View buildMigrationKitRow() {
+        final Context appContext = requireContext().getApplicationContext();
+        LinearLayoutCompat texts = new LinearLayoutCompat(requireContext());
+        texts.addView(rowTitle(R.string.migration_kit_row));
+        texts.addView(rowSummary(R.string.migration_kit_row_desc));
+        LinearLayoutCompat row = automationRow(texts);
+        row.setOnClickListener(v -> {
+            UIUtils.displayShortToast(R.string.migration_kit_writing);
+            ThreadUtils.postOnBackgroundThread(() -> {
+                String where;
+                try {
+                    where = MigrationKit.write(appContext).getFilePath();
+                } catch (Throwable th) {
+                    ThreadUtils.postOnMainThread(() -> UIUtils.displayLongToast(R.string.failed));
+                    return;
+                }
+                ThreadUtils.postOnMainThread(() ->
+                        UIUtils.displayLongToast(R.string.migration_kit_written, where));
+            });
+        });
+        return row;
+    }
+
+    /**
+     * Fork (白い熊, +151): whether a caller must present the token at all.
+     *
+     * <p>Off by default — the v2 shape of the sister-app contract. The token row below is
+     * hidden while it is off, because a secret you are not being asked for is furniture.
+     */
+    @NonNull
+    private View buildAutomationRequireTokenRow(@NonNull View tokenRow) {
+        final Context appContext = requireContext().getApplicationContext();
+        final int yellow = ContextCompat.getColor(requireContext(), R.color.theme_bright_yellow);
+        LinearLayoutCompat texts = new LinearLayoutCompat(requireContext());
+        texts.addView(rowTitle(R.string.settings_automation_require_token));
+        texts.addView(rowSummary(R.string.settings_automation_require_token_desc));
+        LinearLayoutCompat row = automationRow(texts);
+
+        MaterialSwitch sw = (MaterialSwitch) View.inflate(requireContext(), R.layout.item_switch, null);
+        sw.setLayoutParams(new LinearLayoutCompat.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        int[][] states = {{android.R.attr.state_checked}, {}};
+        sw.setThumbTintList(new ColorStateList(states, new int[]{0xFF000000, 0xFF808000}));
+        sw.setTrackTintList(new ColorStateList(states,
+                new int[]{yellow, ColorUtils.setAlphaComponent(yellow, 0x33)}));
+        boolean required = AutomationAuth.isTokenRequired(appContext);
+        sw.setChecked(required);
+        tokenRow.setVisibility(required ? View.VISIBLE : View.GONE);
+        sw.setOnCheckedChangeListener((v, checked) -> {
+            AutomationAuth.setTokenRequired(appContext, checked);
+            tokenRow.setVisibility(checked ? View.VISIBLE : View.GONE);
+        });
+        row.addView(sw);
+        row.setOnClickListener(v -> sw.toggle());
+        return row;
+    }
+
     @NonNull
     private View buildAutomationSwitchRow() {
         final Context appContext = requireContext().getApplicationContext();

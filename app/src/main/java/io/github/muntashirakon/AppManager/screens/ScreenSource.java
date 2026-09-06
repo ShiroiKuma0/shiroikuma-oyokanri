@@ -25,6 +25,15 @@ public interface ScreenSource {
     int titleRes();
 
     /**
+     * The title as shown. A screen whose subject is a name rather than a category — the apps
+     * carrying one tracker, say — overrides this; everything else keeps its string resource.
+     */
+    @NonNull
+    default CharSequence title(@NonNull Context context) {
+        return context.getString(titleRes());
+    }
+
+    /**
      * Build every row. Always called on a background thread — one of these walks the backup
      * directory and another runs a resolver pass per app.
      */

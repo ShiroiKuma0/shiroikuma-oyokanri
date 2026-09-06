@@ -60,6 +60,19 @@ import io.github.muntashirakon.widget.SwipeRefreshLayout;
  */
 public class ListScreenActivity extends BaseActivity {
     public static final String EXTRA_SCREEN = "screen";
+    /**
+     * Fork (白い熊, +146): the apps carrying one tracker. Not a shelf screen — it is entered from
+     * a tracker pill and its subject is the tracker's name, so it takes an extra rather than an id.
+     */
+    public static final String EXTRA_TRACKER = "tracker";
+
+    /** The screen listing every app that carries {@code tracker}. */
+    @NonNull
+    public static Intent intentForTracker(@NonNull Context context, @NonNull String tracker) {
+        Intent intent = new Intent(context, ListScreenActivity.class);
+        intent.putExtra(EXTRA_TRACKER, tracker);
+        return intent;
+    }
 
     /**
      * The intent for a screen id — including the two that are separate activities already. The
@@ -85,7 +98,12 @@ public class ListScreenActivity extends BaseActivity {
     }
 
     @NonNull
-    private static ScreenSource sourceFor(@Nullable String screenId) {
+    private static ScreenSource sourceFor(@Nullable Intent intent) {
+        String tracker = intent == null ? null : intent.getStringExtra(EXTRA_TRACKER);
+        if (tracker != null) {
+            return new TrackerAppsSource(tracker);
+        }
+        String screenId = intent == null ? null : intent.getStringExtra(EXTRA_SCREEN);
         if (ShelfPrefs.SCREEN_SNOOPING.equals(screenId)) {
             return new SnoopingSource();
         }
@@ -113,13 +131,13 @@ public class ListScreenActivity extends BaseActivity {
 
     @Override
     protected void onAuthenticated(@Nullable Bundle savedInstanceState) {
-        mSource = sourceFor(getIntent() == null ? null : getIntent().getStringExtra(EXTRA_SCREEN));
+        mSource = sourceFor(getIntent());
         setContentView(R.layout.activity_list_screen);
         setSupportActionBar(findViewById(R.id.toolbar));
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
             actionBar.setDisplayHomeAsUpEnabled(true);
-            actionBar.setTitle(mSource.titleRes());
+            actionBar.setTitle(mSource.title(this));
         }
         mProgress = findViewById(R.id.progress_linear);
         mEmptyView = findViewById(R.id.screen_empty);

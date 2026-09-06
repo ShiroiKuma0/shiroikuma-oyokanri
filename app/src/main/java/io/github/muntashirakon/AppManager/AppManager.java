@@ -19,6 +19,7 @@ import org.lsposed.hiddenapibypass.HiddenApiBypass;
 import java.security.Security;
 
 import dalvik.system.ZipPathValidator;
+import io.github.muntashirakon.AppManager.main.LastScreenPrefs;
 import io.github.muntashirakon.AppManager.misc.AMExceptionHandler;
 import io.github.muntashirakon.AppManager.compat.ProcessCompat;
 import io.github.muntashirakon.AppManager.settings.Prefs;
@@ -53,6 +54,9 @@ public class AppManager extends Application {
         // ours exists, so the listeners that notice a lost/returned server have to be registered for
         // the life of the process rather than by a screen.
         PrivilegeWatchdog.install(this);
+        // Fork (白い熊, +146): remember which screen is on top, so the launcher can return to it
+        // even after EMUI has dropped the task. One recorder for every screen at once.
+        LastScreenPrefs.install(this);
         Security.removeProvider(BouncyCastleProvider.PROVIDER_NAME);
         Security.addProvider(new JavaKeyStoreProvider());
         Security.addProvider(new BouncyCastleProvider());

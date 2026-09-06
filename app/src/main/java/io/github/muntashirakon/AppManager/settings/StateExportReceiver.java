@@ -28,8 +28,8 @@ import io.github.muntashirakon.AppManager.utils.ThreadUtils;
  * point 白い熊's automation app (白い熊 自由作業盤, {@code shiroikuma.jiyusagyoban})
  * uses to back up every sister app in one run.
  * <p>
- * Two token-gated actions ({@link AutomationAuth} is the gate; the switch is
- * off by default):
+ * Two gated actions ({@link AutomationAuth} is the gate — the master switch is <b>on</b> by
+ * default and a token is asked for only when 白い熊 has said to ask for one, +151):
  * <ul>
  * <li>{@code <pkg>.action.LIST_CATEGORIES} — instant; replies {@code OK:}
  * followed by one {@code id<TAB>label} line per exportable category. This
@@ -63,8 +63,8 @@ public class StateExportReceiver extends BroadcastReceiver {
     public static final String ACTION_EXPORT_STATE = BuildConfig.APPLICATION_ID + ".action.EXPORT_STATE";
     public static final String ACTION_LIST_CATEGORIES = BuildConfig.APPLICATION_ID + ".action.LIST_CATEGORIES";
     /**
-     * Stop the export that is running. Fire-and-forget: it is gated by the same
-     * token as the others but <b>sends no reply of its own</b>, and arriving
+     * Stop the export that is running. Fire-and-forget: it passes the same gate
+     * as the others but <b>sends no reply of its own</b>, and arriving
      * when nothing is running — or after the run already finished — is a silent
      * no-op, never an error.
      */
@@ -114,10 +114,12 @@ public class StateExportReceiver extends BroadcastReceiver {
         ThreadUtils.postOnBackgroundThread(() -> {
             String result;
             try {
-                if (!AutomationAuth.isEnabled(appContext)) {
-                    result = "ERROR:automation disabled";
-                } else if (!AutomationAuth.tokenMatches(appContext, token)) {
-                    result = "ERROR:bad token";
+                // One gate, one place (+151): the master switch, then the token only when this
+                // app has been told to ask for one. A token sent to an app that does not
+                // require one is ignored rather than refused.
+                String refused = AutomationAuth.refuse(appContext, token);
+                if (refused != null) {
+                    result = refused;
                 } else if (ACTION_LIST_CATEGORIES.equals(action)) {
                     result = listCategories(appContext);
                 } else if (ACTION_EXPORT_STATE.equals(action)) {

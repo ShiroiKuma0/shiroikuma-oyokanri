@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.Objects;
 
 import io.github.muntashirakon.AppManager.BuildConfig;
+import io.github.muntashirakon.AppManager.appdata.self.MigrationKit;
+import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsManager.BatchOpsInfo;
 import io.github.muntashirakon.AppManager.history.ops.OpHistoryManager;
@@ -275,6 +277,14 @@ public class BatchOpsService extends ForegroundService {
         broadcastIntent.putExtra(EXTRA_RESULT, result);  // Fork: let the main window theme the completion toast
         sendBroadcast(broadcastIntent);
         sendNotification(result, queueItem, opResult);
+        // Fork (白い熊, +154): the migration kit is refreshed after every backup run, not only
+        // when 応用管理 backs itself up — a kit older than the archives beside it is a kit that
+        // restores the wrong phone. Never on the caller's thread, and never fatal.
+        int op = queueItem != null ? queueItem.getOp() : BatchOpsManager.OP_NONE;
+        if (op == BatchOpsManager.OP_BACKUP || op == BatchOpsManager.OP_BACKUP_APK) {
+            Context appContext = getApplicationContext();
+            ThreadUtils.postOnBackgroundThread(() -> MigrationKit.writeQuietly(appContext));
+        }
     }
 
     private void sendNotification(int result, @Nullable BatchQueueItem queueItem, @Nullable BatchOpsManager.Result opResult) {
