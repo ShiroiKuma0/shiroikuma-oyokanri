@@ -10,6 +10,94 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.0+2026-06-29.21-57.gfc1e7007+157 — 2026-09-06
+
+Trackers named and counted on the anti-snooping page, a migration kit that rebuilds this app on a
+wiped phone, and the app reopening where you left it. (Built on upstream App Manager `4.1.0`, commit
+`fc1e7007` of 2026-06-29 21:57 UTC.)
+
+### 🎯 Trackers, on the page that is about being watched
+
+- **Every tracker inside an app, named**, in a card pinned above the capabilities and framed like the
+  device-policy card below it: the count at headline size, a line saying what those trackers can do,
+  and a pill per tracker.
+- **Colour is a measured severity rung, not a category.** The dataset ships 989 names and signatures
+  and no categories, so a taxonomy would have to be invented; what the components *do* say is whether
+  a tracker can report while you are not using the app. A service or receiver can be started by the
+  system (**red**), a content provider runs whenever the app runs (**theme yellow**), activities need
+  a screen of their own (**grey**). Second-degree trackers keep their rung and draw faded.
+- **Two scan depths, and the row says which it used.** The manifest pass runs the app's own component
+  names through the same index the tracker count already used — cheap enough for a list row, and it
+  yields the *names* as well — and states that it is a floor. A **deep scan** mounts the base APK as a
+  dex filesystem and walks every class, per app, on demand, cached against the installed version so an
+  update re-scans by itself.
+- **A pill leads somewhere**: the components that tracker owns in this app, **every other app on the
+  phone carrying it** (a screen built on the sibling-screen machinery, so it inherits their rows,
+  sort menu and column picker), and the Exodus report.
+- **No Block button, and the reason is printed.** Measured again: `pm disable` and `pm disable-user`
+  both answer *Shell cannot change component state*, and the Intent Firewall route needs root. Two
+  existing features are silently dead here for the same reason — the selection-toolbar *Block
+  trackers* discards its failure, and one-click *block trackers* skips every non-test-only app when
+  running as shell.
+- **盗み見一覧 gained a tracker count and a sort by it**, read from the app database rather than
+  scanned again, and its two findings are now **filled pills**: the fork's red at 12sp on black could
+  not be read, and the headline stopped saying "%d allowed", which never said allowed *what* — it
+  reads **%d ways to snoop**.
+
+### 🧳 A wiped phone becomes this phone
+
+- **A migration kit at the backup root**, refreshed after every backup run: this app's APK, 雫's APK
+  (both properly named and versioned), a full settings archive, and a marker naming the versions and
+  the four steps. Restoring this app from its own backup is circular — it needs privileges, which need
+  雫, which needs the app configured — so the bootstrap rides on the settings export, which needs no
+  privileges either to write or to read back.
+- **The app finds its own kit**: the configured backup directory first, then the storage root two
+  levels down and every removable volume, looking for the marker and nothing else.
+- **The offer is gated on the install having nothing of yours in it** — no profiles, no notes, no
+  anti-snooping decisions — rather than on "first run", so a phone in use never sees it.
+- **A report on the next start** counts what landed, and names the number that matters: how many
+  anti-snooping decisions are waiting for apps that are **not installed yet**. It is counted from the
+  files on disk, because the process still holds the preference maps the import just replaced.
+- **A new APK replaces its predecessor**, matching this kit's own deposit shape for that package, and
+  only after the new copy's length is verified against the source.
+
+### ↩️ Reopening the screen you left
+
+- **The launcher returns to the page you were on** — a list screen, or an app's own page — instead of
+  the app list, and it survives the process being killed and the task cleared, because the screen is
+  recorded rather than hoped for. One recorder covers every screen at once; an allowlist keeps the
+  installer, the keystore prompt and a finished operation's page from ever being replayed.
+- **The app list is not loaded while it is covered.** Reopening creates the main window and buries it
+  at once, so reading and sorting every installed app for a screen nobody is looking at only starved
+  the screen that was on top.
+
+### 🤖 Automation, second shape
+
+- **The switch ships on and the token ships off.** `automation_enabled` now defaults to **true** and a
+  new **Use an authorization token?** switch defaults to **false**, matching every sister app. A
+  pasted secret cannot survive a wipe, and the case this family now serves is restoring a clean phone
+  where nothing has been pasted.
+- **A token sent to an app that does not require one is ignored, never refused** — tokens outlive the
+  setting they were pasted for, and refusing one would turn a switch into half a batch failing.
+- **The whole check is one function**, so "disabled" and "bad token" cannot drift apart, and both flag
+  writes `commit()` rather than `apply()`, because the gate now fails open.
+
+### 🚪 The data door admits the automation app
+
+- **応用管理 and 自由作業盤** are both authorised at this app's data door: an allowlist of exact package
+  names, each cross-checked against the uid the kernel reports and a **pinned signing certificate**.
+  Until now the door was self-only, so the automation app could not back this app up through it at all.
+- Identity is checked **before** dispatch, so an unknown caller gets the same refusal for a bogus
+  method as for a real one, and another app's call passes the automation switch as well.
+
+### 🧾 Smaller things
+
+- **A failure's reason gets its own line** in the operation log. Appended to the summary it was the
+  tail of a middle-ellipsized row, which showed the size and the end of a sentence while eliding the
+  part that named the failure.
+- The selected-screen memory, the deep-scan cache and the migration offer flag are all **device-local**
+  and stay out of settings export/import, as the other per-device stores already do.
+
 ## 4.1.0+2026-06-29.21-57.gfc1e7007+145 — 2026-09-05
 
 The batch surface rebuilt: a full-page operation log, a pill shelf over three sibling screens, and

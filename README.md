@@ -11,7 +11,8 @@
 A fork of [AppManager](https://github.com/MuntashirAkon/AppManager) with **major additions**: a
 **Shizuku mode of operation** that needs no listening `adbd`, a per-app
 **battery history** that survives the charge cycle Android wipes it on, a per-app
-**anti-snooping page** that can cut an app off the network entirely, **app-data backup without
+**anti-snooping page** that can cut an app off the network entirely and **names every tracker**
+inside an app, a **migration kit** that rebuilds this app on a wiped phone, **app-data backup without
 root** through a contract the sister apps implement — and which this app now implements for
 **its own** settings — a **full-page batch operation log**, a **configurable pill shelf** over
 three sibling screens, **per-app backup and restore tables**, **device-policy locks** that
@@ -21,9 +22,9 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+2026-06-29.21-57.gfc1e7007+145`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.0+2026-06-29.21-57.gfc1e7007+157`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
-<sub>Version reads as **upstream `4.1.0`**, rebased onto upstream commit **`fc1e7007` of 2026-06-29 21:57 UTC**, fork build **145**.</sub>
+<sub>Version reads as **upstream `4.1.0`**, rebased onto upstream commit **`fc1e7007` of 2026-06-29 21:57 UTC**, fork build **157**.</sub>
 
 </div>
 
@@ -115,6 +116,27 @@ and a switch that simply reports the live state hides exactly that. So a drifted
 **red** and the pill spells out *what you asked for* beside what the system is doing; one tap puts it
 back. ⋮ → *What the marks mean* is the legend for all of it, and it reads like a reference card
 rather than a wall of text.
+
+## 🎯 Trackers, named and counted
+
+The anti-snooping page opens with **how many trackers are inside the app**, at headline size, and a
+pill for every one of them by name — Firebase Analytics, AppLovin, Adjust, Facebook Ads, whatever the
+app actually ships.
+
+- **The colour is a measured severity, not a category.** A tracker that owns a service or a receiver
+  can be started by the system with no help from you, so it draws **red**: that is the one reporting
+  from your pocket. A content provider runs whenever the app runs (**theme yellow**), and an
+  activity-only hit needs you to open a screen it owns (**grey**). A second-degree tracker — a
+  library that carries somebody else's — is faded rather than renamed.
+- **Two depths, and the page says which it used.** The instant count reads the app's own manifest and
+  is honest that it is a floor; a **deep scan** walks every class in the APK for the true number, per
+  app, on demand, cached until the app updates.
+- **A tracker leads somewhere.** Tapping one shows the components it owns *in this app*, then **every
+  other app on the phone carrying the same tracker** — the question a name alone cannot answer — and
+  the Exodus report last.
+- **No fake Block button.** Component blocking needs root or the Intent Firewall; the shell cannot do
+  it, and this page says so plainly instead of offering a switch that does nothing. What does work is
+  right underneath: cut the app's network, or stop it running in the background.
 
 ## 🔒 Device-policy locks — decisions Settings cannot undo
 
@@ -369,13 +391,39 @@ with everything else — and **verified before it is ever handed back** at resto
   colours & fonts, monitor, toolbar & filters, notes, anti-snooping settings, profiles) — so a new install comes up looking
   and behaving exactly like the old one.
 
+## 🧳 Migration kit — a wiped phone becomes this phone
+
+Restoring this app from its own backup is circular: it needs privileges, which need
+[白い熊 雫](https://github.com/ShiroiKuma0/shiroikuma-shizuku), which needs the app configured, which
+needs the restore. So the kit does not ride on the backups at all.
+
+After every backup run it refreshes four files at the **root of the backup directory**: this app's
+APK, 雫's APK, a **full settings archive**, and a marker naming the versions and the steps. On the new
+phone you install 雫 from a file manager and make it Device Owner, install this app, open it — and it
+**finds the kit by itself**, scanning the storage root two levels deep — and restores every profile,
+note, anti-snooping decision, colour and toolbar **with no privileges set up yet**, including the
+backup directory, so the other apps are one screen away.
+
+The report afterwards counts what landed, and names the number that matters: how many anti-snooping
+decisions are waiting for **apps that are not installed yet** — they apply by themselves as each app
+arrives.
+
+## ↩️ It reopens where you left it
+
+Leave the app on a list screen or on an app's own page, and the launcher brings you back to *that*,
+not to the app list. It survives the phone killing the process and the task being cleared, because
+the screen is written down rather than hoped for — and the app list underneath is not loaded while it
+is covered, so nothing is paid for a screen nobody is looking at.
+
 ## 🤖 Remote-triggerable export
 
 The same export runs **headlessly** on request, so an automation app can back this app up without any
 UI: a token-gated broadcast lists the exportable categories, then writes **exactly one** archive to a
 requested directory and reports back its real path and byte size. Progress arrives as **real counts,
-never a percentage**. The gate is an **Automation export** switch — **off by default** — plus a
-24-byte token that is compared constant-time and deliberately kept **out of every backup archive**.
+never a percentage**. The gate is an **Automation export** switch — **on by default**, so a freshly restored phone answers
+the batch with nothing paired — plus an optional **Use an authorization token?** switch, off by
+default, behind which sits a 24-byte token compared constant-time and deliberately kept **out of every
+backup archive**. A token sent to an app that is not asking for one is ignored rather than refused.
 
 The category listing states **which items start ticked**, so the caller's picker takes its default
 from this app rather than guessing. And a running export can be **cancelled from outside**: the
