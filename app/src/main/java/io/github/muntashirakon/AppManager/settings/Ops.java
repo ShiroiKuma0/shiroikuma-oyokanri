@@ -514,7 +514,7 @@ public class Ops {
                     // came up as and corrects the flags, which is exactly right here — a Shizuku
                     // server started by root gives us uid 0, one started from wireless debugging
                     // gives 2000.
-                    return checkRootOrIncompleteUsbDebuggingInAdb();
+                    return checkRootOrIncompleteUsbDebuggingInAdb(context);
                 case MODE_ADB_WIFI:
                     sDirectRoot = false;
                     sIsRoot = sIsSystem = false;
@@ -681,7 +681,7 @@ public class Ops {
                 }
                 if (LocalServices.alive()) {
                     setMode(MODE_SHIZUKU);
-                    checkRootOrIncompleteUsbDebuggingInAdb();
+                    checkRootOrIncompleteUsbDebuggingInAdb(context);
                     return;
                 }
                 Log.w(TAG, "Shizuku was ready but the services did not come up; trying ADB.");
