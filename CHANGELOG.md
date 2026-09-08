@@ -10,6 +10,104 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.0+2026-06-29.21-57.gfc1e7007+171 — 2026-09-08
+
+The special pages stop being pages and become **lenses** on the main list, sort gets a control of its
+own, and a restore that could never install an app it did not already have is fixed. (Built on
+upstream App Manager `4.1.0`, commit `fc1e7007` of 2026-06-29 21:57 UTC.)
+
+### 🔧 A restore could not install an app that was not already installed
+
+Restoring an uninstalled app always failed with `Couldn't perform an installation.` and nothing after
+it. Three faults were stacked behind that full stop, and each one hid the next.
+
+- **The reason was being thrown away.** The privileged commit path read the platform's status *and*
+  its message, then told every caller only whether it was `STATUS_SUCCESS`. A status carrying a null
+  message therefore arrived as a bare failure. `STATUS_PENDING_USER_ACTION` was handled in exactly one
+  place — the *unprivileged* broadcast path — and never here. Every status now has a name, a null
+  message is filled in on both result paths, and the restore log prints it.
+- **`HuaweiUtils` had never detected a Huawei phone.** All three of its checks used
+  `java.lang.System.getProperty("ro.build.version.emui")`, which reads the JVM's own property table
+  and can never see an Android build property. `isStockHuawei()` was permanently false, so the guard
+  it exists for — *"changing package installer in stock Huawei with UID 2000 does not work"* — had
+  never once fired on a Huawei device. Measured: `getprop` gives `EmotionUI_14.2.0`,
+  `System.getProperty` gives `null`.
+- **So the install session was attributed to 白い熊 応用管理 even when the shell created it**, and
+  EMUI's own `SilentInstallPolicy` refuses a silent install attributed to a non-privileged installer.
+  Measured on the Mate XT with one APK, fresh install: no installer → **Success**;
+  `-i shiroikuma.oyokanri` → **Failure [null]**; `-i com.android.shell` → **Success**.
+
+Updates always worked because the app holds `UPDATE_PACKAGES_WITHOUT_USER_ACTION`, and that exemption
+applies **only when the package is already installed** — which is precisely why the bug looked like it
+did not exist.
+
+### 🔍 Lenses: a "special page" is now a state of the main list
+
+保存一覧, 盗み見一覧 and 仲間 were separate screens, and each paid for that separateness: no search, no
+filters, no profile filters, no saved views, no pill shelf, no app pane, no general batch operations.
+Each reimplemented selection, a selection bar, sorting and a column picker — while drawing the main
+list's own row.
+
+- **A lens changes what some row elements show and which apps are on the page, and nothing else.**
+  The filters, the sort, the search, the selection, the batch pane, the app pane, the frames, the
+  separators and the per-geometry column count are all the main list's own, unchanged.
+- **The plain list is "no lens", and the way out is the way in** — tapping the lit shelf pill again,
+  a gesture that already existed for saved views.
+- **Existing pills keep working untouched.** The lens ids are the same strings the shelf has always
+  stored, so nothing had to be migrated.
+- **A lens deliberately cannot take over the row's tap** (that unrolls the pane) **or contribute
+  filter flags** (those are a persisted bitmask *and* the wire format of a saved view).
+- **Backups, Snooping and Sister apps are lenses**; the shelf now offers them under their own
+  heading, apart from the two real screens.
+- **Battery and Process stay screens.** Their rows are per-uid and per-pid, not apps.
+- The three sources they replaced are **deleted**. `ListScreenActivity` survives serving only the
+  tracker screen, and now requires its tracker extra rather than falling through to a page with no
+  way in. *Clean up backups* moved to the main overflow, shown while the Backups lens is on.
+
+One consequence is a bug fixed by construction: the Backups screen drew the **Android robot** and the
+**package id** for apps that are no longer installed. Both facts were already on disk — `icon.png` is
+written into every backup directory unencrypted, and `meta_v5.am.json` carries the label — and neither
+was being read. **No backup-format change was needed.** A lens row is an ordinary list item, whose icon
+loader has always fallen back to the backup's own icon.
+
+**Cost is paid once.** A keystroke in the search box re-runs the whole pipeline, so the Snooping lens
+caches its verdict per package against the app's update time — an update is what changes what an app
+can do, and moving that timestamp is how an update announces itself. Pull-to-refresh is what clears it.
+
+### 🔤 Sort leaves the filter sheet
+
+A filter is set once and left alone; a sort is flicked between while you are looking at the same list.
+Keeping both in one bottom sheet made the frequent one cost an open, a scroll and a dismiss.
+
+- **Its own icon on the top bar**, right of clear-filters, opening a dropdown rather than a sheet.
+- **Drawn by hand**, because a framework popup menu cannot be packed or ruled: rows packed to the
+  text, a hairline between them, a wash plus a filled marker on the selection, and the fork's
+  text-width underline for the group heading.
+- **The active lens's own orders join the same panel** under a heading naming it — one place to sort
+  from — while keeping a separate id space, since the list's sort ids are what a saved view stores.
+- It hugs its content and otherwise runs to the bottom edge, measured from the anchor rather than
+  assumed, because the Mate XT's window height differs folded, unfolded and in multi-window.
+
+### 🐛 Fixes & behaviour
+
+- **App info and Snooping opened the same page.** "App info" passed *"whatever tab is first"*, which
+  became Snooping when that was pinned in front. The tab is now named, and **both positions are looked
+  up in the tab table rather than written as literals**, so reordering cannot quietly repoint either.
+  The backup column's tap and the app pane's default branch had the same bug.
+- **Reverse sort could sort with the old value.** It submitted its re-sort *before* assigning, and read
+  the field rather than a local — a race that only became visible once Reverse was a one-tap toggle.
+- **A single-app restore ran twice, in parallel.** The singleton branch built the package list and then
+  fell through into the general loop, which added the same package and user again; the batch executor
+  then restored one app twice at once — two installs of the same APK and two extractions into one data
+  directory, where one worker's recursive `chown` walked the tree the other was rewriting.
+- **The tracker card's red on black could not be read.** The autonomous rung is now a filled pill in
+  the Snooping page's own blood-red/near-white pair, matching the summary line above it. A filled pill
+  is never faded as a whole — the fill carries the severity, only the ink softens — because fading the
+  view fades the fill into the background behind it.
+- **An uninstalled app's icon no longer poisons every other screen.** The backup icon has a cache key
+  of its own; the shared package-name key had been storing the fallback robot for up to seven days and
+  serving it to the process monitor, app usage, Finder and app info.
+
 ## 4.1.0+2026-06-29.21-57.gfc1e7007+157 — 2026-09-06
 
 Trackers named and counted on the anti-snooping page, a migration kit that rebuilds this app on a
