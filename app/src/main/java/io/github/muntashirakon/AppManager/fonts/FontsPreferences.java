@@ -299,6 +299,8 @@ public class FontsPreferences extends Fragment {
         addColorRow(logCr, new ColorSpec(ColorPrefs.OPLOG_DETAIL, R.string.pref_oplog_detail), () -> {});
         addColorRow(logCr, new ColorSpec(ColorPrefs.OPLOG_OK, R.string.pref_oplog_ok), () -> {});
         addColorRow(logCr, new ColorSpec(ColorPrefs.OPLOG_FAIL, R.string.pref_oplog_fail), () -> {});
+        addColorRow(logCr, new ColorSpec(ColorPrefs.OPLOG_FAIL_BG, R.string.pref_oplog_fail_bg), () -> {});
+        addColorRow(logCr, new ColorSpec(ColorPrefs.OPLOG_FAIL_MARK, R.string.pref_oplog_fail_mark), () -> {});
         addColorRow(logCr, new ColorSpec(ColorPrefs.OPLOG_SKIP, R.string.pref_oplog_skip), () -> {});
         addColorRow(logCr, new ColorSpec(ColorPrefs.OPLOG_WARN, R.string.pref_oplog_warn), () -> {});
         addColorRow(logCr, new ColorSpec(ColorPrefs.OPLOG_TIME, R.string.pref_oplog_time), () -> {});

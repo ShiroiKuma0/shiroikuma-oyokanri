@@ -253,11 +253,15 @@ public class BatchOpsService extends ForegroundService {
         OpLog log = OpLog.getInstance();
         log.end(getString(cancelled ? R.string.op_log_end_cancelled : R.string.op_log_end,
                 total - failedCount, total), null);
-        if (failed != null) {
-            for (String packageName : failed) {
-                log.endDetail(packageName, true);
-            }
-        }
+        // Fork (白い熊): the FULL failure report, at the very end of the log.
+        //
+        // This block used to print the failed package names and stop there, which on a run with
+        // twenty or thirty failures meant going back through thousands of interleaved lines to
+        // find out what happened to each one. Every failure's reason and archive path were
+        // recorded as they occurred; they are reprinted here together, so the end of the log is
+        // the complete account. Ops with no stages record no reason and are still named.
+        log.writeFailureReport(getString(R.string.op_log_failures, failedCount),
+                getString(R.string.op_log_failure_no_reason), failed);
     }
 
     private void sendStarted(@NonNull BatchQueueItem queueItem) {

@@ -2542,7 +2542,7 @@
     <string name="pane_installed">Installed</string>
     <string name="pane_target_sdk">Target SDK</string>
     <string name="pane_blocked">Blocked</string>
-    <string name="batch_backup_restore_delete">Restore / delete…</string>
+    <string name="batch_backup_restore_delete">Restore…</string>
     <string name="batch_backup_table_title">Back up %d apps</string>
     <string name="batch_backup_all_apps">Every app</string>
     <string name="backup_part_apk">APK</string>
@@ -2645,6 +2645,15 @@
     <string name="op_log_save">Save log</string>
     <string name="op_log_saved">Log saved: %s</string>
     <string name="op_log_save_failed">Could not save the log.</string>
+    <string name="share_backup">Share backup</string>
+    <string name="share_backup_armed">Handed to 白い熊 魔法絨毯. Choose Hotspot or Shared network there and press Start.</string>
+    <string name="share_backup_none">No backup directory could be found for the selection.</string>
+    <string name="share_backup_no_carrier">白い熊 魔法絨毯 is not installed — it is what carries the backup to the other device.</string>
+    <string name="op_log_failures">Failures — %d</string>
+    <string name="appdata_still_working">Still working · %s</string>
+    <string name="backup_stage_waiting_large">Waiting — another large transfer is running</string>
+    <string name="appdata_still_waiting">Waiting for the app · %s</string>
+    <string name="op_log_failure_no_reason">No reason recorded.</string>
     <string name="backup_item_permissions">%1$d permissions · %2$d app ops</string>
     <string name="restore_item_rules">%1$d of %2$d rules applied</string>
     <string name="pref_oplog_group">Batch operation log</string>
@@ -2657,7 +2666,9 @@
     <string name="pref_oplog_item">Item</string>
     <string name="pref_oplog_detail">Detail (size, counts)</string>
     <string name="pref_oplog_ok">Succeeded</string>
-    <string name="pref_oplog_fail">Failed</string>
+    <string name="pref_oplog_fail">Failed (text)</string>
+    <string name="pref_oplog_fail_bg">Failed (highlight)</string>
+    <string name="pref_oplog_fail_mark">Failed (✗ mark)</string>
     <string name="pref_oplog_skip">Skipped</string>
     <string name="pref_oplog_warn">Warning</string>
     <string name="pref_oplog_time">Timestamp</string>

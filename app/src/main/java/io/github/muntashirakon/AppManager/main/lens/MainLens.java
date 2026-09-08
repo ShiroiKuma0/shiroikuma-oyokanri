@@ -70,16 +70,20 @@ public interface MainLens {
     /** Colour for the headline, or 0 for the theme's ordinary ink. */
     int accent(@NonNull ApplicationItem item);
 
-    /** Labels for this lens's own sort orders, in menu order; empty for a lens that adds none. */
-    @NonNull
-    List<CharSequence> sortLabels(@NonNull Context context);
-
     /**
-     * Order the page. Sorts <em>in place</em>, by an index into {@link #sortLabels}, and runs after
-     * the list's own sort — so leaving a lens sort unset keeps the list's ordering rather than
-     * imposing one.
+     * Fork (白い熊): whether this lens only <b>narrows</b> the page and never draws it.
+     * <p>
+     * 仲間 is the case: "show me only my sister apps" is a question you ask <em>about</em> whatever
+     * you are already looking at. With 保存 lit the page is still the backups page and 仲間 merely
+     * restricts it to sister apps; with 盗み見 lit it is still the snooping page; with neither, it
+     * is the plain list, filtered. So a filter lens supplies no right-hand column and never
+     * competes for it — which is what lets several lenses be on at once without the row having to
+     * decide whose lines win. A display lens (保存, 盗み見) owns the column and stays exclusive
+     * with the other display lenses, because there is only one column to own.
      */
-    void applySort(@NonNull List<ApplicationItem> rows, int lensSort);
+    default boolean filterOnly() {
+        return false;
+    }
 
     /**
      * Optional off-thread enrichment, run once per pipeline pass before the rows are published.

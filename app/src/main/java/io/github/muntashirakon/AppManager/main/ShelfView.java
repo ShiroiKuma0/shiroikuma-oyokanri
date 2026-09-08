@@ -55,6 +55,12 @@ public class ShelfView extends LinearLayoutCompat {
     /** The pill whose view is on screen right now, drawn filled. */
     @Nullable
     private String mActiveId;
+    /**
+     * Fork (白い熊): additionally-lit pills. A filter lens (仲間) is not the view on
+     * screen — it narrows whatever view IS — so it lights beside the active pill
+     * rather than replacing it, and {@link #mActiveId} keeps its old meaning.
+     */
+    private final java.util.Set<String> mLitIds = new java.util.HashSet<>();
 
     public ShelfView(@NonNull Context context) {
         this(context, null);
@@ -123,6 +129,16 @@ public class ShelfView extends LinearLayoutCompat {
         return mActiveId;
     }
 
+    /** Fork (白い熊): the pills lit in addition to the active one — the filter lenses. */
+    public void setLitIds(@NonNull java.util.Collection<String> ids) {
+        if (mLitIds.size() == ids.size() && mLitIds.containsAll(ids)) {
+            return;
+        }
+        mLitIds.clear();
+        mLitIds.addAll(ids);
+        mAdapter.notifyDataSetChanged();
+    }
+
     /** Re-read the shelf from preferences and redraw. Cheap; called on resume. */
     public void reload() {
         mPills.clear();
@@ -163,7 +179,7 @@ public class ShelfView extends LinearLayoutCompat {
             ShelfPrefs.Pill pill = mPills.get(position);
             TextView view = (TextView) holder.itemView;
             int ink = ForkThemeUtils.getTextColor();
-            boolean active = pill.id.equals(mActiveId);
+            boolean active = pill.id.equals(mActiveId) || mLitIds.contains(pill.id);
             RowPills.styleActionPill(view, ink, active, true);
             view.setText(pill.name);
             if (pill.isScreen()) {

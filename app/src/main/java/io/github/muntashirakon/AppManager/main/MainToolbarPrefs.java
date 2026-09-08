@@ -64,6 +64,9 @@ public final class MainToolbarPrefs {
             "clear_data_cache",
             "save_apk",
             "backup",
+            "restore",
+            "delete_backup",
+            "share_backup",
             "disable_background",
             "block_unblock_trackers",
             "net_policy",
@@ -85,6 +88,9 @@ public final class MainToolbarPrefs {
             case "clear_data_cache":        return R.id.action_clear_data_cache;
             case "save_apk":                return R.id.action_save_apk;
             case "backup":                  return R.id.action_backup;
+            case "restore":                 return R.id.action_restore;
+            case "delete_backup":           return R.id.action_delete_backup;
+            case "share_backup":            return R.id.action_share_backup;
             case "disable_background":      return R.id.action_disable_background;
             case "block_unblock_trackers":  return R.id.action_block_unblock_trackers;
             case "net_policy":              return R.id.action_net_policy;
@@ -107,7 +113,10 @@ public final class MainToolbarPrefs {
             case "force_stop":              return R.string.force_stop;
             case "clear_data_cache":        return R.string.clear;
             case "save_apk":                return R.string.save_apk;
-            case "backup":                  return R.string.backup_restore;
+            case "backup":                  return R.string.back_up;
+            case "restore":                 return R.string.restore;
+            case "delete_backup":           return R.string.delete_backup;
+            case "share_backup":            return R.string.share_backup;
             case "disable_background":      return R.string.disable_background;
             case "block_unblock_trackers":  return R.string.block_unblock_trackers;
             case "net_policy":              return R.string.net_policy;
@@ -130,7 +139,10 @@ public final class MainToolbarPrefs {
             case "force_stop":              return R.drawable.ic_power_settings;
             case "clear_data_cache":        return R.drawable.ic_brush;
             case "save_apk":                return R.drawable.ic_get_app;
-            case "backup":                  return R.drawable.ic_backup_restore;
+            case "backup":                  return R.drawable.ic_archive;
+            case "restore":                 return R.drawable.ic_restore;
+            case "delete_backup":           return R.drawable.ic_trash_can;
+            case "share_backup":            return R.drawable.ic_share;
             case "disable_background":      return R.drawable.ic_block;
             case "block_unblock_trackers":  return R.drawable.ic_cctv_off;
             case "net_policy":              return R.drawable.ic_security_network;

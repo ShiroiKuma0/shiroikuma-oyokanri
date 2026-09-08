@@ -1086,7 +1086,9 @@ public class BatchOpsManager {
             @Override
             public void onDestination(@NonNull String destination) {
                 monitor.itemDestination(key, destination);
-                log.item(key, "→ " + destination, null);
+                // Fork (白い熊): destination() both prints the line and remembers the path, so the
+                // closing failure report can name the archive a failed app was working on.
+                log.destination(key, destination);
             }
 
             @Override

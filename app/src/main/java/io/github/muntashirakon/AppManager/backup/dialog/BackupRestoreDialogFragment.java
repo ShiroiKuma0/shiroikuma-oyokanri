@@ -23,6 +23,7 @@ import androidx.annotation.NonNull;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.ViewCompat;
 import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
 import androidx.annotation.UiThread;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
@@ -73,11 +74,15 @@ public class BackupRestoreDialogFragment extends CapsuleBottomSheetDialogFragmen
     }
 
     @NonNull
-    public static BackupRestoreDialogFragment getInstanceWithPref(@NonNull List<UserPackagePair> userPackagePairs, @UserIdInt int preferredUserForRestore) {
+    public static BackupRestoreDialogFragment getInstanceWithPref(@NonNull List<UserPackagePair> userPackagePairs,
+                                                                 @UserIdInt int preferredUserForRestore,
+                                                                 @ActionMode int mode) {
         BackupRestoreDialogFragment fragment = new BackupRestoreDialogFragment();
         Bundle args = new Bundle();
         args.putParcelableArrayList(ARG_PACKAGE_PAIRS, new ArrayList<>(userPackagePairs));
         args.putInt(ARG_PREFERRED_USER_FOR_RESTORE, preferredUserForRestore);
+        // Fork (白い熊): every caller says which single action it means.
+        args.putInt(ARG_CUSTOM_MODE, mode);
         fragment.setArguments(args);
         return fragment;
     }
@@ -176,8 +181,10 @@ public class BackupRestoreDialogFragment extends CapsuleBottomSheetDialogFragmen
             mViewModel.setPreferredUserForRestore(preferredUserForRestore);
         }
 
+        // Fork (白い熊): the header names the ONE action this sheet was opened for. "Backup/restore"
+        // was accurate only while the sheet did all three at once, which is what it stopped doing.
         mDialogTitleBuilder = new DialogTitleBuilder(requireContext())
-                .setTitle(R.string.backup_restore)
+                .setTitle(titleForModes())
                 .setStartIcon(R.drawable.ic_backup_restore);
         setHeader(mDialogTitleBuilder.build());
 
@@ -187,7 +194,41 @@ public class BackupRestoreDialogFragment extends CapsuleBottomSheetDialogFragmen
         mViewModel.processPackages(targetPackages);
     }
 
+    @StringRes
+    private int titleForModes() {
+        switch (mCustomModes) {
+            case MODE_BACKUP:  return R.string.back_up;
+            case MODE_RESTORE: return R.string.restore;
+            case MODE_DELETE:  return R.string.delete_backup;
+            default:           return R.string.backup_restore;
+        }
+    }
+
+    /** Fork (白い熊): opened for deleting backups and nothing else. */
+    private boolean isDeleteOnly() {
+        return mCustomModes == MODE_DELETE;
+    }
+
     private void loadBody(@BackupInfoState int state) {
+        // Fork (白い熊): a delete-only sheet is answered from the RAW state, before getRealState()
+        // -- that method knows only about backup and restore, so delete-only collapses to NONE and
+        // the sheet would say there is nothing to do. Deleting needs no list and no options: if
+        // anything in the selection has a backup, ask once and act. This is the same confirmation
+        // the header's trash icon used to raise; it is now reached by its own pill instead of
+        // sitting inside the restore sheet.
+        if (isDeleteOnly()) {
+            boolean anyHasBackup = state == BackupInfoState.RESTORE_MULTIPLE
+                    || state == BackupInfoState.RESTORE_SINGLE
+                    || state == BackupInfoState.BOTH_MULTIPLE
+                    || state == BackupInfoState.BOTH_SINGLE;
+            if (anyHasBackup) {
+                finishLoading();
+                handleDeleteBaseBackup();
+            } else {
+                showBackupOptionsUnavailable();
+            }
+            return;
+        }
         state = getRealState(state);
         Log.d(TAG, "Backup dialog state: " + state);
         switch (state) {
@@ -304,9 +345,13 @@ public class BackupRestoreDialogFragment extends CapsuleBottomSheetDialogFragmen
     }
 
     public void updateMultipleRestoreHeader() {
-        // Display delete button
-        mDialogTitleBuilder.setEndIcon(R.drawable.ic_trash_can, v -> handleDeleteBaseBackup())
-                .setEndIconContentDescription(R.string.delete_backup);
+        // Fork (白い熊): the delete button is shown only when MODE_DELETE was actually requested.
+        // It used to be added unconditionally, so every restore sheet carried a one-tap way to
+        // destroy the very backups it was offering to restore.
+        if ((mCustomModes & MODE_DELETE) != 0) {
+            mDialogTitleBuilder.setEndIcon(R.drawable.ic_trash_can, v -> handleDeleteBaseBackup())
+                    .setEndIconContentDescription(R.string.delete_backup);
+        }
         setHeader(mDialogTitleBuilder.build());
     }
 

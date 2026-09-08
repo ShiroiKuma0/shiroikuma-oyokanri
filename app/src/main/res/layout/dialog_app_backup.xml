@@ -68,17 +68,16 @@
         app:rowSpacing="4dp"
         tools:visibility="visible">
 
+        <!-- Fork (白い熊): this used to be a ⋮ overflow whose entire contents was Freeze, which
+             is not a backup action and had no business here. It is now Share, which is. -->
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/more"
+            android:id="@+id/action_share"
             style="@style/Widget.AppTheme.Button.Dialog.YellowOutlined"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:contentDescription="@string/backup_dialog_more"
-            android:minWidth="52dp"
-            app:icon="@drawable/ic_more_vert"
+            android:text="@string/share"
+            app:icon="@drawable/ic_share"
             app:iconGravity="textStart"
-            app:iconPadding="0dp"
-            app:iconSize="24dp"
             app:iconTint="@color/theme_bright_yellow" />
 
         <com.google.android.material.button.MaterialButton

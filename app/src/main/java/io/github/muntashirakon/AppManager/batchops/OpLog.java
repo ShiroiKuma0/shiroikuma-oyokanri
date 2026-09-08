@@ -13,9 +13,11 @@ import androidx.lifecycle.MutableLiveData;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Fork (白い熊, +116): the running narrative of a batch operation — every app, every stage
@@ -105,12 +107,51 @@ public final class OpLog {
         final int userId;
         final long startedAtRealtime;
         long bytes;
+        /** Fork (白い熊): the "→ /storage/…" line, so a failure can say WHICH archive it was on. */
+        @Nullable
+        CharSequence destination;
+        /** Fork (白い熊): the last stage announced, so a failure can say HOW FAR it got. */
+        @Nullable
+        CharSequence lastStage;
 
         AppState(@NonNull CharSequence label, @NonNull String packageName, int userId) {
             this.label = label;
             this.packageName = packageName;
             this.userId = userId;
             this.startedAtRealtime = SystemClock.elapsedRealtime();
+        }
+    }
+
+    /**
+     * Fork (白い熊): one failed app, kept for the report printed at the END of the run.
+     * <p>
+     * The closing block used to list failed package NAMES and nothing else, so a run with
+     * twenty or thirty failures left you scrolling thousands of lines to find out what actually
+     * happened to each one. The reason and the path are already known at the moment of failure —
+     * they are simply written down here as well, and reprinted together at the end.
+     */
+    public static final class Failure {
+        @NonNull
+        public final CharSequence label;
+        @NonNull
+        public final String packageName;
+        public final int userId;
+        @Nullable
+        public final CharSequence reason;
+        @Nullable
+        public final CharSequence destination;
+        @Nullable
+        public final CharSequence lastStage;
+
+        Failure(@NonNull CharSequence label, @NonNull String packageName, int userId,
+                @Nullable CharSequence reason, @Nullable CharSequence destination,
+                @Nullable CharSequence lastStage) {
+            this.label = label;
+            this.packageName = packageName;
+            this.userId = userId;
+            this.reason = reason;
+            this.destination = destination;
+            this.lastStage = lastStage;
         }
     }
 
@@ -124,6 +165,8 @@ public final class OpLog {
     private final Object mLock = new Object();
     private final List<Entry> mEntries = new ArrayList<>();
     private final Map<String, AppState> mApps = new HashMap<>();
+    /** Fork (白い熊): every failure of the current run, for the closing report. */
+    private final List<Failure> mFailures = new ArrayList<>();
     private final MutableLiveData<Long> mRevision = new MutableLiveData<>(0L);
     private long mSeq;
     /** How many lines have been dropped off the front, so the adapter can tell a trim apart. */
@@ -171,6 +214,7 @@ public final class OpLog {
         synchronized (mLock) {
             mEntries.clear();
             mApps.clear();
+            mFailures.clear();
             mDropped = 0;
             mLastKey = null;
             mTitle = title;
@@ -190,9 +234,35 @@ public final class OpLog {
         append(1, KIND_APP, name, subtitle(packageName, userId), false);
     }
 
+    /**
+     * Fork (白い熊): where this app's archive lives. Appended as a line exactly as before, and
+     * also remembered, so the closing failure report can name the path without re-deriving it.
+     */
+    @AnyThread
+    public void destination(@Nullable String key, @NonNull CharSequence destination) {
+        if (key != null) {
+            synchronized (mLock) {
+                AppState s = mApps.get(key);
+                if (s != null) {
+                    s.destination = destination;
+                }
+            }
+        }
+        ensureContext(key);
+        append(3, KIND_ITEM, "→ " + destination, null, false);
+    }
+
     /** A stage within one app: APK, Data, Extras, App-supplied data, Finalising. */
     @AnyThread
     public void stage(@Nullable String key, @NonNull CharSequence stage, @Nullable CharSequence detail) {
+        if (key != null) {
+            synchronized (mLock) {
+                AppState s = mApps.get(key);
+                if (s != null) {
+                    s.lastStage = stage;
+                }
+            }
+        }
         ensureContext(key);
         append(2, KIND_STAGE, stage, detail, false);
     }
@@ -240,6 +310,19 @@ public final class OpLog {
             s = mApps.remove(key);
             if (key.equals(mLastKey)) {
                 mLastKey = null;
+            }
+        }
+        if (!ok) {
+            // Fork (白い熊): written down NOW, while the destination and stage are still known.
+            // AppState is removed just above, so this is the last moment either exists.
+            synchronized (mLock) {
+                mFailures.add(new Failure(
+                        s != null ? s.label : key,
+                        s != null ? s.packageName : key,
+                        s != null ? s.userId : 0,
+                        detail,
+                        s != null ? s.destination : null,
+                        s != null ? s.lastStage : null));
             }
         }
         CharSequence text;
@@ -311,6 +394,71 @@ public final class OpLog {
     @AnyThread
     public void endDetail(@NonNull CharSequence text, boolean failed) {
         append(1, failed ? KIND_FAIL : KIND_ITEM, text, null, false);
+    }
+
+    /** What failed during this run, in the order it failed. */
+    @AnyThread
+    @NonNull
+    public List<Failure> failures() {
+        synchronized (mLock) {
+            return new ArrayList<>(mFailures);
+        }
+    }
+
+    /**
+     * Fork (白い熊): reprint EVERY failure at the end of the run, with its reason and its path.
+     * <p>
+     * The closing block used to print failed package names alone. With twenty or thirty failures
+     * that is a list of things to go and hunt for: the reason was written once, thousands of
+     * lines earlier, interleaved with seven other worker threads. Restating them together — app,
+     * package and user, where it was writing, how far it got, and why it stopped — makes the end
+     * of the log the place you can actually read.
+     * <p>
+     * {@code alsoFailed} is the batch's own failed-package list. Ops with no stages of their own
+     * (freeze, uninstall, force-stop) never call {@link #appFinished}, so they record no reason;
+     * they are still named here rather than silently dropped.
+     */
+    @AnyThread
+    public void writeFailureReport(@NonNull CharSequence heading,
+                                   @Nullable CharSequence noReasonText,
+                                   @Nullable List<String> alsoFailed) {
+        List<Failure> failures = failures();
+        Set<String> named = new LinkedHashSet<>();
+        for (Failure f : failures) {
+            named.add(f.packageName);
+        }
+        List<String> extras = new ArrayList<>();
+        if (alsoFailed != null) {
+            for (String packageName : alsoFailed) {
+                if (packageName != null && !named.contains(packageName)) {
+                    extras.add(packageName);
+                }
+            }
+        }
+        if (failures.isEmpty() && extras.isEmpty()) {
+            return;
+        }
+        append(0, KIND_SUMMARY, heading, null, false);
+        for (Failure f : failures) {
+            append(1, KIND_FAIL, f.label, subtitle(f.packageName, f.userId), false);
+            if (!TextUtils.isEmpty(f.destination)) {
+                append(2, KIND_ITEM, "→ " + f.destination, null, false);
+            }
+            if (!TextUtils.isEmpty(f.lastStage)) {
+                append(2, KIND_ITEM, f.lastStage, null, false);
+            }
+            if (!TextUtils.isEmpty(f.reason)) {
+                append(2, KIND_FAIL, f.reason, null, false);
+            } else if (!TextUtils.isEmpty(noReasonText)) {
+                append(2, KIND_FAIL, noReasonText, null, false);
+            }
+        }
+        for (String packageName : extras) {
+            append(1, KIND_FAIL, packageName, null, false);
+            if (!TextUtils.isEmpty(noReasonText)) {
+                append(2, KIND_FAIL, noReasonText, null, false);
+            }
+        }
     }
 
     // ── The whole log as text, for Copy and Save ─────────────────────────────

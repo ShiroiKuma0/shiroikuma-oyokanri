@@ -25,6 +25,9 @@ public class MainBatchOpsHandler implements MultiSelectionView.OnSelectionChange
     private final MenuItem mClearDataCacheMenu;
     private final MenuItem mSaveApkMenu;
     private final MenuItem mBackupRestoreMenu;
+    private final MenuItem mRestoreMenu;
+    private final MenuItem mDeleteBackupMenu;
+    private final MenuItem mShareBackupMenu;
     private final MenuItem mPreventBackgroundMenu;
     private final MenuItem mBlockUnblockTrackersMenu;
     private final MenuItem mNetPolicyMenu;
@@ -54,6 +57,9 @@ public class MainBatchOpsHandler implements MultiSelectionView.OnSelectionChange
         mClearDataCacheMenu = selectionMenu.findItem(R.id.action_clear_data_cache);
         mSaveApkMenu = selectionMenu.findItem(R.id.action_save_apk);
         mBackupRestoreMenu = selectionMenu.findItem(R.id.action_backup);
+        mRestoreMenu = selectionMenu.findItem(R.id.action_restore);
+        mDeleteBackupMenu = selectionMenu.findItem(R.id.action_delete_backup);
+        mShareBackupMenu = selectionMenu.findItem(R.id.action_share_backup);
         mPreventBackgroundMenu = selectionMenu.findItem(R.id.action_disable_background);
         mBlockUnblockTrackersMenu = selectionMenu.findItem(R.id.action_block_unblock_trackers);
         mNetPolicyMenu = selectionMenu.findItem(R.id.action_net_policy);
@@ -125,8 +131,30 @@ public class MainBatchOpsHandler implements MultiSelectionView.OnSelectionChange
         mBlockUnblockTrackersMenu.setEnabled(nonZeroSelection && areAllInstalled);
         // Enable “Save APK” action iff all selections are installed or the uninstalled apps are all system apps
         mSaveApkMenu.setEnabled(nonZeroSelection && (areAllInstalled || areAllUninstalledSystem));
-        // Enable “Backup/restore” action iff all selections are installed or all the uninstalled apps have backups
+        // Enable “Back up” action iff all selections are installed or all the uninstalled apps have backups
         mBackupRestoreMenu.setEnabled(nonZeroSelection && (areAllInstalled || doAllUninstalledhaveBackup));
+        // Fork (白い熊): Restore and Delete backup ask a DIFFERENT question from Back up. The rule
+        // above is a backup rule -- it is about whether every selected app can be WRITTEN. What
+        // restoring or deleting needs is only whether anything selected HAS a backup: installed
+        // apps have backups too, and a selected app without one is simply not offered.
+        boolean anyHasBackup = false;
+        for (ApplicationItem item : selectedItems) {
+            if (item.backup != null) {
+                anyHasBackup = true;
+                break;
+            }
+        }
+        if (mRestoreMenu != null) {
+            mRestoreMenu.setEnabled(nonZeroSelection && anyHasBackup);
+        }
+        if (mDeleteBackupMenu != null) {
+            mDeleteBackupMenu.setEnabled(nonZeroSelection && anyHasBackup);
+        }
+        // Fork (白い熊): sharing a backup asks the same question as restoring one — is there a
+        // backup to act on at all.
+        if (mShareBackupMenu != null) {
+            mShareBackupMenu.setEnabled(nonZeroSelection && anyHasBackup);
+        }
         // Rests are enabled by default
         mExportRulesMenu.setEnabled(nonZeroSelection);
         mExportAppListMenu.setEnabled(nonZeroSelection);

@@ -72,6 +72,12 @@ public class SnoopingLens implements MainLens {
 
     private final Map<String, Verdict> mVerdicts = new ConcurrentHashMap<>();
 
+    /** Fork (白い熊): how many ways this app can snoop right now — read by the list's own sort. */
+    public int allowedCount(@NonNull String packageName) {
+        Verdict v = mVerdicts.get(packageName);
+        return v != null ? v.allowed : 0;
+    }
+
     @NonNull
     @Override
     public String id() {
@@ -221,34 +227,6 @@ public class SnoopingLens implements MainLens {
     }
 
     @NonNull
-    @Override
-    public List<CharSequence> sortLabels(@NonNull Context context) {
-        return Arrays.asList(
-                context.getString(R.string.screen_sort_allowed_count),
-                context.getString(R.string.screen_sort_name),
-                context.getString(R.string.screen_sort_tracker_count));
-    }
-
-    @Override
-    public void applySort(@NonNull List<ApplicationItem> rows, int lensSort) {
-        switch (lensSort) {
-            case SORT_NAME:
-                // The list's own label order already holds underneath.
-                break;
-            case SORT_TRACKERS:
-                Collections.sort(rows, (a, b) -> Integer.compare(trackers(b), trackers(a)));
-                break;
-            case SORT_ALLOWED:
-            default:
-                Collections.sort(rows, (a, b) -> {
-                    int byAllowed = Integer.compare(allowed(b), allowed(a));
-                    // Ties broken by how many are merely narrowed, as the screen did.
-                    return byAllowed != 0 ? byAllowed : Integer.compare(narrowed(b), narrowed(a));
-                });
-                break;
-        }
-    }
-
     private int allowed(@NonNull ApplicationItem item) {
         Verdict verdict = mVerdicts.get(item.packageName);
         return verdict != null ? verdict.allowed : 0;
