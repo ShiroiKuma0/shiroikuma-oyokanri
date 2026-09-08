@@ -16,16 +16,17 @@ inside an app, a **migration kit** that rebuilds this app on a wiped phone, **ap
 root** through a contract the sister apps implement — and which this app now implements for
 **its own** settings — a **full-page batch operation log**, a **configurable pill shelf** whose
 **lenses** re-dress the app list itself, a **sort menu** of its own,
-**per-app backup and restore tables**, **device-policy locks** that
+**per-app backup and restore tables**, the ability to **hand a backup to another device**,
+**device-policy locks** that
 Settings cannot undo, a configurable
 **yellow-on-black UI** with a deep customization page, a hard-blocking **protected profile**, a
 from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-tap **main-list quick
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.0+2026-06-29.21-57.gfc1e7007+171`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.1+2026-09-05.03-37.g41d79af5+013`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
-<sub>Version reads as **upstream `4.1.0`**, rebased onto upstream commit **`fc1e7007` of 2026-06-29 21:57 UTC**, fork build **171**.</sub>
+<sub>Version reads as **upstream `4.1.1`**, rebased onto upstream commit **`41d79af5` of 2026-09-05 03:37 UTC**, fork build **013**.</sub>
 
 </div>
 
@@ -383,6 +384,20 @@ with everything else — and **verified before it is ever handed back** at resto
   can export and shows its own categories, nested and pre-ticked as it recommends. The choice is
   remembered per package, so a **bulk backup applies it silently** — per-app control inside a batch,
   with no batch UI to wade through. Untouched apps simply export what they recommend.
+
+## 📤 Send a backup to another phone
+
+A backup is not much use if it only exists on the phone that made it. **Share backup** — on the app
+pane, on the selection pane, and beside Restore in the backup dialog — hands the backup's **whole
+directory** to 白い熊 魔法絨毯, which carries it to another device over its own hotspot or your
+network.
+
+The directory travels rather than its files, and that distinction is the feature: a backup is only
+restorable inside its own folder, and the folder's name is the timestamp that tells two backups of
+one app apart. Sending the files loose would produce a pile that looks like a backup and restores as
+nothing.
+
+---
 
 ## 💾 Backups & settings portability
 

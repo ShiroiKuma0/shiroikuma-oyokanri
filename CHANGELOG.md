@@ -10,6 +10,116 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-09-05.03-37.g41d79af5+013 — 2026-09-08
+
+Upstream **4.1.1**, and the backup side stops lying: backing up, restoring and deleting become three
+separate actions, a restore stops failing on data it had already restored correctly, and a backup can
+be handed to another phone. (Built on upstream App Manager `4.1.1`, commit `41d79af5` of
+2026-09-05 03:37 UTC.)
+
+### ⬆️ Rebased onto upstream 4.1.1
+
+Forty-seven upstream commits, including a permission system rewritten around modular controllers, a
+reworked installer with concurrent installation, and a substantial ADB / mode-of-operation overhaul.
+
+- **The database version had to move.** Upstream spent schema **v8** on its new `permission_override`
+  table; this fork had already spent v8, v9 and v10 on the battery sampler, and those are live on
+  installed devices. Upstream's table is therefore appended as **`M_10_11`** and the database is now
+  **v11**. Renumbering the battery migrations to make room would have cost every installed device its
+  history, or refused to open at all.
+- **Two convergent fixes were merged rather than picked.** Upstream fixed the server-JAR race from a
+  different angle than the fork did; the fork keeps its atomic `Files.move` and its
+  configuration-cache-safe task edge, and additionally adopts upstream's d8 Java-version pinning and
+  its new lint-task dependency.
+- **The fork's network lever and upstream's new firewall do not collide** — upstream chose
+  `FIREWALL_CHAIN_OEM_DENY_3`, the fork has always used `_2`.
+
+### 💾 Backing up, restoring and deleting are three actions
+
+One "Backup/restore" pill opened a sheet with no mode restriction, so a mixed selection produced a
+two-tab pager **and** a delete icon — three actions for one intent — headed by a red "these apps are
+not installed and cannot be backed up" banner, which when restoring describes the ordinary case
+rather than a problem.
+
+- **Separate pills** for Back up, Restore and Delete backup, in both the selection pane and the app
+  pane. Existing customised orders pick them up automatically.
+- **Every route names one action.** The single-app sheet, App info's action, the "Backup" tag and the
+  not-installed-but-has-backups path each open restricted to one mode; `getInstanceWithPref` now
+  takes a mode so no caller can open the sheet without saying what it means.
+- **The trash icon appears only when deleting was asked for.** Every restore sheet used to carry a
+  one-tap way to destroy the backups it was offering to restore.
+- **Restore and Delete enable on the right question** — whether anything selected *has* a backup,
+  rather than the backup rule they had inherited.
+- The backup dialog's ⋮ menu is gone; its entire contents was **Freeze**, which is not a backup
+  action. That slot is now **Share**.
+
+### 🔧 A restore failed on data it had already restored correctly
+
+`RestoreOp` ran `chown -R` on **external** app data unguarded. Ownership on FUSE-emulated storage is
+synthesised from the path, so `chown` cannot succeed there — which both neighbouring operations
+already knew, being wrapped in `!isExternal()`. This one was not, and it is the only one of the three
+that throws. An app whose only data was `Android/data/<pkg>` had it extracted correctly and was then
+reported as **"Failed to restore ownership info for index 0."**
+
+### ⏱️ App-data transfers are measured rather than guessed at
+
+Sister-app transfers were being killed after two minutes of silence while the apps were working.
+
+- **Liveness no longer depends on the main thread.** The contract client registered its broadcast
+  receiver with no scheduler, so the busiest thread in the process decided whether a transfer was
+  alive while the watchdog counted down on a worker that was never blocked. Delivery now runs on a
+  private `HandlerThread`.
+- **Silence is no longer the only death signal.** `/proc/<pid>/stat` is sampled every ten seconds and
+  a moving CPU total resets the clock. The pure-silence ceiling rose from two minutes to ten, because
+  an app blocked on slow storage accumulates no CPU ticks at all — the two signals cover different
+  failures.
+- **A heartbeat every five seconds**, saying whether the app is working or merely quiet. A 4 GB
+  restore once printed nothing between 13:18:52 and 13:28:20; the work was fine, but a log silent for
+  ten minutes cannot be told from a hung one.
+- **A timeout now says what it heard** — how many progress messages and replies arrived — so a
+  completed-but-unacknowledged transfer can be told from an app that never started.
+
+### 🚦 Large transfers no longer fight each other
+
+One permit for any transfer whose archive exceeds **256 MB**, shared between backup and restore
+because they compete for one disk. Five concurrent multi-gigabyte restores took half an hour to
+finish three of eight — one 3.2 MB app needed **22m 37s**, queued behind four others — and wanted
+twenty-five gigabytes of staging cache at once. Small apps still run in parallel around a large one,
+waiting is announced in the log, and the wait polls so Cancel still reaches a queued worker.
+
+### 📋 The log names every failure, and can be read
+
+- **A full failure report closes every run**: each failed app with its reason, its archive path and
+  the stage it reached. The closing summary used to print package names alone, leaving twenty
+  failures to be hunted through thousands of interleaved lines.
+- **Failure lines are legible.** Saturated red on black is the one colour in this fork that genuinely
+  cannot be read at log size, so the words are now near-white on a blood-red fill — the pairing the
+  Snooping page already uses — while the ✗ keeps the full-strength alarm red. All three colours are
+  settable.
+
+### 🔭 Lenses combine, and there is one list of sort orders
+
+- **仲間 (sister apps) is a filter, not a page.** A lens is now either a *display* lens (保存, 盗み見)
+  that owns the right-hand column and stays exclusive, or a *filter* lens that only narrows and
+  therefore stacks with whatever is on screen — or with nothing, which is the plain list, filtered.
+- **仲間 recognises an app by its manifest contract *or* by a backup that carried app data**, so an
+  uninstalled sister app appears on the strength of its backup alone. That is the case the whole
+  contract exists for: a wiped phone, where no manifest can be read yet.
+- **One sort list, everywhere.** The six lens orders — backup date, number of backups, size on disk,
+  stale first, allowed capabilities, format — are ordinary sort ids now, so the plain list can be
+  sorted by backup date and the backups view by anything the list knows. The lens a chosen order
+  depends on is prepared even when it is not lit.
+
+### 📤 Share backup
+
+Hand a backup's **whole directory** to 白い熊 魔法絨毯, which carries it to another device. Reachable
+from the app pane, the selection pane, and beside Restore in the backup dialog.
+
+The directory travels rather than its files: a backup is only restorable inside its own folder, and
+that folder's name is the timestamp distinguishing two backups of one app. One backup per transfer,
+enforced by the picker — the carrier names a received folder by its leaf, and two directories sharing
+a leaf are merged into one on arrival.
+
 ## 4.1.0+2026-06-29.21-57.gfc1e7007+171 — 2026-09-08
 
 The special pages stop being pages and become **lenses** on the main list, sort gets a control of its
