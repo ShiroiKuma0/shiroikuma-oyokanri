@@ -27,6 +27,8 @@ import io.github.muntashirakon.AppManager.details.struct.AppDetailsPermissionIte
 import io.github.muntashirakon.AppManager.details.struct.AppDetailsSnoopingItem;
 import io.github.muntashirakon.AppManager.permission.DevelopmentPermission;
 import io.github.muntashirakon.AppManager.permission.PermUtils;
+import io.github.muntashirakon.AppManager.permission.PermissionControllerRegistry;
+import io.github.muntashirakon.AppManager.permission.SpecialPermissionController;
 import io.github.muntashirakon.AppManager.permission.Permission;
 import io.github.muntashirakon.AppManager.permission.ReadOnlyPermission;
 import io.github.muntashirakon.AppManager.permission.RuntimePermission;
@@ -316,8 +318,15 @@ public final class SnoopingResolver {
             } else {
                 permission = new ReadOnlyPermission(permissionName, isGranted, appOp, isGranted, permissionFlags);
             }
+            // Upstream 4.1.1 widened this constructor for the controller-based permission system.
+            // The first two extras reproduce what the old 3-arg form computed internally
+            // (modifiable = PermUtils.isModifiable; settingItem = the permission->settings map,
+            // now owned by SpecialPermissionController); overlayModifiable is new and is taken
+            // from the registry exactly as AppDetailsViewModel does.
             AppDetailsPermissionItem item = new AppDetailsPermissionItem(permissionInfo, permission,
-                    permissionInfo.flags);
+                    permissionInfo.flags, PermUtils.isModifiable(permission),
+                    PermissionControllerRegistry.getInstance().isOverlayModifiable(permissionName),
+                    SpecialPermissionController.getInstance().getUserAction(permissionName));
             item.name = permissionName;
             return item;
         } catch (Throwable th) {
