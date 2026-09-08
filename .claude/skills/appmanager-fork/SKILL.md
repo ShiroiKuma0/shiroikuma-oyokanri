@@ -305,14 +305,14 @@ Ten files. Two logically distinct features bundled into one commit because they 
 
 ### Versioning system
 
-Adds a custom build-number suffix that appears in both `versionName` (`4.1.0+N`) and `versionCode` (4500000+N) so each rebuild is identifiable and registered by Android's update-detection as an upgrade over the previous custom build.
+Adds a custom build-number suffix that appears in both `versionName` (`4.1.1+N`) and `versionCode` (4510000+N) so each rebuild is identifiable and registered by Android's update-detection as an upgrade over the previous custom build.
 
 **`gradle.properties` additions:**
 
 ```properties
 customBuildNumber=1
-customBaseVersionName=4.1.0
-customBaseVersionCode=450
+customBaseVersionName=4.1.1
+customBaseVersionCode=451
 ```
 
 `customBuildNumber` advances on every dev build via `tools/bump-build.sh`. `customBaseVersion*` mirror the current upstream `defaultConfig` values — update them by hand when adopting a new upstream base (e.g. when MuntashirAkon ships 4.0.6 / versionCode 446).
@@ -334,7 +334,7 @@ versionName "${customBaseVersionName}${upstreamPin}+${String.format('%03d', cust
 
 **Upstream-base pin (`git`-tracking, 2026-08-06).** `custom` is rebased onto upstream **master commits**, not release tags, so `customBaseVersionName` stands still for months and cannot say how current the fork is. `upstreamPin` — another script-level `def`, computed by `upstreamBasePin()` at the bottom of `app/build.gradle` — renders `.<base commit date>.g<sha8>` from `git merge-base HEAD master`: the upstream commit our patches sit on, **not** our HEAD and **not** master's tip. The date is the base commit's committer date **in UTC** (build time would break the "one base, one pin" property; UTC so anything reading the date back from the GitHub API agrees). The process must run through `providers.exec` — `ProcessBuilder`/`String.execute()` at configuration time is a configuration-cache failure. Missing git or master ⇒ empty pin; unreadable date ⇒ `.g<sha>` alone. **The build never fails over a missing pin.** `tools/fork-version.sh` is the shell twin and the single source of truth for the pipeline; the global **`git-versioning`** skill holds the full rationale.
 
-**LANDMINE — never reset `customBuildNumber` on an ordinary upstream rebase here.** `versionCode` is built from `customBaseVersionCode` (450), which only moves when upstream cuts a **release** — so a counter reset after a plain master rebase drives the versionCode backwards and Android rejects the install as a downgrade. Reset it only in the same edit that raises `customBaseVersionCode`.
+**LANDMINE — never reset `customBuildNumber` on an ordinary upstream rebase here.** `versionCode` is built from `customBaseVersionCode` (451), which only moves when upstream cuts a **release** — so a counter reset after a plain master rebase drives the versionCode backwards and Android rejects the install as a downgrade. Reset it only in the same edit that raises `customBaseVersionCode`.
 
 **Why the `def`s are at script level, NOT inside `android {}`:** Groovy DSL scoping for nested closures inside the `android` extension is unreliable — variables declared with `def` inside the `android` closure body can fail to be visible to `defaultConfig {}`'s nested closure under some Groovy versions / CC configurations. Script-level declarations are unambiguously visible to every nested DSL block. *We tripped over this directly: first attempt had the defs inside `android {}` and the build silently used pre-CC-cached compilation of an old AndroidManifest with versionCode=445 / versionName=4.0.5. Surface symptom: APK with correct filename but wrong internal version.*
 
