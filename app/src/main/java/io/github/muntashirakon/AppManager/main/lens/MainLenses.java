@@ -51,6 +51,25 @@ public final class MainLenses {
         return LENSES;
     }
 
+    /**
+     * Fork (白い熊): typed handles, for the sort comparators that read a lens's cached facts even
+     * when that lens is not the one on screen.
+     */
+    @NonNull
+    public static BackupsLens backups() {
+        return (BackupsLens) LENSES.get(BackupsLens.ID);
+    }
+
+    @NonNull
+    public static SnoopingLens snooping() {
+        return (SnoopingLens) LENSES.get(SnoopingLens.ID);
+    }
+
+    @NonNull
+    public static SisterAppsLens sister() {
+        return (SisterAppsLens) LENSES.get(SisterAppsLens.ID);
+    }
+
     private MainLenses() {
     }
 }

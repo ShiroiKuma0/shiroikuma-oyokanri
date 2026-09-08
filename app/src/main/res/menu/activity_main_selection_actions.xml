@@ -31,8 +31,27 @@
         android:icon="@drawable/ic_get_app" />
     <item
         android:id="@+id/action_backup"
-        android:title="@string/backup_restore"
-        android:icon="@drawable/ic_backup_restore" />
+        android:title="@string/back_up"
+        android:icon="@drawable/ic_archive" />
+    <!-- Fork (白い熊): restore and delete are their OWN actions. One combined
+         "Backup/restore" pill meant the only route to a restore ran through the
+         backup table, and landed on a sheet offering backup, restore and delete
+         at once, with the backup tab's "not installed and cannot be backed up"
+         warning on top, which when restoring is the normal case, not an error. -->
+    <item
+        android:id="@+id/action_restore"
+        android:title="@string/restore"
+        android:icon="@drawable/ic_restore" />
+    <item
+        android:id="@+id/action_delete_backup"
+        android:title="@string/delete_backup"
+        android:icon="@drawable/ic_trash_can" />
+    <!-- Fork (白い熊): hand a whole backup directory to 白い熊 魔法絨毯 to carry to another
+         device. See main/ShareBackupHandler.java. -->
+    <item
+        android:id="@+id/action_share_backup"
+        android:title="@string/share_backup"
+        android:icon="@drawable/ic_share" />
     <item
         android:id="@+id/action_disable_background"
         android:title="@string/disable_background"

@@ -933,6 +933,16 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
      */
     private void relightLensPill() {
         if (mShelf == null || viewModel == null) return;
+        List<ShelfPrefs.Pill> pills = ShelfPrefs.load(this);
+        // Fork (白い熊): the filter lenses light in addition to whatever pill is active.
+        java.util.Set<String> filterIds = viewModel.getFilterLensIds();
+        java.util.List<String> lit = new ArrayList<>();
+        for (ShelfPrefs.Pill pill : pills) {
+            if (pill.isScreen() && filterIds.contains(pill.payload)) {
+                lit.add(pill.id);
+            }
+        }
+        mShelf.setLitIds(lit);
         String lensId = viewModel.getLensId();
         if (lensId == null) {
             // Only clear a lit LENS pill; a saved view is lit by its own rules.
@@ -942,7 +952,7 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             }
             return;
         }
-        for (ShelfPrefs.Pill pill : ShelfPrefs.load(this)) {
+        for (ShelfPrefs.Pill pill : pills) {
             if (pill.isScreen() && lensId.equals(pill.payload)) {
                 mShelf.setActiveId(pill.id);
                 return;
@@ -989,12 +999,12 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         if (anchor == null) {
             return;
         }
-        MainLens lens = viewModel.getLens();
-        List<CharSequence> lensSorts = lens != null ? lens.sortLabels(this)
-                : Collections.emptyList();
-        CharSequence lensTitle = lens != null ? getString(lens.titleRes()) : null;
+        // Fork (白い熊): ONE list of orders, and every one of them available here whatever the page
+        // is showing. The panel used to carry a second section for the active lens's own orders,
+        // which meant the plain list could not be sorted by backup date and the backups page could
+        // not be sorted by anything the list knew. Those orders are ordinary sort ids now.
         SortMenuPopup.show(this, anchor, MainListOptions.sortIdLocaleMap(), viewModel.getSortBy(),
-                viewModel.isReverseSort(), lensTitle, lensSorts, viewModel.getLensSort(),
+                viewModel.isReverseSort(),
                 new SortMenuPopup.Listener() {
                     @Override
                     public void onListSort(int sortId) {
@@ -1008,13 +1018,6 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                         if (viewModel == null) return;
                         showProgressIndicator(true);
                         viewModel.setReverseSort(reverse);
-                    }
-
-                    @Override
-                    public void onLensSort(int index) {
-                        if (viewModel == null) return;
-                        showProgressIndicator(true);
-                        viewModel.setLensSort(index);
                     }
                 });
     }
@@ -1230,14 +1233,22 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             // that is why MainLenses is keyed by them. Battery and Monitor are still real screens
             // and still start, because their rows are not apps.
             if (MainLenses.isLensId(pill.payload) && viewModel != null) {
-                boolean active = pill.id.equals(mShelf != null ? mShelf.getActiveId() : null);
-                // Tapping the lit pill is the way OUT — one pill is both the way in and the way
-                // back to the plain list, exactly as a saved view already behaves.
+                MainLens tapped = MainLenses.get(pill.payload);
                 // A lens can be seconds of work on its first pass (盗み見 resolves every app), so
                 // say so rather than leaving the list looking stuck.
                 showProgressIndicator(true);
-                viewModel.setLens(active ? null : pill.payload);
-                if (mShelf != null) mShelf.setActiveId(active ? null : pill.id);
+                if (tapped != null && tapped.filterOnly()) {
+                    // Fork (白い熊): 仲間 narrows whatever is on screen and never replaces it, so it
+                    // toggles on its own and lights beside the active pill rather than becoming it.
+                    viewModel.toggleFilterLens(pill.payload);
+                } else {
+                    // Tapping the lit pill is the way OUT — one pill is both the way in and the way
+                    // back to the plain list, exactly as a saved view already behaves.
+                    boolean active = pill.id.equals(mShelf != null ? mShelf.getActiveId() : null);
+                    viewModel.setLens(active ? null : pill.payload);
+                    if (mShelf != null) mShelf.setActiveId(active ? null : pill.id);
+                }
+                relightLensPill();
                 invalidateOptionsMenu();
                 return;
             }
@@ -1442,9 +1453,29 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
 
                     @Override
                     public void onRestoreOrDelete() {
-                        openBackupRestoreSheet(pairs);
+                        openBackupRestoreSheet(pairs, BackupRestoreDialogFragment.MODE_RESTORE);
                     }
                 }).show();
+            }
+        } else if (id == R.id.action_restore) {
+            // Fork (白い熊): restore is its own action, opened RESTORE-only. getRealState() then
+            // narrows BOTH_MULTIPLE to RESTORE_MULTIPLE, so there is no backup tab and therefore
+            // no "these apps are not installed and cannot be backed up" banner -- which is the
+            // ordinary case when restoring, not a warning.
+            if (viewModel != null) {
+                openBackupRestoreSheet(viewModel.getSelectedPackagesWithUsers(),
+                        BackupRestoreDialogFragment.MODE_RESTORE);
+            }
+        } else if (id == R.id.action_delete_backup) {
+            // Fork (白い熊): deleting backups is never bundled with restoring them.
+            if (viewModel != null) {
+                openBackupRestoreSheet(viewModel.getSelectedPackagesWithUsers(),
+                        BackupRestoreDialogFragment.MODE_DELETE);
+            }
+        } else if (id == R.id.action_share_backup) {
+            // Fork (白い熊): pick a backup, hand the whole directory to 白い熊 魔法絨毯.
+            if (viewModel != null) {
+                ShareBackupHandler.share(this, viewModel.getSelectedPackagesWithUsers());
             }
         } else if (id == R.id.action_save_apk) {
             mStoragePermission.request(granted -> {
@@ -1966,9 +1997,17 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         });
     }
 
-    /** The multi-tab sheet, for the questions it answers better than the table does. */
-    private void openBackupRestoreSheet(@NonNull List<UserPackagePair> pairs) {
-        BackupRestoreDialogFragment fragment = BackupRestoreDialogFragment.getInstance(pairs);
+    /**
+     * The sheet, restricted to ONE action.
+     * <p>
+     * Fork (白い熊): it used to be opened with no restriction at all, so a mixed selection
+     * resolved to BOTH_MULTIPLE and produced a two-tab pager (Backup | Restore) plus a delete
+     * icon in the header -- three actions for one intent. Every caller now says which one it
+     * means, and {@link BackupRestoreDialogFragment#getRealState} collapses the sheet to it.
+     */
+    private void openBackupRestoreSheet(@NonNull List<UserPackagePair> pairs,
+                                        @BackupRestoreDialogFragment.ActionMode int actionMode) {
+        BackupRestoreDialogFragment fragment = BackupRestoreDialogFragment.getInstance(pairs, actionMode);
         fragment.setOnActionBeginListener(mode -> showProgressIndicator(true));
         fragment.setOnActionCompleteListener((mode, failedPackages) -> showProgressIndicator(false));
         fragment.show(getSupportFragmentManager(), BackupRestoreDialogFragment.TAG);

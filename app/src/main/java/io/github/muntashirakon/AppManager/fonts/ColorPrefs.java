@@ -117,6 +117,10 @@ public final class ColorPrefs {
     public static final String OPLOG_DETAIL = "oplog_detail";
     public static final String OPLOG_OK = "oplog_ok";
     public static final String OPLOG_FAIL = "oplog_fail";
+    /** Fork (白い熊): the fill behind a failure line. See the default below for why. */
+    public static final String OPLOG_FAIL_BG = "oplog_fail_bg";
+    /** Fork (白い熊): the ✗ glyph, kept at full alarm strength. */
+    public static final String OPLOG_FAIL_MARK = "oplog_fail_mark";
     public static final String OPLOG_SKIP = "oplog_skip";
     public static final String OPLOG_WARN = "oplog_warn";
 
@@ -200,7 +204,19 @@ public final class ColorPrefs {
             case OPLOG_OK:
                 return 0xFF4CD07A;  // green — the only colour here that means "nothing to do"
             case OPLOG_FAIL:
-                return 0xFFFF0028;  // the fork's alarm red, shared with the Snooping page
+                // Fork (白い熊): the INK of a failure line, and deliberately not #FF0028.
+                //
+                // Saturated red has very low luminance, so at this size on black it is the one
+                // colour in the fork that genuinely cannot be read -- the same finding as +149,
+                // where the sibling screens' red headline had to become a filled pill. Red must
+                // stay, because it is the critical colour; what changes is which half of the
+                // pair carries it. The fill below is red; the words are near-white, exactly the
+                // pairing the Snooping page already uses for its "Allowed" state.
+                return 0xFFFFD9DC;  // near-white pink — reads instantly, still unmistakably red
+            case OPLOG_FAIL_BG:
+                return 0xFF6E0B14;  // blood red — the fill, shared with the Snooping page
+            case OPLOG_FAIL_MARK:
+                return 0xFFFF0028;  // the fork's alarm red, kept for the ✗ glyph alone
             case OPLOG_WARN:
                 return ContextCompat.getColor(ctx, R.color.theme_bright_orange);
             case VERSION_INACTIVE:

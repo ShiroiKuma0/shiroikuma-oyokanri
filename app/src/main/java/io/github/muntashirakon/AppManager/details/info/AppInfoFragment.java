@@ -460,8 +460,11 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
             });
         } else if (itemId == R.id.action_backup) {
             if (mMainModel == null) return true;
+            // Fork (白い熊): App info's own action backs up. Restoring is the "Backup" tag below,
+            // and deleting is the app pane's own pill — one action per control.
             BackupRestoreDialogFragment fragment = BackupRestoreDialogFragment.getInstanceWithPref(
-                    Collections.singletonList(new UserPackagePair(mPackageName, mUserId)), mUserId);
+                    Collections.singletonList(new UserPackagePair(mPackageName, mUserId)), mUserId,
+                    BackupRestoreDialogFragment.MODE_BACKUP);
             fragment.setOnActionBeginListener(mode -> showProgressIndicator(true));
             fragment.setOnActionCompleteListener((mode, failedPackages) -> {
                 showProgressIndicator(false);
@@ -1032,7 +1035,10 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
                     .setOnClickListener(v -> {
                         BackupRestoreDialogFragment fragment = BackupRestoreDialogFragment.getInstance(
                                 Collections.singletonList(new UserPackagePair(mPackageName, mUserId)),
-                                BackupRestoreDialogFragment.MODE_RESTORE | BackupRestoreDialogFragment.MODE_DELETE);
+                                // Fork (白い熊): restore only. The tag says "this app has backups",
+                                // so tapping it offers to put one back; it never also offers to
+                                // destroy them from the same surface.
+                                BackupRestoreDialogFragment.MODE_RESTORE);
                         fragment.setOnActionBeginListener(mode -> showProgressIndicator(true));
                         fragment.setOnActionCompleteListener((mode, failedPackages) -> showProgressIndicator(false));
                         fragment.show(getParentFragmentManager(), BackupRestoreDialogFragment.TAG);

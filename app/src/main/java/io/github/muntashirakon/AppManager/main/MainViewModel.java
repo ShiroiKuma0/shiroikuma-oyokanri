@@ -68,8 +68,11 @@ import io.github.muntashirakon.AppManager.profiles.struct.AppsProfile;
 import io.github.muntashirakon.AppManager.profiles.struct.BaseProfile;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
 import io.github.muntashirakon.AppManager.settings.FeatureController;
+import io.github.muntashirakon.AppManager.main.lens.BackupsLens;
 import io.github.muntashirakon.AppManager.main.lens.MainLens;
 import io.github.muntashirakon.AppManager.main.lens.MainLenses;
+import io.github.muntashirakon.AppManager.main.lens.SisterAppsLens;
+import io.github.muntashirakon.AppManager.main.lens.SnoopingLens;
 import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsManager;
 import io.github.muntashirakon.AppManager.types.PackageChangeReceiver;
@@ -107,7 +110,12 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
     @Nullable
     private String mLensId;
     /** Index into the active lens's own sort labels. Reset whenever the lens changes. */
-    private int mLensSort;
+    /**
+     * Fork (白い熊): the FILTER lenses that are on — 仲間 today. A filter lens narrows the page and
+     * never draws it, so several may be on at once and they combine with whatever display lens is
+     * lit (or with none, which is the plain list, filtered).
+     */
+    private final java.util.Set<String> mFilterLensIds = new java.util.LinkedHashSet<>();
     /**
      * Profiles whose packages an app MUST belong to in order to pass the filter.
      * Empty set means "no include constraint". Multiple entries are ANDed
@@ -331,8 +339,23 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
         return MainLenses.get(mLensId);
     }
 
-    public int getLensSort() {
-        return mLensSort;
+    /** Fork (白い熊): the filter lenses currently on. */
+    @NonNull
+    public java.util.Set<String> getFilterLensIds() {
+        return new java.util.LinkedHashSet<>(mFilterLensIds);
+    }
+
+    public boolean isFilterLensOn(@NonNull String lensId) {
+        return mFilterLensIds.contains(lensId);
+    }
+
+    /** Fork (白い熊): turn a filter lens on or off. Independent of the display lens. */
+    public void toggleFilterLens(@NonNull String lensId) {
+        if (!mFilterLensIds.remove(lensId)) {
+            mFilterLensIds.add(lensId);
+        }
+        cancelIfRunning();
+        mFilterResult = executor.submit(this::filterItemsByFlags);
     }
 
     /**
@@ -343,18 +366,9 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
             return;
         }
         mLensId = lensId;
-        // A sort index means nothing across lenses -- index 2 is "backups" in one and could be
-        // anything in the next -- so it starts again rather than carrying over.
-        mLensSort = 0;
-        cancelIfRunning();
-        mFilterResult = executor.submit(this::filterItemsByFlags);
-    }
-
-    public void setLensSort(int lensSort) {
-        if (mLensSort == lensSort) {
-            return;
-        }
-        mLensSort = lensSort;
+        // Fork (白い熊): the sort no longer restarts here. It used to, because a lens sort was a
+        // bare index whose meaning changed from lens to lens; every order is now an ordinary sort
+        // id that means the same thing everywhere, so changing the view keeps the order you chose.
         cancelIfRunning();
         mFilterResult = executor.submit(this::filterItemsByFlags);
     }
@@ -748,8 +762,30 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
      */
     @WorkerThread
     private void publish(@NonNull List<ApplicationItem> items) {
-        MainLens lens = MainLenses.get(mLensId);
-        if (lens == null) {
+        // Fork (白い熊): every active lens narrows, in conjunction; at most one of them draws.
+        //
+        // A DISPLAY lens (保存, 盗み見) owns the right-hand column, so only one can be lit — there
+        // is one column. A FILTER lens (仲間) owns nothing and only answers "does this app belong",
+        // so any number can be on at once and they stack with the display lens, or with none at
+        // all, in which case this is the plain list with a filter over it.
+        MainLens display = MainLenses.get(mLensId);
+        List<MainLens> active = new ArrayList<>();
+        if (display != null) {
+            active.add(display);
+        }
+        for (String id : mFilterLensIds) {
+            MainLens lens = MainLenses.get(id);
+            if (lens != null) {
+                active.add(lens);
+            }
+        }
+        // A sort may need facts a lens works out even when that lens is not lit — "size on disk"
+        // on the plain list is the case. Prepare it too, once, alongside the rest.
+        MainLens forSort = lensForSort(mSortBy);
+        if (forSort != null && !active.contains(forSort)) {
+            active.add(forSort);
+        }
+        if (active.isEmpty()) {
             mApplicationItemsLiveData.postValue(items);
             return;
         }
@@ -758,29 +794,109 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
         // resolver pass and 仲間 needs manifest metadata, neither of which an ApplicationItem carries.
         // Off-thread by construction: this is the pipeline's own executor, and a row's right-hand
         // column must be free to draw at bind time.
-        try {
-            lens.prepare(getApplication(), items);
-        } catch (Throwable th) {
-            Log.w(TAG, "Lens %s could not prepare its rows.", th, lens.id());
-        }
-        if (ThreadUtils.isInterrupted()) {
-            return;
+        for (MainLens lens : active) {
+            try {
+                lens.prepare(getApplication(), items);
+            } catch (Throwable th) {
+                Log.w(TAG, "Lens %s could not prepare its rows.", th, lens.id());
+            }
+            if (ThreadUtils.isInterrupted()) {
+                return;
+            }
         }
         List<ApplicationItem> lensed = new ArrayList<>(items.size());
         for (ApplicationItem item : items) {
             if (ThreadUtils.isInterrupted()) {
                 return;
             }
-            if (lens.includes(item)) {
+            boolean keep = true;
+            for (MainLens lens : active) {
+                // The sort-only lens must not narrow the page — it was prepared for its facts.
+                if (lens == forSort && lens != display && !mFilterLensIds.contains(lens.id())) {
+                    continue;
+                }
+                if (!lens.includes(item)) {
+                    keep = false;
+                    break;
+                }
+            }
+            if (keep) {
                 lensed.add(item);
             }
         }
-        try {
-            lens.applySort(lensed, mLensSort);
-        } catch (Throwable th) {
-            Log.w(TAG, "Lens %s could not sort its rows.", th, lens.id());
-        }
+        applyLensSort(lensed);
         mApplicationItemsLiveData.postValue(lensed);
+    }
+
+    /**
+     * Fork (白い熊): the lens whose {@code prepare()} a sort depends on, or null when the list can
+     * answer the order by itself. This is what lets a former lens order be chosen anywhere.
+     */
+    @Nullable
+    private static MainLens lensForSort(int sortBy) {
+        switch (sortBy) {
+            case MainListOptions.SORT_BY_BACKUP_DATE:
+            case MainListOptions.SORT_BY_BACKUP_COUNT:
+            case MainListOptions.SORT_BY_BACKUP_SIZE:
+            case MainListOptions.SORT_BY_BACKUP_STALE:
+                return MainLenses.backups();
+            case MainListOptions.SORT_BY_SNOOPING:
+                return MainLenses.snooping();
+            case MainListOptions.SORT_BY_APPDATA_FORMAT:
+                return MainLenses.sister();
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Fork (白い熊): the orders whose facts are worked out by a lens rather than carried on the
+     * item. Applied here rather than in the main comparator because here is where {@code prepare()}
+     * has already run; every other order is sorted the usual way and left alone by this.
+     */
+    @WorkerThread
+    private void applyLensSort(@NonNull List<ApplicationItem> rows) {
+        int mode = mReverseSort ? -1 : 1;
+        switch (mSortBy) {
+            case MainListOptions.SORT_BY_BACKUP_DATE: {
+                BackupsLens lens = MainLenses.backups();
+                Collections.sort(rows, (a, b) -> -mode * Long.compare(
+                        lens.newestBackupTime(a.packageName), lens.newestBackupTime(b.packageName)));
+                break;
+            }
+            case MainListOptions.SORT_BY_BACKUP_COUNT: {
+                BackupsLens lens = MainLenses.backups();
+                Collections.sort(rows, (a, b) -> -mode * Integer.compare(
+                        lens.backupCount(a.packageName), lens.backupCount(b.packageName)));
+                break;
+            }
+            case MainListOptions.SORT_BY_BACKUP_SIZE: {
+                BackupsLens lens = MainLenses.backups();
+                Collections.sort(rows, (a, b) -> -mode * Long.compare(
+                        lens.backupSize(a.packageName), lens.backupSize(b.packageName)));
+                break;
+            }
+            case MainListOptions.SORT_BY_BACKUP_STALE: {
+                BackupsLens lens = MainLenses.backups();
+                Collections.sort(rows, (a, b) -> -mode * Boolean.compare(
+                        lens.isStale(a.packageName), lens.isStale(b.packageName)));
+                break;
+            }
+            case MainListOptions.SORT_BY_SNOOPING: {
+                SnoopingLens lens = MainLenses.snooping();
+                Collections.sort(rows, (a, b) -> -mode * Integer.compare(
+                        lens.allowedCount(a.packageName), lens.allowedCount(b.packageName)));
+                break;
+            }
+            case MainListOptions.SORT_BY_APPDATA_FORMAT: {
+                SisterAppsLens lens = MainLenses.sister();
+                Collections.sort(rows, (a, b) -> -mode * Integer.compare(
+                        lens.formatOf(a.packageName), lens.formatOf(b.packageName)));
+                break;
+            }
+            default:
+                break;
+        }
     }
 
     @WorkerThread

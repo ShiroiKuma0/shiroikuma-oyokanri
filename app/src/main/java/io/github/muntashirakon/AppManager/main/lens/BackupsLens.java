@@ -78,6 +78,34 @@ public class BackupsLens implements MainLens {
     }
 
     private final Map<String, Info> mInfo = new ConcurrentHashMap<>();
+
+    /**
+     * Fork (白い熊): the facts this lens works out, readable by the list's own sort.
+     * <p>
+     * These orders are no longer the lens's private business — they are ordinary sort ids now, and
+     * the plain list can be sorted by them with no lens lit at all. The cache stays here because
+     * this is what fills it; {@code MainViewModel} runs {@link #prepare} for whichever lens the
+     * chosen sort needs, active or not.
+     */
+    public int backupCount(@NonNull String packageName) {
+        Info info = mInfo.get(packageName);
+        return info != null ? info.count : 0;
+    }
+
+    public long backupSize(@NonNull String packageName) {
+        Info info = mInfo.get(packageName);
+        return info != null ? info.size : 0;
+    }
+
+    public long newestBackupTime(@NonNull String packageName) {
+        Info info = mInfo.get(packageName);
+        return info != null ? info.newestBackupTime : 0;
+    }
+
+    public boolean isStale(@NonNull String packageName) {
+        Info info = mInfo.get(packageName);
+        return info != null && info.stale;
+    }
     /** pkg + "@" + newest backup time -> bytes. Survives a pass; invalidated by a newer backup. */
     private final Map<String, Long> mSizes = new ConcurrentHashMap<>();
 
@@ -190,38 +218,6 @@ public class BackupsLens implements MainLens {
     }
 
     @NonNull
-    @Override
-    public List<CharSequence> sortLabels(@NonNull Context context) {
-        return Arrays.asList(
-                context.getString(R.string.screen_sort_backup_date),
-                context.getString(R.string.screen_sort_name),
-                context.getString(R.string.screen_sort_backup_count),
-                context.getString(R.string.screen_sort_size),
-                context.getString(R.string.screen_sort_stale_first));
-    }
-
-    @Override
-    public void applySort(@NonNull List<ApplicationItem> rows, int lensSort) {
-        switch (lensSort) {
-            case SORT_NAME:
-                // The list's own label order already holds underneath; leave it alone.
-                break;
-            case SORT_COUNT:
-                Collections.sort(rows, (a, b) -> Integer.compare(count(b), count(a)));
-                break;
-            case SORT_SIZE:
-                Collections.sort(rows, (a, b) -> Long.compare(size(b), size(a)));
-                break;
-            case SORT_STALE_FIRST:
-                Collections.sort(rows, (a, b) -> Integer.compare(rank(b), rank(a)));
-                break;
-            case SORT_BACKUP_DATE:
-            default:
-                Collections.sort(rows, (a, b) -> Long.compare(newest(b), newest(a)));
-                break;
-        }
-    }
-
     private int count(@NonNull ApplicationItem item) {
         Info info = mInfo.get(item.packageName);
         return info != null ? info.count : 0;

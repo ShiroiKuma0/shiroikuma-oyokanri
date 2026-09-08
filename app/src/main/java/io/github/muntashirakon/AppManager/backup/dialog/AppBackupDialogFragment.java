@@ -32,6 +32,7 @@ import io.github.muntashirakon.AppManager.utils.ForkThemeUtils;
 import io.github.muntashirakon.AppManager.utils.LangUtils;
 import io.github.muntashirakon.AppManager.appdata.AppDataHeader;
 import io.github.muntashirakon.AppManager.backup.BackupItems;
+import io.github.muntashirakon.AppManager.main.ShareBackupHandler;
 import io.github.muntashirakon.io.Path;
 import androidx.annotation.StringRes;
 import android.text.SpannableStringBuilder;
@@ -163,7 +164,7 @@ public class AppBackupDialogFragment extends DialogFragment {
     private View mActionsView;
     private MaterialButton mRestoreButton;
     private MaterialButton mDeleteButton;
-    private MaterialButton mMoreButton;
+    private MaterialButton mShareButton;
     private int mMultiChoiceItemLayout;
 
     /** The app's backups, newest state as last loaded. Index = position in the tick list. */
@@ -230,7 +231,7 @@ public class AppBackupDialogFragment extends DialogFragment {
         mActionsView = body.findViewById(R.id.backup_actions);
         mRestoreButton = body.findViewById(R.id.action_restore);
         mDeleteButton = body.findViewById(R.id.action_delete);
-        mMoreButton = body.findViewById(R.id.more);
+        mShareButton = body.findViewById(R.id.action_share);
         mRestoreButton.setOnClickListener(v -> {
             List<BackupMetadataV5> selected = getSelectedBackups();
             if (selected.size() == 1) {
@@ -243,7 +244,15 @@ public class AppBackupDialogFragment extends DialogFragment {
                 handleDelete(selected);
             }
         });
-        mMoreButton.setOnClickListener(v -> showMoreActions());
+        // Fork (白い熊): hand the chosen backup's directory to 白い熊 魔法絨毯 to carry to another
+        // device. The dialog already knows which backup is meant, so this goes straight to the
+        // send rather than through ShareBackupHandler's picker.
+        mShareButton.setOnClickListener(v -> {
+            List<BackupMetadataV5> selected = getSelectedBackups();
+            if (selected.size() == 1) {
+                shareBackup(selected.get(0));
+            }
+        });
 
         // Loading is usually a blink, but it reads the backup metadata off disk,
         // so say so rather than showing an empty box.
@@ -714,7 +723,7 @@ public class AppBackupDialogFragment extends DialogFragment {
         // would look identical to an enabled one - dim it by hand.
         setActionEnabled(mRestoreButton, count == 1);
         setActionEnabled(mDeleteButton, count > 0);
-        setActionEnabled(mMoreButton, count > 0);
+        setActionEnabled(mShareButton, count == 1);
     }
 
     private static void setActionEnabled(@NonNull MaterialButton button, boolean enabled) {
@@ -882,68 +891,17 @@ public class AppBackupDialogFragment extends DialogFragment {
     }
 
     /**
-     * Freezing a backup drops a marker file in it that protects it from being
-     * rotated away. Only the applicable entry is offered - a list of two where
-     * one is greyed out says less than a list of one.
+     * Fork (白い熊): hand this backup's directory to 白い熊 魔法絨毯, which carries it to another
+     * device. The whole directory travels, because a backup is only restorable inside its own
+     * folder — see {@link ShareBackupHandler}.
      */
-    private void showMoreActions() {
-        List<BackupMetadataV5> selected = getSelectedBackups();
-        if (selected.isEmpty()) {
+    private void shareBackup(@NonNull BackupMetadataV5 metadata) {
+        BackupItems.BackupItem item = metadata.info.getBackupItem();
+        if (item == null) {
+            UIUtils.displayShortToast(R.string.share_backup_none);
             return;
         }
-        int frozen = 0;
-        for (BackupMetadataV5 metadata : selected) {
-            if (metadata.info.isFrozen()) {
-                ++frozen;
-            }
-        }
-        List<CharSequence> labels = new ArrayList<>(2);
-        List<Boolean> freezeActions = new ArrayList<>(2);
-        if (frozen < selected.size()) {
-            labels.add(getString(R.string.freeze));
-            freezeActions.add(true);
-        }
-        if (frozen > 0) {
-            labels.add(getString(R.string.unfreeze));
-            freezeActions.add(false);
-        }
-        if (labels.isEmpty()) {
-            return;
-        }
-        ForkDialog.present(ForkDialog.builder(mDialogContext)
-                .setTitle(R.string.backup_dialog_more)
-                .setAdapter(new ArrayAdapter<>(mDialogContext, R.layout.item_dialog_pill, labels),
-                        (dialog, which) -> setFrozen(selected, freezeActions.get(which)))
-                .setNegativeButton(R.string.cancel, null));
-    }
-
-    private void setFrozen(@NonNull List<BackupMetadataV5> backups, boolean freeze) {
-        ThreadUtils.postOnBackgroundThread(() -> {
-            boolean failed = false;
-            for (BackupMetadataV5 metadata : backups) {
-                if (metadata.info.getBackupItem() == null || metadata.info.isFrozen() == freeze) {
-                    continue;
-                }
-                try {
-                    if (freeze) {
-                        metadata.info.getBackupItem().freeze();
-                    } else {
-                        metadata.info.getBackupItem().unfreeze();
-                    }
-                } catch (IOException e) {
-                    failed = true;
-                }
-            }
-            boolean anyFailed = failed;
-            ThreadUtils.postOnMainThread(() -> {
-                if (!isAdded()) return;
-                if (anyFailed) {
-                    UIUtils.displayShortToast(R.string.failed);
-                }
-                // The "Frozen" suffix lives in the row label, so re-read it.
-                reloadRows();
-            });
-        });
+        ShareBackupHandler.sendDirectory(requireActivity(), item.getBackupPath());
     }
 
     // ------------------------------------------------------------------

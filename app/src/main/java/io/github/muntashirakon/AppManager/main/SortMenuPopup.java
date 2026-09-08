@@ -75,23 +75,21 @@ public final class SortMenuPopup {
         void onListSort(int sortId);
 
         void onReverseToggled(boolean reverse);
-
-        void onLensSort(int index);
     }
 
     /**
-     * @param listSorts  sort id → label resource, in menu order
-     * @param lensTitle  the active lens's name, or null when there is none
-     * @param lensSorts  that lens's own orders, in its own order; may be empty
+     * @param listSorts sort id → label resource, in menu order
+     *
+     * <p>Fork (白い熊): one section, always. There used to be a second one carrying the active
+     * lens's own orders under a heading, with an index space of its own — which made those orders
+     * unreachable unless that lens happened to be lit, and left the plain list unable to sort by
+     * backup date at all. They are ordinary sort ids now and simply appear in this list.
      */
     public static void show(@NonNull Activity activity,
                             @NonNull View anchor,
                             @NonNull LinkedHashMap<Integer, Integer> listSorts,
                             int currentSort,
                             boolean reverse,
-                            @Nullable CharSequence lensTitle,
-                            @NonNull List<CharSequence> lensSorts,
-                            int currentLensSort,
                             @NonNull Listener listener) {
         Context context = activity;
         int ink = ForkThemeUtils.getTextColor();
@@ -129,23 +127,6 @@ public final class SortMenuPopup {
                     popup.dismiss();
                     listener.onReverseToggled(!reverse);
                 }));
-
-        // The active lens's own orders, under a heading that names it.
-        if (lensTitle != null && !lensSorts.isEmpty()) {
-            body.addView(rule(context, ink, RULE_ALPHA, 1));
-            body.addView(heading(context, ink, lensTitle));
-            for (int i = 0; i < lensSorts.size(); ++i) {
-                final int index = i;
-                if (i > 0) {
-                    body.addView(rule(context, ink, HAIRLINE_ALPHA, 1));
-                }
-                body.addView(row(context, ink, lensSorts.get(i), i == currentLensSort, false,
-                        v -> {
-                            popup.dismiss();
-                            listener.onLensSort(index);
-                        }));
-            }
-        }
 
         ScrollView scroller = new ScrollView(context);
         scroller.setVerticalScrollBarEnabled(false);

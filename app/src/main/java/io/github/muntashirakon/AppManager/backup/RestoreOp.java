@@ -754,10 +754,25 @@ class RestoreOp implements Closeable {
             throw new BackupException("Failed to restore data files for index " + index + ".", th);
         }
         // Restore UID and GID
-        if (!Runner.runCommand(String.format(Locale.ROOT, "chown -R %d:%d \"%s\"", uidGidPair.uid, uidGidPair.gid, dataSourceFile.getFilePath())).isSuccessful()) {
-            if (!Utils.isRoboUnitTest()) {
-                throw new BackupException("Failed to restore ownership info for index " + index + ".");
-            } // else Don't care about permissions
+        // Fork (白い熊): skipped for EXTERNAL data, which upstream did not guard here.
+        //
+        // /storage/emulated/0/Android/{data,obb,media}/<pkg> is FUSE-emulated storage, where
+        // ownership is SYNTHESISED by the kernel from the path -- chown cannot succeed there for
+        // the shell uid, and means nothing even where it is permitted. Both neighbouring
+        // ownership/context operations already know this: setUidGid() above and restorecon below
+        // are each wrapped in !isExternal(). This one was not, and it is the only one of the three
+        // that THROWS -- so an app whose only restored data was Android/data/<pkg> (often a single
+        // empty directory) had its data extracted correctly and was then reported as
+        // "Failed to restore ownership info for index 0." and counted as a failed restore.
+        //
+        // Internal data still throws on failure: there the uid is real, and an app that cannot
+        // read its own files is worse than a restore that stops and says so.
+        if (!dataDirectoryInfo.isExternal()) {
+            if (!Runner.runCommand(String.format(Locale.ROOT, "chown -R %d:%d \"%s\"", uidGidPair.uid, uidGidPair.gid, dataSourceFile.getFilePath())).isSuccessful()) {
+                if (!Utils.isRoboUnitTest()) {
+                    throw new BackupException("Failed to restore ownership info for index " + index + ".");
+                } // else Don't care about permissions
+            }
         }
         // Restore context
         if (!dataDirectoryInfo.isExternal()) {
@@ -942,7 +957,8 @@ class RestoreOp implements Closeable {
         stage(listener, null, R.string.restore_stage_app_data);
         // Fork (白い熊, +141): the three passes before the app ever sees the archive, each one a
         // full traversal of it and each one silent until now — see the same note in BackupOp.
-        CharSequence archiveSize = OpLog.formatSize(sizeOf(dataFile));
+        long archiveBytes = sizeOf(dataFile);
+        CharSequence archiveSize = OpLog.formatSize(archiveBytes);
         // Verify BEFORE use: these two files are in checksums.txt like every other member, and a
         // corrupted archive must never reach the app that would import it.
         if (!mRequestedFlags.skipSignatureCheck()) {
@@ -969,6 +985,17 @@ class RestoreOp implements Closeable {
         // initialisation had happened, which is the very thing install → do-not-launch → import
         // exists to avoid. Measured to work without it.
         Context context = ContextUtils.getContext();
+        // Fork (白い熊): a large restore takes the gate, so only one of them stages and streams at
+        // a time. Everything below this line writes a full copy of the archive into the cache and
+        // then hands it to the app — five of those at once is what turned a 3.2 MB 猫管 restore
+        // into twenty-two minutes of queueing. Small apps never reach here and keep running in
+        // parallel around it.
+        boolean gated = LargeTransferGate.isLarge(archiveBytes);
+        if (gated && !LargeTransferGate.acquire(
+                () -> BatchOpsProgressMonitor.getInstance().isCancelled(),
+                () -> stage(listener, archiveSize, R.string.backup_stage_waiting_large))) {
+            throw new BatchOpsProgressMonitor.OperationCancelledException();
+        }
         File staging = new File(new File(context.getCacheDir(), "appdata"), mPackageName + ".restore.bin");
         try {
             File parent = staging.getParentFile();
@@ -995,7 +1022,13 @@ class RestoreOp implements Closeable {
                                         R.string.appdata_second_pass, pass[1]), null);
                             }
                         }
-                        pass[0] = Math.max(current, 0);
+                        // Fork (白い熊): only a REAL count moves the high-water mark. The liveness
+                        // heartbeat reports current = -1, and Math.max(current, 0) would drive the
+                        // mark back to zero on every beat — inventing a "second pass" the moment
+                        // the app spoke again.
+                        if (current >= 0) {
+                            pass[0] = current;
+                        }
                         CharSequence detail = progressDetail(label, current, total, unit);
                         if (listener != null && detail != null) {
                             listener.onItem(marked(detail), null);
@@ -1010,6 +1043,9 @@ class RestoreOp implements Closeable {
             throw new BackupException("App-supplied data restore failed.", th);
         } finally {
             staging.delete();
+            if (gated) {
+                LargeTransferGate.release();
+            }
         }
     }
 

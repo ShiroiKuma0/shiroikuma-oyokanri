@@ -7,6 +7,7 @@ import android.graphics.Typeface;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.TextUtils;
+import android.text.style.BackgroundColorSpan;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.StyleSpan;
 import android.util.TypedValue;
@@ -54,6 +55,8 @@ public class OpLogAdapter extends RecyclerView.Adapter<OpLogAdapter.ViewHolder> 
     private int mTimeColor;
     private int mGuideColor;
     private int mDetailColor;
+    private int mFailBgColor;
+    private int mFailMarkColor;
 
     public OpLogAdapter(@NonNull Context context) {
         mContext = context;
@@ -71,6 +74,8 @@ public class OpLogAdapter extends RecyclerView.Adapter<OpLogAdapter.ViewHolder> 
         mTimeColor = ColorPrefs.getColor(mContext, ColorPrefs.OPLOG_TIME);
         mGuideColor = ColorPrefs.getColor(mContext, ColorPrefs.OPLOG_GUIDE);
         mDetailColor = ColorPrefs.getColor(mContext, ColorPrefs.OPLOG_DETAIL);
+        mFailBgColor = ColorPrefs.getColor(mContext, ColorPrefs.OPLOG_FAIL_BG);
+        mFailMarkColor = ColorPrefs.getColor(mContext, ColorPrefs.OPLOG_FAIL_MARK);
     }
 
     /**
@@ -120,9 +125,19 @@ public class OpLogAdapter extends RecyclerView.Adapter<OpLogAdapter.ViewHolder> 
             append(sb, guides, mGuideColor, false);
         }
         int color = OpLogFormat.color(mContext, e.kind, e.continued);
+        boolean failed = e.kind == OpLog.KIND_FAIL;
+        // Fork (白い熊): a failure is HIGHLIGHTED, not merely tinted.
+        //
+        // Red is the right colour for it and stays, but saturated red on black at this size is
+        // the one thing in the fork that cannot actually be read (+149 found the same on the
+        // sibling screens and answered it with a filled pill). So the red moves to the FILL and
+        // the words become near-white on top of it — the Snooping page's "Allowed" pairing,
+        // already proven legible. The ✗ keeps the full-strength alarm red, because a glyph is
+        // a shape rather than prose and carries the colour without having to be read.
+        int failStart = sb.length();
         String marker = OpLogFormat.marker(e.kind, e.continued);
         if (!marker.isEmpty()) {
-            append(sb, marker, color, false);
+            append(sb, marker, failed ? mFailMarkColor : color, false);
         }
         // An app header is the one line the eye uses to find its place, so it alone is bold —
         // and a continuation is not, or a busy eight-thread stretch would be bold throughout.
@@ -130,6 +145,12 @@ public class OpLogAdapter extends RecyclerView.Adapter<OpLogAdapter.ViewHolder> 
         if (!TextUtils.isEmpty(e.detail)) {
             append(sb, "  ", mDetailColor, false);
             append(sb, e.detail, mDetailColor, false);
+        }
+        if (failed && sb.length() > failStart) {
+            // The band starts at the marker, so the timestamp and the indent ladder keep their
+            // own quiet colours on black and the ladder stays readable down the page.
+            sb.setSpan(new BackgroundColorSpan(mFailBgColor), failStart, sb.length(),
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
         holder.text.setTextSize(TypedValue.COMPLEX_UNIT_SP, mTextSizeSp);
         holder.text.setText(sb);

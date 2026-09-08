@@ -707,6 +707,7 @@ class BackupOp implements Closeable {
         File staging = new File(new File(context.getCacheDir(), "appdata"), mPackageName + ".bin");
         // [0] = the highest count seen, [1] = how many times it has started over.
         final long[] pass = {0, 0};
+        boolean gated = false;
         try {
             AppDataTransfer.Outcome outcome = new AppDataTransfer(context).export(mPackageName, mUserId,
                     staging, mAppDataCategories, (label, current, total, unit) -> {
@@ -725,7 +726,11 @@ class BackupOp implements Closeable {
                                         R.string.appdata_second_pass, pass[1]), null);
                             }
                         }
-                        pass[0] = Math.max(current, 0);
+                        // Fork (白い熊): only a REAL count moves the high-water mark — the
+                        // liveness heartbeat reports current = -1. See the same note in RestoreOp.
+                        if (current >= 0) {
+                            pass[0] = current;
+                        }
                         CharSequence detail = progressDetail(label, current, total, unit);
                         if (listener != null && detail != null) {
                             listener.onItem(marked(detail), null);
@@ -748,6 +753,17 @@ class BackupOp implements Closeable {
             // byte count the app sent. Each is announced with the size it is about to walk, so a
             // long quiet stretch is a stated amount of work rather than a suspected hang.
             CharSequence archiveSize = OpLog.formatSize(staging.length());
+            // Fork (白い熊): the three passes below each walk the whole archive — copy, encrypt,
+            // hash — so for a multi-gigabyte export they are minutes each of pure disk. Several
+            // apps doing that at once is the same contention a large restore causes, so a large
+            // one takes the same gate. The export itself cannot be gated: its size is not known
+            // until the app has produced it.
+            gated = LargeTransferGate.isLarge(staging.length());
+            if (gated && !LargeTransferGate.acquire(
+                    () -> BatchOpsProgressMonitor.getInstance().isCancelled(),
+                    () -> stage(listener, archiveSize, R.string.backup_stage_waiting_large))) {
+                throw new BatchOpsProgressMonitor.OperationCancelledException();
+            }
             stage(listener, archiveSize, R.string.backup_stage_storing);
             checkCancelled();
             Path dataFile = mBackupItem.getAppDataFile();
@@ -774,6 +790,9 @@ class BackupOp implements Closeable {
         } finally {
             // The staging copy holds a second copy of the whole archive; never leave it behind.
             staging.delete();
+            if (gated) {
+                LargeTransferGate.release();
+            }
         }
     }
 

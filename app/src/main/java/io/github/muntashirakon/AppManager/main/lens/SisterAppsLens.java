@@ -62,6 +62,8 @@ public class SisterAppsLens implements MainLens {
         boolean everBackedUp;
         int chosen = -1;
         int seen;
+        /** Fork (白い熊): no manifest was readable — the backup is what identifies it. */
+        boolean knownFromBackupOnly;
     }
 
     private final Map<String, Info> mInfo = new ConcurrentHashMap<>();
@@ -75,6 +77,14 @@ public class SisterAppsLens implements MainLens {
     @Override
     public int titleRes() {
         return R.string.screen_sister;
+    }
+
+    /**
+     * Fork (白い熊): 仲間 narrows, it never draws. See {@link MainLens#filterOnly()}.
+     */
+    @Override
+    public boolean filterOnly() {
+        return true;
     }
 
     @Override
@@ -124,20 +134,26 @@ public class SisterAppsLens implements MainLens {
                 return;
             }
             ApplicationInfo app = byName.get(item.packageName);
-            if (app == null) {
-                continue;
-            }
-            AppDataContract.Support support = AppDataContract.fromMetaData(app.metaData);
-            if (support == null) {
+            AppDataContract.Support support = app != null
+                    ? AppDataContract.fromMetaData(app.metaData) : null;
+            Backup backupWithData = latestWithAppData.get(item.packageName);
+            // Fork (白い熊): a backup that carried app-supplied data is proof of a sister app, and
+            // on the phone this contract exists for -- a freshly wiped one -- it is the ONLY proof
+            // available. The manifest cannot be read for an app that is not installed yet, so a
+            // metadata-only rule hid exactly the apps the migration is about. Either witness is
+            // enough; the manifest is preferred where both exist, because it is the current truth.
+            if (support == null && backupWithData == null) {
                 continue;
             }
             Info info = new Info();
             info.supported = true;
-            info.usable = support.isUsable();
-            info.contract = support.contract;
-            info.format = support.format;
-            info.minFormat = support.minFormat;
-            Backup withData = latestWithAppData.get(item.packageName);
+            info.usable = support != null && support.isUsable();
+            info.contract = support != null ? support.contract : 0;
+            info.format = support != null ? support.format : 0;
+            info.minFormat = support != null ? support.minFormat : 0;
+            // Known only from its backup: say so rather than claiming a contract we never read.
+            info.knownFromBackupOnly = support == null;
+            Backup withData = backupWithData;
             if (withData != null) {
                 info.withDataTime = withData.backupTime;
             } else if (latestAny.get(item.packageName) != null) {
@@ -197,33 +213,15 @@ public class SisterAppsLens implements MainLens {
     }
 
     @NonNull
-    @Override
-    public List<CharSequence> sortLabels(@NonNull Context context) {
-        return Arrays.asList(
-                context.getString(R.string.screen_sort_name),
-                context.getString(R.string.screen_sort_backup_date),
-                context.getString(R.string.screen_sort_format));
-    }
-
-    @Override
-    public void applySort(@NonNull List<ApplicationItem> rows, int lensSort) {
-        switch (lensSort) {
-            case SORT_BACKUP_DATE:
-                Collections.sort(rows, (a, b) -> Long.compare(withData(b), withData(a)));
-                break;
-            case SORT_FORMAT:
-                Collections.sort(rows, (a, b) -> Integer.compare(format(b), format(a)));
-                break;
-            case SORT_NAME:
-            default:
-                // The list's own label order already holds underneath.
-                break;
-        }
-    }
-
     private long withData(@NonNull ApplicationItem item) {
         Info info = mInfo.get(item.packageName);
         return info != null ? info.withDataTime : 0;
+    }
+
+    /** Fork (白い熊): the app-data format, read by the list's own sort. */
+    public int formatOf(@NonNull String packageName) {
+        Info info = mInfo.get(packageName);
+        return info != null ? info.format : 0;
     }
 
     private int format(@NonNull ApplicationItem item) {

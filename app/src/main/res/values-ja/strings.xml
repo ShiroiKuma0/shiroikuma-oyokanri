@@ -1116,7 +1116,7 @@
     <string name="pane_installed">導入</string>
     <string name="pane_target_sdk">対象 SDK</string>
     <string name="pane_blocked">遮断</string>
-    <string name="batch_backup_restore_delete">復元・削除…</string>
+    <string name="batch_backup_restore_delete">復元…</string>
     <string name="batch_backup_table_title">%d 個のアプリを保存</string>
     <string name="batch_backup_all_apps">すべてのアプリ</string>
     <string name="backup_part_apk">APK</string>

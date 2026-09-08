@@ -1302,6 +1302,17 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             case "backup":
                 showBackupDialog(item);
                 break;
+            case "restore":
+                openBackupSheet(item, BackupRestoreDialogFragment.MODE_RESTORE);
+                break;
+            case "delete_backup":
+                openBackupSheet(item, BackupRestoreDialogFragment.MODE_DELETE);
+                break;
+            case "share_backup":
+                // Fork (白い熊): pick one of this app's backups, hand its directory to 魔法絨毯.
+                ShareBackupHandler.share(mActivity, Collections.singletonList(
+                        new UserPackagePair(item.packageName, UserHandleHidden.myUserId())));
+                break;
             case "note":
                 AppNotesManager.showNoteDialog(mActivity, item.packageName, item.label,
                         () -> notifyItemChanged(indexOf(item)));
@@ -1459,10 +1470,19 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             displayShortToast(R.string.app_not_installed);
             return;
         }
-        // Has backups
+        // Fork (白い熊): the app is NOT installed and has backups, so the only thing that can be
+        // meant here is a restore. This used to open the unrestricted sheet, which for a mixed
+        // state produced the backup tab, its "not installed and cannot be backed up" banner and a
+        // delete icon — for an app that by definition cannot be backed up.
+        openBackupSheet(item, BackupRestoreDialogFragment.MODE_RESTORE);
+    }
+
+    /** Fork (白い熊): the sheet for ONE app, restricted to one action. */
+    private void openBackupSheet(@NonNull ApplicationItem item,
+                                 @BackupRestoreDialogFragment.ActionMode int actionMode) {
         BackupRestoreDialogFragment fragment = BackupRestoreDialogFragment.getInstance(
                 Collections.singletonList(new UserPackagePair(
-                        item.packageName, UserHandleHidden.myUserId())));
+                        item.packageName, UserHandleHidden.myUserId())), actionMode);
         fragment.setOnActionBeginListener(mode -> mActivity.showProgressIndicator(true));
         fragment.setOnActionCompleteListener((mode, failedPackages) -> mActivity.showProgressIndicator(false));
         fragment.show(mActivity.getSupportFragmentManager(), BackupRestoreDialogFragment.TAG);

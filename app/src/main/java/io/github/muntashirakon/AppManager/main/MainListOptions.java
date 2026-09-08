@@ -61,6 +61,12 @@ public class MainListOptions extends ListOptions {
             SORT_BY_OPEN_COUNT,
             SORT_BY_SCREEN_TIME,
             SORT_BY_LAST_USAGE_TIME,
+            SORT_BY_BACKUP_DATE,
+            SORT_BY_BACKUP_COUNT,
+            SORT_BY_BACKUP_SIZE,
+            SORT_BY_BACKUP_STALE,
+            SORT_BY_SNOOPING,
+            SORT_BY_APPDATA_FORMAT,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface SortOrder {
@@ -84,6 +90,21 @@ public class MainListOptions extends ListOptions {
     public static final int SORT_BY_OPEN_COUNT = 15;
     public static final int SORT_BY_SCREEN_TIME = 16;
     public static final int SORT_BY_LAST_USAGE_TIME = 17;
+    // Fork (白い熊): orders that used to belong to a lens and now belong to the list.
+    //
+    // They were a second, separate section in the sort menu with an id space of its own, because a
+    // lens sort was a bare index -- 0 meant "backup date" in one lens and "name" in the next. That
+    // made them unreachable from the plain list and made the Backups page unable to sort by
+    // anything the list knew. They are ordinary sort ids now, so every order is available
+    // everywhere and there is one list to read.
+    //
+    // APPEND ONLY, NEVER RENUMBER: these integers are the wire format a saved view stores.
+    public static final int SORT_BY_BACKUP_DATE = 18;
+    public static final int SORT_BY_BACKUP_COUNT = 19;
+    public static final int SORT_BY_BACKUP_SIZE = 20;
+    public static final int SORT_BY_BACKUP_STALE = 21;
+    public static final int SORT_BY_SNOOPING = 22;
+    public static final int SORT_BY_APPDATA_FORMAT = 23;
 
     @IntDef(flag = true, value = {
             FILTER_NO_FILTER,
@@ -343,6 +364,13 @@ public class MainListOptions extends ListOptions {
                 put(SORT_BY_SCREEN_TIME, R.string.sort_by_screen_time);
                 put(SORT_BY_LAST_USAGE_TIME, R.string.sort_by_last_used);
             }
+            // Fork (白い熊): the former lens orders, in the one list with everything else.
+            put(SORT_BY_BACKUP_DATE, R.string.screen_sort_backup_date);
+            put(SORT_BY_BACKUP_COUNT, R.string.screen_sort_backup_count);
+            put(SORT_BY_BACKUP_SIZE, R.string.screen_sort_size);
+            put(SORT_BY_BACKUP_STALE, R.string.screen_sort_stale_first);
+            put(SORT_BY_SNOOPING, R.string.screen_sort_allowed_count);
+            put(SORT_BY_APPDATA_FORMAT, R.string.screen_sort_format);
         }};
     }
 

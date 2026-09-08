@@ -51,6 +51,9 @@ public final class AppPanePrefs {
             "freeze",
             "force_stop",
             "backup",
+            "restore",
+            "delete_backup",
+            "share_backup",
             "note",
             "uninstall",
             "add_to_profile",
@@ -64,7 +67,8 @@ public final class AppPanePrefs {
 
     /** What a fresh install shows, in this order. */
     private static final List<String> DEFAULT_VISIBLE = Collections.unmodifiableList(Arrays.asList(
-            "open", "app_info", "snooping", "freeze", "force_stop", "backup", "note", "uninstall"));
+            "open", "app_info", "snooping", "freeze", "force_stop", "backup", "restore",
+            "share_backup", "note", "uninstall"));
 
     @StringRes
     public static int titleForKey(@NonNull String key) {
@@ -74,7 +78,13 @@ public final class AppPanePrefs {
             case "snooping":        return R.string.snooping;
             case "freeze":          return R.string.freeze;
             case "force_stop":      return R.string.force_stop;
-            case "backup":          return R.string.backup_restore;
+            // Fork (白い熊): backing up and restoring are separate actions here too. One
+            // "Backup/restore" pill is the same merge the batch pane had, in the pane a
+            // single app opens.
+            case "backup":          return R.string.back_up;
+            case "restore":         return R.string.restore;
+            case "delete_backup":   return R.string.delete_backup;
+            case "share_backup":    return R.string.share_backup;
             case "note":            return R.string.note;
             case "uninstall":       return R.string.uninstall;
             case "add_to_profile":  return R.string.add_to_profile;
@@ -97,7 +107,10 @@ public final class AppPanePrefs {
             case "snooping":        return R.drawable.ic_cctv_off;
             case "freeze":          return R.drawable.ic_snowflake;
             case "force_stop":      return R.drawable.ic_power_settings;
-            case "backup":          return R.drawable.ic_backup_restore;
+            case "backup":          return R.drawable.ic_archive;
+            case "restore":         return R.drawable.ic_restore;
+            case "delete_backup":   return R.drawable.ic_trash_can;
+            case "share_backup":    return R.drawable.ic_share;
             case "note":            return R.drawable.ic_note_24dp;
             case "uninstall":       return R.drawable.ic_trash_can;
             case "add_to_profile":  return R.drawable.ic_file_plus;
