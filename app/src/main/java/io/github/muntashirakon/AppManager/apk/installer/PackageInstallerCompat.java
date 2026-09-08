@@ -172,6 +172,50 @@ public final class PackageInstallerCompat {
      */
     public static final int STATUS_FAILURE_INCOMPATIBLE_ROM = -7;
 
+    // Fork: a failure that names no reason is a dead end. A restore of an app that was NOT already
+    // installed died with the log line "Couldn't perform an installation." -- a bare full stop,
+    // because the platform answered with a status whose EXTRA_STATUS_MESSAGE was null and every
+    // caller of install() is told only "false". The backup was provably fine (its base.apk installs
+    // straight from a shell session), so the reason was ours to report and we were throwing it away.
+    // Give every status a name, so a photograph of the progress log is enough to diagnose the next one.
+    @NonNull
+    public static String statusToString(int status) {
+        switch (status) {
+            case PackageInstaller.STATUS_PENDING_USER_ACTION:
+                return "STATUS_PENDING_USER_ACTION";
+            case STATUS_SUCCESS:
+                return "STATUS_SUCCESS";
+            case PackageInstaller.STATUS_FAILURE:
+                return "STATUS_FAILURE";
+            case STATUS_FAILURE_BLOCKED:
+                return "STATUS_FAILURE_BLOCKED";
+            case STATUS_FAILURE_ABORTED:
+                return "STATUS_FAILURE_ABORTED";
+            case STATUS_FAILURE_INVALID:
+                return "STATUS_FAILURE_INVALID";
+            case STATUS_FAILURE_CONFLICT:
+                return "STATUS_FAILURE_CONFLICT";
+            case STATUS_FAILURE_STORAGE:
+                return "STATUS_FAILURE_STORAGE";
+            case STATUS_FAILURE_INCOMPATIBLE:
+                return "STATUS_FAILURE_INCOMPATIBLE";
+            case STATUS_FAILURE_SECURITY:
+                return "STATUS_FAILURE_SECURITY";
+            case STATUS_FAILURE_SESSION_CREATE:
+                return "STATUS_FAILURE_SESSION_CREATE";
+            case STATUS_FAILURE_SESSION_WRITE:
+                return "STATUS_FAILURE_SESSION_WRITE";
+            case STATUS_FAILURE_SESSION_COMMIT:
+                return "STATUS_FAILURE_SESSION_COMMIT";
+            case STATUS_FAILURE_SESSION_ABANDON:
+                return "STATUS_FAILURE_SESSION_ABANDON";
+            case STATUS_FAILURE_INCOMPATIBLE_ROM:
+                return "STATUS_FAILURE_INCOMPATIBLE_ROM";
+            default:
+                return "status " + status;
+        }
+    }
+
     @SuppressLint({"NewApi", "UniqueConstants", "InlinedApi"})
     @IntDef(flag = true, value = {
             INSTALL_REPLACE_EXISTING,
@@ -840,6 +884,11 @@ public final class PackageInstallerCompat {
             Log.d(TAG, "Commit: Waiting for user interaction and terminal result...");
             awaitBroadcastResult("installation", true);
         } else {
+            // Upstream 4.1.1 handles STATUS_PENDING_USER_ACTION on this privileged path too
+            // (some ROMs demand confirmation even for a privileged install) by routing it through
+            // the normal confirmation flow. That supersedes the fork's +171 workaround, which could
+            // only NAME the nameless failure; the "never report a failure with no reason" half of
+            // that fix now lives in finishClaimedAttempt(), where every path converges.
             awaitLocalResult(intentReceiver, "installation", true);
         }
         Log.d(TAG, "Commit: Finishing...");
@@ -858,8 +907,37 @@ public final class PackageInstallerCompat {
         // Changing package installer in stock Huawei with UID 2000 does not work
         boolean canChangeInstaller = mHasInstallPackagePermission && (!HuaweiUtils.isStockHuawei() || Users.getSelfOrRemoteUid() != Ops.SHELL_UID);
         String requestedInstallerPackageName = canChangeInstaller ? installerName : null;
-        String installerPackageName = Build.VERSION.SDK_INT < Build.VERSION_CODES.P && canChangeInstaller
-                ? installerName : BuildConfig.APPLICATION_ID;
+        // Fork (白い熊, +160): who the session is ATTRIBUTED to. That is a different question from who
+        // the installed app is recorded as coming from -- the latter is requestedInstallerPackageName
+        // just above, and the two were being conflated.
+        //
+        // On P+ this was unconditionally our own package. When we are working through the privileged
+        // shell, that is a claim the platform then tests against OUR package's permissions instead of
+        // the shell's. PackageInstallerSession.computeUserActionRequirement() waves an install
+        // through when the installer holds INSTALL_PACKAGES, or is root/system/shell, or -- with
+        // USER_ACTION_NOT_REQUIRED -- holds UPDATE_PACKAGES_WITHOUT_USER_ACTION *and the package is
+        // already installed*. 応用管理 holds only that last one (a normal permission; see the
+        // manifest), so every UPDATE went through and every FRESH install came back
+        // STATUS_PENDING_USER_ACTION -- a confirmation the batch path has no way to show. A restore
+        // of an app that was not already installed therefore always failed.
+        //
+        // Measured on the Mate XT (Android 12, shell uid), same APK, fresh install, session committed
+        // three ways:
+        //     pm install-create -r -t --user 0                       -> Success
+        //     pm install-create -r -t --user 0 -i shiroikuma.oyokanri -> Failure [null]
+        //     pm install-create -r -t --user 0 -i com.android.shell   -> Success
+        //
+        // So when the session really is created by shell/root/system, do not claim it for ourselves:
+        // leave it null and let the platform attribute it to the uid that made the call. The
+        // unprivileged installer path is untouched -- it is genuinely us doing the installing there.
+        String installerPackageName;
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P && canChangeInstaller) {
+            installerPackageName = installerName;
+        } else if (SelfPermissions.isSystemOrRootOrShell()) {
+            installerPackageName = null;
+        } else {
+            installerPackageName = BuildConfig.APPLICATION_ID;
+        }
         try {
             mPackageInstaller = PackageManagerCompat.getPackageInstaller();
         } catch (RemoteException e) {
@@ -1239,6 +1317,12 @@ public final class PackageInstallerCompat {
                                       @Nullable String statusMessage, boolean forgetSession) {
         if (forgetSession) {
             PackageInstallerSessionRegistry.forget(sessionId);
+        }
+        // Fork (+171): a failure must never be reported with no reason. Every completion path —
+        // broadcast, local receiver, watchdog, abort — converges here, and some of them pass a null
+        // message outright, so the fallback belongs at this one point rather than at each caller.
+        if (statusMessage == null && finalStatus != STATUS_SUCCESS) {
+            statusMessage = statusToString(finalStatus);
         }
         mFinalStatus = finalStatus;
         mStatusMessage = statusMessage;

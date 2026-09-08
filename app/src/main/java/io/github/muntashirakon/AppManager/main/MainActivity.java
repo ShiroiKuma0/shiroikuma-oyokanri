@@ -119,6 +119,10 @@ import io.github.muntashirakon.AppManager.battery.BatteryUsageActivity;
 import io.github.muntashirakon.AppManager.processreaper.ProcessMonitorActivity;
 import io.github.muntashirakon.AppManager.self.life.FundingCampaignChecker;
 import io.github.muntashirakon.AppManager.settings.FeatureController;
+import io.github.muntashirakon.AppManager.backup.BackupCleanupDialog;
+import io.github.muntashirakon.AppManager.main.lens.BackupsLens;
+import io.github.muntashirakon.AppManager.main.lens.MainLens;
+import io.github.muntashirakon.AppManager.main.lens.MainLenses;
 import io.github.muntashirakon.AppManager.screens.ListScreenActivity;
 import io.github.muntashirakon.dialog.TextInputDialogBuilder;
 import io.github.muntashirakon.AppManager.settings.Prefs;
@@ -691,6 +695,12 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         super.onPrepareOptionsMenu(menu);
         mAppUsageMenu.setVisible(FeatureController.isUsageAccessEnabled());
         updateFilterIcon(menu);
+        // Fork (白い熊, +167): the backup-directory cleanup, shown where the backups are.
+        MenuItem clean = menu.findItem(R.id.action_clean_backups);
+        if (clean != null) {
+            clean.setVisible(viewModel != null
+                    && BackupsLens.ID.equals(viewModel.getLensId()));
+        }
         return true;
     }
 
@@ -749,6 +759,10 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             listOptions.show(getSupportFragmentManager(), MainListOptions.TAG);
         } else if (id == R.id.action_export_displayed_ids) {
             copyDisplayedAppIds();
+        } else if (id == R.id.action_clean_backups) {
+            BackupCleanupDialog.show(this);
+        } else if (id == R.id.action_sort) {
+            showSortMenu();
         } else if (id == R.id.action_layout_columns) {
             showLayoutPicker();
         } else if (id == R.id.action_clear_filters) {
@@ -910,6 +924,99 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         if (mRecyclerView != null && !LayoutGeometry.key(this).equals(mLayoutGeometry)) {
             applyListLayout();
         }
+    }
+
+    /**
+     * Fork (白い熊, +162): the lit pill is view state; the lens is view-model state. Folding the Mate
+     * XT destroys and rebuilds this activity, so the lens survives and the lit pill does not — and a
+     * page showing backups with no pill lit reads as a bug. Reconcile after every shelf reload.
+     */
+    private void relightLensPill() {
+        if (mShelf == null || viewModel == null) return;
+        String lensId = viewModel.getLensId();
+        if (lensId == null) {
+            // Only clear a lit LENS pill; a saved view is lit by its own rules.
+            String active = mShelf.getActiveId();
+            if (active != null && MainLenses.isLensId(pillPayload(active))) {
+                mShelf.setActiveId(null);
+            }
+            return;
+        }
+        for (ShelfPrefs.Pill pill : ShelfPrefs.load(this)) {
+            if (pill.isScreen() && lensId.equals(pill.payload)) {
+                mShelf.setActiveId(pill.id);
+                return;
+            }
+        }
+    }
+
+    /** The payload of the pill with this id, or null when it is gone. */
+    @Nullable
+    private String pillPayload(@NonNull String pillId) {
+        for (ShelfPrefs.Pill pill : ShelfPrefs.load(this)) {
+            if (pill.id.equals(pillId)) return pill.payload;
+        }
+        return null;
+    }
+
+    /**
+     * Fork (白い熊, +163): the sort dropdown, split out of the filter sheet.
+     *
+     * <p>Sorting and filtering answer different questions and are used at different rates: a filter
+     * is set once and left alone, a sort is flicked between while you are looking at the same list.
+     * Keeping both in one bottom sheet made the frequent one cost an open, a scroll to the right
+     * section and a dismiss. So this is a dropdown from the top bar, on its own icon beside
+     * clear-filters, and {@code MainListOptions.getSortIdLocaleMap()} now returns null so the sheet
+     * is filters only.
+     *
+     * <p>The active lens's own orders are appended to the SAME panel rather than getting one of
+     * their own — one place to sort from, never two. They keep a separate id space and a separate
+     * view-model field because the list's sort ids are a persisted wire format (a saved view stores
+     * the integer) while a lens index means something different in every lens; merging them would
+     * make an exported view load back as the wrong order under a different lens.
+     *
+     * <p>The panel itself is {@link SortMenuPopup}, drawn by hand — see that class for why a
+     * framework PopupMenu could not be made to look like the rest of the fork.
+     */
+    private void showSortMenu() {
+        if (viewModel == null) {
+            return;
+        }
+        View anchor = findViewById(R.id.action_sort);
+        if (anchor == null) {
+            anchor = findViewById(R.id.toolbar);
+        }
+        if (anchor == null) {
+            return;
+        }
+        MainLens lens = viewModel.getLens();
+        List<CharSequence> lensSorts = lens != null ? lens.sortLabels(this)
+                : Collections.emptyList();
+        CharSequence lensTitle = lens != null ? getString(lens.titleRes()) : null;
+        SortMenuPopup.show(this, anchor, MainListOptions.sortIdLocaleMap(), viewModel.getSortBy(),
+                viewModel.isReverseSort(), lensTitle, lensSorts, viewModel.getLensSort(),
+                new SortMenuPopup.Listener() {
+                    @Override
+                    public void onListSort(int sortId) {
+                        if (viewModel == null) return;
+                        showProgressIndicator(true);
+                        viewModel.setSortBy(sortId);
+                    }
+
+                    @Override
+                    public void onReverseToggled(boolean reverse) {
+                        if (viewModel == null) return;
+                        showProgressIndicator(true);
+                        viewModel.setReverseSort(reverse);
+                    }
+
+                    @Override
+                    public void onLensSort(int index) {
+                        if (viewModel == null) return;
+                        showProgressIndicator(true);
+                        viewModel.setLensSort(index);
+                    }
+                });
     }
 
     /**
@@ -1117,6 +1224,23 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
      */
     private void applyShelfPill(@NonNull ShelfPrefs.Pill pill) {
         if (pill.isScreen()) {
+            // Fork (白い熊, +162): a screen id that names a LENS stays on this list instead of
+            // opening a page of its own. The ids are the same strings the shelf has always stored
+            // (ShelfPrefs.SCREEN_*), so a pill made before lenses existed keeps working untouched —
+            // that is why MainLenses is keyed by them. Battery and Monitor are still real screens
+            // and still start, because their rows are not apps.
+            if (MainLenses.isLensId(pill.payload) && viewModel != null) {
+                boolean active = pill.id.equals(mShelf != null ? mShelf.getActiveId() : null);
+                // Tapping the lit pill is the way OUT — one pill is both the way in and the way
+                // back to the plain list, exactly as a saved view already behaves.
+                // A lens can be seconds of work on its first pass (盗み見 resolves every app), so
+                // say so rather than leaving the list looking stuck.
+                showProgressIndicator(true);
+                viewModel.setLens(active ? null : pill.payload);
+                if (mShelf != null) mShelf.setActiveId(active ? null : pill.id);
+                invalidateOptionsMenu();
+                return;
+            }
             Intent intent = ListScreenActivity.intentFor(this, pill.payload);
             if (intent != null) {
                 startActivity(intent);
@@ -1126,6 +1250,8 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         if (viewModel == null) {
             return;
         }
+        // Fork: a view pill is the plain list, so entering one leaves whatever lens was on.
+        viewModel.setLens(null);
         if (pill.id.equals(mShelf != null ? mShelf.getActiveId() : null)) {
             viewModel.applyView(0, viewModel.getSortBy(), viewModel.isReverseSort(),
                     Collections.emptySet(), Collections.emptySet(), null,
@@ -1466,6 +1592,12 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
 
     @Override
     public void onRefresh() {
+        // Fork (白い熊, +166): a refresh must reach the lens caches too, or 盗み見 would keep serving
+        // the verdicts it resolved the first time.
+        if (viewModel != null) {
+            viewModel.invalidateLensCaches();
+        }
+
         showProgressIndicator(true);
         if (viewModel != null) viewModel.loadApplicationItems();
         // Profile membership (the per-row profile pills) is cached in the
@@ -1527,6 +1659,7 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         // here rather than assumed unchanged.
         if (mShelf != null) {
             mShelf.reload();
+            relightLensPill();
         }
         rebuildBatchActions();
         updateBatchPane();

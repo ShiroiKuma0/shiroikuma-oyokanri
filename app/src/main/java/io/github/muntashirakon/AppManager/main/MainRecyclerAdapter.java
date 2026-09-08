@@ -83,6 +83,7 @@ import io.github.muntashirakon.AppManager.profiles.struct.BaseProfile;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
 import io.github.muntashirakon.AppManager.self.imagecache.ImageLoader;
 import io.github.muntashirakon.AppManager.settings.FeatureController;
+import io.github.muntashirakon.AppManager.main.lens.MainLens;
 import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.types.UserPackagePair;
 import io.github.muntashirakon.AppManager.users.UserInfo;
@@ -513,7 +514,35 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
      * rebind rows without re-inflating them.
      */
     private static void applyColumnProportions(@NonNull Context context, @NonNull ViewHolder holder) {
+        applyColumnProportions(context, holder, false);
+    }
+
+    /**
+     * Fork (白い熊, +162): under a lens the right column carries that lens's own lines rather than
+     * version/type/SDK/signature, so it is sized the way every other surface that does this sizes it
+     * — the wide proportions {@code MainCardBinder} uses — instead of against a signature algorithm
+     * that is no longer being drawn.
+     */
+    private static void applyColumnProportions(@NonNull Context context, @NonNull ViewHolder holder,
+                                               boolean wideRight) {
         if (holder.centerColumn == null || holder.rightColumn == null || holder.sha == null) return;
+        if (wideRight) {
+            LinearLayoutCompat.LayoutParams centerLp =
+                    (LinearLayoutCompat.LayoutParams) holder.centerColumn.getLayoutParams();
+            LinearLayoutCompat.LayoutParams rightLp =
+                    (LinearLayoutCompat.LayoutParams) holder.rightColumn.getLayoutParams();
+            if (centerLp.width == 0 && centerLp.weight == 1.35f
+                    && rightLp.width == 0 && rightLp.weight == 1f) {
+                return;
+            }
+            centerLp.width = 0;
+            centerLp.weight = 1.35f;
+            rightLp.width = 0;
+            rightLp.weight = 1f;
+            holder.centerColumn.setLayoutParams(centerLp);
+            holder.rightColumn.setLayoutParams(rightLp);
+            return;
+        }
         // The sha view's own paint, so a larger configured font widens the block
         // instead of clipping inside it.
         float referencePx = holder.sha.getPaint().measureText(RIGHT_COLUMN_REFERENCE);
@@ -542,7 +571,11 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         final ApplicationItem item = getItem(position);
         MaterialCardView cardView = holder.itemView;
         Context context = cardView.getContext();
-        applyColumnProportions(context, holder);
+        // Fork (白い熊, +162): the active lens, resolved once per bind. Everything about the row is
+        // unchanged by it -- icon, film, running box, frames, label line, pane, selection -- except
+        // the right-hand column, which is the whole point.
+        MainLens lens = mActivity.viewModel != null ? mActivity.viewModel.getLens() : null;
+        applyColumnProportions(context, holder, lens != null && lens.wideRight());
         bindAppPane(holder, item);
         // Add click listeners
         cardView.setOnClickListener(v -> {
@@ -903,6 +936,11 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             }
             return false;
         });
+        if (lens != null) {
+            bindLensRightColumn(context, holder, item, lens);
+            super.onBindViewHolder(holder, position);
+            return;
+        }
         // Set version (along with HW accelerated, debug and test only flags)
         holder.version.setText(item.versionTag);
         // Set version color to dark cyan if the app is inactive
@@ -1063,6 +1101,46 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
      * tapping this column during a multi-select would open an app instead of
      * extending the selection.
      */
+    /**
+     * Fork (白い熊, +162): the right-hand column under a lens.
+     *
+     * <p>Rendered through {@code MainCardBinder.renderCustomRightLines} -- the SAME renderer the
+     * sibling screens and the battery header use -- so a change to how these lines look cannot
+     * apply to one surface and not the other.
+     *
+     * <p>The three backup cells are hidden and their listeners nulled, exactly as the
+     * not-installed-and-not-backed-up branch does: a recycled holder would otherwise keep a stale
+     * {@link ApplicationItem} alive through a captured listener, and under the Backups lens the
+     * column beneath is already saying everything those cells would.
+     */
+    private void bindLensRightColumn(@NonNull Context context, @NonNull ViewHolder holder,
+                                     @NonNull ApplicationItem item, @NonNull MainLens lens) {
+        holder.backupIndicator.setVisibility(View.GONE);
+        holder.backupVersion.setVisibility(View.GONE);
+        holder.backupVersion.setAlpha(1f);
+        holder.backupDate.setVisibility(View.GONE);
+        holder.backupDate.setAlpha(1f);
+        holder.backupTime.setVisibility(View.GONE);
+        holder.backupVersion.setOnClickListener(null);
+        holder.backupDate.setOnClickListener(null);
+        holder.backupTime.setOnClickListener(null);
+        holder.backupVersion.setOnLongClickListener(null);
+        holder.backupDate.setOnLongClickListener(null);
+        holder.backupTime.setOnLongClickListener(null);
+        List<CharSequence> lines;
+        int accent;
+        try {
+            lines = lens.rightLines(context, item);
+            accent = lens.accent(item);
+        } catch (Throwable th) {
+            // A lens that throws must cost one row's detail, never the list.
+            lines = java.util.Collections.emptyList();
+            accent = 0;
+        }
+        io.github.muntashirakon.AppManager.battery.MainCardBinder
+                .renderCustomRightLines(holder.itemView, lines, accent);
+    }
+
     private void bindBackupColumnGestures(@NonNull ViewHolder holder, @NonNull ApplicationItem item) {
         View.OnClickListener openInfo = v -> {
             int currentPos = holder.getBindingAdapterPosition();
@@ -1072,7 +1150,10 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                 AccessibilityUtils.requestAccessibilityFocus(holder.itemView);
                 return;
             }
-            handleClick(item);
+            // Fork (白い熊, +168): App info explicitly. This tap has always meant "the app's
+            // information page"; passing -1 made it mean "whatever tab is first", which became
+            // 盗み見 when that was pinned in front.
+            handleClick(item, AppDetailsActivity.TAB_APP_INFO);
         };
         View.OnLongClickListener backupMenu = v -> {
             showBackupDialog(item);
@@ -1205,7 +1286,9 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                 break;
             }
             case "app_info":
-                handleClick(item);
+                // Fork (白い熊, +168): name the tab. Left as the default this pill opened 盗み見 —
+                // the same page as the pill beside it.
+                handleClick(item, AppDetailsActivity.TAB_APP_INFO);
                 break;
             case "snooping":
                 handleClick(item, AppDetailsActivity.TAB_SNOOPING);
@@ -1235,8 +1318,9 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             default:
                 // Uninstall, clear data/cache, save APK, profiles, manifest and scanner all have
                 // a single-app home in App details; sending the row there beats a second copy of
-                // each flow living in the list.
-                handleClick(item);
+                // each flow living in the list. App info is that home — none of them is a snooping
+                // question, so none should land on 盗み見 just because it sits first.
+                handleClick(item, AppDetailsActivity.TAB_APP_INFO);
                 break;
         }
     }

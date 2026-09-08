@@ -195,6 +195,11 @@ public final class ShelfPillDialog {
         }
 
         // ── Screens ─────────────────────────────────────────────────────────
+        // Fork (白い熊, +167): lenses and screens are offered apart. A lens re-dresses the list you
+        // are already on and hands it back with one more tap; a screen takes you somewhere else.
+        body.addView(sectionLabel(context, R.string.shelf_section_lenses, dim));
+        FlowLayout lensFlow = flow(context);
+        body.addView(lensFlow);
         body.addView(sectionLabel(context, R.string.shelf_section_screens, dim));
         FlowLayout screenFlow = flow(context);
         body.addView(screenFlow);
@@ -217,16 +222,16 @@ public final class ShelfPillDialog {
         // A screen pill is not a view, so it is made and saved there and then rather than by the
         // Save button, which would have to mean two different things depending on what was last
         // touched.
-        for (String screenId : ShelfPrefs.screenIds()) {
+        for (String targetId : ShelfPrefs.allTargetIds()) {
             TextView pill = RowPills.actionPill(context,
-                    context.getString(ShelfPrefs.screenTitle(screenId)),
-                    ShelfPrefs.screenIcon(screenId), ink, false);
+                    context.getString(ShelfPrefs.screenTitle(targetId)),
+                    ShelfPrefs.screenIcon(targetId), ink, false);
             pill.setOnClickListener(v -> {
                 listener.onPillCreated(ShelfPrefs.newScreen(
-                        context.getString(ShelfPrefs.screenTitle(screenId)), screenId));
+                        context.getString(ShelfPrefs.screenTitle(targetId)), targetId));
                 dialog.dismiss();
             });
-            screenFlow.addView(pill);
+            (ShelfPrefs.lensIds().contains(targetId) ? lensFlow : screenFlow).addView(pill);
         }
 
         renameFromFilters[0] = () -> {

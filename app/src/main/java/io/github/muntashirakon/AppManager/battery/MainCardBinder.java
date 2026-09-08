@@ -70,9 +70,81 @@ public final class MainCardBinder {
                                  @Nullable String packageName, int uid, boolean frozen,
                                  @NonNull List<CharSequence> rightLines, int accent,
                                  @NonNull View.OnClickListener onCard) {
+        bindLines(context, card, applicationInfo, packageName, uid, frozen, rightLines, accent,
+                onCard, null, null, null);
+    }
+
+    /**
+     * Fork (白い熊, 2026-09-07): the same, but able to say what an app is called and what it looks
+     * like when the platform can no longer answer either question.
+     *
+     * <p>A sibling screen lists apps that may not be installed any more, and for those
+     * {@code applicationInfo} is null — so the card fell back to the package id for the label and to
+     * the Android robot for the icon. Both are recoverable: 保存一覧 already reads the label out of
+     * {@code meta_v5.am.json}, and {@link io.github.muntashirakon.AppManager.screens.BackupIconFetcher}
+     * reads {@code icon.png} out of the backup directory.
+     *
+     * @param displayLabel what to draw on the label line, or null to keep the old fallback
+     * @param iconTag      the {@link ImageLoader} cache key for {@code iconFetcher}; MUST NOT be the
+     *                     bare package name, which other surfaces key installed icons on
+     * @param iconFetcher  how to produce the icon when there is no {@code applicationInfo}
+     */
+    public static void bindLines(@NonNull Context context, @NonNull View card,
+                                 @Nullable ApplicationInfo applicationInfo,
+                                 @Nullable String packageName, int uid, boolean frozen,
+                                 @NonNull List<CharSequence> rightLines, int accent,
+                                 @NonNull View.OnClickListener onCard,
+                                 @Nullable CharSequence displayLabel,
+                                 @Nullable String iconTag,
+                                 @Nullable ImageLoader.ImageFetcherInterface iconFetcher) {
         bind(context, card, null, applicationInfo, packageName, uid, frozen,
                 java.util.Collections.emptyList(), null, null, false,
-                onCard, v -> onCard.onClick(v), v -> onCard.onClick(v), rightLines, accent);
+                onCard, v -> onCard.onClick(v), v -> onCard.onClick(v), rightLines, accent,
+                displayLabel, iconTag, iconFetcher);
+    }
+
+    /**
+     * Fork (白い熊, +162): the right-hand column, drawn from an arbitrary list of lines.
+     *
+     * <p>Extracted from {@link #bind} so that the main list's <b>lens</b> mode
+     * ({@code main/lens/MainLens}) and the sibling screens render through the SAME code rather than
+     * through two blocks that agree today. The first line is the headline and takes the version
+     * row's weight; the second gets its own row; the rest are joined beneath it.
+     *
+     * <p>LANDMINE (白い熊, +150) — the join must stay a {@link android.text.SpannableStringBuilder}
+     * handed to {@code setText} un-{@code toString()}ed. A plain {@code StringBuilder} silently
+     * strips every span the caller put on its own lines; the tracker count is a {@code PillSpan}
+     * (+149) and turned into flat text the moment it moved into this joined block.
+     */
+    public static void renderCustomRightLines(@NonNull View card,
+                                              @NonNull List<CharSequence> customLines,
+                                              int customAccent) {
+        View barTrack = card.findViewById(R.id.battery_bar_track);
+        if (barTrack != null) barTrack.setVisibility(View.GONE);
+        TextView version = card.findViewById(R.id.version);
+        version.setText(customLines.isEmpty() ? "" : customLines.get(0));
+        version.setTextColor(customAccent != 0 ? customAccent : ForkThemeUtils.getTextColor());
+        version.setGravity(android.view.Gravity.END);
+        version.setTypeface(null, Typeface.BOLD);
+        TextView isSystem = card.findViewById(R.id.isSystem);
+        isSystem.setText(customLines.size() > 1 ? customLines.get(1) : "");
+        isSystem.setGravity(android.view.Gravity.END);
+        isSystem.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
+        isSystem.setSingleLine(false);
+        isSystem.setMaxLines(2);
+        TextView sha = card.findViewById(R.id.sha);
+        if (sha != null) {
+            android.text.SpannableStringBuilder rest = new android.text.SpannableStringBuilder();
+            for (int i = 2; i < customLines.size(); ++i) {
+                if (rest.length() > 0) rest.append('\n');
+                rest.append(customLines.get(i));
+            }
+            sha.setText(rest);
+            sha.setGravity(android.view.Gravity.END);
+            sha.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
+            sha.setSingleLine(false);
+            sha.setMaxLines(4);
+        }
     }
 
     /**
@@ -151,6 +223,25 @@ public final class MainCardBinder {
                             @NonNull View.OnClickListener onFreeze,
                             @NonNull View.OnClickListener onKill,
                             @Nullable List<CharSequence> customLines, int customAccent) {
+        bind(context, card, item, applicationInfo, packageName, uid, frozen, profileTags, batteryRow,
+                windowLabel, allCounters, onCard, onFreeze, onKill, customLines, customAccent,
+                null, null, null);
+    }
+
+    public static void bind(@NonNull Context context, @NonNull View card,
+                            @Nullable ApplicationItem item,
+                            @Nullable ApplicationInfo applicationInfo,
+                            @Nullable String packageName, int uid, boolean frozen,
+                            @NonNull List<String> profileTags,
+                            @Nullable BatteryUsageViewModel.Row batteryRow,
+                            @Nullable String windowLabel, boolean allCounters,
+                            @NonNull View.OnClickListener onCard,
+                            @NonNull View.OnClickListener onFreeze,
+                            @NonNull View.OnClickListener onKill,
+                            @Nullable List<CharSequence> customLines, int customAccent,
+                            @Nullable CharSequence displayLabel,
+                            @Nullable String iconTag,
+                            @Nullable ImageLoader.ImageFetcherInterface iconFetcher) {
         float density = context.getResources().getDisplayMetrics().density;
         applyIconSize(context, card);
         MaterialCardView cardView = (MaterialCardView) card;
@@ -181,7 +272,13 @@ public final class MainCardBinder {
         if (applicationInfo != null && packageName != null) {
             icon.setTag(packageName);
             ImageLoader.getInstance().displayImage(packageName, applicationInfo, icon);
+        } else if (iconFetcher != null && iconTag != null) {
+            // Fork: no installed app to ask, but something else knows — a backup, say. The tag and
+            // the ImageView tag must agree or LoadImageInImageView refuses to bind the bitmap.
+            icon.setTag(iconTag);
+            ImageLoader.getInstance().displayImage(iconTag, icon, iconFetcher);
         } else {
+            icon.setTag(null);
             icon.setImageResource(R.drawable.ic_android);
         }
         icon.setAlpha(frozen ? 0.5f : 1f);
@@ -203,8 +300,12 @@ public final class MainCardBinder {
         kill.setOnClickListener(killable ? onKill : null);
 
         TextView label = card.findViewById(R.id.label);
+        // Fork: displayLabel first — a sibling screen knows an uninstalled app's name (from the
+        // backup metadata) where the platform no longer does, and every such row used to render its
+        // package id as the title.
         label.setText(item != null && item.label != null ? item.label
-                : (packageName != null ? packageName : "uid " + uid));
+                : (displayLabel != null ? displayLabel
+                : (packageName != null ? packageName : "uid " + uid)));
         label.setTypeface(null, frozen ? Typeface.ITALIC : Typeface.NORMAL);
         label.setTextColor(system ? orange : ForkThemeUtils.getTextColor());
 
@@ -323,35 +424,7 @@ public final class MainCardBinder {
                 sha.setMaxLines(allCounters ? 8 : 2);
             }
         } else if (customLines != null) {
-            // A sibling screen's own lines, in the main list's own column: first line at the
-            // version's weight (it is the headline of that screen), the rest beneath it.
-            if (barTrack != null) barTrack.setVisibility(View.GONE);
-            version.setText(customLines.isEmpty() ? "" : customLines.get(0));
-            version.setTextColor(customAccent != 0 ? customAccent : ForkThemeUtils.getTextColor());
-            version.setGravity(android.view.Gravity.END);
-            version.setTypeface(null, Typeface.BOLD);
-            isSystem.setText(customLines.size() > 1 ? customLines.get(1) : "");
-            isSystem.setGravity(android.view.Gravity.END);
-            isSystem.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
-            isSystem.setSingleLine(false);
-            isSystem.setMaxLines(2);
-            TextView sha = card.findViewById(R.id.sha);
-            if (sha != null) {
-                // LANDMINE (白い熊, +150) — a StringBuilder here, and toString() on the way out,
-                // silently strips every span the screen put on its own lines. The tracker count
-                // is a PillSpan (+149) and rendered as flat text the moment it moved below the
-                // capability lines and into this joined block.
-                android.text.SpannableStringBuilder rest = new android.text.SpannableStringBuilder();
-                for (int i = 2; i < customLines.size(); ++i) {
-                    if (rest.length() > 0) rest.append('\n');
-                    rest.append(customLines.get(i));
-                }
-                sha.setText(rest);
-                sha.setGravity(android.view.Gravity.END);
-                sha.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
-                sha.setSingleLine(false);
-                sha.setMaxLines(4);
-            }
+            renderCustomRightLines(card, customLines, customAccent);
         } else {
             if (barTrack != null) barTrack.setVisibility(View.GONE);
             version.setText(item != null && item.versionName != null ? item.versionName : "");

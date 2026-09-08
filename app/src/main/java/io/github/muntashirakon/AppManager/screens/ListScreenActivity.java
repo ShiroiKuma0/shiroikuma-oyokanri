@@ -25,17 +25,12 @@ import android.widget.TextView;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import androidx.core.content.ContextCompat;
-import io.github.muntashirakon.AppManager.batchops.BatchOpsManager;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsService;
 import io.github.muntashirakon.AppManager.batchops.BatchQueueItem;
 import io.github.muntashirakon.AppManager.batchops.struct.BatchBackupOptions;
-import io.github.muntashirakon.AppManager.types.UserPackagePair;
 import io.github.muntashirakon.AppManager.main.RowPills;
 import io.github.muntashirakon.AppManager.utils.ForkThemeUtils;
 import io.github.muntashirakon.AppManager.R;
-import io.github.muntashirakon.AppManager.backup.BackupCleanupDialog;
-import io.github.muntashirakon.AppManager.backup.dialog.BatchBackupTableDialog;
-import io.github.muntashirakon.AppManager.backup.dialog.BackupRestoreDialogFragment;
 import io.github.muntashirakon.AppManager.battery.BatteryUsageActivity;
 import io.github.muntashirakon.AppManager.fonts.ColorPrefs;
 import io.github.muntashirakon.AppManager.main.MainSeparatorDecoration;
@@ -75,8 +70,13 @@ public class ListScreenActivity extends BaseActivity {
     }
 
     /**
-     * The intent for a screen id — including the two that are separate activities already. The
-     * shelf should not have to know which of its screens happen to live where.
+     * The intent for a screen id.
+     *
+     * <p>Fork (白い熊, +167): 保存一覧, 盗み見一覧 and 仲間 are no longer screens — they became lenses on
+     * the main list (+162/+166) and {@code MainActivity.applyShelfPill} intercepts their ids before
+     * reaching here. What is left are the two that were always separate activities, because their
+     * rows are not apps: the battery screen is per-uid with its own history chart, and the process
+     * monitor is per-pid with grouping and leak clusters. Anything else answers null.
      */
     @Nullable
     public static Intent intentFor(@NonNull Context context, @NonNull String screenId) {
@@ -85,32 +85,21 @@ public class ListScreenActivity extends BaseActivity {
                 return new Intent(context, BatteryUsageActivity.class);
             case ShelfPrefs.SCREEN_MONITOR:
                 return new Intent(context, ProcessMonitorActivity.class);
-            case ShelfPrefs.SCREEN_BACKUPS:
-            case ShelfPrefs.SCREEN_SNOOPING:
-            case ShelfPrefs.SCREEN_SISTER: {
-                Intent intent = new Intent(context, ListScreenActivity.class);
-                intent.putExtra(EXTRA_SCREEN, screenId);
-                return intent;
-            }
             default:
                 return null;
         }
     }
 
-    @NonNull
+    /**
+     * Fork (白い熊, +167): this activity now serves exactly one page — the apps carrying one tracker
+     * — so the tracker extra is required rather than a special case. There is deliberately no
+     * fall-through: the old default built 保存一覧, and after that became a lens a malformed intent
+     * would have silently opened a screen that no longer has a way in.
+     */
+    @Nullable
     private static ScreenSource sourceFor(@Nullable Intent intent) {
         String tracker = intent == null ? null : intent.getStringExtra(EXTRA_TRACKER);
-        if (tracker != null) {
-            return new TrackerAppsSource(tracker);
-        }
-        String screenId = intent == null ? null : intent.getStringExtra(EXTRA_SCREEN);
-        if (ShelfPrefs.SCREEN_SNOOPING.equals(screenId)) {
-            return new SnoopingSource();
-        }
-        if (ShelfPrefs.SCREEN_SISTER.equals(screenId)) {
-            return new SisterAppsSource();
-        }
-        return new BackupsSource();
+        return tracker != null ? new TrackerAppsSource(tracker) : null;
     }
 
     private ScreenSource mSource;
@@ -131,7 +120,15 @@ public class ListScreenActivity extends BaseActivity {
 
     @Override
     protected void onAuthenticated(@Nullable Bundle savedInstanceState) {
-        mSource = sourceFor(getIntent());
+        ScreenSource source = sourceFor(getIntent());
+        if (source == null) {
+            // Fork (白い熊, +167): nothing to show. Since the three shelf screens became lenses this
+            // activity has exactly one subject, and an intent that does not name a tracker names
+            // nothing at all — better an immediate finish than an empty page with a wrong title.
+            finish();
+            return;
+        }
+        mSource = source;
         setContentView(R.layout.activity_list_screen);
         setSupportActionBar(findViewById(R.id.toolbar));
         ActionBar actionBar = getSupportActionBar();
@@ -260,26 +257,16 @@ public class ListScreenActivity extends BaseActivity {
         }
         TextView selectAll = findViewById(R.id.screen_select_all);
         TextView clear = findViewById(R.id.screen_clear_selection);
-        TextView backUp = findViewById(R.id.screen_backup_selected);
-        TextView restore = findViewById(R.id.screen_restore_selected);
-        TextView delete = findViewById(R.id.screen_delete_selected);
         RowPills.styleActionPill(selectAll, ink, false);
         RowPills.styleActionPill(clear, ink, false);
-        RowPills.styleActionPill(backUp, ink, false);
-        RowPills.styleActionPill(restore, ink, false);
-        RowPills.styleActionPill(delete, red, false);
         selectAll.setOnClickListener(v -> mAdapter.selectAll());
         clear.setOnClickListener(v -> mAdapter.clearSelection());
-        backUp.setOnClickListener(v -> backUpSelected());
-        restore.setOnClickListener(v -> restoreSelected());
-        delete.setOnClickListener(v -> confirmDeleteSelected());
-        // Fork (白い熊, +142): the three things you can do to a backup, where the backups are.
-        // Deleting them was reachable from this bar and re-taking them was not, so re-backing up
-        // a screenful of stale apps meant leaving for the main list and finding each one again.
-        boolean backups = mSource instanceof BackupsSource;
-        backUp.setVisibility(backups ? View.VISIBLE : View.GONE);
-        restore.setVisibility(backups ? View.VISIBLE : View.GONE);
-        delete.setVisibility(backups ? View.VISIBLE : View.GONE);
+        // Fork (白い熊, +167): the back-up / restore / delete pills went with 保存一覧. Under the
+        // Backups LENS those three are the main list's own batch actions, which is strictly more
+        // than this bar ever offered — the whole configured batch pane rather than three buttons.
+        findViewById(R.id.screen_backup_selected).setVisibility(View.GONE);
+        findViewById(R.id.screen_restore_selected).setVisibility(View.GONE);
+        findViewById(R.id.screen_delete_selected).setVisibility(View.GONE);
     }
 
     /**
@@ -287,66 +274,6 @@ public class ListScreenActivity extends BaseActivity {
      * Reuse rather than a second implementation — the per-app parts, the app-supplied categories
      * and the run-scoped choices all come with it.
      */
-    private void backUpSelected() {
-        List<UserPackagePair> pairs = selectedPairs();
-        if (pairs.isEmpty()) {
-            return;
-        }
-        mAdapter.clearSelection();
-        new BatchBackupTableDialog(this, pairs, new BatchBackupTableDialog.Listener() {
-            @Override
-            public void onBackup(@NonNull Map<String, Integer> perPackageFlags, int fallbackFlags,
-                                 @NonNull Map<String, String[]> perPackageAppData) {
-                BatchBackupOptions options = new BatchBackupOptions(fallbackFlags, null, null,
-                        perPackageFlags, null, perPackageAppData);
-                enqueue(BatchOpsManager.OP_BACKUP, pairs, options);
-            }
-
-            @Override
-            public void onRestoreOrDelete() {
-                openRestoreSheet(pairs);
-            }
-        }).show();
-    }
-
-    /** Restore the selected apps, through the per-app restore table. */
-    private void restoreSelected() {
-        List<UserPackagePair> pairs = selectedPairs();
-        if (pairs.isEmpty()) {
-            return;
-        }
-        mAdapter.clearSelection();
-        openRestoreSheet(pairs);
-    }
-
-    private void openRestoreSheet(@NonNull List<UserPackagePair> pairs) {
-        BackupRestoreDialogFragment fragment = BackupRestoreDialogFragment.getInstance(pairs);
-        fragment.setOnActionCompleteListener((mode, failedPackages) -> mReloadOnResume = true);
-        fragment.show(getSupportFragmentManager(), BackupRestoreDialogFragment.TAG);
-    }
-
-    @NonNull
-    private List<UserPackagePair> selectedPairs() {
-        List<UserPackagePair> pairs = new ArrayList<>();
-        for (ScreenRow row : mAdapter.getSelectedRows()) {
-            pairs.add(new UserPackagePair(row.packageName, row.userId));
-        }
-        return pairs;
-    }
-
-    private void enqueue(int op, @NonNull List<UserPackagePair> pairs,
-                         @NonNull BatchBackupOptions options) {
-        ArrayList<String> packages = new ArrayList<>(pairs.size());
-        ArrayList<Integer> users = new ArrayList<>(pairs.size());
-        for (UserPackagePair pair : pairs) {
-            packages.add(pair.getPackageName());
-            users.add(pair.getUserId());
-        }
-        BatchQueueItem item = BatchQueueItem.getBatchOpQueue(op, packages, users, options);
-        ContextCompat.startForegroundService(this, BatchOpsService.getServiceIntent(this, item));
-        mReloadOnResume = true;
-    }
-
     private void updateSelectionBar(int count) {
         if (mSelectionBar == null || mSelectionCount == null) {
             return;
@@ -360,58 +287,14 @@ public class ListScreenActivity extends BaseActivity {
      * Deleting backups is not undoable, so it asks — and it says how many apps and how many
      * backups, because "3 apps" and "41 backups" are the same press with very different weight.
      */
-    private void confirmDeleteSelected() {
-        List<ScreenRow> selected = mAdapter.getSelectedRows();
-        if (selected.isEmpty()) {
-            return;
-        }
-        int backups = 0;
-        for (ScreenRow row : selected) {
-            backups += row.relativeDirs.size();
-        }
-        ForkDialog.present(ForkDialog.builder(this)
-                .setTitle(R.string.delete_backup)
-                .setMessage(getString(R.string.screen_delete_confirm, selected.size(), backups))
-                .setNegativeButton(R.string.cancel, null)
-                .setPositiveButton(R.string.delete, (dialog, which) -> deleteSelected(selected)));
-    }
-
-    private void deleteSelected(@NonNull List<ScreenRow> selected) {
-        ArrayList<String> packages = new ArrayList<>(selected.size());
-        ArrayList<Integer> users = new ArrayList<>(selected.size());
-        Map<String, String[]> perPackageDirs = new LinkedHashMap<>();
-        for (ScreenRow row : selected) {
-            if (row.relativeDirs.isEmpty()) {
-                continue;
-            }
-            packages.add(row.packageName);
-            users.add(row.userId);
-            // Every backup the row stands for. Without this the batch would fall back to "the
-            // base backup" and leave the rest behind — which is not what deleting an app's
-            // backups from this screen can possibly mean.
-            perPackageDirs.put(row.packageName, row.relativeDirs.toArray(new String[0]));
-        }
-        if (packages.isEmpty()) {
-            return;
-        }
-        BatchBackupOptions options = new BatchBackupOptions(0, null, null, null, perPackageDirs);
-        BatchQueueItem item = BatchQueueItem.getBatchOpQueue(BatchOpsManager.OP_DELETE_BACKUP,
-                packages, users, options);
-        ContextCompat.startForegroundService(this, BatchOpsService.getServiceIntent(this, item));
-        mAdapter.clearSelection();
-        // The list is about to be wrong; it is re-read when the operation's page is dismissed.
-        mReloadOnResume = true;
-    }
-
     @Override
     public boolean onCreateOptionsMenu(@NonNull Menu menu) {
         getMenuInflater().inflate(R.menu.activity_list_screen_actions, menu);
-        // Fork (白い熊, +137): only 保存一覧 has a backup directory to clean, and this is where
-        // you would look for it — standing in front of the list of backups, wondering what the
-        // extra folders on disk are.
+        // Fork (白い熊, +167): cleaning the backup directory moved with 保存一覧 — it is on the main
+        // list's overflow while the Backups lens is on, and in Settings as it always was.
         MenuItem clean = menu.findItem(R.id.action_clean_backups);
         if (clean != null) {
-            clean.setVisible(mSource instanceof BackupsSource);
+            clean.setVisible(false);
         }
         return true;
     }
@@ -429,10 +312,6 @@ public class ListScreenActivity extends BaseActivity {
         }
         if (id == R.id.action_layout_columns) {
             showLayoutPicker();
-            return true;
-        }
-        if (id == R.id.action_clean_backups) {
-            BackupCleanupDialog.show(this);
             return true;
         }
         if (id == R.id.action_refresh) {

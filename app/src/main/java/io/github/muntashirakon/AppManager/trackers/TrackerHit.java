@@ -37,9 +37,22 @@ public class TrackerHit {
     /** A service or a receiver: the system can start it with no help from you. */
     public static final int RUNG_AUTONOMOUS = 2;
 
-    /** The Snooping page's "it can do this right now" red. */
+    /**
+     * The Snooping page's "it can do this right now" red.
+     *
+     * <p><b>Only ever as a fill or at headline size.</b> As small TEXT on black it cannot be read —
+     * the same finding that made 盗み見一覧's headline a filled pill in +149, and what 白い熊 hit again
+     * on the tracker card in +169. Use {@link #COLOR_AUTONOMOUS_FILL} with
+     * {@link #COLOR_AUTONOMOUS_INK} wherever the words are small.
+     */
     @ColorInt
     public static final int COLOR_AUTONOMOUS = 0xFFFF0028;
+    /** The blood red behind small autonomous-rung text, from the Snooping page's Allowed pair. */
+    @ColorInt
+    public static final int COLOR_AUTONOMOUS_FILL = 0xFF6E0B14;
+    /** The near-white that sits on it. */
+    @ColorInt
+    public static final int COLOR_AUTONOMOUS_INK = 0xFFFFD9DC;
     /** Neutral grey, the page's "nothing to look at here". */
     @ColorInt
     public static final int COLOR_PASSIVE = 0xFF9E9E9E;

@@ -60,6 +60,16 @@ public class AppDetailsActivity extends BaseActivity {
     private static final String EXTRA_TAB = "tab";
     /** The Snooping tab, as an {@link AppDetailsFragment.Property} id — resolved to a position via {@link #getTabPosition(int)}. */
     public static final int TAB_SNOOPING = AppDetailsFragment.SNOOPING;
+    /**
+     * Fork (白い熊, +168): the App info tab, as an {@link AppDetailsFragment.Property} id.
+     *
+     * <p>It needs a name of its own because App details opens on Snooping by default, so a caller
+     * that means "open this app on App info" must say so. Carried as an id (not a position) and
+     * resolved through {@link #getTabPosition(int)}, so the user-configurable tab order cannot
+     * quietly repoint it — the same reason the app pane's <i>App info</i> and <i>Snooping</i> pills
+     * stay distinct.
+     */
+    public static final int TAB_APP_INFO = AppDetailsFragment.APP_INFO;
 
     @NonNull
     public static Intent getIntent(@NonNull Context context, @NonNull String packageName, @UserIdInt int userId) {

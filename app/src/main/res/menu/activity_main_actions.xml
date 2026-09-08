@@ -56,6 +56,27 @@
         android:title="@string/clear_all_filters"
         app:showAsAction="always" />
 
+    <!-- Fork (白い熊, +163): sort, split out of the filter sheet and given its own affordance to the
+         right of clear-filters. It opens a dropdown from the top bar rather than a bottom sheet,
+         because re-sorting is something you do repeatedly while looking at the list — a sheet makes
+         you open it, scroll to the sort section and dismiss it every time. The active lens's own
+         orders are appended to the same menu, so there is one place to sort from, never two. -->
+    <!-- Fork (白い熊, +167): cleaning the backup directory came off 保存一覧 when that screen became a
+         lens. It appears here only while the Backups lens is on, which is the same place you would
+         have looked for it before: standing in front of the list of backups. Settings ->
+         Backup/restore still has it too. -->
+    <item
+        android:id="@+id/action_clean_backups"
+        android:title="@string/backup_clean_title"
+        android:visible="false"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_sort"
+        android:icon="@drawable/ic_sort"
+        android:title="@string/sort"
+        app:showAsAction="always" />
+
     <!-- Fork: copy-displayed-app-IDs moved off the top toolbar into the
          overflow (was ifRoom with ic_content_copy); the 3x3 layout icon
          takes its toolbar slot. Feature stays reachable from the overflow. -->
