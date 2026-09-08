@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import io.github.muntashirakon.AppManager.R;
@@ -517,6 +518,10 @@ class RestoreOp implements Closeable {
                 options.setInstallScenario(PackageManager.INSTALL_SCENARIO_BULK);
             }
             AtomicReference<String> status = new AtomicReference<>();
+            // Fork: keep the numeric status beside the message. The message alone used to be null on
+            // this path, which is how a restore came to say "Couldn't perform an installation." and
+            // nothing more; see PackageInstallerCompat.statusToString().
+            AtomicInteger statusCode = new AtomicInteger(PackageInstallerCompat.STATUS_FAILURE_INVALID);
             PackageInstallerCompat packageInstaller = PackageInstallerCompat.getNewInstance();
             packageInstaller.setOnInstallListener(new PackageInstallerCompat.OnInstallListener() {
                 @Override
@@ -526,6 +531,7 @@ class RestoreOp implements Closeable {
                 @Override
                 public void onFinishedInstall(int sessionId, String packageName, int result, @Nullable String blockingPackage, @Nullable String statusMessage) {
                     status.set(statusMessage);
+                    statusCode.set(result);
                 }
             });
             try {
@@ -537,9 +543,14 @@ class RestoreOp implements Closeable {
                     } else {
                         statusMessage = "Couldn't perform an installation";
                     }
+                    // Fork: always name the status, even when the platform supplied no message --
+                    // a bare full stop here is unactionable, and it is the whole reason this branch
+                    // was impossible to diagnose from the progress log.
                     if (status.get() != null) {
                         statusMessage += ": " + status.get();
-                    } else statusMessage += ".";
+                    } else {
+                        statusMessage += ": " + PackageInstallerCompat.statusToString(statusCode.get());
+                    }
                     throw new BackupException(statusMessage);
                 }
             } finally {

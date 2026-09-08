@@ -418,6 +418,14 @@ public class BackupRestoreDialogViewModel extends AndroidViewModel {
                     operationInfo.packageList.add(backupInfo.packageName);
                     operationInfo.userIdListMappedToPackageList.add(userId);
                 }
+                // Fork: the singleton branch has already produced the whole list, so return here.
+                // Falling through to the loop below added the same package + user a SECOND time
+                // whenever the backup's own user was among the selected ones -- i.e. on every
+                // ordinary same-user single-app restore. The batch executor then restored one app
+                // twice in parallel: two installs of the same APK, and two extractions into one
+                // data directory, where one worker's recursive chown walks the tree the other is
+                // still rewriting and fails with "Failed to restore ownership info for index 0."
+                return;
             }
         }
         // Otherwise, user checks are mandatory.

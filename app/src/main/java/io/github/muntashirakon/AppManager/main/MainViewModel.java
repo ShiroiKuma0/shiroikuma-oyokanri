@@ -68,6 +68,8 @@ import io.github.muntashirakon.AppManager.profiles.struct.AppsProfile;
 import io.github.muntashirakon.AppManager.profiles.struct.BaseProfile;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
 import io.github.muntashirakon.AppManager.settings.FeatureController;
+import io.github.muntashirakon.AppManager.main.lens.MainLens;
+import io.github.muntashirakon.AppManager.main.lens.MainLenses;
 import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsManager;
 import io.github.muntashirakon.AppManager.types.PackageChangeReceiver;
@@ -87,6 +89,8 @@ import io.github.muntashirakon.AppManager.utils.Utils;
 import io.github.muntashirakon.io.Path;
 
 public class MainViewModel extends AndroidViewModel implements ListOptions.ListOptionActions {
+    public static final String TAG = MainViewModel.class.getSimpleName();
+
     private final PackageManager mPackageManager;
     private final PackageIntentReceiver mPackageObserver;
     @MainListOptions.SortOrder
@@ -94,6 +98,16 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
     private boolean mReverseSort;
     @MainListOptions.Filter
     private int mFilterFlags;
+    /**
+     * Fork (白い熊, +162): the active lens, or null for the plain list. Deliberately NOT folded into
+     * {@link #mFilterFlags} — those are a persisted bitmask and the wire format of a saved view, and
+     * a lens is neither. It is also deliberately not persisted: a lens is where you are, not a
+     * setting, and coming back to the app should land on the list.
+     */
+    @Nullable
+    private String mLensId;
+    /** Index into the active lens's own sort labels. Reset whenever the lens changes. */
+    private int mLensSort;
     /**
      * Profiles whose packages an app MUST belong to in order to pass the filter.
      * Empty set means "no include constraint". Multiple entries are ANDed
@@ -307,6 +321,44 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
         return mSearchQuery;
     }
 
+    @Nullable
+    public String getLensId() {
+        return mLensId;
+    }
+
+    @Nullable
+    public MainLens getLens() {
+        return MainLenses.get(mLensId);
+    }
+
+    public int getLensSort() {
+        return mLensSort;
+    }
+
+    /**
+     * Fork: enter a lens, or leave it with null. One pipeline pass, like every other setter here.
+     */
+    public void setLens(@Nullable String lensId) {
+        if (Objects.equals(mLensId, lensId)) {
+            return;
+        }
+        mLensId = lensId;
+        // A sort index means nothing across lenses -- index 2 is "backups" in one and could be
+        // anything in the next -- so it starts again rather than carrying over.
+        mLensSort = 0;
+        cancelIfRunning();
+        mFilterResult = executor.submit(this::filterItemsByFlags);
+    }
+
+    public void setLensSort(int lensSort) {
+        if (mLensSort == lensSort) {
+            return;
+        }
+        mLensSort = lensSort;
+        cancelIfRunning();
+        mFilterResult = executor.submit(this::filterItemsByFlags);
+    }
+
     public void setSearchQuery(String searchQuery, @AdvancedSearchView.SearchType int searchType) {
         this.mSearchQuery = searchType != AdvancedSearchView.SEARCH_TYPE_REGEX ? searchQuery.toLowerCase(Locale.ROOT) : searchQuery;
         this.mSearchType = searchType;
@@ -321,13 +373,20 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
 
     @Override
     public void setReverseSort(boolean reverseSort) {
-        cancelIfRunning();
-        mFilterResult = executor.submit(() -> {
-            sortApplicationList(mSortBy, mReverseSort);
-            filterItemsByFlags();
-        });
+        // Fork (白い熊, +163): assign BEFORE submitting, and sort from locals.
+        // This used to submit a task that read mReverseSort and only then assign it, so which value
+        // the sort actually used was a race between this thread and the executor's — sortBy next
+        // door has always captured a local and been correct. It rarely showed while reverse lived
+        // inside a bottom sheet; the sort dropdown makes it a one-tap toggle, which is exactly the
+        // usage that loses such a race.
         mReverseSort = reverseSort;
         Prefs.MainPage.setReverseSort(mReverseSort);
+        final int sortBy = mSortBy;
+        cancelIfRunning();
+        mFilterResult = executor.submit(() -> {
+            sortApplicationList(sortBy, reverseSort);
+            filterItemsByFlags();
+        });
     }
 
     @Override
@@ -640,6 +699,21 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
     }
 
     @GuardedBy("applicationItems")
+    /**
+     * Fork (白い熊, +166): pull-to-refresh is the one gesture that means "read it again from the
+     * device", so it is what clears a lens's cached verdicts. Without this a resolver pass would be
+     * cached until an app updated, and a capability changed in Settings would never show.
+     */
+    public void invalidateLensCaches() {
+        for (MainLens lens : MainLenses.all().values()) {
+            try {
+                lens.invalidate();
+            } catch (Throwable th) {
+                Log.w(TAG, "Lens %s could not be invalidated.", th, lens.id());
+            }
+        }
+    }
+
     public void loadApplicationItems() {
         cancelIfRunning();
         mFilterResult = executor.submit(() -> {
@@ -664,6 +738,51 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
         }
     }
 
+    /**
+     * Fork (白い熊, +162): the ONE place the filtered list reaches the UI, so the lens step has one
+     * home rather than four. Every {@code postValue} in the filter path goes through here.
+     *
+     * <p>The lens narrows AFTER the list's own filters and search, which makes the two a plain
+     * conjunction, and sorts last, so a lens with no sort of its own leaves the list's ordering
+     * exactly as it was.
+     */
+    @WorkerThread
+    private void publish(@NonNull List<ApplicationItem> items) {
+        MainLens lens = MainLenses.get(mLensId);
+        if (lens == null) {
+            mApplicationItemsLiveData.postValue(items);
+            return;
+        }
+        // Fork (白い熊, +166): prepare runs BEFORE the include filter, over every candidate, because
+        // for two of the three lenses membership IS what preparation works out — 盗み見 needs a
+        // resolver pass and 仲間 needs manifest metadata, neither of which an ApplicationItem carries.
+        // Off-thread by construction: this is the pipeline's own executor, and a row's right-hand
+        // column must be free to draw at bind time.
+        try {
+            lens.prepare(getApplication(), items);
+        } catch (Throwable th) {
+            Log.w(TAG, "Lens %s could not prepare its rows.", th, lens.id());
+        }
+        if (ThreadUtils.isInterrupted()) {
+            return;
+        }
+        List<ApplicationItem> lensed = new ArrayList<>(items.size());
+        for (ApplicationItem item : items) {
+            if (ThreadUtils.isInterrupted()) {
+                return;
+            }
+            if (lens.includes(item)) {
+                lensed.add(item);
+            }
+        }
+        try {
+            lens.applySort(lensed, mLensSort);
+        } catch (Throwable th) {
+            Log.w(TAG, "Lens %s could not sort its rows.", th, lens.id());
+        }
+        mApplicationItemsLiveData.postValue(lensed);
+    }
+
     @WorkerThread
     private void filterItemsByQuery(@NonNull List<ApplicationItem> applicationItems) {
         List<ApplicationItem> filteredApplicationItems;
@@ -673,7 +792,7 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
                         add(item.packageName);
                         add(item.label);
                     }}, AdvancedSearchView.SEARCH_TYPE_REGEX);
-            mApplicationItemsLiveData.postValue(filteredApplicationItems);
+            publish(filteredApplicationItems);
             return;
         }
         // Others
@@ -692,7 +811,7 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
                 filteredApplicationItems.add(item);
             }
         }
-        mApplicationItemsLiveData.postValue(filteredApplicationItems);
+        publish(filteredApplicationItems);
     }
 
     @WorkerThread
@@ -784,7 +903,7 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
                 if (!TextUtils.isEmpty(mSearchQuery)) {
                     filterItemsByQuery(candidateApplicationItems);
                 } else {
-                    mApplicationItemsLiveData.postValue(candidateApplicationItems);
+                    publish(candidateApplicationItems);
                 }
             } else {
                 List<ApplicationItem> filteredApplicationItems = new ArrayList<>();
@@ -862,7 +981,7 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
                 if (!TextUtils.isEmpty(mSearchQuery)) {
                     filterItemsByQuery(filteredApplicationItems);
                 } else {
-                    mApplicationItemsLiveData.postValue(filteredApplicationItems);
+                    publish(filteredApplicationItems);
                 }
             }
         }

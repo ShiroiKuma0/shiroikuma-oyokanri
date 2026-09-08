@@ -49,6 +49,14 @@ public class ScreenRow {
      */
     @NonNull
     public final List<String> relativeDirs = new ArrayList<>();
+    /**
+     * Fork (白い熊, 2026-09-07): the relative directory of the ONE backup whose {@code icon.png} this
+     * row should draw when the app is not installed — the newest, since that is the icon the app
+     * last had. Deliberately not derived from {@link #relativeDirs}, which is in table order and
+     * says nothing about which backup is newest. Null for a screen with no backups behind it.
+     */
+    @Nullable
+    public String iconBackupDir;
     /** What {@link ScreenSource#applySort} orders by; meaning is the source's own. */
     public long sortKey;
     /** Secondary ordering value, for a source that needs two. */

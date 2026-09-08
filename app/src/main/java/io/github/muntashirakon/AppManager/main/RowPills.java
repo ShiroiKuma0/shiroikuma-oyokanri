@@ -280,6 +280,25 @@ public final class RowPills {
         return pill;
     }
 
+    /**
+     * Fork (白い熊, +170): a filled action pill with an <b>explicit ink</b>.
+     *
+     * <p>{@link #styleActionPill(TextView, int, boolean)}'s filled path hardcodes black text, which
+     * is right for the theme yellow and wrong for a dark fill — on the tracker card it produced black
+     * on deep red, which 白い熊 found no more readable than the red-on-black it replaced. A fill dark
+     * enough to need light text has to be able to say so.
+     *
+     * <p>Everything else — shape, ripple, padding, weight, size, margins — comes from the ordinary
+     * action pill, so a filled pill and an outlined one are still the same object at a glance.
+     */
+    @NonNull
+    public static TextView filledPill(@NonNull Context context, @NonNull CharSequence text,
+                                      @ColorInt int fill, @ColorInt int ink) {
+        TextView pill = actionPill(context, text, 0, fill, true);
+        pill.setTextColor(ink);
+        return pill;
+    }
+
     /** An action pill's leading glyph — a size up from the row pills' own. */
     public static void setActionGlyph(@NonNull TextView pill, int drawableRes, @ColorInt int ink) {
         Context context = pill.getContext();

@@ -2558,6 +2558,7 @@
     <string name="shelf_section_filters">Filters</string>
     <string name="shelf_section_profiles">Profiles</string>
     <string name="shelf_section_sort">Sort by</string>
+    <string name="shelf_section_lenses">Or a lens</string>
     <string name="shelf_section_screens">Or a screen</string>
     <string name="shelf_also_carries">Also carries: %s</string>
     <string name="shelf_add">Add a pill</string>

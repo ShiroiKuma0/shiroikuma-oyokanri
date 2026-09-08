@@ -209,11 +209,32 @@ public final class ShelfPrefs {
                 new Preset(R.string.filter_system_apps, MainListOptions.FILTER_SYSTEM_APPS));
     }
 
-    /** The screens a pill may open, in the order they are offered. */
+    /**
+     * The screens a pill may open, in the order they are offered.
+     *
+     * <p>Fork (白い熊, +167): three of these five stopped being screens and became <b>lenses</b>
+     * (states of the main list) in +162/+166. The ids did not change — a pill made before then keeps
+     * working, which is exactly why {@code MainLenses} is keyed by these same strings — but the two
+     * kinds are offered under separate headings now, because "open a page" and "re-dress the list
+     * you are on" are different promises and a pill should say which it makes.
+     */
     @NonNull
     public static List<String> screenIds() {
-        return Arrays.asList(SCREEN_BACKUPS, SCREEN_SNOOPING, SCREEN_SISTER, SCREEN_BATTERY,
-                SCREEN_MONITOR);
+        return Arrays.asList(SCREEN_BATTERY, SCREEN_MONITOR);
+    }
+
+    /** The lenses a pill may apply, in the order they are offered. */
+    @NonNull
+    public static List<String> lensIds() {
+        return Arrays.asList(SCREEN_BACKUPS, SCREEN_SNOOPING, SCREEN_SISTER);
+    }
+
+    /** Every id a {@code KIND_SCREEN} pill may carry — lenses first, then real screens. */
+    @NonNull
+    public static List<String> allTargetIds() {
+        List<String> ids = new java.util.ArrayList<>(lensIds());
+        ids.addAll(screenIds());
+        return ids;
     }
 
     @StringRes

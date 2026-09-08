@@ -156,6 +156,17 @@ public class ScreenAdapter extends RecyclerView.Adapter<ScreenAdapter.ViewHolder
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         ScreenRow row = mRows.get(position);
+        // Fork (白い熊, 2026-09-07): row.label and the backup icon. Both were computed by the source
+        // and then dropped here, so every row for an app that is not installed drew its package id
+        // as the title and the generic Android robot as the icon — on a phone with 460 backups,
+        // most of 保存一覧. Neither needs a change to the backup format: the label is in
+        // meta_v5.am.json and the icon is the backup's own unencrypted icon.png.
+        String iconTag = null;
+        BackupIconFetcher iconFetcher = null;
+        if (row.info == null && row.iconBackupDir != null) {
+            iconTag = BackupIconFetcher.tagFor(row.packageName, row.iconVersion);
+            iconFetcher = new BackupIconFetcher(row.iconBackupDir);
+        }
         MainCardBinder.bindLines(mContext, holder.itemView, row.info, row.packageName, row.uid,
                 row.frozen, row.right, row.accent, v -> {
                     if (mSelectionMode) {
@@ -163,7 +174,7 @@ public class ScreenAdapter extends RecyclerView.Adapter<ScreenAdapter.ViewHolder
                     } else {
                         mListener.onRowClicked(row);
                     }
-                });
+                }, row.label, iconTag, iconFetcher);
         // A row for an app that is gone is dimmed the way the main list dims one: the card is
         // still the card, it just has no app behind it any more.
         holder.itemView.setAlpha(row.installed ? 1f : 0.6f);

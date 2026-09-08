@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 
 import io.github.muntashirakon.AppManager.R;
+import io.github.muntashirakon.AppManager.main.PillSpan;
 import io.github.muntashirakon.AppManager.main.RowPills;
 import io.github.muntashirakon.AppManager.utils.ForkThemeUtils;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
@@ -194,11 +195,35 @@ public final class TrackerPanel {
     @NonNull
     private static TextView pill(@NonNull Context context, @NonNull PackageInfo packageInfo, int userId,
                                  @NonNull TrackerHit hit, @NonNull List<TrackerHit> all) {
-        int colour = colorFor(hit.rung());
-        if (hit.secondDegree) {
-            colour = RowPills.withAlpha(colour, 0.55f);
+        // Fork (白い熊, +169): the autonomous rung is FILLED rather than outlined. Outlined it was
+        // red text on black at pill size — the same unreadable pair as the summary above, and on the
+        // rung that matters most. Filled, black on #FF0028, it is both legible and the loudest thing
+        // on the card, which is 白い熊's standing rule for trackers. The quieter two rungs keep the
+        // outline: they are information, not an alarm.
+        TextView pill;
+        if (hit.rung() == TrackerHit.RUNG_AUTONOMOUS) {
+            // The same pair as the summary pill above it: blood red under near-white. One severity,
+            // one treatment, and the ink is named rather than left to the pill's default black.
+            //
+            // LANDMINE (白い熊, +171) — a filled pill must NOT be faded as a whole. Second degree was
+            // first expressed as setAlpha(0.55f) on the view, which fades the fill towards the black
+            // behind it and the ink along with it: 白い熊 read the result as "not filled any more and
+            // the text grey", which is exactly what it was. The fill carries the severity and has to
+            // stay at full strength; only the ink is allowed to soften, and only as far as it can
+            // still be read against it.
+            int ink = hit.secondDegree
+                    ? RowPills.withAlpha(TrackerHit.COLOR_AUTONOMOUS_INK, 0.75f)
+                    : TrackerHit.COLOR_AUTONOMOUS_INK;
+            pill = RowPills.filledPill(context, hit.name, TrackerHit.COLOR_AUTONOMOUS_FILL, ink);
+        } else {
+            // The quieter two rungs keep the outline, and there fading the colour is safe: it moves
+            // stroke and text together and neither was near the edge of legibility to begin with.
+            int colour = colorFor(hit.rung());
+            if (hit.secondDegree) {
+                colour = RowPills.withAlpha(colour, 0.55f);
+            }
+            pill = RowPills.actionPill(context, hit.name, 0, colour, false);
         }
-        TextView pill = RowPills.actionPill(context, hit.name, 0, colour, false);
         pill.setOnClickListener(v -> TrackerDialog.show(context, packageInfo, userId, hit));
         return pill;
     }
@@ -245,8 +270,13 @@ public final class TrackerPanel {
             }
         }
         if (autonomous > 0) {
-            parts.add(colored(context.getString(R.string.tracker_rung_autonomous_n, autonomous),
-                    TrackerHit.COLOR_AUTONOMOUS));
+            // Fork (白い熊, +169): a filled pill, not red words. At 12sp on black the page's
+            // #FF0028 is unreadable — the finding that made 盗み見一覧's headline a pill in +149,
+            // and the same pair is used here so one severity is read one way everywhere.
+            float density = context.getResources().getDisplayMetrics().density;
+            parts.add(PillSpan.pill(context.getString(R.string.tracker_rung_autonomous_n, autonomous),
+                    TrackerHit.COLOR_AUTONOMOUS_FILL, TrackerHit.COLOR_AUTONOMOUS_INK,
+                    12f * density, density));
         }
         if (withApp > 0) {
             parts.add(colored(context.getString(R.string.tracker_rung_with_app_n, withApp), ink));

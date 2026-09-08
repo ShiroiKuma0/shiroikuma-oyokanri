@@ -314,9 +314,14 @@ public class MainListOptions extends ListOptions {
         super.onDestroy();
     }
 
-    @Nullable
-    @Override
-    public LinkedHashMap<Integer, Integer> getSortIdLocaleMap() {
+    /**
+     * Fork (白い熊, +163): sort left the filter sheet and became its own toolbar menu, so the sheet
+     * renders filters only — {@link #getSortIdLocaleMap()} returns null for exactly that reason.
+     * The orders themselves still live here, in one place, because they are what the sort menu and
+     * the persisted {@code SORT_BY_*} wire values have to agree about.
+     */
+    @NonNull
+    public static LinkedHashMap<Integer, Integer> sortIdLocaleMap() {
         return new LinkedHashMap<Integer, Integer>() {{
             put(SORT_BY_DOMAIN, R.string.sort_by_domain);
             put(SORT_BY_APP_LABEL, R.string.sort_by_app_label);
@@ -339,6 +344,18 @@ public class MainListOptions extends ListOptions {
                 put(SORT_BY_LAST_USAGE_TIME, R.string.sort_by_last_used);
             }
         }};
+    }
+
+    /**
+     * Fork: null on purpose. {@link ListOptions} hides its whole sort section when this is null, and
+     * the main list's sort now lives on the toolbar (MainActivity#showSortMenu) — a dropdown you can
+     * re-sort from in one tap, instead of a section inside a bottom sheet you have to open first.
+     * Every other {@code ListOptions} subclass keeps its in-sheet sort untouched.
+     */
+    @Nullable
+    @Override
+    public LinkedHashMap<Integer, Integer> getSortIdLocaleMap() {
+        return null;
     }
 
     @Nullable
