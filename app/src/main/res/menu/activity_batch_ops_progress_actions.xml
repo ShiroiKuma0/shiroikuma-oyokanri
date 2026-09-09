@@ -16,5 +16,9 @@
         android:id="@+id/action_save_log"
         android:title="@string/op_log_save"
         app:showAsAction="never" />
+    <item
+        android:id="@+id/action_share_log"
+        android:title="@string/op_log_share"
+        app:showAsAction="never" />
 
 </menu>
