@@ -66,6 +66,11 @@ public final class AppDataContract {
     public static final String EXTRA_PROGRESS_ACTION = "progress_action";
 
     // ── Extras out / reply ──────────────────────────────────────────────────
+    /**
+     * The progress label. <b>This, not {@link #EXTRA_RESULT}, is what a sister app sends</b> — see
+     * {@code AppDataClient#progressLabel}. {@code EXTRA_RESULT} carries the terminal reply.
+     */
+    public static final String EXTRA_TEXT = "text";
     public static final String EXTRA_RESULT = "result";
     public static final String EXTRA_REPLY_ID = "reply_id";
     public static final String EXTRA_CURRENT = "current";
