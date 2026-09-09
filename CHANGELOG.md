@@ -10,6 +10,53 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-09-05.03-37.g41d79af5+028 — 2026-09-09
+
+The batch-operation page ends with the log as its whole report, and the clipboard was the only way
+off it — which loses everything past whatever the next copy overwrites. *Save log*, which existed
+but only in the overflow nobody opens once a batch has finished, now has a pill beside *Copy*, and
+*Share log* is new. Widening the bar to hold four controls turned up a `libcore` layout bug that had
+been quietly ignoring `android:gravity="end"` app-wide. (Built on upstream App Manager `4.1.1`,
+commit `41d79af5` of 2026-09-05 03:37 UTC.)
+
+### 🧾 The finished log can leave the page
+
+- **The finished bar reads *Copy log · Save log · Share log · Close*.** The page *is* the report
+  once the work stops, and until now the only way to keep any of it was the clipboard — where it
+  survives exactly until the next thing copied. *Save log* was reachable the whole time, from the
+  ⋮ overflow, which is precisely where nobody looks when the log is the last thing on screen.
+- **The running bar is unchanged** — *Pause · Leave running · Cancel*. A log still being written is
+  not one to keep, and while a batch runs those three are the only controls that bar should offer.
+  All three log actions stay in the overflow throughout, so nothing became less reachable.
+- **Share log is new, and the log travels as a *file*, never as `EXTRA_TEXT`.** The log is capped at
+  20 000 lines and an overnight backup reaches that; a string of it put into an intent is far past
+  what a Binder transaction carries — and that limit is not a polite refusal but a
+  `TransactionTooLargeException` thrown at whichever side blinks first. The file is handed over as
+  an `FmProvider` content URI with a read grant, the mechanism the logcat viewer and the backup
+  share already use, so the receiving app opens a descriptor we give it rather than a path it has no
+  rights to.
+- **A shared copy goes to our own cache; only *Save log* writes beside the backups.** A copy handed
+  to another app is a copy, and it has no business landing in the directory the backups live in.
+- **One writer.** `writeLog()` produces `shiroikuma-oyokanri_batch-log_<yyyy-MM-dd_HH-mm-ss>.txt`
+  for both actions, so a saved log and a shared one can never turn out to be different files.
+- **The bar is a `FlowLayout` now, not a `LinearLayout`.** Four pills cannot share one line on the
+  folded panel — in Japanese they are four six-character labels — and a `LinearLayout` would have
+  squeezed and ellipsized all four rather than dropping one to a second row, which is the one
+  failure a bar of controls cannot afford.
+
+### 📐 `android:gravity="end"` finally works in a `FlowLayout`
+
+- **A `libcore` landmine, silently wrong app-wide.**
+  `FlowLayout.getHorizontalGravityOffsetForRow` masks the gravity with `HORIZONTAL_GRAVITY_MASK`
+  (`0x7`), which strips `Gravity.END`'s `RELATIVE_LAYOUT_DIRECTION` bit and leaves plain `RIGHT`
+  (`5`) — then compares the result against `Gravity.END` (`0x00800005`), a case that can never
+  match. Every `android:gravity="end"` `FlowLayout` in the app has therefore been laid out from the
+  **start** edge, with no error and nothing to notice but a row sitting on the wrong side.
+- **Fixed by accepting `Gravity.RIGHT` as well**, which is what both `right` and `end` reduce to
+  after that mask. The change is purely additive: `right` previously matched nothing either.
+- **Visible consequence elsewhere:** the app backup dialog's *Share · Delete · Restore* row is now
+  right-aligned, as its layout always declared it wanted to be.
+
 ## 4.1.1+2026-09-05.03-37.g41d79af5+027 — 2026-09-09
 
 A sweep of all 57 sister repos, prompted by finding the same "mismatch" in two of them, inverted the
