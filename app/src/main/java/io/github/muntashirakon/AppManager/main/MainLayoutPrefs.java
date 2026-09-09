@@ -20,6 +20,19 @@ public final class MainLayoutPrefs {
 
     private static final String PREF_FILE = "shiroikuma_main_layout";
     private static final String KEY_COLUMNS = "columns";
+    /**
+     * Fork (白い熊, +173): how wide the right-hand block is, as a percentage of the reference
+     * string, stored <b>per geometry</b> like the column count beside it.
+     * <p>
+     * The trade it settles cannot be settled once: the row has one pool of width, and every pixel
+     * the version block takes comes out of the app name and package id. Which of those you would
+     * rather read in full genuinely differs folded, unfolded and in a four-column grid, so it is a
+     * per-geometry choice rather than a constant somebody has to be right about.
+     */
+    private static final String KEY_RIGHT_COLUMN_PCT = "right_column_pct";
+    public static final int RIGHT_COLUMN_PCT_MIN = 40;
+    public static final int RIGHT_COLUMN_PCT_MAX = 200;
+    public static final int RIGHT_COLUMN_PCT_DEFAULT = 100;
 
     private MainLayoutPrefs() {
     }
@@ -39,22 +52,41 @@ public final class MainLayoutPrefs {
         LayoutGeometry.setColumns(context, prefs(context), KEY_COLUMNS, columns);
     }
 
+    /**
+     * The right-column width percentage for the current geometry. 100 means "exactly the reference
+     * string", which is a full fork version name — see {@code MainRecyclerAdapter}.
+     * <p>
+     * <b>Pass a view or activity context</b>, never the application one: {@link LayoutGeometry}
+     * reads the window's configuration to decide which geometry this is.
+     */
+    public static int getRightColumnPct(@NonNull Context context) {
+        int pct = LayoutGeometry.getColumns(context, prefs(context), KEY_RIGHT_COLUMN_PCT,
+                RIGHT_COLUMN_PCT_DEFAULT);
+        return Math.max(RIGHT_COLUMN_PCT_MIN, Math.min(RIGHT_COLUMN_PCT_MAX, pct));
+    }
+
+    /** Stores the width for the current geometry only. */
+    public static void setRightColumnPct(@NonNull Context context, int pct) {
+        LayoutGeometry.setColumns(context, prefs(context), KEY_RIGHT_COLUMN_PCT,
+                Math.max(RIGHT_COLUMN_PCT_MIN, Math.min(RIGHT_COLUMN_PCT_MAX, pct)));
+    }
+
     // ── Row proportions ──────────────────────────────────────────────────────
     /** One column per this many dp, matching {@code UIUtils.getGridLayoutAt450Dp}. */
     private static final int ADAPTIVE_COLUMN_DP = 450;
     /** The icon column, which is a fixed width and not part of the weighted split. */
     private static final int ICON_COLUMN_DP = 60;
     /**
-     * The version/backup block, expressed as a multiple of the width of the
-     * signature string beneath it.
+     * Fork (白い熊, +173): the block was sized from the <b>signature</b> line —
+     * {@code "SHA384withRSA"}, 13 characters, times a constant 1.45 — which made the whole column
+     * about 19 characters wide. That was right while a version was {@code 1.6.0+081}, and became
+     * wrong the moment the family's version names started pinning their upstream base:
+     * {@code 4.1.1+2026-09-05.03-37.g41d79af5+016} is 36 characters, and 雫's is 43. The column was
+     * sized for a fifth of what it had to carry, so the version could not help but truncate.
      * <p>
-     * Measured rather than guessed in dp so it follows the <b>configurable
-     * fonts</b>: enlarge the row's text and the block that has to hold it grows
-     * with it. The factor covers the three paired lines above the signature —
-     * the widest of them is the no-backup case, "System" beside the "long-press"
-     * hint, which runs about a quarter wider than the signature itself.
+     * The reference is now a version, measured with the version line's own paint, and the multiple
+     * is {@link #getRightColumnPct} rather than a constant — see there for why it is per geometry.
      */
-    private static final float RIGHT_COLUMN_REF_FACTOR = 1.45f;
     /** The tuned proportion: centre 1, right 2. Never exceeded. */
     private static final float RIGHT_COLUMN_MAX_SHARE = 2f / 3f;
 
@@ -93,11 +125,11 @@ public final class MainLayoutPrefs {
      * exceed two thirds of the row, and there the old proportion still stands.
      * This can therefore only ever widen the label column, never narrow it.
      *
-     * @param signatureWidthPx measured width of the signature line, i.e. the
-     *                         widest single item in the block
+     * @param referenceWidthPx measured width of the reference version string, i.e. the
+     *                         widest single item the block now has to carry
      */
-    public static int rightColumnWidthPx(@NonNull Context context, float signatureWidthPx) {
-        int needed = Math.round(signatureWidthPx * RIGHT_COLUMN_REF_FACTOR);
+    public static int rightColumnWidthPx(@NonNull Context context, float referenceWidthPx) {
+        int needed = Math.round(referenceWidthPx * (getRightColumnPct(context) / 100f));
         int rowPx = availableRowWidthPx(context);
         int max = Math.round(rowPx * RIGHT_COLUMN_MAX_SHARE);
         return Math.max(1, Math.min(needed, max));

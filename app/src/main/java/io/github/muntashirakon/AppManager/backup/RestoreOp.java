@@ -311,6 +311,9 @@ class RestoreOp implements Closeable {
                 plan.add(R.string.restore_stage_decrypting);
             }
             plan.add(R.string.restore_stage_staging);
+            // Fork (白い熊): and the import itself, which is the LONGEST of them and was
+            // the only one with no stage of its own -- see restoreAppData.
+            plan.add(R.string.restore_stage_importing);
         }
         if (mRequestedFlags.backupRules()) {
             plan.add(R.string.restore_stage_rules);
@@ -1006,6 +1009,15 @@ class RestoreOp implements Closeable {
             try (InputStream is = dataFile.openInputStream(); OutputStream os = new FileOutputStream(staging)) {
                 IoUtils.copy(is, os);
             }
+            // Fork (白い熊): the archive is staged; from here the SISTER APP is doing the work,
+            // and it is the longest step of the whole restore.
+            //
+            // Until now nothing announced it, so the in-flight header kept saying "Unpacking the
+            // archive" -- a step that had finished minutes earlier -- while the sister app's own
+            // byte counter sat at its completed spool figure. 白い熊 read the pair, correctly, as
+            // "100% out of 100%": the words named a finished step and the numbers were equal.
+            // Naming the phase is what separates "still working" from "stuck at the end".
+            stage(listener, archiveSize, R.string.restore_stage_importing);
             // [0] = the highest count seen, [1] = how many times it has started over.
             final long[] pass = {0, 0};
             AppDataTransfer.Outcome outcome = new AppDataTransfer(context).importData(mPackageName,

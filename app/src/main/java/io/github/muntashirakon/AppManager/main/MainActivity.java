@@ -772,6 +772,22 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                 if (mSearchView != null && !mSearchView.isIconified()) {
                     mSearchView.setQuery("", false);
                 }
+                // Fork (白い熊, +174): and the shelf, or a cleared lens keeps its pill filled while
+                // the list beneath it shows everything. The shelf is view state and the lens is
+                // view-model state; relightLensPill is the one place that reconciles them, and this
+                // was the only route that changed the second without calling it.
+                //
+                // Fork (白い熊, +177): the ACTIVE VIEW pill goes too, and it has to be cleared
+                // here rather than in relightLensPill. That method deliberately leaves a saved
+                // view lit -- "a saved view is lit by its own rules" -- which is right everywhere
+                // except this one route: clearing every filter, profile filter, search and lens IS
+                // un-applying whatever view was showing, so nothing can still be in effect. It
+                // only became visible once Sister apps stopped being a lens (+175) and became an
+                // ordinary filter pill, at which point relightLensPill stopped covering it.
+                if (mShelf != null) {
+                    mShelf.setActiveId(null);
+                }
+                relightLensPill();
                 invalidateOptionsMenu();
                 UIUtils.displayShortToast(R.string.filters_cleared);
             }
@@ -1274,7 +1290,12 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
             return;
         }
         ShelfPrefs.ViewState state = ShelfPrefs.ViewState.fromJson(pill.payload);
-        viewModel.applyView(state.filterFlags, state.sortBy, state.reverseSort,
+        // Fork (白い熊, +174): a pill saved WITHOUT its sort narrows the list and leaves the order
+        // you are reading in. applyView takes both in one pass, so the current values are handed
+        // straight back to it rather than the stored ones — there is no second path to keep in step.
+        int sortBy = state.savesSort ? state.sortBy : viewModel.getSortBy();
+        boolean reverse = state.savesSort ? state.reverseSort : viewModel.isReverseSort();
+        viewModel.applyView(state.filterFlags, sortBy, reverse,
                 state.profilesInclude, state.profilesExclude, state.query, state.queryType);
         if (mSearchView != null) {
             mSearchView.setQuery(state.query == null ? "" : state.query, false);
@@ -1354,8 +1375,12 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                 List<ShelfPrefs.Pill> pills = ShelfPrefs.load(this);
                 for (int i = 0; i < pills.size(); ++i) {
                     if (pills.get(i).id.equals(pill.id)) {
-                        pills.set(i, new ShelfPrefs.Pill(pill.id, pill.name,
-                                ShelfPrefs.KIND_VIEW, currentViewState().toJson()));
+                        // The pill's OWN choice about carrying a sort survives an update:
+                        // "update to current" is about what the list is showing, not about
+                        // changing what kind of pill this is.
+                        boolean keepsSort = ShelfPrefs.ViewState.fromJson(pill.payload).savesSort;
+                        pills.set(i, new ShelfPrefs.Pill(pill.id, pill.name, ShelfPrefs.KIND_VIEW,
+                                currentViewState().withSavesSort(keepsSort).toJson()));
                         break;
                     }
                 }

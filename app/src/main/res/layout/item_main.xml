@@ -324,36 +324,37 @@
                  bottom was dropped at the user's request - the above three
                  rows replace it. -->
 
-            <androidx.appcompat.widget.LinearLayoutCompat
+            <!-- Fork (白い熊, +173): the version has the line to ITSELF.
+                 It used to share row 1 with the backup version (version at
+                 weight 1, backup at wrap_content), which left a 36-43 character
+                 fork version name about ten characters once a 9-character
+                 backup version had taken its share - so the one field that
+                 grew was the one being squeezed. The backup version now sits on
+                 its own line directly beneath, still flush right and still
+                 immediately under the installed version, so the comparison the
+                 pair exists for - is my backup current? - is read down instead
+                 of across and both get the full width of the column. -->
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/version"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:singleLine="true"
+                android:ellipsize="middle"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                tools:text="4.1.1+2026-09-05.03-37.g41d79af5+016" />
 
-                <androidx.appcompat.widget.AppCompatTextView
-                    android:id="@+id/version"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:singleLine="true"
-                    android:textAppearance="?attr/textAppearanceBodySmall"
-                    tools:text="v3.0.0" />
-
-                <androidx.appcompat.widget.AppCompatTextView
-                    android:id="@+id/backup_version"
-                    android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
-                    android:layout_marginStart="@dimen/padding_small"
-                    android:layout_weight="0"
-                    android:gravity="center_vertical"
-                    android:singleLine="true"
-                    android:textAppearance="?attr/textAppearanceBodySmall"
-                    android:textSize="11sp"
-                    android:visibility="gone"
-                    tools:text="3.1.9"
-                    tools:visibility="visible" />
-
-            </androidx.appcompat.widget.LinearLayoutCompat>
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/backup_version"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="end"
+                android:singleLine="true"
+                android:ellipsize="middle"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textSize="11sp"
+                android:visibility="gone"
+                tools:text="3.1.9"
+                tools:visibility="visible" />
 
             <!-- Fork: share-of-drain bar, used only by the battery screens
                  (MainCardBinder shows it when a battery row is bound). GONE by

@@ -122,6 +122,11 @@ public final class MainCardBinder {
         View barTrack = card.findViewById(R.id.battery_bar_track);
         if (barTrack != null) barTrack.setVisibility(View.GONE);
         TextView version = card.findViewById(R.id.version);
+        // Fork (白い熊, +173): the main list autosizes this view for long version names. Autosize
+        // wins over setTextSize, so a lens rendering into a recycled row would inherit a shrunk
+        // line it never asked for -- turn it off before writing a lens's own text.
+        androidx.core.widget.TextViewCompat.setAutoSizeTextTypeWithDefaults(version,
+                androidx.core.widget.TextViewCompat.AUTO_SIZE_TEXT_TYPE_NONE);
         version.setText(customLines.isEmpty() ? "" : customLines.get(0));
         version.setTextColor(customAccent != 0 ? customAccent : ForkThemeUtils.getTextColor());
         version.setGravity(android.view.Gravity.END);

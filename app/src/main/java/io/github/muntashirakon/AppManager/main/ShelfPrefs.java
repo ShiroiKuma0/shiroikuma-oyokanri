@@ -98,6 +98,22 @@ public final class ShelfPrefs {
         public final int filterFlags;
         public final int sortBy;
         public final boolean reverseSort;
+        /**
+         * Fork (白い熊, +174): whether this view carries a sort at all.
+         * <p>
+         * A saved view stores filters and sort together because they usually only mean anything
+         * together — but not always. 白い熊 keeps one order across the whole list and flicks
+         * between views underneath it, and every pill re-imposing the order it was saved with is
+         * what looked like the sort "getting default-sorted often": a pill captured while the list
+         * was on App label put it back on App label for ever.
+         * <p>
+         * So the pill says which kind it is. With this off, applying the view changes the filters
+         * and leaves whatever order you are reading in.
+         * <p>
+         * <b>Wire format: absent means TRUE.</b> Every pill made before this existed was saved
+         * with a sort and must keep behaving exactly as it did.
+         */
+        public final boolean savesSort;
         @NonNull
         public final Set<String> profilesInclude;
         @NonNull
@@ -109,6 +125,14 @@ public final class ShelfPrefs {
         public ViewState(int filterFlags, int sortBy, boolean reverseSort,
                          @NonNull Set<String> profilesInclude, @NonNull Set<String> profilesExclude,
                          @Nullable String query, int queryType) {
+            this(filterFlags, sortBy, reverseSort, profilesInclude, profilesExclude, query,
+                    queryType, true);
+        }
+
+        public ViewState(int filterFlags, int sortBy, boolean reverseSort,
+                         @NonNull Set<String> profilesInclude, @NonNull Set<String> profilesExclude,
+                         @Nullable String query, int queryType, boolean savesSort) {
+            this.savesSort = savesSort;
             this.filterFlags = filterFlags;
             this.sortBy = sortBy;
             this.reverseSort = reverseSort;
@@ -125,6 +149,11 @@ public final class ShelfPrefs {
                 o.put("flags", filterFlags);
                 o.put("sort", sortBy);
                 o.put("reverse", reverseSort);
+                // Written only when FALSE: absent means true, so a pill that carries its sort is
+                // byte-identical to one written before this field existed.
+                if (!savesSort) {
+                    o.put("save_sort", false);
+                }
                 o.put("include", new JSONArray(profilesInclude));
                 o.put("exclude", new JSONArray(profilesExclude));
                 if (!TextUtils.isEmpty(query)) {
@@ -146,6 +175,7 @@ public final class ShelfPrefs {
             Set<String> exclude = new HashSet<>();
             String query = null;
             int queryType = 0;
+            boolean savesSort = true;
             try {
                 JSONObject o = new JSONObject(json == null ? "{}" : json);
                 flags = o.optInt("flags", 0);
@@ -155,10 +185,11 @@ public final class ShelfPrefs {
                 readInto(o.optJSONArray("exclude"), exclude);
                 query = o.has("query") ? o.optString("query", null) : null;
                 queryType = o.optInt("query_type", 0);
+                savesSort = o.optBoolean("save_sort", true);
             } catch (Throwable th) {
                 Log.w(TAG, "unreadable view payload; falling back to the unfiltered list", th);
             }
-            return new ViewState(flags, sort, reverse, include, exclude, query, queryType);
+            return new ViewState(flags, sort, reverse, include, exclude, query, queryType, savesSort);
         }
 
         private static void readInto(@Nullable JSONArray array, @NonNull Set<String> out) {
@@ -167,6 +198,13 @@ public final class ShelfPrefs {
                 String s = array.optString(i, null);
                 if (!TextUtils.isEmpty(s)) out.add(s);
             }
+        }
+
+        /** The same view, with the sort-carrying choice replaced — used by "update to current". */
+        @NonNull
+        public ViewState withSavesSort(boolean savesSort) {
+            return new ViewState(filterFlags, sortBy, reverseSort, profilesInclude, profilesExclude,
+                    query, queryType, savesSort);
         }
 
         /** Whether this view narrows the list at all — an empty one is the plain list. */

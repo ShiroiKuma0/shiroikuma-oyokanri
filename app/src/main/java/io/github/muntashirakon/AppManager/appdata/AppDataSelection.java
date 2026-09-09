@@ -100,6 +100,30 @@ public class AppDataSelection {
      * An id that has disappeared from the app is dropped rather than sent back to it, which would
      * earn an {@code ERROR:unknown category in items}.
      */
+    /**
+     * Fork (白い熊): what this app would actually export right now, stored choice or not.
+     *
+     * <p>{@link #reconcile} answers only half the question — it needs a {@link Stored}, and the
+     * commonest case by far is an app that has never been customised, where the answer is the
+     * app's own defaults. A caller that wants to <b>say</b> whether anything is being left out
+     * needs both halves, and two callers working that out separately is how they come to
+     * disagree.
+     */
+    @NonNull
+    public static List<String> effective(@Nullable Stored stored,
+                                         @NonNull List<AppDataCategory> offered) {
+        if (stored != null) {
+            return reconcile(stored, offered);
+        }
+        List<String> defaults = new ArrayList<>();
+        for (AppDataCategory category : offered) {
+            if (category.defaultOn) {
+                defaults.add(category.id);
+            }
+        }
+        return defaults;
+    }
+
     @NonNull
     public static List<String> reconcile(@NonNull Stored stored, @NonNull List<AppDataCategory> offered) {
         List<String> effective = new ArrayList<>();

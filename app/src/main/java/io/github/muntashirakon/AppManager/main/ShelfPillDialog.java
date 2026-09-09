@@ -34,6 +34,7 @@ import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.ForkThemeUtils;
 import io.github.muntashirakon.widget.FlowLayout;
+import io.github.muntashirakon.AppManager.main.lens.SisterAppsLens;
 
 /**
  * Fork (白い熊, +119): the dialog that makes a shelf pill.
@@ -127,11 +128,42 @@ public final class ShelfPillDialog {
         body.addView(filterFlow);
 
         // ── Sort ────────────────────────────────────────────────────────────
+        final List<TextView> sortPillsRef = new ArrayList<>();
         body.addView(sectionLabel(context, R.string.shelf_section_sort, dim));
+        // Fork (白い熊, +174): a pill either carries a sort or deliberately does not.
+        //
+        // 白い熊 wants both kinds on the shelf: some views are a whole reading — "biggest apps,
+        // by size" — and mean nothing without their order; others are just a narrowing you drop
+        // over whatever order you are already in, and having those re-impose a sort saved months
+        // ago is what made the sort look like it kept resetting itself.
+        //
+        // The toggle leads the section rather than hiding at the end of it, because it decides
+        // whether anything below it is even read. With it off the orders stay visible but faded
+        // and inert: greying them says "not applicable" where removing them would say "there is
+        // no sort", which is a different and wrong claim.
+        final boolean[] savesSort = {current.savesSort};
         final int[] sortBy = {current.sortBy};
         FlowLayout sortFlow = flow(context);
+        TextView saveSortPill = RowPills.actionPill(context, context.getString(R.string.shelf_save_sort),
+                0, ink, savesSort[0]);
+        saveSortPill.setOnClickListener(v -> {
+            savesSort[0] = !savesSort[0];
+            RowPills.styleActionPill(saveSortPill, ink, savesSort[0]);
+            saveSortPill.setText(context.getString(savesSort[0]
+                    ? R.string.shelf_save_sort : R.string.shelf_save_sort_off));
+            sortFlow.setAlpha(savesSort[0] ? 1f : 0.4f);
+            for (TextView p : sortPillsRef) {
+                p.setEnabled(savesSort[0]);
+            }
+        });
+        if (!savesSort[0]) {
+            saveSortPill.setText(context.getString(R.string.shelf_save_sort_off));
+        }
+        FlowLayout saveSortFlow = flow(context);
+        saveSortFlow.addView(saveSortPill);
+        body.addView(saveSortFlow);
         LinkedHashMap<Integer, Integer> sortLabels = new MainListOptions().getSortIdLocaleMap();
-        List<TextView> sortPills = new ArrayList<>();
+        List<TextView> sortPills = sortPillsRef;
         List<Integer> sortIds = new ArrayList<>();
         if (sortLabels != null) {
             for (Map.Entry<Integer, Integer> entry : sortLabels.entrySet()) {
@@ -149,6 +181,10 @@ public final class ShelfPillDialog {
                 sortIds.add(id);
                 sortFlow.addView(pill);
             }
+        }
+        sortFlow.setAlpha(savesSort[0] ? 1f : 0.4f);
+        for (TextView p : sortPills) {
+            p.setEnabled(savesSort[0]);
         }
         body.addView(sortFlow);
 
@@ -214,7 +250,7 @@ public final class ShelfPillDialog {
                 .setPositiveButton(R.string.save, (d, which) -> {
                     ShelfPrefs.ViewState state = new ShelfPrefs.ViewState(flags[0], sortBy[0],
                             current.reverseSort, include, exclude,
-                            current.query, current.queryType);
+                            current.query, current.queryType, savesSort[0]);
                     listener.onPillCreated(ShelfPrefs.newView(
                             nameOf(context, name, flags[0], filterLabels), state));
                 }));
@@ -223,6 +259,20 @@ public final class ShelfPillDialog {
         // Save button, which would have to mean two different things depending on what was last
         // touched.
         for (String targetId : ShelfPrefs.allTargetIds()) {
+            // Fork (白い熊, +175): 仲間 is NOT offered as a lens any more.
+            //
+            // It drew nothing — filterOnly() — so it was a second Sister-apps filter under
+            // another name, sitting in the same dialog as the real one and selecting a slightly
+            // different set. 白い熊: "are they a duplicate in fact? In that case leave as filter
+            // only." Its (wider) membership rule moved into SisterAppOption, so the filter pill
+            // above is strictly the better of the two.
+            //
+            // It stays REGISTERED in MainLenses on purpose: the payload is the shelf's wire
+            // format, so a pill made before this build keeps working instead of becoming a pill
+            // that does nothing. Only the way to make NEW ones is withdrawn.
+            if (SisterAppsLens.ID.equals(targetId)) {
+                continue;
+            }
             TextView pill = RowPills.actionPill(context,
                     context.getString(ShelfPrefs.screenTitle(targetId)),
                     ShelfPrefs.screenIcon(targetId), ink, false);
