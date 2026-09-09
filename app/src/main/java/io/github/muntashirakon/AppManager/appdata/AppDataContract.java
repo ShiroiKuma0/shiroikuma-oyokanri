@@ -15,6 +15,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import io.github.muntashirakon.AppManager.BuildConfig;
+import io.github.muntashirakon.AppManager.db.utils.AppDb;
+import io.github.muntashirakon.AppManager.db.entity.Backup;
 
 /**
  * Fork: capability discovery and wire vocabulary for the sister-app data contract (v2).
@@ -177,8 +179,92 @@ public final class AppDataContract {
     // needed a restart to notice a new sister app would be worse than a slow one.
     private static final long SUPPORTED_CACHE_MS = 5_000L;
     @Nullable
+    private static volatile Set<String> sEverSister;
+    private static volatile long sEverSisterAt;
+    @Nullable
     private static volatile Set<String> sSupported;
     private static volatile long sSupportedAt;
+
+    /**
+     * Fork (白い熊, +175): every app that <b>is</b> a sister app, on either of the two witnesses.
+     *
+     * <p>This is a deliberately wider question than {@link #supportedPackages}, which asks "can I
+     * talk to it right now" and therefore requires a readable manifest AND a contract version this
+     * build speaks. That is the right test before a transfer and the wrong one for a list: it
+     * silently drops the two cases you most want to see.
+     *
+     * <ul>
+     * <li><b>Known only from a backup.</b> A backup that carried app-supplied data is proof the
+     * app is a sister app, and on the phone this whole contract exists for — a freshly wiped one —
+     * it is the ONLY proof available, because the manifest of an app that is not installed yet
+     * cannot be read.</li>
+     * <li><b>Declared but unusable.</b> An app whose contract version we do not speak is still a
+     * sister app; hiding it makes a version mismatch look like the app never having a door.</li>
+     * </ul>
+     *
+     * <p>This is the same rule {@code SisterAppsLens.prepare} applies (manifest OR a backup with
+     * app data), which is what lets the two agree — see the note there.
+     */
+    @NonNull
+    public static Set<String> everSisterPackages(@NonNull Context context) {
+        Set<String> cached = sEverSister;
+        if (cached != null && SystemClock.elapsedRealtime() - sEverSisterAt < SUPPORTED_CACHE_MS) {
+            return cached;
+        }
+        Set<String> sister = new HashSet<>();
+        // Every package whose manifest we can read at all. For these the manifest is the ANSWER,
+        // present or absent -- see the backup pass below for why that matters.
+        Set<String> manifestReadable = new HashSet<>();
+        try {
+            List<ApplicationInfo> apps = context.getPackageManager().getInstalledApplications(
+                    PackageManager.GET_META_DATA
+                            | PackageManager.MATCH_UNINSTALLED_PACKAGES
+                            | PackageManager.MATCH_DISABLED_COMPONENTS);
+            for (ApplicationInfo app : apps) {
+                manifestReadable.add(app.packageName);
+                // Declared is enough here; usability is a separate question -- see above.
+                if (fromMetaData(app.metaData) != null) {
+                    sister.add(app.packageName);
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+        try {
+            // The backup witness, and it applies ONLY where there is no manifest to read.
+            //
+            // LANDMINE (白い熊, +022 -- it shipped wrong in +020): Backup.flags records what the
+            // backup was ASKED for, not what it got. App-supplied data is ticked by default, and
+            // BackupOp.backupAppData returns early for an app that declares no contract WITHOUT
+            // clearing the flag -- so essentially every backup on the phone claims backupAppData()
+            // and trusting it made the Sister apps filter match everything with a backup.
+            //
+            // Two guards. First, only consider a package whose manifest could not be read at all:
+            // for anything installed the manifest is authoritative in both directions, and this is
+            // the case the backup witness exists for anyway (a wiped phone, app not installed
+            // yet). Second, confirm the archive really holds the file -- getAppDataFile throws
+            // when it does not, which is how RestoreOp tells "no app data" from an error. That is
+            // a filesystem check, kept affordable by the manifest gate above reducing it to the
+            // handful of backed-up-but-absent packages.
+            for (Backup backup : new AppDb().getAllBackups()) {
+                if (backup == null || backup.packageName == null
+                        || sister.contains(backup.packageName)
+                        || manifestReadable.contains(backup.packageName)
+                        || !backup.getFlags().backupAppData()) {
+                    continue;
+                }
+                try {
+                    backup.getItem().getAppDataFile();
+                    sister.add(backup.packageName);
+                } catch (Throwable ignore) {
+                    // No app-supplied data in this archive after all.
+                }
+            }
+        } catch (Throwable ignore) {
+        }
+        sEverSister = sister;
+        sEverSisterAt = SystemClock.elapsedRealtime();
+        return sister;
+    }
 
     /**
      * Every installed package declaring a contract this build can speak.

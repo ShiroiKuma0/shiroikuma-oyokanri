@@ -19,8 +19,11 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
+import io.github.muntashirakon.AppManager.appdata.AppDataCategory;
 import io.github.muntashirakon.AppManager.appdata.AppDataCategoryPicker;
 import io.github.muntashirakon.AppManager.appdata.AppDataContract;
+import io.github.muntashirakon.AppManager.appdata.AppDataSelection;
+import io.github.muntashirakon.AppManager.appdata.AppDataTransfer;
 import io.github.muntashirakon.AppManager.backup.BackupFlags;
 import androidx.annotation.NonNull;
 import androidx.appcompat.widget.AppCompatImageView;
@@ -31,8 +34,10 @@ import androidx.core.util.Consumer;
 import java.util.List;
 
 import io.github.muntashirakon.AppManager.R;
+import io.github.muntashirakon.AppManager.utils.ContextUtils;
 import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.ForkThemeUtils;
+import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 
 /**
  * Fork (白い熊, +121): how a backup's parts are drawn wherever you choose between them.
@@ -160,6 +165,12 @@ public final class BackupPartRows {
         return pill;
     }
 
+    /**
+     * The fork's critical red, used here for the two answers that are not merely a narrowing:
+     * a ticked part that would export nothing, and an app that would not answer at all.
+     */
+    private static final int WARN_MISSING = 0xFFFF0028;
+
     /** A plain pill in one colour — the app-data categories, which have no palette of their own. */
     @NonNull
     public static TextView plainPill(@NonNull Context context, @NonNull CharSequence text,
@@ -270,6 +281,8 @@ public final class BackupPartRows {
         body.setPadding(pad, Math.round(4 * d), pad, 0);
         List<BackupParts.Part> parts = BackupParts.allParts(supportedFlags);
         boolean sister = packageName != null && AppDataContract.isSupported(context, packageName);
+        // Fork (白い熊): filled in once the app has answered -- see askForCategories below.
+        final Runnable[] askForCategories = {null};
         for (BackupParts.Part part : parts) {
             body.addView(partRow(context, part, (chosen[0] & part.flag) != 0, on -> {
                 if (on) {
@@ -277,15 +290,99 @@ public final class BackupPartRows {
                 } else {
                     chosen[0] &= ~part.flag;
                 }
+                // Switching the part ON is the moment its categories start to matter. Asking
+                // before that would thaw an app to answer a question about a part that is off.
+                if (on && part.flag == BackupFlags.BACKUP_APP_DATA && askForCategories[0] != null) {
+                    askForCategories[0].run();
+                }
             }));
             if (part.flag == BackupFlags.BACKUP_APP_DATA && sister) {
                 final String pkg = packageName;
                 TextView categoriesPill = plainPill(context,
                         context.getString(R.string.appdata_categories), part.color, false, on -> {
                         });
+                // Fork (白い熊, +172): the pill says whether ANYTHING IS BEING LEFT OUT, before
+                // it is tapped.
+                //
+                // It used to read "App data categories" and nothing else, so the one question you
+                // have while setting up a backup -- is all of this app's data going in? -- could
+                // only be answered by opening the picker and counting ticks, for every app, every
+                // time. And the commonest way to lose data here is silent: an app whose own
+                // defaults exclude a category, or a narrowing chosen months ago and forgotten.
+                //
+                // The categories cannot be known without asking the app (a broadcast round trip
+                // that may have to thaw it), which is why nothing has said this until now. But
+                // that cost is right HERE and wrong in a list: this dialog is one app, opened
+                // deliberately to decide exactly this, and tapping the pill would pay the same
+                // cost a moment later anyway.
+                final List<AppDataCategory>[] offered = new List[]{null};
+                final boolean[] asked = {false};
+                Runnable renderSummary = () -> {
+                    List<AppDataCategory> all = offered[0];
+                    if (all == null) {
+                        // Not asked yet, or the app would not answer. Both are said out loud:
+                        // a pill that falls back to its bare name reads as "nothing to report",
+                        // and for an app that refused to list its data that would be a lie.
+                        boolean unavailable = asked[0];
+                        categoriesPill.setText(unavailable
+                                ? context.getString(R.string.appdata_categories_summary_unknown)
+                                : context.getString(R.string.appdata_categories));
+                        applyPillStyle(categoriesPill, unavailable ? WARN_MISSING : part.color, false);
+                        return;
+                    }
+                    int total = all.size();
+                    // The run-scoped pick wins where the picker made one; otherwise the stored
+                    // choice, or the app's own defaults. Same resolution the exporter performs.
+                    int on = categories[0] != null
+                            ? categories[0].size()
+                            : AppDataSelection.effective(AppDataSelection.get(context, pkg), all).size();
+                    if (on >= total) {
+                        categoriesPill.setText(context.getString(
+                                R.string.appdata_categories_summary_all, total));
+                        applyPillStyle(categoriesPill, part.color, false);
+                    } else if (on <= 0) {
+                        // The part is ticked and would export nothing -- the one case here that
+                        // is plainly wrong rather than merely narrowed.
+                        categoriesPill.setText(context.getString(
+                                R.string.appdata_categories_summary_none, total));
+                        applyPillStyle(categoriesPill, WARN_MISSING, false);
+                    } else {
+                        categoriesPill.setText(context.getString(
+                                R.string.appdata_categories_summary_partial, on, total, total - on));
+                        // The theme yellow, the fork's "this departs from the whole -- look at
+                        // it", not the red reserved for a failure. A narrowed set is usually
+                        // deliberate; it still has to be visible.
+                        applyPillStyle(categoriesPill, ForkThemeUtils.getTextColor(), false);
+                    }
+                };
+                askForCategories[0] = () -> {
+                    if (asked[0]) {
+                        return;
+                    }
+                    asked[0] = true;
+                    categoriesPill.setText(context.getString(
+                            R.string.appdata_categories_summary_asking));
+                    ThreadUtils.postOnBackgroundThread(() -> {
+                        List<AppDataCategory> listed = new AppDataTransfer(ContextUtils.getContext())
+                                .listCategories(pkg, userId);
+                        ThreadUtils.postOnMainThread(() -> {
+                            offered[0] = listed == null || listed.isEmpty() ? null : listed;
+                            renderSummary.run();
+                        });
+                    });
+                };
                 categoriesPill.setOnClickListener(v ->
                         AppDataCategoryPicker.show(context, pkg, userId,
-                                picked -> categories[0] = picked));
+                                picked -> {
+                                    categories[0] = picked;
+                                    // The picker has just listed them itself, so re-reading our
+                                    // own answer costs nothing and keeps the pill honest whichever
+                                    // way it was closed -- OK, Save, or the app's defaults.
+                                    renderSummary.run();
+                                }));
+                if ((chosen[0] & BackupFlags.BACKUP_APP_DATA) != 0) {
+                    askForCategories[0].run();
+                }
                 LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
                 lp.setMarginStart(Math.round(36 * d));

@@ -44,7 +44,15 @@
     <string name="error">Error</string>
     <string name="loading">Loading…</string>
     <string name="sort_by_app_label">App label</string>
-    <string name="sort_by_package_name">Package name</string>
+    <!-- Fork (白い熊): "App ID", not "Package name". This sorts on
+         ApplicationInfo.packageName, which is the installed identity — the Gradle
+         applicationId. "Package name" is the older term and means the manifest package,
+         i.e. the Java namespace, which since AGP 7 is a separate thing. This very app is
+         the proof: namespace io.github.muntashirakon.AppManager, applicationId
+         shiroikuma.oyokanri. The old label named the string the fork does NOT change
+         while displaying the one it does. The resource name stays put, so the sort id and
+         every saved view are untouched. -->
+    <string name="sort_by_package_name">App ID</string>
     <string name="sort_by_domain">User apps first</string>
     <string name="sort_by_target_sdk">Target SDK</string>
     <string name="sdk" translatable="false">SDK</string>
@@ -813,6 +821,12 @@
     <string name="appdata_categories_asking">Asking the app what it can export…</string>
     <string name="appdata_categories_unavailable">This app would not list its data categories.</string>
     <string name="appdata_categories_use_defaults">Use app\'s defaults</string>
+    <!-- Fork (白い熊): the pill has to answer "is anything being left out?" before it is tapped. -->
+    <string name="appdata_categories_summary_asking">App data categories · asking…</string>
+    <string name="appdata_categories_summary_all">App data categories · all %1$d</string>
+    <string name="appdata_categories_summary_partial">App data categories · %1$d of %2$d · %3$d left out</string>
+    <string name="appdata_categories_summary_none">App data categories · none of %1$d</string>
+    <string name="appdata_categories_summary_unknown">App data categories · could not ask the app</string>
     <string name="backup_obb_media_description">Back up OBB and media folders.</string>
     <string name="backup_cache_description">Also include the <b>cache</b>, <b>code_cache</b> and <b>no_backup</b> subfolders of the folders above. Android treats all three as disposable, and <b>no_backup</b> is the app explicitly asking not to have it backed up.</string>
     <string name="backup_extras">Extras</string>
@@ -1845,6 +1859,10 @@
     <!-- Fork: main app list app-icon controls (size + roundness) -->
     <string name="pref_mainlist_icon_size">App icon size</string>
     <string name="pref_mainlist_icon_size_hint">Size of the app icons in the list</string>
+    <!-- Fork (白い熊, +173): the version/backup block width, per geometry. -->
+    <string name="pref_mainlist_right_width">Version column width</string>
+    <string name="pref_mainlist_right_width_hint">How much of the row the version and backup block takes, as a share of a full version name. Every pixel here comes out of the app name and package id beside it, so this is remembered separately for each screen geometry — folded, unfolded and each grid.</string>
+    <string name="pref_mainlist_right_width_value">%1$d%% · %2$s</string>
     <string name="pref_mainlist_icon_roundness">App icon roundness</string>
     <string name="pref_mainlist_icon_roundness_hint">Corner roundness (0 = square, 50 = circle)</string>
     <!-- Fork: process monitor settings (colours + app-icon size) -->
@@ -2558,6 +2576,9 @@
     <string name="shelf_section_filters">Filters</string>
     <string name="shelf_section_profiles">Profiles</string>
     <string name="shelf_section_sort">Sort by</string>
+    <!-- Fork (白い熊, +174): whether a saved view carries its sort. -->
+    <string name="shelf_save_sort">Save the sort with this pill</string>
+    <string name="shelf_save_sort_off">Keep the current sort</string>
     <string name="shelf_section_lenses">Or a lens</string>
     <string name="shelf_section_screens">Or a screen</string>
     <string name="shelf_also_carries">Also carries: %s</string>
@@ -2760,6 +2781,9 @@
     <string name="restore_stage_verifying_archive">Checking the archive</string>
     <string name="restore_stage_decrypting">Decrypting</string>
     <string name="restore_stage_staging">Unpacking the archive</string>
+    <!-- Fork: the phase AFTER our staging copy - the sister app importing what we handed it.
+         Without it the header kept naming the staging copy for the whole import. -->
+    <string name="restore_stage_importing">The app is restoring its data</string>
     <!-- Fork (白い熊, +143): Cancel, once it has been heard. -->
     <string name="op_cancelling">Cancelling…</string>
 </resources>

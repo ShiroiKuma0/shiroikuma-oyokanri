@@ -47,6 +47,8 @@ import java.util.List;
 import java.util.Locale;
 
 import io.github.muntashirakon.AppManager.R;
+import io.github.muntashirakon.AppManager.utils.LayoutGeometry;
+import io.github.muntashirakon.AppManager.main.MainLayoutPrefs;
 import io.github.muntashirakon.AppManager.appdata.self.MigrationKit;
 import io.github.muntashirakon.AppManager.main.LastScreenPrefs;
 import io.github.muntashirakon.AppManager.processreaper.MonitorPrefs;
@@ -243,6 +245,7 @@ public class FontsPreferences extends Fragment {
             if (g.titleRes == R.string.pref_font_group_main_list) {
                 groupContent.addView(buildMainIconElement(inflater, groupContent));
                 groupContent.addView(buildMainRoundnessElement(inflater, groupContent));
+                groupContent.addView(buildRightColumnElement(inflater, groupContent));
             }
             container.addView(groupView);
         }
@@ -821,6 +824,51 @@ public class FontsPreferences extends Fragment {
 
     /** Fork: the main app list app-icon size slider. */
     @NonNull
+    /**
+     * Fork (白い熊, +173): how wide the version/backup block is, <b>for this geometry</b>.
+     *
+     * <p>The row has one pool of width and the split is a real trade — the version in full, or the
+     * package id in full. 100% is exactly the width of a full fork version name, so the version
+     * always fits; pull it down and the app name gets the difference while the version falls back
+     * to shrinking and then to a middle ellipsis, which keeps its two useful ends.
+     *
+     * <p>It is per geometry because the right answer is not the same folded, unfolded and in a
+     * four-column grid — the same reason the column count beside it is stored that way. The value
+     * line names the geometry it is editing, or a slider that silently means something different
+     * after unfolding would be worse than no slider.
+     */
+    private View buildRightColumnElement(@NonNull LayoutInflater inflater, @NonNull LinearLayoutCompat parent) {
+        View element = inflater.inflate(R.layout.view_separator_element, parent, false);
+        ((AppCompatTextView) element.findViewById(R.id.element_label))
+                .setText(R.string.pref_mainlist_right_width);
+        ((AppCompatTextView) element.findViewById(R.id.sep_sublabel))
+                .setText(R.string.pref_mainlist_right_width_hint);
+        final AppCompatTextView valueView = element.findViewById(R.id.sep_width_value);
+        final AppCompatSeekBar seek = element.findViewById(R.id.sep_width_seek);
+        final int min = MainLayoutPrefs.RIGHT_COLUMN_PCT_MIN;
+        seek.setMax(MainLayoutPrefs.RIGHT_COLUMN_PCT_MAX - min);
+        final Runnable render = () -> {
+            // The VIEW's context, never the fragment's application one: LayoutGeometry reads the
+            // window configuration to decide which geometry is being edited.
+            int pct = MainLayoutPrefs.getRightColumnPct(element.getContext());
+            valueView.setText(getString(R.string.pref_mainlist_right_width_value, pct,
+                    LayoutGeometry.key(element.getContext())));
+            seek.setProgress(pct - min);
+        };
+        render.run();
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                MainLayoutPrefs.setRightColumnPct(element.getContext(), min + progress);
+                render.run();
+            }
+            @Override public void onStartTrackingTouch(SeekBar sb) {}
+            @Override public void onStopTrackingTouch(SeekBar sb) {}
+        });
+        return element;
+    }
+
     private View buildMainIconElement(@NonNull LayoutInflater inflater, @NonNull LinearLayoutCompat parent) {
         View element = inflater.inflate(R.layout.view_separator_element, parent, false);
         ((AppCompatTextView) element.findViewById(R.id.element_label)).setText(R.string.pref_mainlist_icon_size);

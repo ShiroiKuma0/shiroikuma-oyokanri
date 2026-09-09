@@ -141,6 +141,19 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
 
     /** SharedPreferences file holding the multi-profile filter state. */
     private static final String PREFS_PROFILE_FILTER = "am_main_page_profile_filter";
+    /**
+     * Fork (白い熊, +174): the lens state, which used to live only in memory.
+     * <p>
+     * A lens is a view of the list, and the fork already persists every other part of that view —
+     * filter flags, sort, reverse, profile filters, per-geometry columns. The lens was the one
+     * thing that was not, so <b>anything that rebuilt this view model silently dropped it</b>:
+     * folding the Mate XT, rotating, a multi-window move, EMUI killing the process. The list came
+     * back showing everything, which reads as the lens having been cleared by something rather
+     * than never having been saved.
+     */
+    private static final String PREFS_LENS = "shiroikuma_main_lens";
+    private static final String PREF_KEY_LENS = "lens";
+    private static final String PREF_KEY_FILTER_LENSES = "filter_lenses";
     private static final String PREF_KEY_INCLUDE = "include";
     private static final String PREF_KEY_EXCLUDE = "exclude";
 
@@ -152,6 +165,18 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
         mSortBy = Prefs.MainPage.getSortOrder();
         mReverseSort = Prefs.MainPage.isReverseSort();
         mFilterFlags = Prefs.MainPage.getFilters();
+        // Fork (白い熊, +174): restore the lens alongside the rest of the view state.
+        android.content.SharedPreferences lensPrefs = application.getSharedPreferences(
+                PREFS_LENS, android.content.Context.MODE_PRIVATE);
+        String storedLens = lensPrefs.getString(PREF_KEY_LENS, null);
+        // A lens id that no longer exists is dropped rather than kept: it would narrow nothing and
+        // light no pill, so it can only confuse.
+        mLensId = MainLenses.get(storedLens) != null ? storedLens : null;
+        for (String id : lensPrefs.getStringSet(PREF_KEY_FILTER_LENSES, Collections.emptySet())) {
+            if (MainLenses.get(id) != null) {
+                mFilterLensIds.add(id);
+            }
+        }
         // Load multi-profile filter state from our own SharedPreferences file
         // (kept separate from libcore Prefs.MainPage so we don't have to thread
         // new keys through that class). Sorted alphabetically on load so the
@@ -354,6 +379,7 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
         if (!mFilterLensIds.remove(lensId)) {
             mFilterLensIds.add(lensId);
         }
+        persistLensState();
         cancelIfRunning();
         mFilterResult = executor.submit(this::filterItemsByFlags);
     }
@@ -361,11 +387,21 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
     /**
      * Fork: enter a lens, or leave it with null. One pipeline pass, like every other setter here.
      */
+    /** Fork (白い熊, +174): the single writer of the persisted lens state. */
+    private void persistLensState() {
+        getApplication().getSharedPreferences(PREFS_LENS, android.content.Context.MODE_PRIVATE)
+                .edit()
+                .putString(PREF_KEY_LENS, mLensId)
+                .putStringSet(PREF_KEY_FILTER_LENSES, new HashSet<>(mFilterLensIds))
+                .apply();
+    }
+
     public void setLens(@Nullable String lensId) {
         if (Objects.equals(mLensId, lensId)) {
             return;
         }
         mLensId = lensId;
+        persistLensState();
         // Fork (白い熊): the sort no longer restarts here. It used to, because a lens sort was a
         // bare index whose meaning changed from lens to lens; every order is now an ordinary sort
         // id that means the same thing everywhere, so changing the view keeps the order you chose.
@@ -461,6 +497,18 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
      * left untouched (it is not a filter).
      */
     public void clearAllFilters() {
+        // Fork (白い熊, +174): the LENSES go too.
+        //
+        // 白い熊: "the remove-filters when in Sister apps shows everything, but doesn't release the
+        // pill's fill, so it still looks on while we're showing something else." Both halves of
+        // that are the same omission — this cleared the flags, the profile filters and the search
+        // and left the lens state untouched, so what the page showed and what the shelf claimed
+        // could not agree. A lens IS a filter in the only sense that matters here (白い熊's own
+        // words about 仲間: "Sister apps is just a filter"), so clearing filters clears it, and
+        // MainActivity relights the shelf from this state immediately afterwards.
+        mLensId = null;
+        mFilterLensIds.clear();
+        persistLensState();
         mFilterFlags = 0;
         Prefs.MainPage.setFilters(0);
         mProfileFiltersInclude.clear();

@@ -142,7 +142,19 @@ public class SisterAppsLens implements MainLens {
             // available. The manifest cannot be read for an app that is not installed yet, so a
             // metadata-only rule hid exactly the apps the migration is about. Either witness is
             // enough; the manifest is preferred where both exist, because it is the current truth.
-            if (support == null && backupWithData == null) {
+            // Fork (白い熊, +175): this rule — manifest OR a backup carrying app data — is now
+            // also AppDataContract.everSisterPackages, which is what the Sister apps FILTER asks.
+            // Keep the two in step: they are deliberately the same membership, and the filter is
+            // the surface 白い熊 uses, this lens surviving only for pills made before +175.
+            // Fork (白い熊, +176): the backup witness applies ONLY where no manifest could be
+            // read. Backup.flags says what was ASKED for, and app-supplied data is ticked by
+            // default while BackupOp skips it silently for an app that declares no contract -- so
+            // a backup claiming backupAppData() proves nothing about an installed app. Where the
+            // manifest IS readable it answers in both directions and is the only thing consulted.
+            // See AppDataContract.everSisterPackages, which is the same rule and the surface the
+            // Sister apps filter asks.
+            boolean manifestReadable = app != null;
+            if (support == null && (backupWithData == null || manifestReadable)) {
                 continue;
             }
             Info info = new Info();

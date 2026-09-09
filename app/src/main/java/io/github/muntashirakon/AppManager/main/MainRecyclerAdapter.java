@@ -28,6 +28,9 @@ import android.text.SpannableString;
 import android.text.TextUtils;
 import android.text.style.RelativeSizeSpan;
 import android.view.LayoutInflater;
+import android.text.TextPaint;
+import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
@@ -43,6 +46,7 @@ import androidx.appcompat.widget.LinearLayoutCompat;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.core.widget.TextViewCompat;
 
 import com.google.android.material.card.MaterialCardView;
 
@@ -451,7 +455,20 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
     }
 
     /** The widest single item in the version/backup block, and its reference width. */
-    private static final String RIGHT_COLUMN_REFERENCE = "SHA384withRSA";
+    /**
+     * Fork (白い熊, +173): the block is sized from a VERSION, not from the signature.
+     * <p>
+     * This literal is a real fork version name at its full shape —
+     * {@code <base>+<upstream base date>.<HH-MM>.g<sha8>+<NNN>} — because that is the widest thing
+     * the column now carries and the thing 白い熊 asked to be able to read in full. The old
+     * reference was {@code "SHA384withRSA"}: 13 characters for a field that had grown to 43.
+     * <p>
+     * It is deliberately a fixed string rather than the row's own version: a per-row width would
+     * make the column ragged down the list, which is worse than either extreme. What varies is the
+     * multiplier, and that is {@code MainLayoutPrefs.getRightColumnPct} — per geometry, 白い熊's
+     * to set.
+     */
+    private static final String RIGHT_COLUMN_REFERENCE = "4.1.1+2026-09-05.03-37.g41d79af5+016";
 
     /**
      * Fork (白い熊, +094): the row's note affordance — ONE pill, right-aligned on
@@ -513,6 +530,116 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
      * column count and a fold can change the window under a live list, and both
      * rebind rows without re-inflating them.
      */
+    /**
+     * Fork (白い熊, +173/+178): size the installed version and the backup version <b>together</b>.
+     *
+     * <p>Two rules, and one function because they cannot be satisfied separately.
+     *
+     * <p><b>They must match.</b> 白い熊: "the backup version font size must be the same as the
+     * app's version font size." Autosizing each view on its own cannot promise that — each would
+     * pick from its own text, so 白い熊 GNU Jami (a long installed version above a longer backup
+     * one) would land on two different sizes stacked in the same column. So one size is chosen
+     * for the pair: the largest at which <em>both</em> fit.
+     *
+     * <p><b>They grow where there is room.</b> "For items that have space — like ArcaneChat — make
+     * them both bigger than the current installed version font size." The configured VERSION size
+     * is therefore the nominal size rather than the ceiling: a short pair grows to
+     * {@link #VERSION_GROW}× it, and a long pair shrinks toward {@link #VERSION_MIN_SP} before the
+     * middle ellipsis in the layout takes over. The font setting still drives everything — it
+     * moves the whole band up and down.
+     *
+     * <p><b>The measurement is done here, not by the framework.</b> {@code TextView} autosize is
+     * per-view by construction and also fights {@code setTextSize}, which is what the +173 version
+     * of this had to work around; measuring the two strings against the column width is both
+     * simpler and the only way to get a shared answer.
+     *
+     * @param backupText the backup version, or null when the column carries no backup version (no
+     *                   backup at all, or the "Back up" hint, which keeps its own size)
+     */
+    /**
+     * Fork (白い熊, +179): put both version lines back to their nominal size.
+     *
+     * <p>Called before anything measures or draws them, and it must not be skipped: the sizes are
+     * chosen per row, {@code FontUtil.apply} only writes a size when the category has one
+     * configured, and a {@code RecyclerView} holder is reused across hundreds of rows. Without
+     * this the "nominal" size read at the next bind is the last row's answer, which then gets
+     * re-fitted from there — the backup line drifting bigger than the installed line, and the rows
+     * growing taller, both came from that.
+     *
+     * <p>The layout default is restored first and the configured font applied over it, in that
+     * order, so the result is the same whether or not a size is configured.
+     */
+    private static void resetVersionSizes(@NonNull ViewHolder holder) {
+        if (holder.version != null) {
+            if (holder.baseVersionPx > 0) {
+                holder.version.setTextSize(TypedValue.COMPLEX_UNIT_PX, holder.baseVersionPx);
+            }
+            FontUtil.apply(holder.version, FontPrefs.VERSION);
+        }
+        if (holder.backupVersion != null) {
+            if (holder.baseBackupPx > 0) {
+                holder.backupVersion.setTextSize(TypedValue.COMPLEX_UNIT_PX, holder.baseBackupPx);
+            }
+            FontUtil.apply(holder.backupVersion, FontPrefs.BACKUP_INFO);
+        }
+    }
+
+    private static void fitVersionPair(@NonNull ViewHolder holder, @Nullable CharSequence backupText) {
+        TextView version = holder.version;
+        if (version == null) {
+            return;
+        }
+        // The nominal size, re-read every bind: FontUtil.apply has already put the configured
+        // value on the view, and a recycled row arrives carrying whatever the last row chose.
+        float density = version.getResources().getDisplayMetrics().scaledDensity;
+        float baseSp = version.getTextSize() / density;
+        int max = Math.max(VERSION_MIN_SP, Math.round(baseSp * VERSION_GROW));
+        int available = version.getWidth() - version.getPaddingLeft() - version.getPaddingRight();
+        if (available <= 0) {
+            // First bind, before layout. The column width is known independently of it, and it is
+            // what the text actually has to fit into.
+            available = holder.rightColumn != null ? holder.rightColumn.getLayoutParams().width : 0;
+        }
+        int chosen = max;
+        if (available > 0) {
+            TextPaint probe = new TextPaint(version.getPaint());
+            CharSequence installed = version.getText();
+            for (int sp = max; sp > VERSION_MIN_SP; --sp) {
+                probe.setTextSize(sp * density);
+                if (fits(probe, installed, available) && fits(probe, backupText, available)) {
+                    chosen = sp;
+                    break;
+                }
+                chosen = VERSION_MIN_SP;
+            }
+        }
+        version.setTextSize(TypedValue.COMPLEX_UNIT_SP, chosen);
+        if (backupText != null && holder.backupVersion != null) {
+            holder.backupVersion.setTextSize(TypedValue.COMPLEX_UNIT_SP, chosen);
+        }
+    }
+
+    private static boolean fits(@NonNull TextPaint paint, @Nullable CharSequence text, int width) {
+        return text == null || text.length() == 0 || paint.measureText(text, 0, text.length()) <= width;
+    }
+
+    /** How small the pair may shrink before the middle ellipsis takes over. */
+    private static final int VERSION_MIN_SP = 9;
+    /**
+     * Fork (白い熊, +179): the pair never grows past the version line's nominal size.
+     * <p>
+     * +178 let a short pair grow to 1.45x, which 白い熊 rejected on sight: these two lines are what
+     * set the right column's height, so anything that makes them taller makes the whole card
+     * taller — "we make the app's box grow vertically here. We don't want that." Growth and a
+     * fixed row height cannot both be had, and the fixed height wins.
+     * <p>
+     * The backup line still ENDS UP bigger than it was, because it is now equalised to the version
+     * line's size rather than pinned at 11sp. The way to make both bigger deliberately is the
+     * VERSION font size on the 白い熊 応用管理 UI page, which moves the pair together and lets 白い熊
+     * accept the extra row height knowingly.
+     */
+    private static final float VERSION_GROW = 1f;
+
     private static void applyColumnProportions(@NonNull Context context, @NonNull ViewHolder holder) {
         applyColumnProportions(context, holder, false);
     }
@@ -525,7 +652,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
      */
     private static void applyColumnProportions(@NonNull Context context, @NonNull ViewHolder holder,
                                                boolean wideRight) {
-        if (holder.centerColumn == null || holder.rightColumn == null || holder.sha == null) return;
+        if (holder.centerColumn == null || holder.rightColumn == null || holder.version == null) return;
         if (wideRight) {
             LinearLayoutCompat.LayoutParams centerLp =
                     (LinearLayoutCompat.LayoutParams) holder.centerColumn.getLayoutParams();
@@ -543,9 +670,10 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             holder.rightColumn.setLayoutParams(rightLp);
             return;
         }
-        // The sha view's own paint, so a larger configured font widens the block
-        // instead of clipping inside it.
-        float referencePx = holder.sha.getPaint().measureText(RIGHT_COLUMN_REFERENCE);
+        // The version view's own paint, so a larger configured font widens the block instead of
+        // clipping inside it. It must be the VERSION's paint now that the version is what the
+        // reference describes — the signature line is no longer drawn in the plain list.
+        float referencePx = holder.version.getPaint().measureText(RIGHT_COLUMN_REFERENCE);
         int rightWidth = MainLayoutPrefs.rightColumnWidthPx(context, referencePx);
         LinearLayoutCompat.LayoutParams centerLp =
                 (LinearLayoutCompat.LayoutParams) holder.centerColumn.getLayoutParams();
@@ -575,6 +703,12 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         // unchanged by it -- icon, film, running box, frames, label line, pane, selection -- except
         // the right-hand column, which is the whole point.
         MainLens lens = mActivity.viewModel != null ? mActivity.viewModel.getLens() : null;
+        // Fork (白い熊, +178): put the version line back to its configured size BEFORE the column
+        // is measured from it. applyColumnProportions measures the reference string with this
+        // view's own paint, and fitVersionPair leaves the paint at whatever size the previous row
+        // needed -- so without this reset the column width would follow the last row bound, and
+        // the columns would go ragged down the list.
+        resetVersionSizes(holder);
         applyColumnProportions(context, holder, lens != null && lens.wideRight());
         bindAppPane(holder, item);
         // Add click listeners
@@ -701,16 +835,18 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             holder.userId.setVisibility(View.GONE);
         }
         FontUtil.apply(holder.userId, FontPrefs.UID);
-        if (item.sha != null) {
-            // Set signature type (right column)
-            holder.sha.setVisibility(View.VISIBLE);
-            holder.sha.setText(item.sha.second);
-        } else {
-            holder.sha.setVisibility(View.GONE);
-        }
-        FontUtil.apply(holder.sha, FontPrefs.SIGNATURE);
-        // Signature had no explicit colour originally; only override if set.
-        if (mcSignatureSet) holder.sha.setTextColor(mcSignature);
+        // Fork (白い熊, +173): the signature-algorithm line is NOT drawn in the plain list.
+        //
+        // It said "SHA384withRSA" — the signing certificate's algorithm, identical for every app
+        // 白い熊 builds — and it cost a line of every row plus, until this build, the width of the
+        // whole column, which was measured from it. 白い熊 traded it for the version's own line.
+        //
+        // The VIEW stays and is only hidden: MainCardBinder.renderCustomRightLines hands it the
+        // third and later lines of a lens's custom right column, so deleting it from the layout
+        // would silently truncate every lens. The signature SORT also stays — sort ids are the
+        // wire format of a saved view and are never renumbered — see the note in the release
+        // summary about it no longer having a visible column.
+        holder.sha.setVisibility(View.GONE);
         // Fork: configurable main-list icon size. Size the icon and widen the
         // icon column to match, and scale the snowflake + ✕ glyphs under it
         // proportionally (so the pair always fits with a gap). Read at bind
@@ -942,9 +1078,21 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             return;
         }
         // Set version (along with HW accelerated, debug and test only flags)
+        // Fork (白い熊, +173): the version line, which is now the widest thing in the row.
+        // Autosize BEFORE the text so a long name shrinks rather than losing its middle; see
+        // fitLongValue.
         holder.version.setText(item.versionTag);
+        // Fork (白い熊, +176): right-aligned, so the installed version sits directly above the
+        // backup version rather than starting at the opposite edge of the same column. Set here
+        // rather than in the layout because this view is shared: the battery card binds it as a
+        // left-aligned stat line, and the lens path sets its own gravity in
+        // MainCardBinder.renderCustomRightLines. Every bind states what it wants, or a recycled
+        // row inherits whichever surface used it last.
+        holder.version.setGravity(Gravity.END);
         // Set version color to dark cyan if the app is inactive
         holder.version.setTextColor(item.isAppInactive ? mcVersionInactive : mcVersionNormal);
+        // Size is settled once for the PAIR, after the backup version is known -- see
+        // fitVersionPair, called at the end of the backup block below.
         FontUtil.apply(holder.version, FontPrefs.VERSION);
         // Set app type: system or user app (along with large heap, suspended, multi-arch,
         // has code, vm safe mode)
@@ -992,7 +1140,19 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             holder.backupTime.setVisibility(View.VISIBLE);
             holder.backupTime.setText(timeFmt.format(when));
             holder.backupTime.setTextColor(mcBackup);
-            FontUtil.apply(holder.backupVersion, FontPrefs.BACKUP_INFO);
+            // Fork (白い熊, +180): the backup VERSION follows the VERSION font, not BACKUP_INFO.
+            //
+            // 白い熊: "they must be identical." Equal text SIZES were not enough and could never
+            // be: the two lines were being given two different typefaces, and the same sp in two
+            // faces with different cap and x-heights reads as two different sizes -- which is
+            // exactly what it looked like. It also made the fit wrong, because fitVersionPair
+            // measures both strings with the version line's paint.
+            //
+            // Only this line moves. The date and time below it stay BACKUP_INFO: they are backup
+            // metadata, they sit opposite the app's own type and SDK lines, and nothing about them
+            // has to line up with a version. The backup version is still told apart by its COLOUR,
+            // which is what distinguished it in the first place.
+            FontUtil.apply(holder.backupVersion, FontPrefs.VERSION);
             FontUtil.apply(holder.backupDate, FontPrefs.BACKUP_INFO);
             FontUtil.apply(holder.backupTime, FontPrefs.BACKUP_INFO);
             bindBackupColumnGestures(holder, item);
@@ -1040,6 +1200,11 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             holder.backupDate.setOnLongClickListener(null);
             holder.backupTime.setOnLongClickListener(null);
         }
+        // Fork (白い熊, +178): both version lines are sized together, here, because this is the
+        // first point at which BOTH texts are known. The backup version is passed only when it
+        // really is a version -- the "Back up" hint that borrows the same view is a different
+        // string and keeps its own size.
+        fitVersionPair(holder, item.backup != null ? item.backup.versionName : null);
         super.onBindViewHolder(holder, position);
     }
 
@@ -1115,6 +1280,8 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
      */
     private void bindLensRightColumn(@NonNull Context context, @NonNull ViewHolder holder,
                                      @NonNull ApplicationItem item, @NonNull MainLens lens) {
+        // Fork (白い熊, +179): the lens's first line goes into the version view, which a plain row
+        // may have shrunk to fit a version string; resetVersionSizes has already put it back.
         holder.backupIndicator.setVisibility(View.GONE);
         holder.backupVersion.setVisibility(View.GONE);
         holder.backupVersion.setAlpha(1f);
@@ -1596,6 +1763,18 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
     }
 
     public static class ViewHolder extends MultiSelectionView.ViewHolder {
+        /**
+         * Fork (白い熊, +179): the two version lines' LAYOUT default sizes, captured once.
+         * <p>
+         * They are re-sized at bind time, and {@code FontUtil.apply} only calls
+         * {@code setTextSize} when the category has a configured size — with the size left on
+         * "inherit" it changes the typeface and nothing else. So a bind that reads the size back
+         * off the view is reading whatever the PREVIOUS row was given, and multiplying it again:
+         * that is what made the backup line balloon past the installed one and the rows grow
+         * taller as the list was scrolled.
+         */
+        float baseVersionPx;
+        float baseBackupPx;
         MaterialCardView itemView;
         View centerColumn;  // Fork: label/package. Widened on a wide row.
         View rightColumn;   // Fork: version/backup. Held to a constant width.
@@ -1637,6 +1816,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             freezeIndicator = itemView.findViewById(R.id.freeze_indicator);
             label = itemView.findViewById(R.id.label);
             packageName = itemView.findViewById(R.id.packageName);
+
             version = itemView.findViewById(R.id.version);
             isSystemApp = itemView.findViewById(R.id.isSystem);
             date = itemView.findViewById(R.id.date);
@@ -1645,6 +1825,8 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             sha = itemView.findViewById(R.id.sha);
             backupIndicator = itemView.findViewById(R.id.backup_indicator);
             backupVersion = itemView.findViewById(R.id.backup_version);
+            baseVersionPx = version != null ? version.getTextSize() : 0f;
+            baseBackupPx = backupVersion != null ? backupVersion.getTextSize() : 0f;
             backupDate = itemView.findViewById(R.id.backup_date);
             backupTime = itemView.findViewById(R.id.backup_time);
             profilePills = itemView.findViewById(R.id.profile_pills);
