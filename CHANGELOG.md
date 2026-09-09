@@ -10,6 +10,55 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-09-05.03-37.g41d79af5+027 — 2026-09-09
+
+A sweep of all 57 sister repos, prompted by finding the same "mismatch" in two of them, inverted the
+assumption it was written on: `text` is the family convention and **this app was the one deviating**,
+discarding the progress label of essentially every sister app for months. Alongside that, a transfer
+that is given up on now stops the app's writes instead of leaving them to vanish, and a stall that
+the OS caused says so. (Built on upstream App Manager `4.1.1`, commit `41d79af5` of
+2026-09-05 03:37 UTC.)
+
+### 🗣️ Sister apps' progress lines actually arrive
+
+- **The progress label is read from `text`, falling back to `result`.** `result` carries the
+  *terminal reply* and nothing else. 自由作業盤's `StateExportReceiver` — the reference
+  implementation every sister app mirrors — defines `EXTRA_PROGRESS_TEXT = "text"`, and **26 of the
+  31** sister apps that report progress send `"text"` alone. 応用管理's own `StateExportReceiver`
+  sends `"text"` too. `AppDataClient` nevertheless read the label from `EXTRA_RESULT`, so this app
+  emitted one key and read another — which is why a multi-gigabyte transfer showed climbing counts
+  and never a word about what it was doing, and why two sister chats were sent to "fix" apps that
+  were correct. The fallback is kept because three apps now send both keys.
+- Recorded as a **landmine** in `CLAUDE.md`: a future session must not tidy it back to one key, nor
+  conclude from a silent transfer that the app is sending nothing.
+
+### 🛑 An abandoned transfer cancels the writes
+
+- **The callee is force-stopped when a transfer is given up on.** Abandoning it sent a cancel and
+  closed our dup of the descriptor, which stops nothing: the app holds its own dup pointing at a
+  real file, so the file is merely *unlinked* and every later write succeeds into an inode nobody
+  can reach. An app that ignores the cancel therefore writes into nothing for hours — very close to
+  a 368-minute "still working" hang seen in the family.
+- It happens **before** our descriptor is closed and before the caller deletes the staging file, so
+  nothing is mid-write when the file goes. `AppDataClient.Result` gains an `abandoned` flag, so an
+  ordinary failure is never treated this way. Force-stop is the instrument this class already uses
+  before every transfer and again after every successful import.
+
+### ❄️ A stall says when the OS is the cause
+
+- **`/proc/<pid>/cgroup` is probed alongside the CPU liveness check**, on the same 10-second
+  cadence, and the heartbeat says **"The OS has frozen this app"** rather than "Waiting for the
+  app". The abandonment message carries the same note.
+- This is the distinction that costs whole evenings: off the charger, EMUI puts a sister app in a
+  freezer cgroup with `cpuset:/background` while 応用管理 sits in `cpuset:/vip`, and every thread of
+  the app goes to D state. Such a process is silent **and** burns no CPU, so it fails both halves of
+  the liveness test and is abandoned looking exactly like one that has wedged. A foreground service
+  with an ongoing notification does not prevent it — that was measured, with `isForeground=true`
+  throughout.
+- No new privilege: `/proc/<pid>/cgroup` is world-readable, unlike `smaps_rollup` beside it, which
+  is ptrace-gated and refuses the shell. The placement is still not ours to change without root —
+  only the diagnosis improves.
+
 ## 4.1.1+2026-09-05.03-37.g41d79af5+026 — 2026-09-09
 
 The app list stops truncating the thing it exists to show. Fork version names now pin their upstream
