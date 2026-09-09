@@ -10,6 +10,119 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-09-05.03-37.g41d79af5+026 — 2026-09-09
+
+The app list stops truncating the thing it exists to show. Fork version names now pin their upstream
+base — this one is 36 characters and 白い熊 雫's is 43 — while the right-hand column was still sized
+for `1.6.0+081`. Alongside that: a saved view no longer drags its sort along unless you ask it to,
+lenses survive folding the phone, and *Sister apps* becomes one control instead of two.
+(Built on upstream App Manager `4.1.1`, commit `41d79af5` of 2026-09-05 03:37 UTC.)
+
+### 📏 The version is readable at any length
+
+- **The version has its line to itself**, with the backup version stacked directly beneath it and
+  both right-aligned, so the two line up and can be compared down rather than across. They used to
+  share one line, which left a 36–43 character version about ten characters once a nine-character
+  backup version had taken its share — the one field that had grown was the one being squeezed.
+- **The column is sized from a version, not from a signature.** It was measured from
+  `"SHA384withRSA"` — 13 characters — times a constant 1.45, making the whole column about 19
+  characters wide. The reference is now a real fork version string, measured with the version
+  line's own paint so it follows the configured font.
+- **New per-geometry setting: *Version column width*,** on the 白い熊 応用管理 UI page beside the
+  column count. Every pixel the version block takes comes out of the app name and package id
+  beside it, and the right split genuinely differs folded, unfolded and in a four-column grid —
+  so it is remembered per geometry, like the column count. The value line names the geometry it is
+  editing (`p403`, `l819`), or a slider would silently mean something else after unfolding.
+- **The signature-algorithm line is gone**, which is what pays for the extra line. It read
+  `SHA384withRSA` — the signing certificate's algorithm, identical for every app 白い熊 builds. Its
+  *view* stays and is only hidden: `MainCardBinder` hands it the third and later lines of a lens's
+  right column, so deleting it from the layout would silently truncate every lens. The signature
+  **sort** also stays, since sort ids are the wire format of a saved view and are never renumbered.
+- **Both version lines are sized as one pair** — the largest size at which *both* fit, so they can
+  never disagree. Autosizing each view separately could not promise that: each would pick from its
+  own text, and a long installed version above a longer backup one would land on two different
+  sizes stacked in the same column.
+- **They never grow past nominal.** These two lines are what set the right column's height, so
+  anything that makes them taller makes the whole card taller. The way to make them bigger
+  deliberately is the VERSION font size, which moves the pair together.
+- **Middle ellipsis, never end ellipsis**, once even 9sp will not do: `4.1.1+2026-…f5+026` keeps the
+  base version and the build number and drops only the upstream pin between them — the same
+  convention the operation log already uses.
+- **Both lines share the VERSION font.** Equal sizes were not enough: they were being given two
+  different typefaces, and the same `sp` in two faces with different cap and x-heights reads as two
+  different sizes. It also made the fit wrong, since both strings are measured with the version
+  line's paint. The backup date and time stay on their own font — they are metadata, and nothing
+  about them has to line up with a version.
+
+### 📌 A saved view only carries a sort if you say so
+
+- **New toggle when making a pill: *Save the sort with this pill* / *Keep the current sort*.** A
+  saved view stores filters and sort together because they usually only mean anything together —
+  but not always. Every pill re-imposing the order it had been captured with is what looked like the
+  sort resetting itself: a pill saved while the list was on *App label* put it back on *App label*
+  for ever. Both kinds can now sit on the shelf.
+- **Every pill made before this is untouched.** The wire format gains `save_sort`, written *only
+  when false*, so absent means true and an existing pill is byte-identical.
+- **Reverse follows the sort** — a pill that does not carry an order does not carry the reverse flag
+  either; the two are one decision.
+- ***Update to current* keeps the pill's own kind**, so updating what a pill shows never silently
+  re-arms its sort.
+
+### 🔍 Lenses survive the phone folding
+
+- **The lens state is persisted** (`shiroikuma_main_lens`) like every other part of the view —
+  filter flags, sort, reverse, profile filters, per-geometry columns. It lived only in memory, so
+  anything that rebuilt the view model dropped it: folding the Mate XT, rotating, a multi-window
+  move, EMUI killing the process. The list came back showing everything, which reads as the lens
+  having been cleared rather than never having been saved. A lens id that no longer exists is
+  dropped rather than kept.
+- **Clearing filters clears the lenses too, and releases their pills.** Both halves of that were one
+  omission — the flags, profile filters and search were cleared and the lens state was left alone,
+  so what the page showed and what the shelf claimed could not agree.
+- **The active *view* pill is released as well.** Clearing every filter, profile filter, search and
+  lens *is* un-applying whatever view was showing, so nothing can still be in effect.
+
+### 🤝 One Sister apps control, with the better definition
+
+- **The lens is no longer offered when adding a pill.** It drew nothing — it was `filterOnly` — so
+  it was a second Sister-apps filter under another name, in the same dialog as the real one,
+  selecting a slightly different set. It stays *registered* so pills already on the shelf keep
+  working rather than becoming pills that do nothing.
+- **Its membership rule is the one kept**, in the new `AppDataContract.everSisterPackages`: an app
+  is a sister app if its manifest declares the contract **or** a backup proves it. That is wider
+  than "can I talk to it right now", which required a readable manifest and a contract version this
+  build speaks — and so hid an app known only from its backup (the wiped-phone case the contract
+  exists for, where the manifest cannot be read at all) and an app whose contract version we do not
+  speak (which makes a version mismatch look like the app never having a door).
+- **The backup witness is confirmed against the archive, not the flags.** `Backup.flags` records what
+  a backup was *asked* for; App-supplied data is ticked by default and `BackupOp` skips it silently
+  for an app that declares no contract **without clearing the flag**, so essentially every backup
+  claims it. Trusting it matched every app with a backup. The witness now applies only where no
+  manifest could be read — for anything installed the manifest answers in both directions — and the
+  archive is checked for the file, which keeps the filesystem cost to the handful of
+  backed-up-but-absent packages. `SisterAppsLens` had the identical flaw and is corrected the same
+  way.
+
+### 💾 Backup and restore
+
+- **The App-data categories pill says whether anything is being left out, before you tap it**:
+  `all 7` in the part's green, `5 of 7 · 2 left out` in the theme yellow, `none of 7` in red for a
+  ticked part that would export nothing, and `could not ask the app` for one that refuses to list —
+  because a pill falling back to its bare name reads as "nothing to report". It asks the app when
+  the dialog opens, which can thaw it, but this dialog is one app opened to decide exactly this and
+  tapping the pill would pay the same cost a moment later. Nothing is woken for a part that is
+  switched off. `AppDataSelection.effective` is the one place that resolves stored choice → app
+  defaults, so the pill and the exporter cannot disagree about what "all" means.
+- **A restore says which phase it is in.** The in-flight header kept naming our staging copy —
+  *Unpacking the archive* — for the whole of the sister app's import, the longest step of the run,
+  so a completed byte count under those words read as "100% out of 100%". That import has a stage of
+  its own now.
+
+### 🧹 Housekeeping
+
+- `BACKLOG.md`: work parked rather than dropped, starting with a sweep of the sister repos for the
+  progress-label mismatch that has now been found in two of them.
+
 ## 4.1.1+2026-09-05.03-37.g41d79af5+013 — 2026-09-08
 
 Upstream **4.1.1**, and the backup side stops lying: backing up, restoring and deleting become three
