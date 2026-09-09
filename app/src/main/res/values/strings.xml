@@ -2666,6 +2666,8 @@
     <string name="op_log_save">Save log</string>
     <string name="op_log_saved">Log saved: %s</string>
     <string name="op_log_save_failed">Could not save the log.</string>
+    <string name="op_log_share">Share log</string>
+    <string name="op_log_share_failed">Could not share the log.</string>
     <string name="share_backup">Share backup</string>
     <string name="share_backup_armed">Handed to 白い熊 魔法絨毯. Choose Hotspot or Shared network there and press Start.</string>
     <string name="share_backup_none">No backup directory could be found for the selection.</string>

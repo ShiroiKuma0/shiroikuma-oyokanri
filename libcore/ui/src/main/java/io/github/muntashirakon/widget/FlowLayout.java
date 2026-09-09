@@ -370,6 +370,12 @@ public class FlowLayout extends ViewGroup {
                 // (Layout width - (total horizontal padding + real row width)) / 2
                 offset = (parentLayoutWidth - horizontalPadding - mWidthForRow.get(row)) / 2;
                 break;
+            // Fork (白い熊, +28): Gravity.RIGHT as well as Gravity.END. `horizontalGravity` has
+            // already been masked with HORIZONTAL_GRAVITY_MASK (0x7), which strips END's
+            // RELATIVE_LAYOUT_DIRECTION bit and leaves plain RIGHT (5) — so `case Gravity.END`
+            // (0x00800005) could never match and every android:gravity="end" FlowLayout in the
+            // app was silently laid out from the start edge instead.
+            case Gravity.RIGHT:
             case Gravity.END:
                 offset = parentLayoutWidth - horizontalPadding - mWidthForRow.get(row);
                 break;

@@ -90,21 +90,26 @@
             android:layout_width="match_parent"
             android:layout_height="1px" />
 
-        <LinearLayout
+        <!-- Fork (白い熊, +28): a FlowLayout, not a row. The finished bar carries four pills
+             now — Copy log · Save log · Share log · Close — and in Japanese those are four
+             six-character labels that cannot share one line on the folded panel. A LinearLayout
+             would have squeezed and ellipsized all four rather than dropping one to a second
+             row, which is the one failure a bar of controls cannot afford. -->
+        <io.github.muntashirakon.widget.FlowLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="end"
-            android:orientation="horizontal"
             android:paddingStart="8dp"
             android:paddingEnd="8dp"
             android:paddingTop="8dp"
-            android:paddingBottom="10dp">
+            android:paddingBottom="10dp"
+            app:childSpacing="10dp"
+            app:rowSpacing="8dp">
 
             <androidx.appcompat.widget.AppCompatTextView
                 android:id="@+id/op_secondary"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="10dp"
                 tools:text="@string/pause" />
 
             <!-- Fork (白い熊, +132): leaving is not cancelling, and the page has to say so.
@@ -115,9 +120,28 @@
                 android:id="@+id/op_tertiary"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="10dp"
                 android:visibility="gone"
                 tools:text="@string/op_leave_running"
+                tools:visibility="visible" />
+
+            <!-- Fork (白い熊, +28): the two ways the log leaves the phone. Save was in the
+                 overflow already, which is exactly where nobody looks once the batch has ended
+                 and the log is the only thing left on screen; Share is new. Both appear only in
+                 the finished state, beside Copy, since that is when a log is worth keeping. -->
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/op_save"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                tools:text="@string/op_log_save"
+                tools:visibility="visible" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/op_share"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                tools:text="@string/op_log_share"
                 tools:visibility="visible" />
 
             <androidx.appcompat.widget.AppCompatTextView
@@ -126,7 +150,7 @@
                 android:layout_height="wrap_content"
                 tools:text="@android:string/cancel" />
 
-        </LinearLayout>
+        </io.github.muntashirakon.widget.FlowLayout>
 
     </LinearLayout>
 

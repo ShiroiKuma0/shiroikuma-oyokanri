@@ -25,6 +25,7 @@ import com.google.android.material.progressindicator.LinearProgressIndicator;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
@@ -33,12 +34,14 @@ import java.util.Locale;
 
 import io.github.muntashirakon.AppManager.BaseActivity;
 import io.github.muntashirakon.AppManager.R;
+import io.github.muntashirakon.AppManager.fm.FmProvider;
 import io.github.muntashirakon.AppManager.fonts.ColorPrefs;
 import io.github.muntashirakon.AppManager.main.RowPills;
 import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
+import io.github.muntashirakon.io.Paths;
 
 /**
  * Fork (白い熊, +116): the full-page view of a running batch operation.
@@ -69,6 +72,8 @@ public class BatchOpsProgressActivity extends BaseActivity {
     private AppCompatTextView mPrimary;
     private AppCompatTextView mSecondary;
     private AppCompatTextView mTertiary;
+    private AppCompatTextView mSave;
+    private AppCompatTextView mShare;
     private AppCompatTextView mFollowButton;
 
     /** Whether the list is pinned to the newest line. Off as soon as the user scrolls up. */
@@ -88,6 +93,8 @@ public class BatchOpsProgressActivity extends BaseActivity {
         mPrimary = findViewById(R.id.op_primary);
         mSecondary = findViewById(R.id.op_secondary);
         mTertiary = findViewById(R.id.op_tertiary);
+        mSave = findViewById(R.id.op_save);
+        mShare = findViewById(R.id.op_share);
         mFollowButton = findViewById(R.id.op_follow);
         mRecyclerView = findViewById(R.id.op_log);
         mLayoutManager = new LinearLayoutManager(this);
@@ -168,6 +175,10 @@ public class BatchOpsProgressActivity extends BaseActivity {
         }
         if (id == R.id.action_save_log) {
             saveLog();
+            return true;
+        }
+        if (id == R.id.action_share_log) {
+            shareLog();
             return true;
         }
         if (id == R.id.action_scroll_latest) {
@@ -290,11 +301,25 @@ public class BatchOpsProgressActivity extends BaseActivity {
             // Cancel is the only destructive control on the page; it is drawn as one, so the
             // two neighbours cannot be mistaken for it.
             RowPills.styleActionPill(mPrimary, CANCEL_RED, false);
+            // Fork (白い熊, +28): a log that is still being written is not one to keep — and the
+            // three controls that stop, hold or leave the operation are the only thing this bar
+            // should offer while it runs. Both actions stay in the overflow throughout.
+            mSave.setVisibility(View.GONE);
+            mShare.setVisibility(View.GONE);
         } else {
             mSecondary.setText(R.string.op_log_copy);
             mSecondary.setOnClickListener(v -> copyLog());
             mSecondary.setVisibility(View.VISIBLE);
             mTertiary.setVisibility(View.GONE);
+            // Fork (白い熊, +28): the finished page IS the report, and the clipboard was the only
+            // way off it — which loses everything past whatever the next copy overwrites. Save
+            // writes it beside the backups; Share hands it to another app as a file.
+            mSave.setText(R.string.op_log_save);
+            mSave.setOnClickListener(v -> saveLog());
+            mSave.setVisibility(View.VISIBLE);
+            mShare.setText(R.string.op_log_share);
+            mShare.setOnClickListener(v -> shareLog());
+            mShare.setVisibility(View.VISIBLE);
             mPrimary.setText(R.string.close);
             mPrimary.setEnabled(true);
             mPrimary.setOnClickListener(v -> finish());
@@ -346,13 +371,7 @@ public class BatchOpsProgressActivity extends BaseActivity {
                 String dir = Prefs.Storage.getSettingsExportDirectory();
                 File parent = TextUtils.isEmpty(dir) ? getExternalFilesDir(null) : new File(dir);
                 if (parent != null && (parent.isDirectory() || parent.mkdirs())) {
-                    String stamp = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.ROOT)
-                            .format(new Date());
-                    File out = new File(parent, "shiroikuma-oyokanri_batch-log_" + stamp + ".txt");
-                    try (OutputStream os = new FileOutputStream(out)) {
-                        os.write(text.getBytes(StandardCharsets.UTF_8));
-                    }
-                    path = out.getAbsolutePath();
+                    path = writeLog(parent, text).getAbsolutePath();
                 }
             } catch (Throwable ignore) {
             }
@@ -365,6 +384,63 @@ public class BatchOpsProgressActivity extends BaseActivity {
                 }
             });
         });
+    }
+
+    /**
+     * Fork (白い熊, +28): hand the log to another app.
+     *
+     * <p><b>It travels as a file, never as {@code EXTRA_TEXT}.</b> The log is capped at 20 000
+     * lines and an overnight backup reaches that; a string of it put into an intent is well past
+     * what a Binder transaction carries, and that limit is not a refusal — it is a
+     * {@code TransactionTooLargeException} thrown at whichever side blinks first. The file goes
+     * to our own cache rather than beside the backups: a shared copy is a copy, and
+     * <em>Save log</em> is the action that means "keep this".
+     */
+    private void shareLog() {
+        CharSequence title = OpLog.getInstance().getTitle();
+        String subject = title != null ? title.toString() : getString(R.string.batch_ops);
+        ThreadUtils.postOnBackgroundThread(() -> {
+            File out = null;
+            try {
+                String text = OpLog.getInstance().asText();
+                File parent = new File(getCacheDir(), "logs");
+                if (!text.isEmpty() && (parent.isDirectory() || parent.mkdirs())) {
+                    out = writeLog(parent, text);
+                }
+            } catch (Throwable ignore) {
+            }
+            File finalOut = out;
+            ThreadUtils.postOnMainThread(() -> {
+                if (finalOut == null) {
+                    UIUtils.displayLongToast(R.string.op_log_share_failed);
+                    return;
+                }
+                // FmProvider, not a raw file:// URI: the receiving app opens a descriptor we hand
+                // it rather than a path it has no rights to. The grant flag is what makes that
+                // descriptor reachable at all.
+                Intent intent = new Intent(Intent.ACTION_SEND)
+                        .setType("text/plain")
+                        .putExtra(Intent.EXTRA_SUBJECT, subject)
+                        .putExtra(Intent.EXTRA_STREAM, FmProvider.getContentUri(Paths.get(finalOut)))
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                try {
+                    startActivity(Intent.createChooser(intent, getString(R.string.op_log_share)));
+                } catch (Throwable th) {
+                    UIUtils.displayLongToast(R.string.op_log_share_failed);
+                }
+            });
+        });
+    }
+
+    /** The one writer, so a saved log and a shared one can never be different files. */
+    @NonNull
+    private static File writeLog(@NonNull File parent, @NonNull String text) throws IOException {
+        String stamp = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.ROOT).format(new Date());
+        File out = new File(parent, "shiroikuma-oyokanri_batch-log_" + stamp + ".txt");
+        try (OutputStream os = new FileOutputStream(out)) {
+            os.write(text.getBytes(StandardCharsets.UTF_8));
+        }
+        return out;
     }
 
     /**
@@ -408,6 +484,8 @@ public class BatchOpsProgressActivity extends BaseActivity {
         RowPills.styleActionPill(mPrimary, accent, false);
         RowPills.styleActionPill(mSecondary, accent, false);
         RowPills.styleActionPill(mTertiary, accent, false);
+        RowPills.styleActionPill(mSave, accent, false);
+        RowPills.styleActionPill(mShare, accent, false);
     }
 
     /**

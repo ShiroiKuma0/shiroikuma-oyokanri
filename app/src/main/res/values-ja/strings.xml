@@ -1186,6 +1186,8 @@
     <string name="op_log_save">記録を保存</string>
     <string name="op_log_saved">記録を保存しました: %s</string>
     <string name="op_log_save_failed">記録を保存できませんでした。</string>
+    <string name="op_log_share">記録を共有</string>
+    <string name="op_log_share_failed">記録を共有できませんでした。</string>
     <string name="backup_item_permissions">権限 %1$d 件 · アプリ操作 %2$d 件</string>
     <string name="restore_item_rules">規則 %2$d 件中 %1$d 件を適用</string>
     <string name="pref_oplog_group">一括操作の記録</string>
