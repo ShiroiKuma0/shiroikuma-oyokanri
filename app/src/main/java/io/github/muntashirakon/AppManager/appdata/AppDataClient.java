@@ -119,10 +119,23 @@ public class AppDataClient {
     public static class Result {
         public final boolean ok;
         public final String message;
+        /**
+         * Fork (白い熊, +181): this transfer was given up on, rather than answered.
+         * <p>
+         * The caller has to know, because an abandoned callee is still holding its own dup of the
+         * descriptor and still writing. See {@code AppDataTransfer} — the writes are stopped, not
+         * left to fail.
+         */
+        public final boolean abandoned;
 
         Result(boolean ok, @NonNull String message) {
+            this(ok, message, false);
+        }
+
+        Result(boolean ok, @NonNull String message, boolean abandoned) {
             this.ok = ok;
             this.message = message;
+            this.abandoned = abandoned;
         }
 
         @NonNull
@@ -248,7 +261,7 @@ public class AppDataClient {
                 if (AppDataContract.ACTION_PROGRESS.equals(intent.getAction())) {
                     heardProgress.incrementAndGet();
                     if (listener != null) {
-                        listener.onProgress(intent.getStringExtra(AppDataContract.EXTRA_RESULT),
+                        listener.onProgress(progressLabel(intent),
                                 intent.getLongExtra(AppDataContract.EXTRA_CURRENT, -1),
                                 intent.getLongExtra(AppDataContract.EXTRA_TOTAL, -1),
                                 intent.getStringExtra(AppDataContract.EXTRA_UNIT));
@@ -364,6 +377,7 @@ public class AppDataClient {
         // (no process, no privilege, unparseable) leaves both untouched, so it can only ever
         // EXTEND the deadline on positive evidence and never shorten it.
         long lastCpuTicks = -1;
+        String frozenNote = null;
         long lastCpuProbe = 0;
         while (true) {
             if (cancellation != null && cancellation.isCancelled()) {
@@ -390,6 +404,7 @@ public class AppDataClient {
             // Ask the OS whether the app is working before believing that silence means death.
             if (now - lastCpuProbe >= CPU_PROBE_MS) {
                 lastCpuProbe = now;
+                frozenNote = cpuMoving ? null : frozenState(packageName);
                 long ticks = cpuTicks(packageName);
                 if (ticks >= 0) {
                     if (lastCpuTicks >= 0) {
@@ -406,9 +421,16 @@ public class AppDataClient {
             // silent stretch reads as work rather than as a hang.
             if (listener != null && now - lastReport.get() >= HEARTBEAT_MS) {
                 lastReport.set(now);
+                // Fork (白い熊, +181): three states, not two. "Waiting for the app" is right for an
+                // app that is merely slow and wrong for one the OS has stopped dead -- and the
+                // second is the common case on this phone off the charger, where EMUI puts a
+                // sister app in a freezer cgroup while 応用管理 sits in cpuset:/vip. Probed on the
+                // CPU cadence, not the heartbeat's, so it costs one extra file read per 10s.
+                String state = cpuMoving ? null : frozenNote;
                 listener.onProgress(mContext.getString(cpuMoving
                                 ? R.string.appdata_still_working
-                                : R.string.appdata_still_waiting,
+                                : (state != null ? R.string.appdata_still_frozen
+                                        : R.string.appdata_still_waiting),
                         elapsed(now - startedAt)), -1, -1, null);
             }
             if (System.currentTimeMillis() - lastActivity.get() > SILENCE_TIMEOUT_MS) {
@@ -437,10 +459,40 @@ public class AppDataClient {
                 }
                 Log.w(TAG, "%s: %s; %d broadcasts for other ids %s; sent %s, adopted %s",
                         packageName, heard, heardForeign.get(), foreignIds, ourId, jobId.get());
+                // Fork (白い熊, +181): name the OS as the cause when it IS the cause. A frozen
+                // process is silent AND burns no CPU, so it fails both halves of the liveness test
+                // and lands here looking exactly like an app that has wedged -- which is what sent
+                // 白い熊 hunting through PowerGenie and iAware for an evening.
+                String frozen = frozenState(packageName);
+                if (frozen != null) {
+                    heard.append(" · ").append(frozen);
+                }
                 Log.w(TAG, "%s: %s", packageName, heard);
-                return new Result(false, heard.toString());
+                return new Result(false, heard.toString(), true);
             }
         }
+    }
+
+    /**
+     * Fork (白い熊, +181): the progress label, read from the extra the family actually sends.
+     *
+     * <p><b>{@code "text"} is the convention and this app was the one deviating.</b> 自由作業盤's
+     * {@code StateExportReceiver} — the reference implementation every sister app mirrors — defines
+     * {@code EXTRA_PROGRESS_TEXT = "text"} and uses {@code "result"} only for the terminal reply,
+     * and a sweep of all 57 sister repos found 26 of the 31 that report progress sending
+     * {@code "text"} alone. 応用管理's OWN {@code StateExportReceiver} sends {@code "text"} too. So
+     * this client emitted one key and read another, and silently discarded the progress label of
+     * essentially the whole family — which is why long operations looked mute for months, and why
+     * two sister chats were sent to "fix" code that was correct.
+     *
+     * <p>{@code "result"} is still accepted as a fallback: three apps now send both keys, and one
+     * of them adopted that shape on my own bad advice. Reading either costs nothing and can never
+     * regress them.
+     */
+    @Nullable
+    private static String progressLabel(@NonNull Intent intent) {
+        String text = intent.getStringExtra(AppDataContract.EXTRA_TEXT);
+        return text != null ? text : intent.getStringExtra(AppDataContract.EXTRA_RESULT);
     }
 
     /** Fork (白い熊): enough of a job id to compare two of them by eye in a screenshot. */
@@ -476,6 +528,60 @@ public class AppDataClient {
      * ceiling above was raised rather than removed — the two signals cover different failures.
      */
     @WorkerThread
+    /**
+     * Fork (白い熊, +181): whether the OS has parked this app, read from its own cgroup placement.
+     *
+     * <p>Measured by the 辞書 chat on this phone: off the charger EMUI puts a sister app in
+     * {@code freezer:/Group_…} with {@code cpuset:/background} while 応用管理 sits in
+     * {@code cpuset:/vip}, and every thread of the app goes to D state until the cable goes back
+     * in. A foreground service with an ongoing notification does <b>not</b> prevent it — that was
+     * measured too, with {@code isForeground=true} and a live notification throughout.
+     *
+     * <p>Such an app is silent and burns no CPU, so it fails both halves of the liveness test and
+     * is abandoned after ten minutes looking exactly like one that has wedged. We cannot move it —
+     * cgroup placement is not ours to change without root, and {@code preflight}'s levers
+     * (unsuspend, thaw, Doze exemption) are all AOSP ones that do not touch it. What we can do is
+     * stop reporting a mystery: this turns "it went quiet" into "the OS stopped it", which is a
+     * different problem with a different fix (plug the phone in).
+     *
+     * <p>{@code /proc/<pid>/cgroup} is world-readable — verified on-device, unlike
+     * {@code smaps_rollup} beside it, which is ptrace-gated and returns EPERM for the shell.
+     *
+     * @return a short note for the log, or null when the app is not parked or cannot be read
+     */
+    @Nullable
+    private static String frozenState(@NonNull String packageName) {
+        try {
+            Runner.Result r = Runner.runCommand("for p in $(pidof " + packageName
+                    + " 2>/dev/null); do cat /proc/$p/cgroup 2>/dev/null; done");
+            if (r == null || !r.isSuccessful()) {
+                return null;
+            }
+            boolean frozen = false;
+            boolean background = false;
+            for (String line : r.getOutputAsList()) {
+                int colon = line.lastIndexOf(':');
+                if (colon < 0 || colon + 1 >= line.length()) {
+                    continue;
+                }
+                String path = line.substring(colon + 1).trim();
+                // A freezer path deeper than the root IS a freezer group; the root is the normal,
+                // unfrozen placement and must not be reported.
+                if (line.contains(":freezer:") && !path.equals("/") && !path.isEmpty()) {
+                    frozen = true;
+                } else if (line.contains(":cpuset:") && path.endsWith("/background")) {
+                    background = true;
+                }
+            }
+            if (frozen) {
+                return "frozen by the OS";
+            }
+            return background ? "backgrounded by the OS" : null;
+        } catch (Throwable th) {
+            return null;
+        }
+    }
+
     private static long cpuTicks(@NonNull String packageName) {
         try {
             Runner.Result r = Runner.runCommand("for p in $(pidof " + packageName

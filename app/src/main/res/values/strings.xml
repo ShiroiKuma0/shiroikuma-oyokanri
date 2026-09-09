@@ -2674,6 +2674,8 @@
     <string name="appdata_still_working">Still working · %s</string>
     <string name="backup_stage_waiting_large">Waiting — another large transfer is running</string>
     <string name="appdata_still_waiting">Waiting for the app · %s</string>
+    <!-- Fork (白い熊, +181): the OS stopped it; a different problem from a slow app. -->
+    <string name="appdata_still_frozen">The OS has frozen this app · %s</string>
     <string name="op_log_failure_no_reason">No reason recorded.</string>
     <string name="backup_item_permissions">%1$d permissions · %2$d app ops</string>
     <string name="restore_item_rules">%1$d of %2$d rules applied</string>

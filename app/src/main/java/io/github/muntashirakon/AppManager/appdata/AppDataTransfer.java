@@ -143,11 +143,30 @@ public class AppDataTransfer {
             if (fd == null) {
                 return new Outcome(false, "could not open a destination descriptor", null);
             }
-            AppDataClient.Result result;
+            AppDataClient.Result result = null;
             try {
                 result = mClient.transfer(packageName, AppDataContract.METHOD_EXPORT, fd, items,
                         listener, cancellation);
             } finally {
+                // Fork (白い熊, +181): an ABANDONED callee is still writing -- stop it.
+                //
+                // Giving up sends the app a cancel and closes OUR dup of the descriptor, and the
+                // caller then deletes the staging file. None of that stops the app: it holds its
+                // own dup, the descriptor points at a real file, so on Linux the file is merely
+                // unlinked and every subsequent write succeeds into an inode nobody can reach.
+                // An app that ignores the cancel therefore writes into nothing for hours, which is
+                // very close to the 368-minute "still working" hang the 辞書 chat was chasing.
+                //
+                // 白い熊's ruling: not loud failing writes -- cancelled writes. So the cancel is
+                // made to stick. Force-stop is the only thing that reliably ends them, it is what
+                // this class already does before every transfer and again after a successful
+                // import, and it runs BEFORE our fd is closed and the staging file removed, so
+                // nothing is mid-write when the file goes.
+                if (result != null && !result.ok && result.abandoned) {
+                    Log.w(TAG, "%s: abandoned; force-stopping so its writes stop", packageName);
+                    forceStop(packageName, userId);
+                }
+
                 // Our copy must be closed or the file stays open and cannot be checksummed or
                 // encrypted. The callee dups before the call returns, so this is safe.
                 closeQuietly(fd);
@@ -201,11 +220,20 @@ public class AppDataTransfer {
             if (fd == null) {
                 return new Outcome(false, "could not open the archive", null);
             }
-            AppDataClient.Result result;
+            AppDataClient.Result result = null;
             try {
                 result = mClient.transfer(packageName, AppDataContract.METHOD_IMPORT, fd, null,
                         listener, cancellation);
             } finally {
+                // Fork (白い熊, +181): stop an abandoned callee before the descriptor goes -- see
+                // the same guard on the export path for why closing our dup does not stop it.
+                // On import the app is READING our archive rather than writing, so nothing is
+                // corrupted either way; it is stopped for the same reason nonetheless, because a
+                // job we have given up on must not still be running when the next one starts.
+                if (result != null && !result.ok && result.abandoned) {
+                    Log.w(TAG, "%s: abandoned; force-stopping so its work stops", packageName);
+                    forceStop(packageName, userId);
+                }
                 closeQuietly(fd);
             }
             if (result.ok) {
