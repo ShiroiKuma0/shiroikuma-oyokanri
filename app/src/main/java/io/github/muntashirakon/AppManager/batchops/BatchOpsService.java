@@ -24,6 +24,7 @@ import java.util.Objects;
 
 import io.github.muntashirakon.AppManager.BuildConfig;
 import io.github.muntashirakon.AppManager.appdata.self.MigrationKit;
+import io.github.muntashirakon.AppManager.types.UserPackagePair;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsManager.BatchOpsInfo;
@@ -152,7 +153,16 @@ public class BatchOpsService extends ForegroundService {
         // so the dialog opens against a populated monitor.
         BatchOpsProgressMonitor monitor = BatchOpsProgressMonitor.getInstance();
         CharSequence opTitle = getDesiredOpTitle(this, item.getOp());
-        monitor.begin(opTitle, item.getPackages().size());
+        // Fork (白い熊): the monitor is told WHAT this run is, not merely how big it is, so the
+        // finished page can offer to send the backup without re-deriving which apps were in the
+        // batch — by then the in-flight list has been emptied and nothing else remembers.
+        ArrayList<String> opPackages = item.getPackages();
+        ArrayList<Integer> opUsers = item.getUsers();  // guaranteed parallel to the packages
+        List<UserPackagePair> opTargets = new ArrayList<>(opPackages.size());
+        for (int i = 0; i < opPackages.size(); ++i) {
+            opTargets.add(new UserPackagePair(opPackages.get(i), opUsers.get(i)));
+        }
+        monitor.begin(opTitle, opPackages.size(), item.getOp(), opTargets);
         // Fork (+116): open the log for this run. Started BEFORE the announcement, so the page
         // finds a populated log the instant it opens rather than an empty one that fills in.
         OpLog.getInstance().begin(opTitle,

@@ -106,6 +106,19 @@
             app:childSpacing="10dp"
             app:rowSpacing="8dp">
 
+            <!-- Fork (白い熊): send the backup that was just made to 白い熊 魔法絨毯. First, and
+                 so left-most, because on the finished bar it is the only pill that acts on the
+                 BACKUP rather than on the log — the three log pills and Close follow it. Shown
+                 only after a backup, never after a restore or a delete, where there is nothing
+                 newly made to carry. -->
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/op_send"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                tools:text="@string/share_backup_send"
+                tools:visibility="visible" />
+
             <androidx.appcompat.widget.AppCompatTextView
                 android:id="@+id/op_secondary"
                 android:layout_width="wrap_content"
