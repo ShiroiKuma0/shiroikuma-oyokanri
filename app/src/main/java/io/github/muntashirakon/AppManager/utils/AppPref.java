@@ -93,6 +93,9 @@ public class AppPref {
         // Fork: one-shot guard for the Disable → Advanced suspend move, see
         // Prefs.Blocking#migrateDefaultFreezingMethod.
         PREF_FREEZE_TYPE_MIGRATED_ADV_SUSPEND_BOOL,
+        // Fork: one-shot guard for the Advanced suspend → Total freeze move, see
+        // Prefs.Blocking#migrateDefaultFreezingMethodToTotal.
+        PREF_FREEZE_TYPE_MIGRATED_TOTAL_BOOL,
         PREF_SKIP_FREEZE_METHOD_DIALOG_BOOL,
         PREF_FM_DISPLAY_IN_LAUNCHER_BOOL,
         PREF_FM_FILENAME_ELLIPSIZE_STR,
@@ -437,6 +440,7 @@ public class AppPref {
             case PREF_USE_SYSTEM_FONT_BOOL:
             case PREF_SHIZUKU_AUTO_RECHECKED_BOOL:
             case PREF_FREEZE_TYPE_MIGRATED_ADV_SUSPEND_BOOL:
+            case PREF_FREEZE_TYPE_MIGRATED_TOTAL_BOOL:
                 return false;
             case PREF_APP_OP_SHOW_DEFAULT_BOOL:
             case PREF_SHOW_DISCLAIMER_BOOL:
@@ -539,7 +543,11 @@ public class AppPref {
                 // suspension flag is left alone (measured on the Mate XT against
                 // com.huawei.powergenie, 2026-08-24). Advanced suspend also force-stops
                 // first, so the app is not left running until it dies of its own accord.
-                return FreezeUtils.FREEZE_ADV_SUSPEND;
+                // +29: and since suspension leaves the components resolvable — measured
+                // 2026-09-10, a suspended app's provider still answers "not exported"
+                // where a disabled one answers "could not find provider" — the default is
+                // now the whole stack rather than any single one of them.
+                return FreezeUtils.FREEZE_TOTAL;
             case PREF_FM_OPTIONS_INT:
                 return FmListOptions.OPTIONS_DISPLAY_DOT_FILES | FmListOptions.OPTIONS_FOLDERS_FIRST;
             case PREF_FM_SORT_ORDER_INT:

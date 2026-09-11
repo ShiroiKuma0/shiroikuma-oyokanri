@@ -1702,6 +1702,9 @@
     <string name="remove_filename">Remove %s</string>
     <string name="advanced_suspend_app">Advanced suspend</string>
     <string name="advanced_suspend_app_description">It force-stops and suspends the app to ensure that the app is not running in the background. This method should be preferred over the regular <b>suspend</b> method.</string>
+    <!-- Fork: the whole stack as one freezing method. -->
+    <string name="total_freeze_app">Total freeze</string>
+    <string name="total_freeze_app_description">Every gate this phone allows, at once: force-stop, then suspend, disable and hide. Suspension is what survives a restart; disabling removes the app\'s components from resolution so nothing can find them; hiding reports it as not installed. Layers that are unavailable are skipped.</string>
     <string name="freeze_prefer_per_app_option">Prefer per app option</string>
     <string name="remember_option_for_this_app">Remember for this app</string>
     <string name="no_overlay_permission">No permission to display overlays</string>

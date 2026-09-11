@@ -23,13 +23,16 @@ import io.github.muntashirakon.AppManager.compat.ManifestCompat;
 import io.github.muntashirakon.AppManager.compat.PackageManagerCompat;
 import io.github.muntashirakon.AppManager.db.AppsDb;
 import io.github.muntashirakon.AppManager.db.entity.FreezeType;
+import io.github.muntashirakon.AppManager.logs.Log;
 import io.github.muntashirakon.AppManager.devicepolicy.DevicePolicyBridge;
 import io.github.muntashirakon.AppManager.profiles.ProtectedAppsProfile;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
 import io.github.muntashirakon.AppManager.settings.Prefs;
 
 public final class FreezeUtils {
-    @IntDef({FREEZE_DISABLE, FREEZE_SUSPEND, FREEZE_HIDE, FREEZE_ADV_SUSPEND})
+    public static final String TAG = FreezeUtils.class.getSimpleName();
+
+    @IntDef({FREEZE_DISABLE, FREEZE_SUSPEND, FREEZE_HIDE, FREEZE_ADV_SUSPEND, FREEZE_TOTAL})
     @Retention(RetentionPolicy.SOURCE)
     public @interface FreezeMethod {
     }
@@ -38,6 +41,17 @@ public final class FreezeUtils {
     public static final int FREEZE_SUSPEND = 1 << 1;
     public static final int FREEZE_HIDE = 1 << 2;
     public static final int FREEZE_ADV_SUSPEND = 1 << 3;
+    /**
+     * Fork (白い熊, +29): every gate this phone allows, at once — force-stop, suspend,
+     * disable and hide.
+     * <p>
+     * These values are bit flags, but every consumer compares them with {@code ==},
+     * so this is a <b>distinct method</b> rather than a mask of the others. That is
+     * deliberate: the value is the wire format of {@code FreezeRule} and of the
+     * per-app remembered method, and a mask would have every {@code ==} in the app
+     * quietly stop matching.
+     */
+    public static final int FREEZE_TOTAL = 1 << 4;
 
     @WorkerThread
     public static void storeFreezeMethod(@NonNull String packageName, @FreezeMethod int freezeType) {
@@ -111,40 +125,209 @@ public final class FreezeUtils {
         if (BuildConfig.APPLICATION_ID.equals(packageName) && userId == UserHandleHidden.myUserId()) {
             throw new RemoteException("Could not freeze myself.");
         }
+        if (freezeType == FREEZE_TOTAL) {
+            freezeTotal(packageName, userId);
+            return;
+        }
         if (freezeType == FREEZE_HIDE) {
-            if (SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.MANAGE_USERS)) {
-                PackageManagerCompat.hidePackage(packageName, userId, true);
+            if (hideBestEffort(packageName, userId)) {
                 return;
             }
-            // No permission, fall-through
+            // Neither MANAGE_USERS nor a delegation, fall-through
         } else if ((freezeType == FREEZE_SUSPEND || freezeType == FREEZE_ADV_SUSPEND) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             if (freezeType == FREEZE_ADV_SUSPEND) {
-                // Force-stop app
+                // Force-stop app. Fork (白い熊, measured 2026-09-10): NOT redundant beside
+                // the suspension. A `pm suspend` of a running app does kill the process
+                // by itself, but leaves stopped=false; only the force-stop sets the
+                // stopped flag, which is what withholds implicit broadcasts afterwards.
                 if (SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.FORCE_STOP_PACKAGES)) {
                     PackageManagerCompat.forceStopPackage(packageName, userId);
                 }
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                if (SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.SUSPEND_APPS)) {
-                    PackageManagerCompat.suspendPackages(new String[]{packageName}, userId, true);
-                    return;
-                }
-                // No permission, fall-through
-            } else {
-                if (SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.MANAGE_USERS)) {
-                    PackageManagerCompat.suspendPackages(new String[]{packageName}, userId, true);
-                    return;
-                }
-                // No permission, fall-through
+            if (suspendBestEffort(packageName, userId)) {
+                return;
             }
+            // No permission, fall-through
         }
         PackageManagerCompat.setApplicationEnabledSetting(packageName, PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER, 0, userId);
+    }
+
+    /**
+     * Fork (白い熊, +29): every gate at once, each one best-effort.
+     * <p>
+     * <b>Order is load-bearing.</b> Force-stop first, so the app is not left running
+     * until it dies of its own accord; <b>hide last</b>, because a hidden package is
+     * reported as not installed and the suspend and enabled-state calls would then have
+     * nothing to act on.
+     * <p>
+     * Each layer closes a different hole, which is why this is a stack rather than a
+     * choice (all measured 2026-09-10 on the phone reporting {@code HUAWEI GRL-LX9},
+     * {@code SDK_INT 31}; behaviour confirmed by 白い熊 on their second phone):
+     * <ul>
+     * <li><b>Suspend</b> blocks the launch and — surprisingly — an explicit broadcast
+     *     too, even one carrying {@code FLAG_INCLUDE_STOPPED_PACKAGES}; and it is the
+     *     one flag EMUI does <i>not</i> restore at boot.</li>
+     * <li><b>Disable</b> removes the components from <i>resolution</i>. The cleanest
+     *     proof is a content provider: suspended it answers "not exported from UID
+     *     …", disabled it answers "Could not find provider".</li>
+     * <li><b>Hide</b> reports the package as not installed for this user.</li>
+     * </ul>
+     * A layer that cannot be applied is skipped, never fatal — but if <i>none</i>
+     * landed the caller must hear about it, or the row would go on claiming a freeze
+     * that never happened.
+     */
+    @WorkerThread
+    private static void freezeTotal(@NonNull String packageName, @UserIdInt int userId) throws RemoteException {
+        boolean any = false;
+        if (SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.FORCE_STOP_PACKAGES)) {
+            try {
+                PackageManagerCompat.forceStopPackage(packageName, userId);
+            } catch (Throwable ignore) {
+                // A process that would not die is not a reason to skip the gates.
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            try {
+                any |= suspendBestEffort(packageName, userId);
+            } catch (Throwable ignore) {
+            }
+        }
+        try {
+            PackageManagerCompat.setApplicationEnabledSetting(packageName,
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER, 0, userId);
+            any = true;
+        } catch (Throwable ignore) {
+        }
+        try {
+            any |= hideBestEffort(packageName, userId);
+        } catch (Throwable ignore) {
+        }
+        if (!any) {
+            throw new RemoteException("Could not freeze " + packageName
+                    + ": no freezing method is available right now.");
+        }
+    }
+
+    /**
+     * Fork (白い熊, +29): suspend through the <b>admin's</b> slot where we can.
+     * <p>
+     * The platform records a suspension per <i>suspending package</i> — measured on the
+     * phone: ours through the shell reads {@code suspendingPackage=com.android.shell},
+     * one applied through 雫's delegation reads {@code suspendingPackage=android}. Only
+     * the second is beyond the reach of {@code adb shell pm unsuspend}, so it is the
+     * harder lock and is preferred whenever the delegation is live. {@link #unfreeze}
+     * already lifts both, so nothing becomes unrecoverable by choosing it.
+     * <p>
+     * Device-policy calls act on the calling user, hence the user check before one.
+     */
+    @WorkerThread
+    private static boolean suspendBestEffort(@NonNull String packageName, @UserIdInt int userId)
+            throws RemoteException {
+        if (userId == UserHandleHidden.myUserId() && DevicePolicyBridge.canSuspend()
+                && DevicePolicyBridge.setSuspended(packageName, true)) {
+            return true;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            if (SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.SUSPEND_APPS)) {
+                PackageManagerCompat.suspendPackages(new String[]{packageName}, userId, true);
+                return true;
+            }
+        } else if (SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.MANAGE_USERS)) {
+            PackageManagerCompat.suspendPackages(new String[]{packageName}, userId, true);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Fork (白い熊, +29): hide through whichever door is open.
+     * <p>
+     * On this phone only the second one is: the shell holds no {@code MANAGE_USERS}, so
+     * {@link PackageManagerCompat#hidePackage} throws and hiding is reachable solely
+     * through 雫's {@code DELEGATION_PACKAGE_ACCESS} — see
+     * {@link DevicePolicyBridge#setHidden}. The shell path is tried first anyway,
+     * because a rooted phone or another OEM may well grant it.
+     */
+    @WorkerThread
+    private static boolean hideBestEffort(@NonNull String packageName, @UserIdInt int userId) {
+        boolean hidden = false;
+        if (SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.MANAGE_USERS)) {
+            try {
+                PackageManagerCompat.hidePackage(packageName, userId, true);
+                hidden = true;
+            } catch (Throwable ignore) {
+                // Fall through to the delegate.
+            }
+        }
+        if (!hidden && userId == UserHandleHidden.myUserId()) {
+            hidden = DevicePolicyBridge.setHidden(packageName, true);
+        }
+        if (hidden && !isVisibleToOurList(packageName, userId)) {
+            // Fork (白い熊, +29): PARAMOUNT — a hidden app we cannot list is an app that
+            // can never be thawed again from this app, because the row carrying the
+            // snowflake is the only way back. Every reading of the platform says the row
+            // survives (hiding sets PRIVATE_FLAG_HIDDEN and leaves FLAG_INSTALLED alone,
+            // and our enumeration passes MATCH_UNINSTALLED_PACKAGES), but this phone has
+            // never once executed a hide — the shell holds no MANAGE_USERS, so the method
+            // has silently been Disable — so the assumption is untested here and is not
+            // one to be wrong about. Undo it and report the layer as not applied; the
+            // other three gates still stand.
+            revealBestEffort(packageName, userId);
+            Log.w(TAG, "Hiding %s left it invisible to our own list; reverted.", packageName);
+            return false;
+        }
+        return hidden;
+    }
+
+    /**
+     * Fork (白い熊, +29): reveal through whichever door is open — the mirror of
+     * {@link #hideBestEffort}, and the only place that knows both doors.
+     */
+    @WorkerThread
+    private static boolean revealBestEffort(@NonNull String packageName, @UserIdInt int userId) {
+        boolean revealed = false;
+        try {
+            PackageManagerCompat.hidePackage(packageName, userId, false);
+            revealed = true;
+        } catch (Throwable ignore) {
+            // Fall through to the delegate, which is what applied it on this phone.
+        }
+        if (!revealed && userId == UserHandleHidden.myUserId()) {
+            revealed = DevicePolicyBridge.setHidden(packageName, false);
+        }
+        return revealed;
+    }
+
+    /**
+     * Fork (白い熊, +29): would the main list still carry a row for this package?
+     * <p>
+     * Deliberately asks the <b>exact predicate the list itself uses</b> rather than a
+     * proxy for it: {@code AppDb} enumerates with {@code MATCH_UNINSTALLED_PACKAGES |
+     * MATCH_DISABLED_COMPONENTS} and then sets {@code App.isInstalled} from
+     * {@link ApplicationInfoCompat#isInstalled}, so a package that answers both is a
+     * package that gets a row — and a row is a snowflake, which is the way back.
+     */
+    @WorkerThread
+    private static boolean isVisibleToOurList(@NonNull String packageName, @UserIdInt int userId) {
+        try {
+            ApplicationInfo info = PackageManagerCompat.getApplicationInfo(packageName,
+                    PackageManagerCompat.MATCH_UNINSTALLED_PACKAGES
+                            | PackageManagerCompat.MATCH_DISABLED_COMPONENTS, userId);
+            return ApplicationInfoCompat.isInstalled(info);
+        } catch (Throwable th) {
+            return false;
+        }
     }
 
     public static void unfreeze(@NonNull String packageName, @UserIdInt int userId) throws RemoteException {
         // Ignore checking preference, unfreeze for all types
         if (PackageManagerCompat.isPackageHidden(packageName, userId)) {
-            PackageManagerCompat.hidePackage(packageName, userId, false);
+            // Fork (白い熊, +29): hidePackage THROWS when MANAGE_USERS is missing, which on
+            // this phone is always. Uncaught, that throw abandoned the rest of this method
+            // and left the app suspended AND disabled with no way back through it — a bug
+            // that could not fire while nothing here was able to hide anything, and fires
+            // on the first Total freeze. Try the shell, then the delegate that applied it.
+            revealBestEffort(packageName, userId);
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && PackageManagerCompat.isPackageSuspended(packageName, userId)) {
             PackageManagerCompat.suspendPackages(new String[]{packageName}, userId, false);

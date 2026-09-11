@@ -233,6 +233,74 @@ public final class DevicePolicyBridge {
         }
     }
 
+    // ── Hiding: the resolution gate the shell cannot reach ─────────────
+
+    /**
+     * Whether hiding is reachable at all.
+     * <p>
+     * The <b>same scope</b> as suspension: {@code DELEGATION_PACKAGE_ACCESS} carries
+     * {@code setApplicationHidden}, {@code isApplicationHidden},
+     * {@code setPackagesSuspended} and {@code isPackageSuspended} together. So a phone
+     * whose Snooping suspend switch works can hide too, and one where the delegation
+     * was never granted can do neither — there is no third case to handle.
+     */
+    @WorkerThread
+    public static boolean canHide() {
+        return SUPPORTED && getScopes().contains(DevicePolicyManager.DELEGATION_PACKAGE_ACCESS);
+    }
+
+    @WorkerThread
+    public static boolean isHidden(@NonNull String packageName) {
+        try {
+            DevicePolicyManager dpm = dpm();
+            return dpm != null && dpm.isApplicationHidden(null, packageName);
+        } catch (Throwable th) {
+            return false;
+        }
+    }
+
+    /**
+     * Hide or reveal a package. A hidden app is reported as <i>not installed</i> for
+     * this user, so its components stop resolving for everyone.
+     * <p>
+     * <b>LANDMINE — the shell cannot hide anything on this phone</b> (白い熊, measured
+     * 2026-09-10 on the phone that reports {@code HUAWEI GRL-LX9}, {@code SDK_INT 31},
+     * and confirmed by 白い熊 on their second phone). {@code pm hide} answers {@code SecurityException:
+     * Neither user 2000 nor current process has android.permission.MANAGE_USERS}, and
+     * an audit of the shell uid confirms that permission is simply not granted on this
+     * EMUI build while {@code SUSPEND_APPS}, {@code CHANGE_COMPONENT_ENABLED_STATE} and
+     * {@code FORCE_STOP_PACKAGES} all are. {@code PackageManagerCompat#hidePackage}
+     * therefore <i>throws</i> here, which is why the <b>Hide</b> freezing method has
+     * been silently degrading to <b>Disable</b> ever since the fork ran on this phone.
+     * This is the only route that works, and it works because the <i>owner</i> is
+     * making the call rather than the shell.
+     *
+     * @return {@code true} only when the platform actually took it, re-read afterwards.
+     *         Never record a decision a write did not achieve.
+     */
+    @WorkerThread
+    public static boolean setHidden(@NonNull String packageName, boolean hidden) {
+        if (!canHide()) return false;
+        // The same guard suspension applies. Revealing is never blocked: an app that
+        // somehow got hidden must still be recoverable.
+        if (hidden && ProtectedAppsProfile.isProtected(packageName)) {
+            Log.w(TAG, "%s is protected and will not be hidden", packageName);
+            return false;
+        }
+        try {
+            DevicePolicyManager dpm = dpm();
+            if (dpm == null) return false;
+            if (!dpm.setApplicationHidden(null, packageName, hidden)) {
+                Log.w(TAG, "Refused to hide %s", packageName);
+                return false;
+            }
+            return isHidden(packageName) == hidden;
+        } catch (Throwable th) {
+            Log.w(TAG, "Hiding %s refused", th, packageName);
+            return false;
+        }
+    }
+
     // ── Uninstall block ─────────────────────────────────────────────────────
 
     @WorkerThread
