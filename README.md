@@ -24,7 +24,7 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.1+2026-09-05.03-37.g41d79af5+030`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.1+2026-09-05.03-37.g41d79af5+031`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
 <sub>Version reads as **upstream `4.1.1`**, rebased onto upstream commit **`41d79af5` of 2026-09-05 03:37 UTC**, fork build **030**.</sub>
 
@@ -417,9 +417,13 @@ with everything else — and **verified before it is ever handed back** at resto
 ## 📤 Send a backup to another phone
 
 A backup is not much use if it only exists on the phone that made it. **Share backup** — on the app
-pane, on the selection pane, and beside Restore in the backup dialog — hands the backup's **whole
-directory** to 白い熊 魔法絨毯, which carries it to another device over its own hotspot or your
-network.
+pane, on the selection pane, beside Restore in the backup dialog, and as **Send backup** on the
+progress bar the moment a backup finishes — hands the backup's **whole directory** to 白い熊 魔法絨毯,
+which carries it to another device over its own hotspot or your network.
+
+Sending from the finished bar is the shortest path of the four: that page already knows which apps
+the run covered, so backing up one app sends it straight across, while a batch asks which of its
+backups to carry.
 
 The directory travels rather than its files, and that distinction is the feature: a backup is only
 restorable inside its own folder, and the folder's name is the timestamp that tells two backups of
