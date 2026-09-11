@@ -10,6 +10,39 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-09-05.03-37.g41d79af5+031 — 2026-09-11
+
+A backup is at its most sendable the moment it finishes, and that was the one place you could not
+send it from. Carrying one to another device meant leaving the page that had just told you the
+backup existed, going to the main list or an app's backup dialog, and selecting the same apps a
+second time. (Built on upstream App Manager `4.1.1`, commit `41d79af5` of 2026-09-05 03:37 UTC.)
+
+### 📤 Send backup, from the bar that says it finished
+
+- **A `Send backup` pill on the finished progress bar**, left-most — ahead of Copy log, Save log,
+  Share log and Close. It leads rather than joins the queue because it is the only control there
+  that acts on the **backup** rather than on the **log**. It hands the backup's whole directory to
+  白い熊 魔法絨毯, exactly as the three existing entry points do.
+- **Only a real backup is offered.** The pill appears after a backup and after nothing else: a
+  restore consumes a backup and a delete removes one, so neither leaves anything newly made. *Back
+  up APK* is excluded too, and that one is the trap — it writes a bare APK and records nothing in
+  the backup database, so a pill shown there would have quietly offered some *older* backup of the
+  same app instead of what had just run.
+- **One app sends, several ask.** After backing up a single app there is exactly one thing the
+  request can mean — the backup just written, which is the newest — and a picker there is a question
+  with one answer, so it goes straight across. After a batch there is no such thing, and the picker
+  is doing real work rather than being polite: 魔法絨毯 names each received folder by its own leaf,
+  and a batch stamps every app in the same second, so two backups sent together would merge into one
+  directory that looks like a backup and restores as nothing.
+- **The page had to learn what it had just done.** Its progress state holds what is *in flight* and
+  is emptied when the run ends — right for a progress bar, useless for a question asked afterwards.
+  The batch monitor now also records which operation ran and which apps it named, and keeps that
+  past the end of the run, so the finished page can answer without the batch being reconstructed
+  from the log.
+- **The wait is shown.** Working out which backups exist reads the database and stats every
+  directory on disk, which is long enough that a silent pill reads as a pill that did nothing. The
+  page's own progress indicator, idle once a run has finished, says so while it works.
+
 ## 4.1.1+2026-09-05.03-37.g41d79af5+030 — 2026-09-11
 
 Freezing an app suspended it and stopped there. A session of measurement on the phone settled what
