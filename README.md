@@ -18,15 +18,15 @@ root** through a contract the sister apps implement — and which this app now i
 **lenses** re-dress the app list itself, a **sort menu** of its own,
 **per-app backup and restore tables**, the ability to **hand a backup to another device**,
 **device-policy locks** that
-Settings cannot undo, a configurable
+Settings cannot undo, a **freeze that closes every gate the phone allows** rather than one, a configurable
 **yellow-on-black UI** with a deep customization page, a hard-blocking **protected profile**, a
 from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-tap **main-list quick
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.1+2026-09-05.03-37.g41d79af5+028`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.1+2026-09-05.03-37.g41d79af5+030`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
-<sub>Version reads as **upstream `4.1.1`**, rebased onto upstream commit **`41d79af5` of 2026-09-05 03:37 UTC**, fork build **028**.</sub>
+<sub>Version reads as **upstream `4.1.1`**, rebased onto upstream commit **`41d79af5` of 2026-09-05 03:37 UTC**, fork build **030**.</sub>
 
 </div>
 
@@ -221,6 +221,34 @@ Changes apply live the moment you leave the screen, and a reference **legend** e
 colour and style means. A four-state main list — installed, frozen (snowflake + cool film), stopped,
 uninstalled (dimmed + mauve film) — reads at a glance, with type-coloured italic labels.
 
+## 🧊 A freeze that closes every gate
+
+Stock freezes an app one way and stops there. This one applies **every gate the phone allows, at
+once** — force-stop, suspend, disable, hide — because each closes a different hole, and measurement
+rather than documentation decided which:
+
+- **Suspension** is far stronger than its documentation admits: it blocks the launch, the launcher
+  path, and even an explicit broadcast to a receiver that still resolves. It is also the one flag the
+  vendor does **not** restore at boot — so it is what makes a freeze outlive a restart.
+- **Disabling** is the only gate that removes the app's components from *resolution*, so nothing can
+  find them at all. The cleanest tell is a content provider: suspended, it answers *"not exported"*;
+  disabled, it answers *"could not find provider"*.
+- **Hiding** reports the package as not installed for this user. The shell cannot do it on this phone
+  — it holds no `MANAGE_USERS` — so it goes through the Device Owner delegation instead, which is why
+  the stock *Hide* method had been silently degrading to *Disable* all along.
+- The suspension is written in the **owner's slot** rather than the shell's, so `adb shell pm
+  unsuspend` cannot lift it. Unfreezing clears all four, whichever applied.
+
+The app keeps its row and its snowflake throughout, and that is enforced rather than assumed: a
+hidden app is invisible to any query that does not explicitly ask for it, and a freeze you cannot
+reverse from the row would be a trap — so the hide is **reverted automatically** if the app would not
+still get a row.
+
+One honest limit: these gates stop an app being *started*. A **persistent system app** that the OS
+brought up at boot keeps running through all four, and the app does not pretend otherwise.
+
+---
+
 ## 🛡️ Protected profile (`必要`)
 
 Put any app into an apps-profile named **`必要`** ("necessary") and it becomes **hard-blocked from
@@ -337,13 +365,14 @@ The app list does more without a trip into details:
   freeze/unfreeze toggle, with an at-a-glance snowflake indicator.
 - **Suspended apps read apart from merely frozen ones** at a glance: a violet padlock in place of the
   snowflake, the app's name struck through, and a heavier film over the row.
-- **Freezing survives a restart, by the method you chose.** The default freezing method is **Advanced
-  suspend** — force-stop, then suspend — rather than stock's *Disable*: on EMUI the disabled flag is
-  restored for the vendor's own system packages at boot, so a disable-freeze quietly comes undone,
-  while the per-user suspension flag is left alone. And the snowflake now honours the method
-  **remembered for that app** in App info before falling back to the global default. The two used to
-  disagree, so remembering "suspend" for one package changed nothing about what its row icon did; the
-  battery panel's snowflake and plain batch freeze resolve it the same way now.
+- **Freezing closes every gate at once, and survives a restart.** The default freezing method is
+  **Total freeze** — force-stop, suspend, disable and hide together (see above) — rather than stock's
+  *Disable*, which on EMUI quietly comes undone at boot because the vendor restores the disabled flag
+  for its own system packages while leaving the per-user suspension flag alone. And the snowflake
+  honours the method **remembered for that app** in App info before falling back to the global
+  default. The two used to disagree, so remembering "suspend" for one package changed nothing about
+  what its row icon did; the battery panel's snowflake and plain batch freeze resolve it the same way
+  now.
 - Free-text **per-app notes**, shown on the row as a pill carrying the note's **first line** — you
   read the note without opening it. The app name keeps its full width and the note takes whatever is
   left, so it says as much as the row can fit. A **“With notes” filter** summons exactly the apps

@@ -10,6 +10,74 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-09-05.03-37.g41d79af5+030 — 2026-09-11
+
+Freezing an app suspended it and stopped there. A session of measurement on the phone settled what
+each mechanism actually does — and the answers were not the documented ones — so a freeze now applies
+**every gate this phone allows, at once**, and the *Hide* method, which had been silently degrading
+to *Disable* for as long as this fork has run here, works for the first time. Along the way a latent
+defect turned up that would have made a hidden app impossible to thaw from the app. (Built on
+upstream App Manager `4.1.1`, commit `41d79af5` of 2026-09-05 03:37 UTC.)
+
+### 🧊 Total freeze — four gates instead of one
+
+- **The default freezing method is now `Total freeze`**: force-stop → suspend → disable-user → hide,
+  in that order, each best-effort, failing only if none of them landed. Order is load-bearing — hide
+  goes last, because a hidden package is reported as *not installed* and the suspend and
+  enabled-state calls would then have nothing to act on.
+- **Why a stack rather than a better single choice.** Each gate closes a different hole:
+  **suspension** blocks the launch, the launcher path and even an explicit broadcast to a receiver
+  that still resolves — and it is the one flag EMUI does not restore at boot; **disabling** is the
+  only one that removes the components from *resolution*, the clean tell being a content provider
+  that answers "not exported" while suspended and "could not find provider" while disabled;
+  **hiding** reports the package as not installed for the user.
+- **Suspension now goes in the owner's slot.** The platform records a suspension per *suspending
+  package*: through the shell it reads `com.android.shell`, through 白い熊 雫's device-policy
+  delegation it reads `android`. Only the second is beyond the reach of `adb shell pm unsuspend`, so
+  it is preferred whenever the delegation is live. Unfreezing already lifted both.
+- **The force-stop is not redundant beside the suspension.** A `pm suspend` of a running app does
+  kill the process by itself, but leaves the package's *stopped* flag clear; only the force-stop sets
+  it, and that flag is what withholds implicit broadcasts afterwards.
+- `Total freeze` is a distinct method value rather than a combination of the existing flags: they are
+  bit flags, but every consumer compares them with `==`, and the value is the wire format of both
+  `FreezeRule` and the per-app remembered method. Existing installs move to it by a one-shot
+  migration that fires only while the stored value is still exactly the previous default, so a method
+  chosen deliberately is never overwritten.
+
+### 🫥 Hide works at last, through the Device Owner
+
+- **The shell holds no `MANAGE_USERS` on this phone**, so `pm hide` is refused outright while
+  `SUSPEND_APPS`, `CHANGE_COMPONENT_ENABLED_STATE` and `FORCE_STOP_PACKAGES` are all granted. Hiding
+  was therefore unreachable, and the *Hide* freezing method had been quietly lowering itself to
+  *Disable* on every start.
+- It now goes through 雫's `DELEGATION_PACKAGE_ACCESS` — the same delegated scope that already
+  carries suspension, so a phone whose Snooping suspend switch works can hide too, and one without
+  the delegation can do neither.
+
+### 🩹 A hidden app you could never have thawed
+
+- **Fixed before it could bite:** the "is this package hidden?" read looked the package up *without*
+  asking for uninstalled packages. A hidden package is precisely one the platform reports as not
+  installed, so that query failed for exactly the packages it was asked about, fell through to a
+  reader this shell cannot use, and answered a flat **"not hidden"** — whereupon unfreezing skipped
+  the reveal and the app could never be thawed again from within the app. Harmless until now only
+  because nothing here had ever managed to hide anything.
+- **And a guard, because the row is the only way back.** After hiding, the app is re-read through the
+  exact predicate the main list itself uses; if it would not still get a row, the hide is **reverted**
+  and reported as not applied, leaving the other three gates standing. By construction it cannot fire
+  — hiding leaves the *installed* flag alone — but that assumption had never once been executed on
+  this phone, so it is checked rather than trusted.
+
+### 📋 Measured, and written down
+
+Recorded in `CLAUDE.md` so the next session does not re-derive them: `pm disable` (fully disabled) is
+refused for the shell at **package** level too, not only per component, and component state is
+refused for both disabled and disabled-user; a **persistent system app keeps running through all four
+gates**, because the platform's force-stop deliberately spares persistent processes, so the gates
+stop an app being *started* and cannot evict one the OS brought up at boot; and 白い熊 自由作業盤
+**mirrors this gate set** from its own device-policy delegation, so a change to the stack has to be
+announced to that repo or its thaw stops clearing everything this one applies.
+
 ## 4.1.1+2026-09-05.03-37.g41d79af5+028 — 2026-09-09
 
 The batch-operation page ends with the log as its whole report, and the clipboard was the only way
