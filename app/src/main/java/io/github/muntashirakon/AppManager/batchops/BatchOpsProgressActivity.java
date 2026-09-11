@@ -30,6 +30,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 import io.github.muntashirakon.AppManager.BaseActivity;
@@ -37,7 +38,9 @@ import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.fm.FmProvider;
 import io.github.muntashirakon.AppManager.fonts.ColorPrefs;
 import io.github.muntashirakon.AppManager.main.RowPills;
+import io.github.muntashirakon.AppManager.main.ShareBackupHandler;
 import io.github.muntashirakon.AppManager.settings.Prefs;
+import io.github.muntashirakon.AppManager.types.UserPackagePair;
 import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 import io.github.muntashirakon.AppManager.utils.UIUtils;
@@ -74,6 +77,7 @@ public class BatchOpsProgressActivity extends BaseActivity {
     private AppCompatTextView mTertiary;
     private AppCompatTextView mSave;
     private AppCompatTextView mShare;
+    private AppCompatTextView mSend;
     private AppCompatTextView mFollowButton;
 
     /** Whether the list is pinned to the newest line. Off as soon as the user scrolls up. */
@@ -95,6 +99,7 @@ public class BatchOpsProgressActivity extends BaseActivity {
         mTertiary = findViewById(R.id.op_tertiary);
         mSave = findViewById(R.id.op_save);
         mShare = findViewById(R.id.op_share);
+        mSend = findViewById(R.id.op_send);
         mFollowButton = findViewById(R.id.op_follow);
         mRecyclerView = findViewById(R.id.op_log);
         mLayoutManager = new LinearLayoutManager(this);
@@ -306,6 +311,7 @@ public class BatchOpsProgressActivity extends BaseActivity {
             // should offer while it runs. Both actions stay in the overflow throughout.
             mSave.setVisibility(View.GONE);
             mShare.setVisibility(View.GONE);
+            mSend.setVisibility(View.GONE);
         } else {
             mSecondary.setText(R.string.op_log_copy);
             mSecondary.setOnClickListener(v -> copyLog());
@@ -320,11 +326,49 @@ public class BatchOpsProgressActivity extends BaseActivity {
             mShare.setText(R.string.op_log_share);
             mShare.setOnClickListener(v -> shareLog());
             mShare.setVisibility(View.VISIBLE);
+            // Fork (白い熊): this page is the last thing that knows which apps the run covered,
+            // and it is what is on screen the moment a backup ends — so the way to carry that
+            // backup to another device belongs here, rather than three screens away in the main
+            // list where the same apps would have to be selected all over again.
+            bindSendBackup();
             mPrimary.setText(R.string.close);
             mPrimary.setEnabled(true);
             mPrimary.setOnClickListener(v -> finish());
             RowPills.styleActionPill(mPrimary, ColorPrefs.getColor(this, ColorPrefs.OPLOG_APP), false);
         }
+    }
+
+    /**
+     * Offer the just-made backup to 魔法絨毯, when there is one.
+     *
+     * <p>Only {@link BatchOpsManager#OP_BACKUP} qualifies. A restore consumes a backup and a
+     * delete removes one, so neither leaves anything newly made; and {@code OP_BACKUP_APK} is not
+     * a backup at all in this sense — it writes a bare APK through {@code ApkUtils.backupApk} and
+     * records nothing in the backup database, so the pill would have quietly offered some older
+     * backup of the same app instead of the thing that just ran.
+     */
+    private void bindSendBackup() {
+        BatchOpsProgressMonitor monitor = BatchOpsProgressMonitor.getInstance();
+        List<UserPackagePair> targets = monitor.getTargets();
+        if (targets.isEmpty() || monitor.getOp() != BatchOpsManager.OP_BACKUP) {
+            mSend.setVisibility(View.GONE);
+            return;
+        }
+        mSend.setText(R.string.share_backup_send);
+        mSend.setOnClickListener(v ->
+                ShareBackupHandler.shareFinishedBackup(this, targets, this::showSendProgress));
+        mSend.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * Enumerating the backups reads the database and stats every directory — long enough to read
+     * as a pill that did nothing, which is 白い熊's own recorded complaint about this exact action
+     * elsewhere ("clicking backup seemingly doesn't do anything on click"). The page already owns
+     * a progress indicator and it is idle once the run has finished, so it says so here.
+     */
+    private void showSendProgress(boolean busy) {
+        mProgress.setIndeterminate(true);
+        mProgress.setVisibility(busy ? View.VISIBLE : View.GONE);
     }
 
     // ── Following ───────────────────────────────────────────────────────────
@@ -486,6 +530,7 @@ public class BatchOpsProgressActivity extends BaseActivity {
         RowPills.styleActionPill(mTertiary, accent, false);
         RowPills.styleActionPill(mSave, accent, false);
         RowPills.styleActionPill(mShare, accent, false);
+        RowPills.styleActionPill(mSend, accent, false);
     }
 
     /**

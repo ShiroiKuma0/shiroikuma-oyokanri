@@ -17,6 +17,8 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 
+import io.github.muntashirakon.AppManager.types.UserPackagePair;
+
 /**
  * Fork: a process-wide bridge between a running {@link BatchOpsService} batch
  * operation (executed on a background worker thread) and the in-app progress
@@ -180,6 +182,21 @@ public final class BatchOpsProgressMonitor {
     private volatile boolean mPaused;
     private volatile boolean mCancelled;
     private volatile long mStartedAtRealtime;
+
+    /**
+     * Fork (白い熊): what this run WAS — the operation, and the apps it named — deliberately kept
+     * past {@link #finish()}.
+     *
+     * <p>{@link State#items} is the wrong source for the same question: that list holds what is
+     * <em>in flight</em> and is emptied by {@code finish()}, because it exists to drive a
+     * progress bar. The finished page needs the opposite — what the run covered, still readable
+     * after it has ended — so the backup just made can be handed to 魔法絨毯 from the bar that is
+     * on screen the moment it completes, rather than from a screen where the batch must be
+     * selected all over again.
+     */
+    private volatile int mOp = BatchOpsManager.OP_NONE;
+    @NonNull
+    private volatile List<UserPackagePair> mTargets = Collections.emptyList();
     // Fork: whether the main window is in the foreground. Set by MainActivity in
     // onResume/onPause; read by BatchOpsService to decide whether to post the
     // system completion heads-up (suppressed while foreground, since the in-app
@@ -250,9 +267,16 @@ public final class BatchOpsProgressMonitor {
         return packageName + ':' + userId;
     }
 
-    /** Called by the service when a new operation starts. Resets all flags. */
+    /**
+     * Called by the service when a new operation starts. Resets all flags.
+     *
+     * <p>The operation and its targets are taken here rather than through a setter of their own:
+     * there is exactly one caller, and a second call site is precisely how the two would come to
+     * disagree about which run the page is describing.
+     */
     @AnyThread
-    public void begin(@Nullable CharSequence title, int max) {
+    public void begin(@Nullable CharSequence title, int max, @BatchOpsManager.OpType int op,
+                      @NonNull List<UserPackagePair> targets) {
         synchronized (mPauseLock) {
             mPaused = false;
             mCancelled = false;
@@ -262,6 +286,8 @@ public final class BatchOpsProgressMonitor {
         mResultSeen = false;
         mTitle = title;
         mMax = max;
+        mOp = op;
+        mTargets = new ArrayList<>(targets);
         mCurrent = 0;
         mStartedAtRealtime = SystemClock.elapsedRealtime();
         synchronized (mItemLock) {
@@ -366,6 +392,20 @@ public final class BatchOpsProgressMonitor {
             }
         }
         publish();
+    }
+
+    /** The operation this run performed; {@link BatchOpsManager#OP_NONE} before the first run. */
+    @AnyThread
+    @BatchOpsManager.OpType
+    public int getOp() {
+        return mOp;
+    }
+
+    /** The apps this run named, in the order the batch listed them. Never null, often empty. */
+    @AnyThread
+    @NonNull
+    public List<UserPackagePair> getTargets() {
+        return mTargets;
     }
 
     /** Called by the service when the operation finishes (or is cancelled). */

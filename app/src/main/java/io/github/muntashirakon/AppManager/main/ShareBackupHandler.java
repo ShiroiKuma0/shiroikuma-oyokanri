@@ -111,6 +111,66 @@ public final class ShareBackupHandler {
         });
     }
 
+    /** Told whether the enumeration is running, so a caller can show a wait of its own. */
+    public interface BusyListener {
+        void onBusy(boolean busy);
+    }
+
+    /**
+     * Send the backup a just-finished run produced: straight to 魔法絨毯 when the run covered ONE
+     * app, through the picker when it covered several.
+     *
+     * <p><b>The asymmetry is the point.</b> After backing up one app there is exactly one thing
+     * the request can mean — the backup just written, which is the newest — and a picker there is
+     * a question with one answer. After backing up forty there is no such thing, and the picker
+     * is then doing real work rather than asking politely: 魔法絨毯 names each received folder by
+     * its own leaf, so two backups sent together merge into one unrestorable directory (see
+     * {@link #showPicker}), and a batch stamps every app in the same second.
+     *
+     * <p>This is deliberately NOT the behaviour of {@link #share}, which always asks. That one is
+     * reached from the main list, where nothing has just happened and "the newest" names no
+     * particular backup.
+     */
+    public static void shareFinishedBackup(@NonNull FragmentActivity activity,
+                                           @NonNull List<UserPackagePair> pairs,
+                                           @Nullable BusyListener busyListener) {
+        if (pairs.isEmpty()) {
+            return;
+        }
+        if (!isCarrierInstalled(activity)) {
+            UIUtils.displayLongToast(R.string.share_backup_no_carrier);
+            return;
+        }
+        boolean single = pairs.size() == 1;
+        setBusy(busyListener, true);
+        ThreadUtils.postOnBackgroundThread(() -> {
+            List<Item> items = collect(activity, pairs);
+            ThreadUtils.postOnMainThread(() -> {
+                if (activity.isDestroyed()) {
+                    return;
+                }
+                setBusy(busyListener, false);
+                if (items.isEmpty()) {
+                    UIUtils.displayShortToast(R.string.share_backup_none);
+                    return;
+                }
+                if (single) {
+                    // collect() sorts newest first, and right after a backup the newest IS the
+                    // one that was just written.
+                    send(activity, items.get(0));
+                } else {
+                    showPicker(activity, items);
+                }
+            });
+        });
+    }
+
+    private static void setBusy(@Nullable BusyListener listener, boolean busy) {
+        if (listener != null) {
+            listener.onBusy(busy);
+        }
+    }
+
     @WorkerThread
     @NonNull
     private static List<Item> collect(@NonNull Context context,
