@@ -50,6 +50,7 @@ public class AppManager extends Application {
         // Fork: AppPref writes every default into preferences.xml on first run, so a
         // changed default never reaches an existing install on its own.
         Prefs.Blocking.migrateDefaultFreezingMethod();
+        Prefs.Blocking.migrateDefaultFreezingMethodToTotal();
         // Fork: a Shizuku server pushes its binder whenever it likes, including while no activity of
         // ours exists, so the listeners that notice a lost/returned server have to be registered for
         // the life of the process rather than by a screen.

@@ -89,21 +89,24 @@ public final class FreezeUnfreeze {
             FreezeUtils.FREEZE_SUSPEND,
             FreezeUtils.FREEZE_ADV_SUSPEND,
             FreezeUtils.FREEZE_DISABLE,
-            FreezeUtils.FREEZE_HIDE
+            FreezeUtils.FREEZE_HIDE,
+            FreezeUtils.FREEZE_TOTAL
     };
 
     private static final Integer[] FREEZING_METHOD_TITLES = new Integer[]{
             R.string.suspend_app,
             R.string.advanced_suspend_app,
             R.string.disable,
-            R.string.hide_app
+            R.string.hide_app,
+            R.string.total_freeze_app
     };
 
     private static final Integer[] FREEZING_METHOD_DESCRIPTIONS = new Integer[]{
             R.string.suspend_app_description,
             R.string.advanced_suspend_app_description,
             R.string.disable_app_description,
-            R.string.hide_app_description
+            R.string.hide_app_description,
+            R.string.total_freeze_app_description
     };
 
     @NonNull

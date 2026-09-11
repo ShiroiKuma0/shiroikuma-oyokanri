@@ -506,9 +506,20 @@ public final class PackageManagerCompat {
     public static boolean isPackageHidden(String packageName, @UserIdInt int userId) throws RemoteException {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             try {
-                // Find using private flags
+                // Find using private flags.
+                // Fork (白い熊, +29) — LANDMINE: MATCH_UNINSTALLED_PACKAGES is not optional
+                // here. A hidden package is exactly one the platform reports as NOT
+                // installed for this user (PackageUserState#isAvailable returns
+                // installed && (!hidden || matchUninstalled)), so without that flag this
+                // query throws NameNotFoundException for precisely the packages it is
+                // being asked about. It then fell through to the MANAGE_USERS reader,
+                // which this phone's shell cannot use — so the answer was a flat "not
+                // hidden", FreezeUtils#unfreeze skipped the reveal, and a hidden app
+                // could never be thawed again. Harmless before +29 only because nothing
+                // here had ever managed to hide anything.
                 ApplicationInfo info = getApplicationInfo(packageName,
-                        PackageManagerCompat.MATCH_STATIC_SHARED_AND_SDK_LIBRARIES, userId);
+                        PackageManagerCompat.MATCH_STATIC_SHARED_AND_SDK_LIBRARIES
+                                | MATCH_UNINSTALLED_PACKAGES | MATCH_DISABLED_COMPONENTS, userId);
                 return ApplicationInfoCompat.isHidden(info);
             } catch (PackageManager.NameNotFoundException ignore) {
             }

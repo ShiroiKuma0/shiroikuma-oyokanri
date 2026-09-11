@@ -39,6 +39,7 @@ import io.github.muntashirakon.AppManager.compat.ManifestCompat;
 import io.github.muntashirakon.AppManager.details.AppDetailsFragment;
 import io.github.muntashirakon.AppManager.details.AppDetailsTab;
 import io.github.muntashirakon.AppManager.details.AppDetailsTabs;
+import io.github.muntashirakon.AppManager.devicepolicy.DevicePolicyBridge;
 import io.github.muntashirakon.AppManager.fm.FmActivity;
 import io.github.muntashirakon.AppManager.fm.FmListOptions;
 import io.github.muntashirakon.AppManager.logcat.helper.LogcatHelper;
@@ -384,16 +385,27 @@ public final class Prefs {
         @FreezeUtils.FreezeMethod
         public static int getDefaultFreezingMethod() {
             int freezeType = AppPref.getInt(AppPref.PrefKey.PREF_FREEZE_TYPE_INT);
-            if (freezeType == FreezeUtils.FREEZE_HIDE) {
-                // Requires MANAGE_USERS permission
-                if (!SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.MANAGE_USERS)) {
+            if (freezeType == FreezeUtils.FREEZE_TOTAL) {
+                // Fork (白い熊, +29): every layer of the stack guards itself and the ones
+                // that cannot be applied are skipped, so there is nothing to lower it to —
+                // disable-user alone is always available to us and is the floor.
+                return freezeType;
+            } else if (freezeType == FreezeUtils.FREEZE_HIDE) {
+                // Requires MANAGE_USERS permission — or, where the shell does not hold it
+                // (on this phone it does not: measured 2026-09-10, `pm hide` refused for
+                // uid 2000), 雫's DELEGATION_PACKAGE_ACCESS, which reaches the same call
+                // through the Device Owner. Without this second test the Hide method
+                // silently became Disable on every EMUI install.
+                if (!SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.MANAGE_USERS)
+                        && !DevicePolicyBridge.canHide()) {
                     return FreezeUtils.FREEZE_DISABLE;
                 }
             } else if (freezeType == FreezeUtils.FREEZE_SUSPEND || freezeType == FreezeUtils.FREEZE_ADV_SUSPEND) {
                 // 7+ only. Requires MANAGE_USERS permission until P. Requires SUSPEND_APPS permission after that.
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N
+                if (!DevicePolicyBridge.canSuspend()
+                        && (Build.VERSION.SDK_INT < Build.VERSION_CODES.N
                         || Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && !SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.SUSPEND_APPS)
-                        || (Build.VERSION.SDK_INT < Build.VERSION_CODES.P && !SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.MANAGE_USERS))) {
+                        || (Build.VERSION.SDK_INT < Build.VERSION_CODES.P && !SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.MANAGE_USERS)))) {
                     return FreezeUtils.FREEZE_DISABLE;
                 }
             }
@@ -430,6 +442,30 @@ public final class Prefs {
             AppPref.set(AppPref.PrefKey.PREF_FREEZE_TYPE_MIGRATED_ADV_SUSPEND_BOOL, true);
             if (AppPref.getInt(AppPref.PrefKey.PREF_FREEZE_TYPE_INT) == FreezeUtils.FREEZE_DISABLE) {
                 AppPref.set(AppPref.PrefKey.PREF_FREEZE_TYPE_INT, FreezeUtils.FREEZE_ADV_SUSPEND);
+            }
+        }
+
+        /**
+         * Fork (白い熊, +29): one-time move of the stored default freezing method from
+         * <b>Advanced suspend</b> to <b>Total freeze</b>.
+         * <p>
+         * Same shape and same landmine as {@link #migrateDefaultFreezingMethod()} above —
+         * {@code AppPref.init()} has already written the old default into
+         * {@code preferences.xml}, so changing {@link AppPref#getDefaultValue} alone would
+         * only ever reach a fresh install. It fires once and only while the value is still
+         * exactly the previous default, so a method deliberately chosen from this build on
+         * is never touched.
+         * <p>
+         * Runs <i>after</i> the Disable → Advanced suspend migration, so an install that
+         * never moved off upstream's Disable lands on Total in one launch.
+         */
+        public static void migrateDefaultFreezingMethodToTotal() {
+            if (AppPref.getBoolean(AppPref.PrefKey.PREF_FREEZE_TYPE_MIGRATED_TOTAL_BOOL)) {
+                return;
+            }
+            AppPref.set(AppPref.PrefKey.PREF_FREEZE_TYPE_MIGRATED_TOTAL_BOOL, true);
+            if (AppPref.getInt(AppPref.PrefKey.PREF_FREEZE_TYPE_INT) == FreezeUtils.FREEZE_ADV_SUSPEND) {
+                AppPref.set(AppPref.PrefKey.PREF_FREEZE_TYPE_INT, FreezeUtils.FREEZE_TOTAL);
             }
         }
 
