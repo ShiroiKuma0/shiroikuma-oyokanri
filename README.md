@@ -18,15 +18,15 @@ root** through a contract the sister apps implement — and which this app now i
 **lenses** re-dress the app list itself, a **sort menu** of its own,
 **per-app backup and restore tables**, the ability to **hand a backup to another device**,
 **device-policy locks** that
-Settings cannot undo, a **freeze whose four gates are four switches**, each operable on its own and shown on every row, a configurable
+Settings cannot undo, a **freeze whose four gates are four switches**, each operable on its own, shown on every row and **applicable to a whole selection as one rung**, a configurable
 **yellow-on-black UI** with a deep customization page, a hard-blocking **protected profile**, a
 from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-tap **main-list quick
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.1+2026-09-05.03-37.g41d79af5+037`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.1+2026-09-05.03-37.g41d79af5+042`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
-<sub>Version reads as **upstream `4.1.1`**, rebased onto upstream commit **`41d79af5` of 2026-09-05 03:37 UTC**, fork build **037**.</sub>
+<sub>Version reads as **upstream `4.1.1`**, rebased onto upstream commit **`41d79af5` of 2026-09-05 03:37 UTC**, fork build **042**.</sub>
 
 </div>
 
@@ -265,6 +265,31 @@ Each write is **measured, not assumed**: the platform is re-read afterwards and 
 if it actually moved, because several of these APIs accept a write and quietly discard it. Step 1
 needed a release that did not previously exist anywhere — a force-stop leaves the app *stopped* with
 no ordinary way back but launching it — so the app clears that flag directly.
+
+### A rung is also an action — on one app or on hundreds
+
+The level an app is frozen at is the one thing about a phone that is written down **nowhere**: it is
+read live off the package every time a row is drawn, the gates themselves persist nothing, and the
+settings export carries preferences, profiles and fonts — no platform state. An app backup does carry
+a freeze *rule*, but restoring it only remembers which method to use later; it never freezes
+anything. So a restored phone comes up entirely thawed.
+
+The answer is to make a rung something you can **tap**: **Freeze ① stop**, **② suspend**,
+**③ disable**, **④ hide**, on the multi-select bar and in the single-app pane. Put the apps that
+belong at one depth into a profile, filter the list to that profile, select all, tap the rung —
+profiles *do* travel in the export, so a profile plus a rung is the record the level never was.
+
+A rung is exact: gates 1‥N applied and **every gate above released**. Tapping ③ on a totally frozen
+app brings it *up* to 3; tapping it on a running one takes it down to 3. Releasing runs first and
+from the top, because a hidden package is reported as not installed and nothing below that gate can
+be touched while it stands. What it reached is then **re-read and compared**, so a rung this phone
+cannot manage is reported rather than claimed.
+
+In the single-app pane the rung the app is **standing on is drawn filled**, from the same number the
+row's badge shows, and tapping that lit rung releases it — one pill is both the way in and the way
+out.
+
+---
 
 ### The row says how deep it goes
 
