@@ -53,9 +53,24 @@ public class AppDetailsOverlaysFragment extends AppDetailsFragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
-                && SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.CHANGE_OVERLAY_PACKAGES)) {
-            overlayManager = OverlayManagerCompact.getOverlayManager();
+        // Fork (白い熊, +034) — LANDMINE, the same one the 盗み見 tab hit in +033:
+        // checkSelfOrRemotePermission reaches Users.getSelfOrRemoteUid() →
+        // LocalServices.getAmService(), which is synchronized on the service
+        // connection. It costs nothing while the :am server is bound and blocks for
+        // the whole bind while it is not — and a bind is exactly what is in flight
+        // right after an install, when PrivilegeWatchdog is reclaiming the session
+        // while holding that monitor. On the main thread that is a black window and
+        // an ANR. Asked on a worker instead; overlayManager is consulted only from
+        // refreshDetails() and a row's toggle, both of which happen long after.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            ThreadUtils.postOnBackgroundThread(() -> {
+                if (!SelfPermissions.checkSelfOrRemotePermission(
+                        ManifestCompat.permission.CHANGE_OVERLAY_PACKAGES)) {
+                    return;
+                }
+                IOverlayManager manager = OverlayManagerCompact.getOverlayManager();
+                ThreadUtils.postOnMainThread(() -> overlayManager = manager);
+            });
         }
     }
 
@@ -68,15 +83,23 @@ public class AppDetailsOverlaysFragment extends AppDetailsFragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        String emptyStringText;
+        // Same landmine as onCreate above. The empty view is only read once the list
+        // comes back empty, so filling it in a moment later costs nothing; blocking
+        // the main thread to word it costs the whole screen.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            emptyStringText = getString(R.string.overlay_sdk_version_too_low);
-        } else if (!SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.CHANGE_OVERLAY_PACKAGES)) {
-            emptyStringText = getString(R.string.no_overlay_permission);
+            emptyView.setText(R.string.overlay_sdk_version_too_low);
         } else {
-            emptyStringText = getString(R.string.no_overlays);
+            emptyView.setText(R.string.no_overlays);
+            ThreadUtils.postOnBackgroundThread(() -> {
+                boolean permitted = SelfPermissions.checkSelfOrRemotePermission(
+                        ManifestCompat.permission.CHANGE_OVERLAY_PACKAGES);
+                if (permitted) return;
+                ThreadUtils.postOnMainThread(() -> {
+                    if (isDetached()) return;
+                    emptyView.setText(R.string.no_overlay_permission);
+                });
+            });
         }
-        emptyView.setText(emptyStringText);
 
         mAdapter = new AppDetailsRecyclerAdapter();
         recyclerView.setAdapter(mAdapter);

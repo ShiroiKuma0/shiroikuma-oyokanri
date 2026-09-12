@@ -17,6 +17,7 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.UserHandleHidden;
 import android.text.SpannableStringBuilder;
@@ -50,7 +51,6 @@ import androidx.core.widget.NestedScrollView;
 import androidx.recyclerview.widget.GridLayoutManager;
 
 import com.google.android.material.card.MaterialCardView;
-import com.google.android.material.checkbox.MaterialCheckBox;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
 import java.util.ArrayList;
@@ -58,7 +58,6 @@ import java.util.List;
 
 import io.github.muntashirakon.AppManager.BuildConfig;
 import io.github.muntashirakon.AppManager.R;
-import io.github.muntashirakon.AppManager.apk.behavior.FreezeUnfreeze;
 import io.github.muntashirakon.AppManager.apk.installer.PackageInstallerCompat;
 import io.github.muntashirakon.AppManager.compat.ActivityManagerCompat;
 import io.github.muntashirakon.AppManager.compat.PackageManagerCompat;
@@ -69,9 +68,9 @@ import io.github.muntashirakon.AppManager.devicepolicy.DevicePolicyBridge;
 import io.github.muntashirakon.AppManager.devicepolicy.PolicyApiClient;
 import io.github.muntashirakon.AppManager.devicepolicy.PolicyLockState;
 import io.github.muntashirakon.AppManager.logs.Log;
+import io.github.muntashirakon.AppManager.main.FreezeLevelBadge;
 import io.github.muntashirakon.AppManager.profiles.ProtectedAppsProfile;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
-import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.snooping.SnoopingActivityTimes;
 import io.github.muntashirakon.AppManager.snooping.SnoopingCatalog;
 import io.github.muntashirakon.AppManager.snooping.SnoopingEnforcer;
@@ -173,7 +172,6 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
     private boolean mPolicyDelegate;
     /** 雫 answered and is Device Owner — so the powers exist but may not be ours yet. */
     private boolean mPolicyOwnerPresent;
-    private boolean mPolicySuspended;
     private boolean mPolicyUninstallBlocked;
     /**
      * The two 雫-side locks, read from {@link PolicyLockState} because the
@@ -184,10 +182,19 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
     private boolean mPolicyAccessibilityBlocked;
     /** Resolved on the worker with the rest, so no bind() ever makes a binder call. */
     private boolean mPolicyCanLock;
-    private boolean mPolicyCanSuspend;
     private boolean mPolicyCanBlockUninstall;
 
-    // ── The two ordinary verdicts on the whole app (白い熊) ───────────────────
+    // ── The four freeze gates, one switch each (白い熊, +032) ─────────────────
+    /**
+     * Whether each gate is standing right now, and whether this phone lets us
+     * operate it at all. Indexed by the gate constant itself ({@code 1..4}), so
+     * slot 0 is unused and the step number reads straight through from the UI to
+     * {@link FreezeUtils#setGate} with nothing to translate.
+     */
+    private final boolean[] mGateApplied = new boolean[FreezeUtils.GATE_HIDE + 1];
+    private final boolean[] mGateAvailable = new boolean[FreezeUtils.GATE_HIDE + 1];
+
+    // ── The verdicts on the whole app (白い熊) ────────────────────────────────
     /**
      * Frozen by any method — disabled, suspended or hidden. Read <b>live</b> from
      * the package manager rather than from the view model's cached
@@ -254,15 +261,42 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 }
             });
         }
-        mCanEnforce = SnoopingEnforcer.canEnforce();
         alertView.setEndIconOnClickListener(v -> alertView.hide());
-        if (!mCanEnforce) {
-            alertView.setAlertType(MaterialAlertView.ALERT_TYPE_WARN);
-            alertView.setText(R.string.snooping_needs_privileges);
-            alertView.show();
-        } else {
-            alertView.setVisibility(View.GONE);
-        }
+        // Fork (白い熊, +033) — LANDMINE: this is a PRIVILEGED read and it used to
+        // run right here, on the main thread. SnoopingEnforcer.canEnforce() reaches
+        // SelfPermissions → Users.getSelfOrRemoteUid() → LocalServices.getAmService(),
+        // which is synchronized on the service-connection wrapper. It returns in
+        // microseconds while the :am server is already bound, and blocks for as long
+        // as a bind takes while it is not — and the bind holds that same monitor
+        // from another thread (PrivilegeWatchdog.reclaim → Ops.init →
+        // LocalServices.bindServices, waiting on a CountDownLatch for the daemon).
+        //
+        // The two meet on every fresh install: replacing the package kills the old
+        // privileged server, the watchdog reclaims it, and the reopen-last-screen
+        // feature (+146) opens this very page while that is in flight. Result: a
+        // black window and "Input dispatching timed out … Waited 10006ms for
+        // FocusEvent" — measured from the ANR trace on 2026-09-12, where the main
+        // thread sat in onViewCreated waiting on a lock held by pool-3-thread-8.
+        //
+        // So it is asked on a worker and the banner filled in when the answer
+        // arrives. The page is useful meanwhile: every capability row does its own
+        // privilege check, and the banner only explains why the switches will not
+        // move.
+        alertView.setVisibility(View.GONE);
+        ThreadUtils.postOnBackgroundThread(() -> {
+            boolean canEnforce = SnoopingEnforcer.canEnforce();
+            ThreadUtils.postOnMainThread(() -> {
+                if (isDetached()) return;
+                mCanEnforce = canEnforce;
+                if (!canEnforce) {
+                    alertView.setAlertType(MaterialAlertView.ALERT_TYPE_WARN);
+                    alertView.setText(R.string.snooping_needs_privileges);
+                    alertView.show();
+                } else {
+                    alertView.setVisibility(View.GONE);
+                }
+            });
+        });
         if (viewModel == null) return;
         mRenderedEpoch = viewModel.getStateEpoch();
         viewModel.get(AppDetailsFragment.SNOOPING).observe(getViewLifecycleOwner(), items -> {
@@ -306,7 +340,6 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
         ThreadUtils.postOnBackgroundThread(() -> {
             DevicePolicyBridge.invalidate();
             boolean delegate = DevicePolicyBridge.isDelegate();
-            boolean suspended = packageName != null && DevicePolicyBridge.isSuspended(packageName);
             boolean uninstallBlocked = packageName != null
                     && DevicePolicyBridge.isUninstallBlocked(packageName);
             // Only ask 雫 when we have nothing: the answer is only needed to tell
@@ -314,7 +347,6 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             // provider call per page open is worth skipping when it cannot matter.
             boolean ownerPresent = delegate || PolicyApiClient.isDeviceOwnerPresent();
             boolean canLock = DevicePolicyBridge.canLockPermissions();
-            boolean canSuspend = DevicePolicyBridge.canSuspend();
             boolean canBlockUninstall = DevicePolicyBridge.canBlockUninstall();
             boolean userControlDisabled = packageName != null
                     && PolicyLockState.isUserControlDisabled(packageName);
@@ -325,6 +357,15 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                     ? resolveApplicationInfo(packageName, userId) : null;
             boolean frozen = appInfo != null && FreezeUtils.isFrozen(appInfo);
             boolean canFreeze = appInfo != null && SelfPermissions.canFreezeUnfreezePackages();
+            // The four gates, from the same ApplicationInfo the freeze state came
+            // from — one resolve, so the box can never show a step disagreeing with
+            // the master switch above it.
+            boolean[] gateApplied = new boolean[FreezeUtils.GATE_HIDE + 1];
+            boolean[] gateAvailable = new boolean[FreezeUtils.GATE_HIDE + 1];
+            for (int gate : FreezeUtils.GATES) {
+                gateApplied[gate] = appInfo != null && FreezeUtils.isGateApplied(appInfo, gate);
+                gateAvailable[gate] = appInfo != null && FreezeUtils.canOperateGate(gate);
+            }
             boolean canUninstall = appInfo != null;
             CharSequence label = appInfo != null
                     ? appInfo.loadLabel(ContextUtils.getContext().getPackageManager()) : null;
@@ -336,15 +377,15 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 if (isDetached()) return;
                 mPolicyDelegate = delegate;
                 mPolicyOwnerPresent = ownerPresent;
-                mPolicySuspended = suspended;
                 mPolicyUninstallBlocked = uninstallBlocked;
                 mPolicyUserControlDisabled = userControlDisabled;
                 mPolicyAccessibilityBlocked = accessibilityBlocked;
                 mPolicyCanLock = canLock;
-                mPolicyCanSuspend = canSuspend;
                 mPolicyCanBlockUninstall = canBlockUninstall;
                 mAppFrozen = frozen;
                 mCanFreeze = canFreeze;
+                System.arraycopy(gateApplied, 0, mGateApplied, 0, gateApplied.length);
+                System.arraycopy(gateAvailable, 0, mGateAvailable, 0, gateAvailable.length);
                 mCanUninstall = canUninstall;
                 mAppLabel = label;
                 mAppIsSystem = isSystem;
@@ -775,34 +816,136 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 leading ? null : icon, null);
     }
 
-    // ── Device-policy actions ───────────────────────────────────────────────
+    // ── Freezing and the other whole-app verdicts ───────────────────────────
 
     /**
-     * Suspend the app, or release it — one tap either way (白い熊, +81).
+     * One gate of a freeze, on or off (白い熊, +032).
      * <p>
-     * The last confirmation on this card, gone the same way the three boxes' went
-     * in +78: what it warned about is in the row's own description, which is read
-     * before the tap rather than dismissed after it.
+     * No confirmation, the same rule the policy boxes settled on in +78: what a
+     * dialog would have warned about is in the step's own description, which is
+     * read before the tap rather than dismissed after it. Every step here is
+     * released by the switch that applied it.
+     * <p>
+     * A step that this phone cannot operate says so on its own row, so the tap is
+     * answered with the same sentence rather than a generic refusal — the switch
+     * is drawn dead, and a dead switch that stays silent reads as a bug.
+     * <p>
+     * Releasing is deliberately unguarded: an app added to 必要 <em>after</em> it
+     * was frozen must still be thawable, which is the rule every other chokepoint
+     * in the fork already follows for the way back.
      */
-    private void toggleSuspend() {
+    private void toggleGate(@FreezeUtils.FreezeGate int gate) {
         if (viewModel == null) return;
         String packageName = viewModel.getPackageName();
         if (packageName == null) return;
-        applySuspend(packageName, !mPolicySuspended);
+        int userId = viewModel.getUserId();
+        if (!mGateAvailable[gate]) {
+            UIUtils.displayLongToast(gateUnavailableRes(gate));
+            return;
+        }
+        boolean apply = !mGateApplied[gate];
+        CharSequence stepName = getString(gateLabelRes(gate));
+        runAppAction(() -> FreezeUtils.setGate(packageName, userId, gate, apply),
+                R.string.freeze_gate_failed, stepName, apply);
     }
 
-    private void applySuspend(@NonNull String packageName, boolean suspended) {
-        ProgressIndicatorCompat.setVisibility(progressIndicator, true);
-        ThreadUtils.postOnBackgroundThread(() -> {
-            boolean ok = DevicePolicyBridge.setSuspended(packageName, suspended);
-            ThreadUtils.postOnMainThread(() -> {
-                if (isDetached()) return;
-                ProgressIndicatorCompat.setVisibility(progressIndicator, false);
-                if (!ok) UIUtils.displayLongToast(R.string.policy_failed);
-                else notifyPackageAltered(packageName);
-                loadPolicyState();
-            });
-        });
+    /**
+     * The Freeze box's master switch: every gate at once, exactly as the snowflake
+     * on the main list applies it, and every gate released when it goes off.
+     * <p>
+     * No method picker — a switch that opens a dialog is not a switch. The per-app
+     * remembered freezing method is deliberately left alone: this box operates
+     * gates, not methods, and writing one from here would silently change what the
+     * main list does next.
+     * <p>
+     * Releasing adds one thing to {@link FreezeUtils#unfreeze}: the stopped flag.
+     * Unfreeze has never cleared it — nothing else in the app sets it on its own —
+     * but here step 1 is a switch the user can see standing, so "off" has to mean
+     * all four.
+     */
+    private void toggleMasterFreeze() {
+        if (viewModel == null) return;
+        String packageName = viewModel.getPackageName();
+        if (packageName == null) return;
+        int userId = viewModel.getUserId();
+        if (mAppFrozen) {
+            runAppAction(() -> {
+                FreezeUtils.unfreeze(packageName, userId);
+                if (mGateAvailable[FreezeUtils.GATE_FORCE_STOP]) {
+                    try {
+                        FreezeUtils.setGate(packageName, userId, FreezeUtils.GATE_FORCE_STOP, false);
+                    } catch (Throwable ignore) {
+                        // The three gates that make an app frozen are already lifted;
+                        // a stopped flag we could not clear is not a failed unfreeze.
+                    }
+                }
+                return true;
+            }, R.string.failed_to_unfreeze, null, false);
+            return;
+        }
+        if (BuildConfig.APPLICATION_ID.equals(packageName)) {
+            // Freezing ourselves is refused outright by FreezeUtils, but the
+            // confirmation is what App info asks, so ask it here too.
+            ForkDialog.present(ForkDialog.builder(activity)
+                    .setMessage(R.string.are_you_sure)
+                    .setPositiveButton(R.string.yes, (d, w) -> applyTotalFreeze(packageName, userId))
+                    .setNegativeButton(R.string.no, null));
+            return;
+        }
+        applyTotalFreeze(packageName, userId);
+    }
+
+    private void applyTotalFreeze(@NonNull String packageName, int userId) {
+        runAppAction(() -> {
+            FreezeUtils.freeze(packageName, userId, FreezeUtils.FREEZE_TOTAL);
+            return true;
+        }, R.string.failed_to_freeze, null, true);
+    }
+
+    @StringRes
+    private static int gateLabelRes(@FreezeUtils.FreezeGate int gate) {
+        switch (gate) {
+            case FreezeUtils.GATE_FORCE_STOP:
+                return R.string.freeze_gate_force_stop;
+            case FreezeUtils.GATE_SUSPEND:
+                return R.string.freeze_gate_suspend;
+            case FreezeUtils.GATE_DISABLE:
+                return R.string.freeze_gate_disable;
+            default:
+                return R.string.freeze_gate_hide;
+        }
+    }
+
+    @StringRes
+    private static int gateNoteRes(@FreezeUtils.FreezeGate int gate) {
+        switch (gate) {
+            case FreezeUtils.GATE_FORCE_STOP:
+                return R.string.freeze_gate_force_stop_note;
+            case FreezeUtils.GATE_SUSPEND:
+                return R.string.freeze_gate_suspend_note;
+            case FreezeUtils.GATE_DISABLE:
+                return R.string.freeze_gate_disable_note;
+            default:
+                return R.string.freeze_gate_hide_note;
+        }
+    }
+
+    /**
+     * Why a step cannot be operated here — named, never a bare "unavailable".
+     * Suspension and hiding each have a door this phone may or may not have, and
+     * which door is missing is exactly what tells you whether 白い熊 雫 would fix it.
+     */
+    @StringRes
+    private static int gateUnavailableRes(@FreezeUtils.FreezeGate int gate) {
+        if (gate == FreezeUtils.GATE_SUSPEND) {
+            return Build.VERSION.SDK_INT < Build.VERSION_CODES.N
+                    ? R.string.freeze_gate_unavailable_sdk
+                    : R.string.freeze_gate_unavailable_suspend;
+        }
+        if (gate == FreezeUtils.GATE_HIDE) {
+            return R.string.freeze_gate_unavailable_hide;
+        }
+        return R.string.freeze_gate_unavailable_privilege;
     }
 
     /**
@@ -857,93 +1000,29 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
      * the App info tab, which is alive in the pager beside us and would answer the
      * same event by opening its own freeze dialog.
      */
-    private void toggleFreeze() {
-        if (viewModel == null) return;
-        String packageName = viewModel.getPackageName();
-        if (packageName == null) return;
-        int userId = viewModel.getUserId();
-        if (mAppFrozen) {
-            runAppAction(() -> {
-                FreezeUtils.unfreeze(packageName, userId);
-                return true;
-            }, R.string.failed_to_unfreeze);
-            return;
-        }
-        if (BuildConfig.APPLICATION_ID.equals(packageName)) {
-            // Freezing ourselves is refused outright by FreezeUtils, but the
-            // confirmation is what App info asks, so ask it here too.
-            ForkDialog.present(ForkDialog.builder(activity)
-                    .setMessage(R.string.are_you_sure)
-                    .setPositiveButton(R.string.yes, (d, w) -> chooseFreezeMethod(packageName, userId))
-                    .setNegativeButton(R.string.no, null));
-            return;
-        }
-        chooseFreezeMethod(packageName, userId);
-    }
-
-    /**
-     * Pick the freeze method, unless the user has already said not to be asked
-     * ("Skip freeze method dialog" under Settings → Rules). Same resolution order
-     * as App info: the per-app remembered method, else the global default.
-     */
-    private void chooseFreezeMethod(@NonNull String packageName, int userId) {
-        ProgressIndicatorCompat.setVisibility(progressIndicator, true);
-        ThreadUtils.postOnBackgroundThread(() -> {
-            Integer stored = FreezeUtils.loadFreezeMethod(packageName);
-            int freezeType = stored != null ? stored : Prefs.Blocking.getDefaultFreezingMethod();
-            boolean isCustom = stored != null;
-            ThreadUtils.postOnMainThread(() -> {
-                if (isDetached()) return;
-                ProgressIndicatorCompat.setVisibility(progressIndicator, false);
-                if (Prefs.Blocking.getSkipFreezeMethodDialog()) {
-                    applyFreeze(packageName, userId, freezeType, isCustom);
-                    return;
-                }
-                View view = View.inflate(activity, R.layout.item_checkbox, null);
-                MaterialCheckBox checkBox = view.findViewById(R.id.checkbox);
-                checkBox.setText(R.string.remember_option_for_this_app);
-                checkBox.setChecked(isCustom);
-                FreezeUnfreeze.getFreezeDialog(activity, freezeType)
-                        .setIcon(R.drawable.ic_snowflake)
-                        .setTitle(R.string.freeze)
-                        .setView(view)
-                        .setPositiveButton(R.string.freeze, (dialog, which, selectedItem) -> {
-                            if (selectedItem == null) return;
-                            applyFreeze(packageName, userId, selectedItem, checkBox.isChecked());
-                        })
-                        .setNegativeButton(R.string.cancel, null)
-                        .show();
-            });
-        });
-    }
-
-    private void applyFreeze(@NonNull String packageName, int userId,
-                             @FreezeUtils.FreezeMethod int freezeType, boolean remember) {
-        runAppAction(() -> {
-            if (remember) {
-                FreezeUtils.storeFreezeMethod(packageName, freezeType);
-            } else {
-                FreezeUtils.deleteFreezeMethod(packageName);
-            }
-            FreezeUtils.freeze(packageName, userId, freezeType);
-            return true;
-        }, R.string.failed_to_freeze);
-    }
-
     /**
      * Run a whole-app write, then tell the world and re-read our own state.
      * <p>
      * The 必要 guard throws from inside {@link FreezeUtils}, so it is reported with
      * its own message rather than as a generic failure — a protected app is not a
      * broken one.
+     *
+     * @param failureArg what {@code failureRes} formats in. Null means the app's own
+     *                   label, which is what the freeze and unfreeze messages name;
+     *                   a single gate names the <em>step</em> instead, since the app
+     *                   is not what failed.
+     * @param guarded    whether the 必要 protection applies. <b>Releasing is never
+     *                   guarded</b>: an app added to the profile after it was frozen
+     *                   must still be thawable, or the protection becomes a trap.
      */
-    private void runAppAction(@NonNull AppAction work, @StringRes int failureRes) {
+    private void runAppAction(@NonNull AppAction work, @StringRes int failureRes,
+                              @Nullable CharSequence failureArg, boolean guarded) {
         if (viewModel == null) return;
         String packageName = viewModel.getPackageName();
         if (packageName == null) return;
         ProgressIndicatorCompat.setVisibility(progressIndicator, true);
         ThreadUtils.postOnBackgroundThread(() -> {
-            boolean protectedApp = ProtectedAppsProfile.isProtected(packageName);
+            boolean protectedApp = guarded && ProtectedAppsProfile.isProtected(packageName);
             boolean ok = false;
             if (!protectedApp) {
                 try {
@@ -960,8 +1039,8 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                     UIUtils.displayLongToast(R.string.protected_profile_block,
                             mAppLabel != null ? mAppLabel : packageName);
                 } else if (!finalOk) {
-                    UIUtils.displayLongToast(failureRes,
-                            mAppLabel != null ? mAppLabel : packageName);
+                    UIUtils.displayLongToast(failureRes, failureArg != null ? failureArg
+                            : (mAppLabel != null ? mAppLabel : packageName));
                 } else {
                     notifyPackageAltered(packageName);
                 }
@@ -1312,7 +1391,7 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 ProgressIndicatorCompat.setVisibility(progressIndicator, false);
                 UIUtils.displayLongToast(ok ? R.string.policy_applied : R.string.policy_failed);
                 // Clearing the locks can have lifted a suspension, so the main
-                // list has to be told the same way applySuspend tells it.
+                // list has to be told the same way the Freeze box tells it.
                 if (ok) notifyPackageAltered(packageName);
                 refreshDetails();
             });
@@ -1547,16 +1626,16 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             final MaterialCardView card;
             final TextView title;
             final TextView summary;
-            final View suspendRow;
-            final TextView suspendLabel;
-            final TextView suspendNote;
-            final TextView suspendSummary;
-            final MaterialSwitch suspendToggle;
+            final MaterialCardView freezeBox;
+            final View freezeHeader;
+            final TextView freezeTitle;
+            final MaterialSwitch freezeToggle;
+            final TextView freezeNote;
+            final TextView freezeState;
+            final View freezeDivider;
+            /** The four step rows, indexed by gate constant — slot 0 unused. */
+            final View[] gateRows = new View[FreezeUtils.GATE_HIDE + 1];
             final View appActions;
-            final View freezePill;
-            final ImageView freezeIcon;
-            final TextView freezeLabel;
-            final ImageView freezeInfo;
             final View uninstallPill;
             final ImageView uninstallIcon;
             final TextView uninstallLabel;
@@ -1575,16 +1654,21 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 card = (MaterialCardView) itemView;
                 title = itemView.findViewById(R.id.policy_title);
                 summary = itemView.findViewById(R.id.policy_summary);
-                suspendRow = itemView.findViewById(R.id.policy_suspend_row);
-                suspendLabel = itemView.findViewById(R.id.policy_suspend_label);
-                suspendNote = itemView.findViewById(R.id.policy_suspend_note);
-                suspendSummary = itemView.findViewById(R.id.policy_suspend_summary);
-                suspendToggle = itemView.findViewById(R.id.policy_suspend_toggle);
+                freezeBox = itemView.findViewById(R.id.policy_freeze_box);
+                freezeHeader = freezeBox.findViewById(R.id.freeze_box_header);
+                freezeTitle = freezeBox.findViewById(R.id.freeze_box_title);
+                freezeToggle = freezeBox.findViewById(R.id.freeze_box_toggle);
+                freezeNote = freezeBox.findViewById(R.id.freeze_box_note);
+                freezeState = freezeBox.findViewById(R.id.freeze_box_state);
+                freezeDivider = freezeBox.findViewById(R.id.freeze_box_divider);
+                // The four includes share every id inside them, so each row is
+                // resolved once here and every later lookup is scoped to the row
+                // itself — the same rule the policy boxes follow.
+                gateRows[FreezeUtils.GATE_FORCE_STOP] = freezeBox.findViewById(R.id.freeze_gate_1);
+                gateRows[FreezeUtils.GATE_SUSPEND] = freezeBox.findViewById(R.id.freeze_gate_2);
+                gateRows[FreezeUtils.GATE_DISABLE] = freezeBox.findViewById(R.id.freeze_gate_3);
+                gateRows[FreezeUtils.GATE_HIDE] = freezeBox.findViewById(R.id.freeze_gate_4);
                 appActions = itemView.findViewById(R.id.policy_app_actions);
-                freezePill = itemView.findViewById(R.id.policy_freeze_pill);
-                freezeIcon = itemView.findViewById(R.id.policy_freeze_icon);
-                freezeLabel = itemView.findViewById(R.id.policy_freeze_label);
-                freezeInfo = itemView.findViewById(R.id.policy_freeze_info);
                 uninstallPill = itemView.findViewById(R.id.policy_uninstall_pill);
                 uninstallIcon = itemView.findViewById(R.id.policy_uninstall_icon);
                 uninstallLabel = itemView.findViewById(R.id.policy_uninstall_label);
@@ -1600,7 +1684,6 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             }
 
             void bind() {
-                Context context = itemView.getContext();
                 int yellow = ForkThemeUtils.getTextColor();
                 title.setText(mPolicyDelegate ? R.string.policy_title_active : R.string.policy_title_inactive);
                 title.setTextColor(mPolicyDelegate ? yellow : DETAIL_COLOR);
@@ -1614,47 +1697,13 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                             ? R.string.policy_summary_not_authorized
                             : R.string.policy_summary_no_owner);
                 }
-                // Every control below needs a real delegation; without one the
-                // card is a status line and nothing more. Withheld rather than
-                // shown-and-refused, the same rule the capability rows follow.
-                boolean canSuspend = mPolicyDelegate && mPolicyCanSuspend;
-                suspendRow.setVisibility(canSuspend ? View.VISIBLE : View.GONE);
+                // The device-policy boxes below need a real delegation; without one
+                // the lower half of the card is a status line and nothing more.
+                // Withheld rather than shown-and-refused, the same rule the
+                // capability rows follow. The Freeze box is NOT one of them: three
+                // of its four steps need only the shell.
                 controls.setVisibility(mPolicyDelegate ? View.VISIBLE : View.GONE);
-                if (canSuspend) {
-                    // Suspension is the one control on this card that improves
-                    // your position rather than describing an exposure (白い熊,
-                    // +79), so it takes the protective half of the page's palette
-                    // and not the alarming one: OFF is grey — the state every
-                    // phone ships in, nothing to look at — and ON is yellow, the
-                    // colour of a shutter you closed. It was red-when-suspended,
-                    // which read as a warning about the very thing you had just
-                    // done to protect yourself. Unlike the boxes below it, its
-                    // switch needs no inversion: the label already names the
-                    // action, so ON is "suspended" and that is the yellow one.
-                    int accent = mPolicySuspended ? yellow : DETAIL_COLOR;
-                    suspendLabel.setText(R.string.policy_suspend);
-                    suspendLabel.setTextColor(accent);
-                    setLeadingIcon(suspendLabel, R.drawable.ic_lock, accent);
-                    // Bold, right under the row's title: what this is, not a
-                    // warning about it (白い熊, 2026-08-01). Suspension is released
-                    // by this same switch, so 危険 was the wrong word — what
-                    // actually needs saying is that it is a harder freeze than
-                    // hiding, and that nothing outside this app can lift it. It
-                    // follows the accent so the row speaks with one voice: loud
-                    // once the shutter is down, quiet while it is up.
-                    suspendNote.setText(R.string.policy_suspend_note);
-                    suspendNote.setTextColor(accent);
-                    suspendSummary.setText(R.string.policy_suspend_summary);
-                    suspendSummary.setTextColor(DETAIL_COLOR);
-                    suspendSummary.setBackgroundTintList(ColorStateList.valueOf(
-                            ColorUtils.setAlphaComponent(DETAIL_COLOR, DETAIL_CHIP_ALPHA)));
-                    suspendToggle.setChecked(mPolicySuspended);
-                    ColorStateList tint = ColorStateList.valueOf(accent);
-                    suspendToggle.setThumbTintList(tint);
-                    suspendToggle.setTrackDecorationTintList(tint);
-                    suspendToggle.setTrackTintList(ColorStateList.valueOf(Color.TRANSPARENT));
-                    suspendRow.setOnClickListener(v -> toggleSuspend());
-                }
+                bindFreezeBox(yellow);
                 bindAppActionPills(yellow);
                 if (mPolicyDelegate) bindControlBoxes();
                 // The card itself is not a control — only its rows are.
@@ -1664,50 +1713,188 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
             }
 
             /**
-             * The two ordinary verdicts, as pills (白い熊).
+             * The Freeze box (白い熊, +032): a master switch over four numbered steps.
              * <p>
-             * They were rows with a title, a bold note and a chip each, which is
-             * three quarters of a screen spent on two actions and pushed the
-             * capabilities themselves below the fold. A pill states what it does
-             * and nothing more; the account is behind the "i", read once instead
-             * of scrolled past every time.
+             * <b>The master reflects {@link FreezeUtils#isFrozen}, not "any step".</b>
+             * Force-stop is not a freeze — it is a state the app leaves the moment
+             * anything opens it — so a phone where only step 1 stands is a phone
+             * where nothing is frozen, and the switch that drives the main list's
+             * snowflake has to agree with the main list's snowflake.
              * <p>
-             * The freeze pill still carries state, because it is the one of the
-             * two that has any: grey and reading "Freeze" while the app runs,
-             * yellow and reading "Unfreeze" once it is shut — the same palette
-             * and the same direction as the suspend row above it. Uninstall is
-             * red in every state: it is the only thing on this page that the
+             * Colours are the protective half of the page's palette, exactly as the
+             * suspend row this box replaced: grey and off is the state every phone
+             * ships in, yellow and on is a shutter you closed. The alarming red is
+             * reserved for a capability the app can use <em>right now</em>, which is
+             * the opposite of what any switch in here means.
+             */
+            void bindFreezeBox(@ColorInt int yellow) {
+                Context context = itemView.getContext();
+                freezeBox.setVisibility(mCanFreeze ? View.VISIBLE : View.GONE);
+                if (!mCanFreeze) return;
+                // Fork (白い熊, +034): the master wears the colour of the deepest gate
+                // standing — the same ramp, from the same builder, that paints the app's
+                // row on the main list. So the switch and the row agree by construction,
+                // and "how hard is this app shut" is one colour in both places. It is
+                // NOT the theme yellow: yellow is the fork's ink everywhere else and
+                // would say nothing about depth.
+                int level = highestGateApplied();
+                int accent = level > 0
+                        ? FreezeLevelBadge.accent(context, level, yellow) : DETAIL_COLOR;
+                freezeTitle.setText(R.string.freeze_box_title);
+                freezeTitle.setTextColor(accent);
+                setLeadingIcon(freezeTitle, mAppFrozen
+                        ? R.drawable.ic_snowflake : R.drawable.ic_snowflake_off, accent);
+                freezeNote.setText(R.string.freeze_box_note);
+                freezeNote.setTextColor(DETAIL_COLOR);
+                freezeNote.setBackgroundTintList(ColorStateList.valueOf(
+                        ColorUtils.setAlphaComponent(DETAIL_COLOR, DETAIL_CHIP_ALPHA)));
+                freezeState.setText(freezeStateText(context));
+                freezeState.setTextColor(accent);
+                freezeDivider.setBackgroundColor(
+                        ColorUtils.setAlphaComponent(DETAIL_COLOR, DETAIL_CHIP_ALPHA));
+                tintSwitch(freezeToggle, accent);
+                freezeToggle.setChecked(mAppFrozen);
+                freezeHeader.setOnClickListener(v -> toggleMasterFreeze());
+                // The box carries the whole outline of "we did something here", so
+                // it takes the capability rows' frame rule: thick and accented once
+                // any step stands, its own hairline while the app runs untouched.
+                if (level > 0) {
+                    freezeBox.setStrokeColor(accent);
+                    freezeBox.setStrokeWidth(Math.round(ForkThemeUtils.dpToPx(context, CHANGED_STROKE_DP)));
+                } else {
+                    freezeBox.setStrokeColor(boxStrokeColor);
+                    freezeBox.setStrokeWidth(boxStrokeWidth);
+                }
+                for (int gate : FreezeUtils.GATES) {
+                    bindGateRow(gate, yellow);
+                }
+            }
+
+            /** The deepest gate standing, 0 for none — what the box is coloured by. */
+            private int highestGateApplied() {
+                int level = 0;
+                for (int gate : FreezeUtils.GATES) {
+                    if (mGateApplied[gate]) level = gate;
+                }
+                return level;
+            }
+
+            /**
+             * What is standing right now, in one line.
+             * <p>
+             * Four switches read one at a time is not a state anybody holds in their
+             * head, and this box exists to be experimented with — you come back to
+             * it after a drive wanting to know what the phone was carrying, not to
+             * re-read four rows.
+             */
+            @NonNull
+            private CharSequence freezeStateText(@NonNull Context context) {
+                List<String> applied = new ArrayList<>(FreezeUtils.GATES.length);
+                for (int gate : FreezeUtils.GATES) {
+                    if (mGateApplied[gate]) applied.add(String.valueOf(gate));
+                }
+                if (applied.isEmpty()) {
+                    return context.getString(R.string.freeze_box_state_none);
+                }
+                if (applied.size() == FreezeUtils.GATES.length) {
+                    return context.getString(R.string.freeze_box_state_all);
+                }
+                StringBuilder steps = new StringBuilder();
+                for (int i = 0; i < applied.size(); ++i) {
+                    if (i > 0) {
+                        steps.append(context.getString(i == applied.size() - 1
+                                ? R.string.freeze_box_state_last_separator
+                                : R.string.freeze_box_state_separator));
+                    }
+                    steps.append(applied.get(i));
+                }
+                return context.getString(R.string.freeze_box_state_some, steps.toString());
+            }
+
+            /**
+             * One step. Every lookup is scoped to the row's own root, because the
+             * four includes share their ids.
+             * <p>
+             * A step this phone cannot operate keeps its number, its name and its
+             * explanation and loses only its switch: the ladder is also the page's
+             * account of what a freeze <em>is</em>, and one with a rung silently
+             * missing explains nothing. Its reason takes the place of the chip, so
+             * the row says why rather than just sitting there dead.
+             */
+            private void bindGateRow(@FreezeUtils.FreezeGate int gate, @ColorInt int yellow) {
+                View row = gateRows[gate];
+                if (row == null) return;
+                Context context = row.getContext();
+                TextView number = row.findViewById(R.id.freeze_gate_number);
+                TextView label = row.findViewById(R.id.freeze_gate_label);
+                TextView note = row.findViewById(R.id.freeze_gate_note);
+                TextView unavailable = row.findViewById(R.id.freeze_gate_unavailable);
+                MaterialSwitch toggle = row.findViewById(R.id.freeze_gate_toggle);
+                boolean available = mGateAvailable[gate];
+                boolean applied = mGateApplied[gate];
+                // Fork (白い熊, +034): each step wears its own rung of the ladder, so
+                // the four switches read as a gradient rather than four identical
+                // yellows — and the colour a step lights up in is the colour the app's
+                // row will wear once it is the deepest one standing.
+                int accent = applied ? FreezeLevelBadge.accent(context, gate, yellow) : DETAIL_COLOR;
+                number.setText(context.getString(R.string.freeze_gate_number, gate));
+                number.setTextColor(accent);
+                label.setText(gateLabelRes(gate));
+                label.setTextColor(accent);
+                note.setText(gateNoteRes(gate));
+                note.setTextColor(DETAIL_COLOR);
+                note.setBackgroundTintList(ColorStateList.valueOf(
+                        ColorUtils.setAlphaComponent(DETAIL_COLOR, DETAIL_CHIP_ALPHA)));
+                unavailable.setVisibility(available ? View.GONE : View.VISIBLE);
+                if (!available) {
+                    unavailable.setText(gateUnavailableRes(gate));
+                    unavailable.setTextColor(DETAIL_COLOR);
+                    unavailable.setBackgroundTintList(ColorStateList.valueOf(
+                            ColorUtils.setAlphaComponent(DETAIL_COLOR, DETAIL_CHIP_ALPHA)));
+                }
+                // Drawn faded rather than hidden — the RowPills alpha language: a
+                // control you cannot use is still information about the app.
+                row.setAlpha(available ? 1f : 0.55f);
+                toggle.setVisibility(available ? View.VISIBLE : View.INVISIBLE);
+                tintSwitch(toggle, accent);
+                toggle.setChecked(applied);
+                row.setOnClickListener(v -> toggleGate(gate));
+            }
+
+            /**
+             * The page's one switch appearance: hollow track, thumb and outline in
+             * the row's accent. {@code MaterialSwitch} is the only widget with a
+             * track decoration, which is what makes the hollow look possible at all.
+             */
+            private void tintSwitch(@NonNull MaterialSwitch toggle, @ColorInt int accent) {
+                ColorStateList tint = ColorStateList.valueOf(accent);
+                toggle.setThumbTintList(tint);
+                toggle.setTrackDecorationTintList(tint);
+                toggle.setTrackTintList(ColorStateList.valueOf(Color.TRANSPARENT));
+            }
+
+            /**
+             * Uninstall, as a pill (白い熊).
+             * <p>
+             * It was a row with a title, a bold note and a chip, which is a quarter
+             * of a screen spent on one action and pushed the capabilities themselves
+             * below the fold. A pill states what it does and nothing more; the
+             * account is behind the "i", read once instead of scrolled past every
+             * time. Red in every state: it is the only thing on this page that the
              * control which did it cannot undo.
              */
             void bindAppActionPills(@ColorInt int yellow) {
                 Context context = itemView.getContext();
-                boolean any = mCanFreeze || mCanUninstall;
-                appActions.setVisibility(any ? View.VISIBLE : View.GONE);
-                if (!any) return;
-                // INVISIBLE, not GONE: the two pills are weighted halves, so
-                // hiding one outright would stretch the other across the card.
-                freezePill.setVisibility(mCanFreeze ? View.VISIBLE : View.INVISIBLE);
-                if (mCanFreeze) {
-                    int accent = mAppFrozen ? yellow : DETAIL_COLOR;
-                    freezeLabel.setText(mAppFrozen ? R.string.unfreeze : R.string.freeze);
-                    freezeLabel.setTextColor(accent);
-                    freezeIcon.setImageResource(mAppFrozen
-                            ? R.drawable.ic_snowflake_off : R.drawable.ic_snowflake);
-                    tintPill(freezePill, freezeIcon, freezeInfo, accent, context);
-                    freezePill.setOnClickListener(v -> toggleFreeze());
-                    freezeInfo.setOnClickListener(v -> showActionInfo(R.string.policy_freeze,
-                            R.string.policy_freeze_note, R.string.policy_freeze_summary));
-                }
-                uninstallPill.setVisibility(mCanUninstall ? View.VISIBLE : View.INVISIBLE);
-                if (mCanUninstall) {
-                    uninstallLabel.setText(R.string.uninstall);
-                    uninstallLabel.setTextColor(CHANGED_STROKE_ALLOWED);
-                    tintPill(uninstallPill, uninstallIcon, uninstallInfo,
-                            CHANGED_STROKE_ALLOWED, context);
-                    uninstallPill.setOnClickListener(v -> promptUninstall());
-                    uninstallInfo.setOnClickListener(v -> showActionInfo(R.string.policy_uninstall,
-                            R.string.policy_uninstall_note, R.string.policy_uninstall_summary));
-                }
+                appActions.setVisibility(mCanUninstall ? View.VISIBLE : View.GONE);
+                if (!mCanUninstall) return;
+                uninstallPill.setVisibility(View.VISIBLE);
+                uninstallLabel.setText(R.string.uninstall);
+                uninstallLabel.setTextColor(CHANGED_STROKE_ALLOWED);
+                tintPill(uninstallPill, uninstallIcon, uninstallInfo,
+                        CHANGED_STROKE_ALLOWED, context);
+                uninstallPill.setOnClickListener(v -> promptUninstall());
+                uninstallInfo.setOnClickListener(v -> showActionInfo(R.string.policy_uninstall,
+                        R.string.policy_uninstall_note, R.string.policy_uninstall_summary));
             }
 
             /**

@@ -77,6 +77,7 @@ import aosp.libcore.util.HexEncoding;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.apk.signing.Signer;
 import io.github.muntashirakon.AppManager.apk.signing.SignerInfo;
+import io.github.muntashirakon.AppManager.compat.ApplicationInfoCompat;
 import io.github.muntashirakon.AppManager.compat.AppOpsManagerCompat;
 import io.github.muntashirakon.AppManager.compat.PackageManagerCompat;
 import io.github.muntashirakon.AppManager.db.entity.App;
@@ -229,9 +230,29 @@ public final class PackageUtils {
             if (liveAi != null) {
                 item.isDisabled = !liveAi.enabled;
                 item.isFrozen = FreezeUtils.isFrozen(liveAi);
+                // Fork (白い熊, +037): and WHICH freeze, from the very same object.
+                //
+                // This is the list's FIRST render, and it used to answer only "frozen
+                // or not" — so a frozen row drew the fallback ice-blue snowflake with
+                // no level colour, no shading and no badge, and only looked right ten
+                // seconds later when MainViewModel.getNewApplicationItem re-read each
+                // package one at a time and filled the rest in. It read as the app
+                // taking ten seconds to notice a freeze it had in fact already read.
+                //
+                // Both lines are free: liveAi comes from the one bulk
+                // getInstalledApplications call above, already carrying
+                // MATCH_UNINSTALLED_PACKAGES | MATCH_DISABLED_COMPONENTS — which is
+                // exactly what a hidden package needs to be visible at all.
+                // isSuspendedApp had the same gap since +81 and is fixed with it.
+                item.isSuspendedApp = ApplicationInfoCompat.isSuspended(liveAi);
+                item.freezeLevel = FreezeUtils.levelOf(liveAi);
             } else {
                 item.isDisabled = !app.isEnabled;
                 item.isFrozen = !app.isEnabled;
+                item.isSuspendedApp = false;
+                // Disabled is all the DB knows; claiming a deeper rung would be an
+                // invention, and the live pass will correct it either way.
+                item.freezeLevel = item.isFrozen ? FreezeUtils.GATE_DISABLE : 0;
             }
             item.label = app.packageLabel;
             item.targetSdk = app.sdk;

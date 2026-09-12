@@ -43,4 +43,30 @@
          — this is the deepest "off" a row can be. -->
     <color name="theme_violet">#C77DFF</color>
     <color name="theme_film_suspended">#2A1440</color>
+
+    <!-- Fork (白い熊, +034): the freeze LADDER, one colour per gate.
+
+         A freeze stopped being one state the moment each of its four gates got
+         its own switch, so the row stopped being able to say which one you are
+         looking at. These are that answer: a ramp read as one gradient, cool and
+         light at step 1, deep violet at step 4, so "how hard is this app shut"
+         is legible without reading anything. The row wears the colour of the
+         HIGHEST gate standing.
+
+         Step 1 (force-stop) has an accent but NO film: an app that is merely
+         stopped is not frozen — anything that opens it clears the mark — so the
+         row stays an ordinary row and only the badge on the snowflake says so.
+         It is therefore the fork's own YELLOW (白い熊, +035): the badge sits on a
+         thawed snowflake, that snowflake is yellow, and giving the badge a cool
+         tint of its own made the row look half-frozen when it is not frozen at
+         all. The ladder proper starts at step 2, where the freezing starts.
+         The deepest rung keeps the violet +81 gave suspension, because that is
+         the colour this app has always used for "as shut as it gets". -->
+    <color name="theme_freeze_1">#FFFF00</color>
+    <color name="theme_freeze_2">#7FB3FF</color>
+    <color name="theme_freeze_3">#B07DFF</color>
+    <color name="theme_freeze_4">#E45BFF</color>
+    <color name="theme_film_freeze_2">#122038</color>
+    <color name="theme_film_freeze_3">#1F1440</color>
+    <color name="theme_film_freeze_4">#33103A</color>
 </resources>

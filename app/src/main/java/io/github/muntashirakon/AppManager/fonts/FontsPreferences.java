@@ -156,10 +156,29 @@ public class FontsPreferences extends Fragment {
                     // (The former "Card outline" colour rows are gone: unselected
                     // cells draw no stroke since the edge-to-edge separator grid.)
                     new Cat(null, R.string.pref_color_cat_freeze, new ColorSpec[]{
+                            // Fork (白い熊, +034): FREEZE_FROZEN is now only the fallback
+                            // for a surface that cannot work out the ladder rung; the
+                            // rungs themselves are the category below. The suspended
+                            // padlock's own colour row is gone with it — it took its
+                            // colour from the ladder now, and a settings row that
+                            // changes nothing is worse than no row at all.
                             new ColorSpec(ColorPrefs.FREEZE_FROZEN, R.string.pref_color_freeze_frozen),
                             new ColorSpec(ColorPrefs.FREEZE_THAWED, R.string.pref_color_freeze_thawed),
-                            // Fork, +81: the padlock a suspended row shows instead.
-                            new ColorSpec(ColorPrefs.FREEZE_SUSPENDED, R.string.pref_color_freeze_suspended),
+                    }),
+                    // Fork (白い熊, +034): the freeze ladder — one colour per gate for
+                    // the snowflake, the badge and the Freeze box's switches, and one
+                    // row shading per gate from step 2 up. Step 1 has no shading: a
+                    // force-stopped app is not frozen and keeps an ordinary row.
+                    new Cat(null, R.string.pref_color_cat_freeze_levels, new ColorSpec[]{
+                            new ColorSpec(ColorPrefs.FREEZE_LEVEL_1, R.string.pref_color_freeze_level_1),
+                            new ColorSpec(ColorPrefs.FREEZE_LEVEL_2, R.string.pref_color_freeze_level_2),
+                            new ColorSpec(ColorPrefs.FREEZE_LEVEL_3, R.string.pref_color_freeze_level_3),
+                            new ColorSpec(ColorPrefs.FREEZE_LEVEL_4, R.string.pref_color_freeze_level_4),
+                    }),
+                    new Cat(null, R.string.pref_color_cat_freeze_level_films, new ColorSpec[]{
+                            new ColorSpec(ColorPrefs.FILM_LEVEL_2, R.string.pref_color_film_level_2),
+                            new ColorSpec(ColorPrefs.FILM_LEVEL_3, R.string.pref_color_film_level_3),
+                            new ColorSpec(ColorPrefs.FILM_LEVEL_4, R.string.pref_color_film_level_4),
                     }),
                     new Cat(null, R.string.pref_color_cat_chips, new ColorSpec[]{
                             new ColorSpec(ColorPrefs.CHIP, R.string.pref_color_chip),
@@ -688,20 +707,30 @@ public class FontsPreferences extends Fragment {
                         Math.max(2f, SelectionFramePrefs.getWidthDp(ctx)), density)));
 
         addLegendHeader(content, R.string.pref_legend_sec_shading, density);
-        addLegendRow(inflater, content, sample, R.string.pref_legend_film_frozen,
-                tv -> tv.setBackground(shadeChip(ColorPrefs.getColor(ctx, ColorPrefs.FILM_FROZEN), density)));
+        // Fork (白い熊, +034): the shading is the freeze ladder now — one rung per
+        // gate, deepening as the freeze does — so the legend shows the ladder rather
+        // than the single "frozen" tint it replaced. Step 1 has no shading and is
+        // therefore not here: a force-stopped app keeps an ordinary row.
+        addLegendRow(inflater, content, sample, R.string.pref_color_film_level_2,
+                tv -> tv.setBackground(shadeChip(ColorPrefs.getColor(ctx, ColorPrefs.FILM_LEVEL_2), density)));
+        addLegendRow(inflater, content, sample, R.string.pref_color_film_level_3,
+                tv -> tv.setBackground(shadeChip(ColorPrefs.getColor(ctx, ColorPrefs.FILM_LEVEL_3), density)));
+        addLegendRow(inflater, content, sample, R.string.pref_color_film_level_4,
+                tv -> tv.setBackground(shadeChip(ColorPrefs.getColor(ctx, ColorPrefs.FILM_LEVEL_4), density)));
         addLegendRow(inflater, content, sample, R.string.pref_legend_film_uninstalled,
                 tv -> tv.setBackground(shadeChip(ColorPrefs.getColor(ctx, ColorPrefs.FILM_UNINSTALLED), density)));
-        addLegendRow(inflater, content, sample, R.string.pref_legend_film_suspended,
-                tv -> tv.setBackground(shadeChip(ColorPrefs.getColor(ctx, ColorPrefs.FILM_SUSPENDED), density)));
 
         addLegendHeader(content, R.string.pref_legend_sec_freeze, density);
-        addLegendRow(inflater, content, "❄", R.string.pref_legend_freeze_on,
-                tv -> tv.setTextColor(ColorPrefs.getColor(ctx, ColorPrefs.FREEZE_FROZEN)));
         addLegendRow(inflater, content, "❄", R.string.pref_legend_freeze_off,
                 tv -> tv.setTextColor(ColorPrefs.getColor(ctx, ColorPrefs.FREEZE_THAWED)));
-        addLegendRow(inflater, content, "\uD83D\uDD12", R.string.pref_legend_freeze_suspended,
-                tv -> tv.setTextColor(ColorPrefs.getColor(ctx, ColorPrefs.FREEZE_SUSPENDED)));
+        addLegendRow(inflater, content, "❄", R.string.pref_color_freeze_level_1,
+                tv -> tv.setTextColor(ColorPrefs.getColor(ctx, ColorPrefs.FREEZE_LEVEL_1)));
+        addLegendRow(inflater, content, "❄", R.string.pref_color_freeze_level_2,
+                tv -> tv.setTextColor(ColorPrefs.getColor(ctx, ColorPrefs.FREEZE_LEVEL_2)));
+        addLegendRow(inflater, content, "❄", R.string.pref_color_freeze_level_3,
+                tv -> tv.setTextColor(ColorPrefs.getColor(ctx, ColorPrefs.FREEZE_LEVEL_3)));
+        addLegendRow(inflater, content, "❄", R.string.pref_color_freeze_level_4,
+                tv -> tv.setTextColor(ColorPrefs.getColor(ctx, ColorPrefs.FREEZE_LEVEL_4)));
     }
 
     /**
