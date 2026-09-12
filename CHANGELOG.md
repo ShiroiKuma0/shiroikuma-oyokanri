@@ -10,6 +10,77 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-09-05.03-37.g41d79af5+037 — 2026-09-12
+
+A freeze had four gates and one switch. That is right for a snowflake and useless for the question
+that actually comes up: *which* gate does some other app trip over? Android Auto refuses to run
+against a totally frozen Google Maps and runs perfectly against the same Maps carrying only the
+disable gate — measured on a second phone, where the package reads `installed=true hidden=false
+suspended=false stopped=false enabled=3`. The difference is installedness: disabling leaves the
+package installed while its components stop resolving; hiding reports it as not installed, and Auto's
+check for Maps is a check that it exists. Nothing in the app could express that state, because a
+freeze was a *method* — one value applied wholesale. Now each gate is a switch, and every row says
+how deep it goes. (Built on upstream App Manager `4.1.1`, commit `41d79af5` of 2026-09-05 03:37 UTC.)
+
+### 🧊 Four gates, four switches
+
+- **A Freeze box on the 盗み見 page**, replacing the old *Suspend this app* row and the *Freeze*
+  pill — which between them could move one gate and all four, and never the other two. A master
+  switch applies or releases the whole ladder; the four gates sit beneath it as **numbered steps**,
+  each with its own switch and its own plain account of what it does.
+- **No unfreeze button anywhere.** The master going off *is* the unfreeze, and each step's own switch
+  releases just that step, so you can stop anywhere on the ladder.
+- **The master is the strongest freeze there is**, and says so — it shuts the app by every means
+  available at once. It raises no method picker: a switch that opens a dialog is not a switch. It
+  also leaves the per-app remembered freezing method alone, so it cannot silently change what the
+  main list's snowflake does next.
+- **A step this phone cannot operate keeps its number, its name and its explanation** and loses only
+  its switch, drawn faded with the reason in place of the chip. The ladder is also the page's account
+  of what a freeze *is*, and one with a rung silently missing explains nothing.
+- **Every write is measured, not assumed.** The platform is re-read after each one and the switch
+  moves only if the state actually moved — several of these APIs accept a write and discard it. A
+  suspension lifted in the wrong slot returns looking like success; a persistent process is back
+  before the force-stop returns.
+- **Step 1 gained a release that did not exist anywhere.** A force-stop leaves the package *stopped*,
+  which is what withholds implicit broadcasts from it, and the only ordinary way out is for something
+  to launch the app. The app now clears that flag directly, so the switch works in both directions.
+- **Applying a gate is refused for a `必要` app; releasing one never is.** That also fixes thawing an
+  app added to the profile *after* it was frozen, which the page had refused outright.
+
+### 🎨 The row says how deep the freeze goes
+
+- **One colour per rung** — the fork's yellow at step 1, then cornflower, orchid and magenta-violet —
+  with a row shading per rung from step 2 up. All seven are settable under *UI colors & fonts →
+  Freeze levels*.
+- **The main list is shaded in the deepest rung standing**, the snowflake takes the same colour, and
+  **that number sits in a ring beside the snowflake**, the same size as it. So *how hard is this app
+  shut* is legible without opening anything.
+- **The Freeze box wears the same colours**: each step lights in its own rung, and the master switch
+  and the box frame in the deepest one standing. The switch and the app's row therefore agree by
+  construction — one builder, not two copies.
+- **Step 1 is deliberately not a freeze.** An app that is only force-stopped resumes the moment
+  anything opens it, so its row stays an ordinary row and only the badge reports it. The badge earns
+  its place there: force-stopped is otherwise an invisible state. (Expect a fair number of them —
+  Android also marks an app stopped when it has never been launched since installing.)
+- The suspended row keeps its **padlock** — shape reads further than colour at that size — but takes
+  the ladder's colour, since suspension is no longer the deepest thing on the list.
+
+### 🩹 Two black-window hangs, and a ten-second lie
+
+- **The app could freeze on a black window after every install.** A privileged read was running on
+  the main thread while the privileged session was being re-established after the package replaced
+  itself — and the reclaim holds the very lock that read waits on. The app then sat for ten seconds
+  and was killed, which looks exactly like a crash and is not one. Asked on a worker now.
+- **The same shape sat in two other tabs** — App components and Overlays — and would have hung
+  identically whenever one of them was the screen being reopened. Both fixed; the menu one caches the
+  answer and rebuilds the menu, since a menu callback cannot be deferred.
+- **A frozen row used to open with no colour, no shading and no badge**, correcting itself about ten
+  seconds later. The list has two builders and only one of them knew about the freeze level, so the
+  first render answered "frozen, depth unknown" and the depth arrived package by package afterwards.
+  It reads as the app being slow to notice a freeze it had in fact already read. Both builders fill
+  it now, from data the first one already had in hand. The suspended padlock had the identical gap
+  since it was introduced and is fixed with it.
+
 ## 4.1.1+2026-09-05.03-37.g41d79af5+031 — 2026-09-11
 
 A backup is at its most sendable the moment it finishes, and that was the one place you could not
