@@ -10,6 +10,76 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-09-05.03-37.g41d79af5+042 — 2026-09-12
+
+The four gates became four switches last release, which answered *which gate does this app trip
+over* for one app at a time. The question that came straight after it was how to say the same thing
+about two hundred apps — and, worse, how to say it to a **new phone**. It turns out the freeze level
+is the one thing about this phone that is written down nowhere: it is read live off the package on
+every row draw, the gates persist nothing, and the settings export carries preferences, profiles and
+fonts and no platform state at all. An app backup does carry a freeze *rule*, but restoring it only
+remembers which method to use later — it never freezes anything. So a restored phone comes up
+entirely thawed, and there was no way to put it back other than by hand.
+
+The answer is a rung as an **action**: put the apps that belong at one depth into a profile, filter
+the list to that profile, select all, tap the rung. Profiles do travel in the settings export, so a
+profile plus a rung is the record the level never was. (Built on upstream App Manager `4.1.1`, commit
+`41d79af5` of 2026-09-05 03:37 UTC.)
+
+### 🧊 The ladder as an action
+
+- **Four new actions — Freeze ① stop, ② suspend, ③ disable, ④ hide** — on the multi-select bar and
+  in the single-app pane, both drawn from one implementation so the two can never disagree.
+- **A rung is exact**: gates 1‥N applied and **every gate above released**. So rung 4 is the whole
+  ladder and the lower ones are it truncated — and tapping rung 3 on a totally frozen app brings it
+  *up* to 3 rather than doing nothing.
+- **Order is load-bearing twice over.** Releasing runs first and from the top down, because a hidden
+  package is reported as not installed and nothing below the hide gate can be read or written while
+  it stands; applying then runs bottom-up, hide last, for the same reason.
+- **Success is measured afterwards, never inferred from the calls returning** — the app re-reads the
+  package and compares the rung it actually reached. A rung this phone cannot reach is reported as a
+  failure on that app rather than claimed.
+- **A gate already in the wanted state is left alone** rather than re-written: a force-stop of an
+  already-stopped app is a real kill, and a re-suspend rewrites the slot that decides whether `adb`
+  can lift it.
+- **The per-app remembered freezing method is untouched.** It is what the main list's snowflake will
+  do next, and a rung quietly rewriting it would change an unrelated control.
+- **The notification and the operation bar name the rung**, not just "Freeze".
+- **The `必要` profile still refuses**, and the selection is checked before the confirmation so the
+  protected apps are named up front.
+
+### 🧊 The pane shows which rung you are on
+
+- In the single-app pane the four rungs **replace the Freeze pill**, and the rung the app is
+  standing on is drawn **filled** — read from the same number the row's badge shows, so the pill and
+  the badge cannot disagree.
+- **Tapping the lit rung releases it**, all the way to rung zero — one pill is both the way in and
+  the way out, as the shelf's pills already are. Unlike an ordinary unfreeze this clears the
+  *stopped* flag too, because rung zero was asked for by name.
+- The snowflake under the icon still freezes and thaws exactly as before, and `Freeze` remains an
+  available pill for anyone who wants the old one back.
+- **Force-stop stays beside them on purpose.** It is the same action only on an app that is not
+  frozen at all: on a frozen app it adds the stop and leaves the freeze standing, while rung 1 tears
+  every gate above it down — and on an app already at rung 1 the lit pill *releases* the stopped flag
+  instead. "Kill this now without changing how frozen it is" is not expressible as a rung.
+
+### 🧹 Clear data, where it was missing
+
+- **The multi-select bar's `Clear` pill is now `Clear data`** and goes straight there, with the same
+  full listing confirmation an uninstall gets. It used to open a dialog asking *data or cache* — two
+  taps to reach the one of the two that is ever wanted from a list of apps.
+- It keeps the old pill's **position** in the bar rather than jumping to the end, which is what
+  retiring an action normally does to it.
+- **The single-app pane gains a real `Clear data` pill.** It had been an offered pill with nothing
+  behind it — it opened App info instead. `Clear cache` beside it was the same, and works now too.
+- Both run the ordinary batch operation over one app, so a single app gets the **progress page and
+  the operation log** like everything else, rather than a second implementation that can disagree
+  with the first.
+- Batch *clear cache* no longer has a bar pill; it remains in One-click ops and as the pane's own
+  (hidden by default) pill.
+- An existing pane that had been rearranged gets the four rungs dropped into the **Freeze pill's own
+  slot** rather than appended at the end, and `Clear data` promoted in place.
+
 ## 4.1.1+2026-09-05.03-37.g41d79af5+037 — 2026-09-12
 
 A freeze had four gates and one switch. That is right for a snowflake and useless for the question
