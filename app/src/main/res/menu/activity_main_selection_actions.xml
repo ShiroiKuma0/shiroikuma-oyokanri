@@ -17,14 +17,34 @@
         android:id="@+id/action_freeze_unfreeze"
         android:icon="@drawable/ic_snowflake"
         android:title="@string/freeze_unfreeze" />
+    <!-- Fork (白い熊, +038): one tap per rung of the freeze ladder. The gates are switches, not a
+         dial, so a rung means "gates 1..N applied, everything above released" — see
+         FreezeUtils.setLevel. -->
+    <item
+        android:id="@+id/action_freeze_level_1"
+        android:icon="@drawable/ic_snowflake"
+        android:title="@string/freeze_level_1" />
+    <item
+        android:id="@+id/action_freeze_level_2"
+        android:icon="@drawable/ic_snowflake"
+        android:title="@string/freeze_level_2" />
+    <item
+        android:id="@+id/action_freeze_level_3"
+        android:icon="@drawable/ic_snowflake"
+        android:title="@string/freeze_level_3" />
+    <item
+        android:id="@+id/action_freeze_level_4"
+        android:icon="@drawable/ic_snowflake"
+        android:title="@string/freeze_level_4" />
     <item
         android:id="@+id/action_force_stop"
         android:title="@string/force_stop"
         android:icon="@drawable/ic_power_settings" />
+    <!-- Fork (白い熊, +038): was "Clear", which opened a dialog asking data or cache. -->
     <item
-        android:id="@+id/action_clear_data_cache"
-        android:icon="@drawable/ic_brush"
-        android:title="@string/clear" />
+        android:id="@+id/action_clear_data"
+        android:icon="@drawable/ic_clear_data"
+        android:title="@string/clear_data" />
     <item
         android:id="@+id/action_save_apk"
         android:title="@string/save_apk"

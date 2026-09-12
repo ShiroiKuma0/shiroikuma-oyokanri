@@ -2533,6 +2533,31 @@
     <string name="freeze_gate_failed">The platform did not change “<xliff:g id="step" example="Hide">%1$s</xliff:g>”.</string>
     <string name="freeze_level_badge_description">Freeze level <xliff:g id="level" example="3">%1$d</xliff:g> of 4</string>
 
+    <!-- Fork (白い熊, +038, renamed +040/+041): the ladder as an action. The circled digit is the
+         badge the row already draws, so the pill and the badge read as the same thing; it lives in
+         the text rather than as the leading glyph so it is never shown twice. The gate's own name
+         stays (白い熊, +041) — a rung that did not say what it does is a number and nothing else,
+         and the word is how you pick the right one without opening the freeze box. It does read
+         close to the Force-stop pill beside it; the two are genuinely different actions and both
+         are kept (see the ladder row in CLAUDE.md). -->
+    <string name="freeze_level_1">Freeze ① stop</string>
+    <string name="freeze_level_2">Freeze ② suspend</string>
+    <string name="freeze_level_3">Freeze ③ disable</string>
+    <string name="freeze_level_4">Freeze ④ hide</string>
+    <plurals name="confirm_freeze_level_count">
+        <item quantity="one">Will bring %d application to this freeze level. Are you sure?</item>
+        <item quantity="other">Will bring %d applications to this freeze level. Are you sure?</item>
+    </plurals>
+    <plurals name="alert_failed_to_set_freeze_level">
+        <item quantity="one">Failed to set the freeze level for %d application.</item>
+        <item quantity="other">Failed to set the freeze level for %d applications.</item>
+    </plurals>
+    <plurals name="confirm_clear_data_count">
+        <item quantity="one">Will erase the data of %d application! Are you sure?</item>
+        <item quantity="other">Will erase the data of %d applications! Are you sure?</item>
+    </plurals>
+    <string name="clear_data_confirm">Erase all of “<xliff:g id="app" example="ArcaneChat">%1$s</xliff:g>”’s data? It will start as if freshly installed — accounts, settings and everything stored inside it are gone.</string>
+
     <!-- Fork (白い熊, +034): the freeze ladder's colours, settable like every other. -->
     <string name="pref_color_cat_freeze_levels">Freeze levels</string>
     <string name="pref_color_freeze_level_1">1 · Force-stopped (badge only)</string>

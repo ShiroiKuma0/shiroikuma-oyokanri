@@ -96,6 +96,7 @@ import io.github.muntashirakon.AppManager.utils.AppNotesManager;
 import io.github.muntashirakon.AppManager.utils.ArrayUtils;
 import io.github.muntashirakon.AppManager.utils.BroadcastUtils;
 import io.github.muntashirakon.AppManager.utils.DateUtils;
+import io.github.muntashirakon.AppManager.batchops.BatchOpsManager;
 import io.github.muntashirakon.AppManager.utils.ForkDialog;
 import io.github.muntashirakon.AppManager.utils.ForkThemeUtils;
 import io.github.muntashirakon.AppManager.utils.FreezeUtils;
@@ -1461,6 +1462,24 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             case "force_stop":
                 forceStopApp(item);
                 break;
+            case "freeze_level_1":
+                applyFreezeLevel(item, userId, 1);
+                break;
+            case "freeze_level_2":
+                applyFreezeLevel(item, userId, 2);
+                break;
+            case "freeze_level_3":
+                applyFreezeLevel(item, userId, 3);
+                break;
+            case "freeze_level_4":
+                applyFreezeLevel(item, userId, 4);
+                break;
+            case "clear_data":
+                clearAppData(item, userId, false);
+                break;
+            case "clear_cache":
+                clearAppData(item, userId, true);
+                break;
             case "backup":
                 showBackupDialog(item);
                 break;
@@ -1662,6 +1681,40 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
      * Caller is responsible for the eligibility gate — this method does not
      * re-check whether the app is a system app or AppManager itself.
      */
+    /**
+     * Fork (白い熊, +039): the pane's rung pills — one rung of the freeze ladder for this app.
+     *
+     * <p><b>Tapping the rung the app is already on releases it</b>, back to rung zero. That is
+     * the shelf's rule ("one pill is both the way in and the way out") and it is what keeps a
+     * thaw inside the pane now that the Freeze/Unfreeze pill is not in it; the snowflake under
+     * the icon still thaws too, as it always has.
+     *
+     * <p>Straight to {@link FreezeUtils#setLevel} on a worker rather than through the batch
+     * service, exactly as {@code toggleFreeze} does: one app is instant, and the refusal message
+     * for a protected app is worth showing where the tap was.
+     */
+    private void applyFreezeLevel(@NonNull ApplicationItem item, int userId, int level) {
+        if (!item.isInstalled) {
+            return;
+        }
+        final Context ctx = mActivity.getApplicationContext();
+        final int target = item.freezeLevel == level ? 0 : level;
+        ThreadUtils.postOnBackgroundThread(() -> {
+            try {
+                FreezeUtils.setLevel(item.packageName, userId, target);
+                BroadcastUtils.sendPackageAltered(ctx, new String[]{item.packageName});
+            } catch (Throwable th) {
+                Log.e(TAG, "Freeze level " + target + " failed for " + item.packageName, th);
+                // Fork: the list is not polled, so a partial walk still has to repaint — the app
+                // may well have moved, just not all the way.
+                BroadcastUtils.sendPackageAltered(ctx, new String[]{item.packageName});
+                ThreadUtils.postOnMainThread(() -> displayLongToast(
+                        target == 0 ? R.string.failed_to_unfreeze : R.string.failed_to_freeze,
+                        item.label));
+            }
+        });
+    }
+
     private void toggleFreeze(@NonNull ApplicationItem item) {
         final Context ctx = mActivity.getApplicationContext();
         final int userId = (item.userIds != null && item.userIds.length > 0)
@@ -1740,6 +1793,35 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
     // background thread, then a package-altered broadcast so the row re-reads
     // its (now stopped) state and the running box + badge drop. Toast on
     // failure (e.g. no FORCE_STOP_PACKAGES privilege).
+    /**
+     * Fork (白い熊, +038): the pane's Clear data / Clear cache pills.
+     *
+     * <p>Both were declared keys with no implementation — they fell through to the default branch
+     * and opened App info, a pill that quietly did something other than what it said. They run the
+     * ordinary batch op over a single package rather than calling the platform here, so the work
+     * shows up on the progress page and in the operation log exactly as the selection pane's does,
+     * and there is one implementation of each rather than two.
+     *
+     * <p>Erasing data is not undoable and is confirmed by name; a cache is, and is not.
+     */
+    private void clearAppData(@NonNull ApplicationItem item, int userId, boolean cacheOnly) {
+        if (!item.isInstalled) {
+            return;
+        }
+        int op = cacheOnly ? BatchOpsManager.OP_CLEAR_CACHE : BatchOpsManager.OP_CLEAR_DATA;
+        if (cacheOnly) {
+            mActivity.runSingleAppOp(op, item.packageName, userId);
+            return;
+        }
+        ForkDialog.present(ForkDialog.builder(mActivity)
+                .setTitle(R.string.clear_data)
+                .setMessage(mActivity.getString(R.string.clear_data_confirm,
+                        item.label != null ? item.label : item.packageName))
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.clear_data, (dialog, which) ->
+                        mActivity.runSingleAppOp(op, item.packageName, userId)));
+    }
+
     private void forceStopApp(@NonNull ApplicationItem item) {
         final Context ctx = mActivity.getApplicationContext();
         final int userId = (item.userIds != null && item.userIds.length > 0)

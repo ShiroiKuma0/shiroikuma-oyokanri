@@ -22,7 +22,9 @@ public class MainBatchOpsHandler implements MultiSelectionView.OnSelectionChange
     private final MenuItem mFreezeUnfreezeMenu;
     private final MenuItem mUnfreezeMenu;
     private final MenuItem mForceStopMenu;
-    private final MenuItem mClearDataCacheMenu;
+    // Fork (白い熊, +038): one per rung of the freeze ladder.
+    private final MenuItem[] mFreezeLevelMenus;
+    private final MenuItem mClearDataMenu;
     private final MenuItem mSaveApkMenu;
     private final MenuItem mBackupRestoreMenu;
     private final MenuItem mRestoreMenu;
@@ -41,7 +43,6 @@ public class MainBatchOpsHandler implements MultiSelectionView.OnSelectionChange
     private boolean mCanInstallExistingPackages;
     private boolean mCanForceStopPackages;
     private boolean mCanClearData;
-    private boolean mCanClearCache;
     private boolean mCanModifyAppOpMode;
     private boolean mCanModifyNetPolicy;
     private boolean mCanModifyComponentState;
@@ -54,7 +55,13 @@ public class MainBatchOpsHandler implements MultiSelectionView.OnSelectionChange
         mFreezeUnfreezeMenu = selectionMenu.findItem(R.id.action_freeze_unfreeze);
         mUnfreezeMenu = selectionMenu.findItem(R.id.action_unfreeze);
         mForceStopMenu = selectionMenu.findItem(R.id.action_force_stop);
-        mClearDataCacheMenu = selectionMenu.findItem(R.id.action_clear_data_cache);
+        mFreezeLevelMenus = new MenuItem[]{
+                selectionMenu.findItem(R.id.action_freeze_level_1),
+                selectionMenu.findItem(R.id.action_freeze_level_2),
+                selectionMenu.findItem(R.id.action_freeze_level_3),
+                selectionMenu.findItem(R.id.action_freeze_level_4),
+        };
+        mClearDataMenu = selectionMenu.findItem(R.id.action_clear_data);
         mSaveApkMenu = selectionMenu.findItem(R.id.action_save_apk);
         mBackupRestoreMenu = selectionMenu.findItem(R.id.action_backup);
         mRestoreMenu = selectionMenu.findItem(R.id.action_restore);
@@ -76,7 +83,6 @@ public class MainBatchOpsHandler implements MultiSelectionView.OnSelectionChange
         mCanInstallExistingPackages = SelfPermissions.canInstallExistingPackages();
         mCanForceStopPackages = SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.FORCE_STOP_PACKAGES);
         mCanClearData = SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.CLEAR_APP_USER_DATA);
-        mCanClearCache = SelfPermissions.canClearAppCache();
         mCanModifyAppOpMode = SelfPermissions.canModifyAppOpMode();
         mCanModifyNetPolicy = SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.MANAGE_NETWORK_POLICY);
         mCanModifyComponentState = SelfPermissions.checkSelfOrRemotePermission(Manifest.permission.CHANGE_COMPONENT_ENABLED_STATE);
@@ -125,7 +131,15 @@ public class MainBatchOpsHandler implements MultiSelectionView.OnSelectionChange
             mUnfreezeMenu.setEnabled(nonZeroSelection && areAllInstalled);
         }
         mForceStopMenu.setEnabled(nonZeroSelection && areAllInstalled);
-        mClearDataCacheMenu.setEnabled(nonZeroSelection && areAllInstalled);
+        // Fork (白い熊, +038): a rung is only meaningful for an installed app. Deliberately NOT
+        // gated on the individual gate's privilege — a rung the phone cannot fully reach still
+        // applies every gate below it, and FreezeUtils.setLevel reports per app what it managed.
+        for (MenuItem item : mFreezeLevelMenus) {
+            if (item != null) {
+                item.setEnabled(nonZeroSelection && areAllInstalled);
+            }
+        }
+        mClearDataMenu.setEnabled(nonZeroSelection && areAllInstalled);
         mPreventBackgroundMenu.setEnabled(nonZeroSelection && areAllInstalled);
         mNetPolicyMenu.setEnabled(nonZeroSelection && areAllInstalled);
         mBlockUnblockTrackersMenu.setEnabled(nonZeroSelection && areAllInstalled);
@@ -172,7 +186,12 @@ public class MainBatchOpsHandler implements MultiSelectionView.OnSelectionChange
             mReinstallMenu.setVisible(mCanInstallExistingPackages);
         }
         mForceStopMenu.setVisible(mCanForceStopPackages);
-        mClearDataCacheMenu.setVisible(mCanClearData || mCanClearCache);
+        for (MenuItem item : mFreezeLevelMenus) {
+            if (item != null) {
+                item.setVisible(mCanFreezeUnfreezePackages);
+            }
+        }
+        mClearDataMenu.setVisible(mCanClearData);
         mPreventBackgroundMenu.setVisible(mCanModifyAppOpMode && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N);
         mNetPolicyMenu.setVisible(mCanModifyNetPolicy);
         mBlockUnblockTrackersMenu.setVisible(mCanModifyComponentState);

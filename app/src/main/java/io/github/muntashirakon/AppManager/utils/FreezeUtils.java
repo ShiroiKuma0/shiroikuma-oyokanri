@@ -551,6 +551,98 @@ public final class FreezeUtils {
     }
 
     /**
+     * Fork (白い熊, +038): bring this app to <b>exactly</b> {@code level} — gates 1‥level
+     * applied, every gate above it released.
+     *
+     * <p>The four gates got their own switches in +032 so one app at a time could be walked
+     * down the ladder; this is the same ladder applied to a selection. The workflow it serves
+     * is 白い熊's: put the apps that belong at one depth into a profile, filter the list to
+     * that profile, select all, tap the level. That is also the only way a phone's freezing can
+     * be <i>reproduced</i> — the level itself is never persisted anywhere (it is read live from
+     * {@link ApplicationInfo} on every bind), so a profile plus a level is the record.
+     *
+     * <p><b>Order is load-bearing, twice over.</b> Releasing runs first and from the top down,
+     * because a hidden package is reported as not installed and nothing below gate 4 can be read
+     * or written while that stands. Applying then runs bottom-up, the order {@link #freezeTotal}
+     * uses and for the same reason: hide last, or the suspend and enabled-state calls have
+     * nothing left to act on.
+     *
+     * <p>A gate already in the wanted state is skipped rather than re-written — {@code setGate}
+     * would happily re-issue it, but a force-stop of an already-stopped app is a real kill and a
+     * re-suspend rewrites the suspending-package slot.
+     *
+     * <p><b>The per-app remembered freezing method is deliberately left alone</b>, the rule the
+     * gate box already follows: the method is what the main list's snowflake will do next, and
+     * silently rewriting it here would change an unrelated control.
+     *
+     * <p><b>Level 0 is a release and is never blocked</b> — it applies no gate at all, so the
+     * 必要 guard does not apply to it, the rule the suspend and uninstall chokepoints already
+     * follow: the way back must always exist. It is a little more than {@link #unfreeze}, which
+     * deliberately leaves {@code stopped} alone; here every gate including the force-stop is
+     * lifted, because the caller asked for rung zero by name.
+     *
+     * @throws RemoteException if the app is protected, or if the level was not reached — judged
+     *                         by {@link #levelOf} afterwards, never inferred from the calls
+     *                         returning. Note that this is a test of the <b>top</b> gate: a
+     *                         PERSISTENT process that survives the force-stop under a disable
+     *                         gate still reads as level 3, which is the truth.
+     */
+    @WorkerThread
+    public static void setLevel(@NonNull String packageName, @UserIdInt int userId, int level)
+            throws RemoteException {
+        if (level < 0 || level > GATE_HIDE) {
+            throw new RemoteException("Not a freeze level: " + level);
+        }
+        // One check, stated once. setGate re-checks on every apply, which is cheap (the profile
+        // lookup is cached) and harmless, but the message a caller reports should come from here.
+        if (level > 0 && ProtectedAppsProfile.isProtected(packageName)) {
+            throw new RemoteException(packageName + (ProtectedAppsProfile.isAlwaysProtected(packageName)
+                    ? " is one of the apps 白い熊 応用管理 cannot work without and is protected from freezing."
+                    : " is in the " + ProtectedAppsProfile.PROTECTED_PROFILE_NAME
+                    + " profile and is protected from freezing."));
+        }
+        if (level > 0 && BuildConfig.APPLICATION_ID.equals(packageName)
+                && userId == UserHandleHidden.myUserId()) {
+            throw new RemoteException("Could not freeze myself.");
+        }
+        for (int gate = GATE_HIDE; gate > level; --gate) {
+            ApplicationInfo info = resolveApplicationInfo(packageName, userId);
+            if (info == null || !isGateApplied(info, gate)) {
+                continue;
+            }
+            try {
+                setGate(packageName, userId, gate, false);
+            } catch (Throwable th) {
+                // Releasing is best-effort: a gate we cannot lift is reported by the level
+                // check below, and abandoning the walk here would leave the app part-way.
+                Log.w(TAG, "Could not release gate %d of %s", th, gate, packageName);
+            }
+        }
+        for (int gate = GATE_FORCE_STOP; gate <= level; ++gate) {
+            ApplicationInfo info = resolveApplicationInfo(packageName, userId);
+            if (info != null && isGateApplied(info, gate)) {
+                continue;
+            }
+            if (!canOperateGate(gate)) {
+                // Not fatal in itself — freezeTotal skips what it cannot apply too. Whether it
+                // mattered is settled by the level check below.
+                continue;
+            }
+            try {
+                setGate(packageName, userId, gate, true);
+            } catch (Throwable th) {
+                Log.w(TAG, "Could not apply gate %d of %s", th, gate, packageName);
+            }
+        }
+        ApplicationInfo after = resolveApplicationInfo(packageName, userId);
+        int reached = after != null ? levelOf(after) : -1;
+        if (reached != level) {
+            throw new RemoteException("Could not bring " + packageName + " to level " + level
+                    + " (it is at level " + reached + ").");
+        }
+    }
+
+    /**
      * This package as the platform sees it now.
      * <p>
      * <b>Landmine.</b> The match flags are not optional: a package frozen by

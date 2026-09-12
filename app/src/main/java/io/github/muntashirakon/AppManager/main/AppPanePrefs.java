@@ -41,6 +41,8 @@ public final class AppPanePrefs {
     public static final String PREF_FILE = "shiroikuma_app_pane";
     private static final String PREF_VISIBLE_ORDER = "visible_order";
     private static final String PREF_HIDDEN_ORDER = "hidden_order";
+    private static final String PREF_MIGRATED_CLEAR_DATA = "migrated_clear_data";
+    private static final String PREF_MIGRATED_FREEZE_LEVELS = "migrated_freeze_levels";
     private static final String DELIM = ",";
 
     /** Every action the pane can offer. Stable wire keys — never rename one. */
@@ -49,6 +51,12 @@ public final class AppPanePrefs {
             "app_info",
             "snooping",
             "freeze",
+            // Fork (白い熊, +039): the ladder, one pill per rung, in place of the single Freeze
+            // pill. "freeze" itself stays a key so it can be brought back from the editor.
+            "freeze_level_1",
+            "freeze_level_2",
+            "freeze_level_3",
+            "freeze_level_4",
             "force_stop",
             "backup",
             "restore",
@@ -67,8 +75,89 @@ public final class AppPanePrefs {
 
     /** What a fresh install shows, in this order. */
     private static final List<String> DEFAULT_VISIBLE = Collections.unmodifiableList(Arrays.asList(
-            "open", "app_info", "snooping", "freeze", "force_stop", "backup", "restore",
-            "share_backup", "note", "uninstall"));
+            "open", "app_info", "snooping", "freeze_level_1", "freeze_level_2", "freeze_level_3",
+            "freeze_level_4", "force_stop", "backup", "restore", "share_backup", "note",
+            "uninstall", "clear_data"));
+
+    /**
+     * Fork (白い熊, +038): one-shot promotion of {@code clear_data} into the visible set.
+     *
+     * <p><b>LANDMINE — adding a key to {@link #DEFAULT_VISIBLE} is inert on an install that has
+     * already edited the pane.</b> Once the editor has saved, both stored orders exist, and
+     * {@link #loadVisibleOrder}'s reconciliation only promotes a key missing from <em>both</em>;
+     * {@code clear_data} has always been in {@link #ALL_KEYS}, so it is sitting in the stored
+     * hidden list and would stay there for ever. Same shape as
+     * {@code Prefs.Blocking.migrateDefaultFreezingMethodToTotal} and for the same reason.
+     *
+     * <p>Fires once, and only while the key is actually hidden, so hiding it again afterwards is
+     * a decision that stands.
+     */
+    public static void migrateClearDataVisible(@NonNull Context ctx) {
+        SharedPreferences sp = sp(ctx);
+        if (sp.getBoolean(PREF_MIGRATED_CLEAR_DATA, false)) {
+            return;
+        }
+        sp.edit().putBoolean(PREF_MIGRATED_CLEAR_DATA, true).apply();
+        String visibleRaw = sp.getString(PREF_VISIBLE_ORDER, null);
+        String hiddenRaw = sp.getString(PREF_HIDDEN_ORDER, null);
+        if (visibleRaw == null && hiddenRaw == null) {
+            // Never edited: DEFAULT_VISIBLE already carries it.
+            return;
+        }
+        List<String> visible = new ArrayList<>(parseKeys(visibleRaw));
+        List<String> hidden = new ArrayList<>(parseKeys(hiddenRaw));
+        if (visible.contains("clear_data")) {
+            return;
+        }
+        hidden.remove("clear_data");
+        visible.add("clear_data");
+        save(ctx, visible, hidden);
+    }
+
+    /**
+     * Fork (白い熊, +039): one-shot swap of the single {@code freeze} pill for the four rungs.
+     *
+     * <p>Same trap as {@link #migrateClearDataVisible} and answered the same way, with one extra
+     * requirement: the rungs must land <b>where the Freeze pill was</b>. Left to the ordinary
+     * reconciliation they would be appended to the end of the pane, which for four pills at once
+     * is not a detail.
+     *
+     * <p>A pane that had already hidden Freeze is left alone here — reconciliation will offer the
+     * rungs at the end, which is the right answer for someone who did not want the pill.
+     */
+    public static void migrateFreezeLevelPills(@NonNull Context ctx) {
+        SharedPreferences sp = sp(ctx);
+        if (sp.getBoolean(PREF_MIGRATED_FREEZE_LEVELS, false)) {
+            return;
+        }
+        sp.edit().putBoolean(PREF_MIGRATED_FREEZE_LEVELS, true).apply();
+        String visibleRaw = sp.getString(PREF_VISIBLE_ORDER, null);
+        String hiddenRaw = sp.getString(PREF_HIDDEN_ORDER, null);
+        if (visibleRaw == null && hiddenRaw == null) {
+            // Never edited: DEFAULT_VISIBLE already carries the rungs, and not "freeze".
+            return;
+        }
+        List<String> visible = new ArrayList<>(parseKeys(visibleRaw));
+        List<String> hidden = new ArrayList<>(parseKeys(hiddenRaw));
+        int at = visible.indexOf("freeze");
+        if (at < 0) {
+            return;
+        }
+        visible.remove(at);
+        List<String> rungs = new ArrayList<>();
+        for (String rung : new String[]{"freeze_level_1", "freeze_level_2", "freeze_level_3",
+                "freeze_level_4"}) {
+            if (!visible.contains(rung)) {
+                rungs.add(rung);
+                hidden.remove(rung);
+            }
+        }
+        visible.addAll(at, rungs);
+        if (!hidden.contains("freeze")) {
+            hidden.add("freeze");
+        }
+        save(ctx, visible, hidden);
+    }
 
     @StringRes
     public static int titleForKey(@NonNull String key) {
@@ -77,6 +166,10 @@ public final class AppPanePrefs {
             case "app_info":        return R.string.app_info;
             case "snooping":        return R.string.snooping;
             case "freeze":          return R.string.freeze;
+            case "freeze_level_1":  return R.string.freeze_level_1;
+            case "freeze_level_2":  return R.string.freeze_level_2;
+            case "freeze_level_3":  return R.string.freeze_level_3;
+            case "freeze_level_4":  return R.string.freeze_level_4;
             case "force_stop":      return R.string.force_stop;
             // Fork (白い熊): backing up and restoring are separate actions here too. One
             // "Backup/restore" pill is the same merge the batch pane had, in the pane a
@@ -106,6 +199,10 @@ public final class AppPanePrefs {
             case "app_info":        return R.drawable.ic_information_circle;
             case "snooping":        return R.drawable.ic_cctv_off;
             case "freeze":          return R.drawable.ic_snowflake;
+            case "freeze_level_1":  return R.drawable.ic_snowflake;
+            case "freeze_level_2":  return R.drawable.ic_snowflake;
+            case "freeze_level_3":  return R.drawable.ic_snowflake;
+            case "freeze_level_4":  return R.drawable.ic_snowflake;
             case "force_stop":      return R.drawable.ic_power_settings;
             case "backup":          return R.drawable.ic_archive;
             case "restore":         return R.drawable.ic_restore;

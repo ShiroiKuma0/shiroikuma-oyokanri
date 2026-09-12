@@ -60,8 +60,16 @@ public final class MainToolbarPrefs {
             "install_existing",
             "freeze_unfreeze",
             "unfreeze",
+            // Fork (白い熊, +038): the ladder as a bulk action — the workflow is a profile per
+            // depth, the profile filter, select-all, one tap.
+            "freeze_level_1",
+            "freeze_level_2",
+            "freeze_level_3",
+            "freeze_level_4",
             "force_stop",
-            "clear_data_cache",
+            // Fork (白い熊, +038): replaces "clear_data_cache", whose pill said only "Clear" and
+            // then asked which. See the alias in parseKeys.
+            "clear_data",
             "save_apk",
             "backup",
             "restore",
@@ -84,8 +92,12 @@ public final class MainToolbarPrefs {
             case "install_existing":        return R.id.action_install_existing;
             case "freeze_unfreeze":         return R.id.action_freeze_unfreeze;
             case "unfreeze":                return R.id.action_unfreeze;
+            case "freeze_level_1":          return R.id.action_freeze_level_1;
+            case "freeze_level_2":          return R.id.action_freeze_level_2;
+            case "freeze_level_3":          return R.id.action_freeze_level_3;
+            case "freeze_level_4":          return R.id.action_freeze_level_4;
             case "force_stop":              return R.id.action_force_stop;
-            case "clear_data_cache":        return R.id.action_clear_data_cache;
+            case "clear_data":              return R.id.action_clear_data;
             case "save_apk":                return R.id.action_save_apk;
             case "backup":                  return R.id.action_backup;
             case "restore":                 return R.id.action_restore;
@@ -110,8 +122,12 @@ public final class MainToolbarPrefs {
             case "install_existing":        return R.string.reinstall;
             case "freeze_unfreeze":         return R.string.freeze;
             case "unfreeze":                return R.string.unfreeze;
+            case "freeze_level_1":          return R.string.freeze_level_1;
+            case "freeze_level_2":          return R.string.freeze_level_2;
+            case "freeze_level_3":          return R.string.freeze_level_3;
+            case "freeze_level_4":          return R.string.freeze_level_4;
             case "force_stop":              return R.string.force_stop;
-            case "clear_data_cache":        return R.string.clear;
+            case "clear_data":              return R.string.clear_data;
             case "save_apk":                return R.string.save_apk;
             case "backup":                  return R.string.back_up;
             case "restore":                 return R.string.restore;
@@ -136,8 +152,12 @@ public final class MainToolbarPrefs {
             case "install_existing":        return R.drawable.ic_restore;
             case "freeze_unfreeze":         return R.drawable.ic_snowflake;
             case "unfreeze":                return R.drawable.ic_snowflake_off;
+            case "freeze_level_1":          return R.drawable.ic_snowflake;
+            case "freeze_level_2":          return R.drawable.ic_snowflake;
+            case "freeze_level_3":          return R.drawable.ic_snowflake;
+            case "freeze_level_4":          return R.drawable.ic_snowflake;
             case "force_stop":              return R.drawable.ic_power_settings;
-            case "clear_data_cache":        return R.drawable.ic_brush;
+            case "clear_data":              return R.drawable.ic_clear_data;
             case "save_apk":                return R.drawable.ic_get_app;
             case "backup":                  return R.drawable.ic_archive;
             case "restore":                 return R.drawable.ic_restore;
@@ -210,6 +230,22 @@ public final class MainToolbarPrefs {
                 .apply();
     }
 
+    /**
+     * Retired keys and what they became, applied while reading a stored order.
+     *
+     * <p>Fork (白い熊, +038). Without this, retiring a key is not merely a rename: {@link
+     * #parseKeys} drops what it does not recognise, the reconciliation loop then appends the
+     * replacement at the <b>end</b> of the visible list, and a pill the user had placed
+     * deliberately silently moves to the back of the pane. Mapping it preserves the position,
+     * and the retired name never has to be recognised anywhere else.
+     */
+    @NonNull
+    private static String alias(@NonNull String key) {
+        // "Clear" opened a dialog asking which kind of clearing; it is Clear data outright now.
+        if ("clear_data_cache".equals(key)) return "clear_data";
+        return key;
+    }
+
     /** Parse a stored comma-delimited string, dropping unknown keys
      *  and dropping duplicates while preserving first-occurrence order. */
     @NonNull
@@ -217,8 +253,10 @@ public final class MainToolbarPrefs {
         LinkedHashSet<String> out = new LinkedHashSet<>();
         if (raw == null || raw.isEmpty()) return out;
         for (String k : raw.split(DELIM)) {
-            if (!k.isEmpty() && ALL_KEYS.contains(k)) {
-                out.add(k);
+            if (k.isEmpty()) continue;
+            String key = alias(k);
+            if (ALL_KEYS.contains(key)) {
+                out.add(key);
             }
         }
         return out;

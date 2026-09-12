@@ -381,6 +381,16 @@ public class BatchOpsService extends ForegroundService {
             case BatchOpsManager.OP_FREEZE:
             case BatchOpsManager.OP_ADVANCED_FREEZE:
                 return context.getString(R.string.freeze);
+            // Fork (白い熊, +038): four ops rather than one carrying a level, precisely so the
+            // notification and the operation bar can say which rung was asked for.
+            case BatchOpsManager.OP_FREEZE_LEVEL_1:
+                return context.getString(R.string.freeze_level_1);
+            case BatchOpsManager.OP_FREEZE_LEVEL_2:
+                return context.getString(R.string.freeze_level_2);
+            case BatchOpsManager.OP_FREEZE_LEVEL_3:
+                return context.getString(R.string.freeze_level_3);
+            case BatchOpsManager.OP_FREEZE_LEVEL_4:
+                return context.getString(R.string.freeze_level_4);
             case BatchOpsManager.OP_DISABLE_BACKGROUND:
                 return context.getString(R.string.disable_background);
             case BatchOpsManager.OP_UNFREEZE:
@@ -433,6 +443,11 @@ public class BatchOpsService extends ForegroundService {
             case BatchOpsManager.OP_FREEZE:
             case BatchOpsManager.OP_ADVANCED_FREEZE:
                 return getResources().getQuantityString(R.plurals.alert_failed_to_freeze, failedCount, failedCount);
+            case BatchOpsManager.OP_FREEZE_LEVEL_1:
+            case BatchOpsManager.OP_FREEZE_LEVEL_2:
+            case BatchOpsManager.OP_FREEZE_LEVEL_3:
+            case BatchOpsManager.OP_FREEZE_LEVEL_4:
+                return getResources().getQuantityString(R.plurals.alert_failed_to_set_freeze_level, failedCount, failedCount);
             case BatchOpsManager.OP_UNFREEZE:
                 return getResources().getQuantityString(R.plurals.alert_failed_to_unfreeze, failedCount, failedCount);
             case BatchOpsManager.OP_DISABLE_BACKGROUND:
