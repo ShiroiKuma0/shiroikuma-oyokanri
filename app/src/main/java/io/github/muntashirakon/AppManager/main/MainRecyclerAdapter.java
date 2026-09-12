@@ -130,14 +130,11 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
     // the outline-vs-filled drawable swap alone was too subtle to read.
     private final int mColorYellow;
     private final int mColorIceBlue;
-    // Fork, +81: violet marks the third dormant state, suspended.
-    private final int mColorViolet;
-    // Fork: dark "dormant" films painted as the card background (cool = frozen,
-    // mauve = uninstalled, violet = suspended). Defaults; overridable via
-    // ColorPrefs at runtime.
-    private final int mColorFilmFrozen;
+    // Fork (白い熊, +034): the frozen films are the freeze ladder's now — one rung per
+    // gate, resolved through FreezeLevelBadge so the main list, the battery cards and
+    // the 盗み見 page cannot drift. Uninstalled keeps its own: it is not a freeze but
+    // an absence, and it outranks every rung.
     private final int mColorFilmUninstalled;
-    private final int mColorFilmSuspended;
     // Fork: uninstalled labels are dimmed to ~65% alpha so they read as inactive.
     private static final int UNINSTALLED_LABEL_DIM_ALPHA = 0xA6;
     private final int mLabelFrozenUser;
@@ -185,12 +182,12 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
     private int mcSignature;
     private boolean mcSignatureSet;
     // Non-text indicators (Stage 2): freeze snowflake, chips, + pill.
-    private int mcFreezeFrozen, mcFreezeThawed, mcFreezeSuspended;
+    private int mcFreezeFrozen, mcFreezeThawed;
     private int mcChip, mcAddPill;
     // Fork: re-added running/active box strokes (yellow user / orange system)
     // and the dormant-row films (cool = frozen, mauve = uninstalled).
     private int mcStrokeUser, mcStrokeSystem;
-    private int mcFilmFrozen, mcFilmUninstalled, mcFilmSuspended;
+    private int mcFilmUninstalled;
 
     // package name -> profile names containing it. Loaded asynchronously on
     // adapter creation; until the load finishes the map is empty and bind
@@ -210,10 +207,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         mQueryStringHighlight = ColorCodes.getQueryStringHighlightColor(activity);
         mColorYellow = ContextCompat.getColor(activity, R.color.theme_bright_yellow);
         mColorIceBlue = ContextCompat.getColor(activity, R.color.theme_ice_blue);
-        mColorViolet = ContextCompat.getColor(activity, R.color.theme_violet);
-        mColorFilmFrozen = ContextCompat.getColor(activity, R.color.theme_film_frozen);
         mColorFilmUninstalled = ContextCompat.getColor(activity, R.color.theme_film_uninstalled);
-        mColorFilmSuspended = ContextCompat.getColor(activity, R.color.theme_film_suspended);
         mLabelFrozenUser = ContextCompat.getColor(activity, R.color.theme_label_frozen_user);
         mLabelFrozenSystem = ContextCompat.getColor(activity, R.color.theme_label_frozen_system);
         reloadColors();
@@ -361,14 +355,11 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         mcSignature = ColorPrefs.getColor(mActivity, ColorPrefs.SIGNATURE, mColorSecondary);
         mcFreezeFrozen = ColorPrefs.getColor(mActivity, ColorPrefs.FREEZE_FROZEN, mColorIceBlue);
         mcFreezeThawed = ColorPrefs.getColor(mActivity, ColorPrefs.FREEZE_THAWED, mColorYellow);
-        mcFreezeSuspended = ColorPrefs.getColor(mActivity, ColorPrefs.FREEZE_SUSPENDED, mColorViolet);
         mcChip = ColorPrefs.getColor(mActivity, ColorPrefs.CHIP, mColorYellow);
         mcAddPill = ColorPrefs.getColor(mActivity, ColorPrefs.ADDPILL, mColorYellow);
         mcStrokeUser = ColorPrefs.getColor(mActivity, ColorPrefs.STROKE_USER, mColorYellow);
         mcStrokeSystem = ColorPrefs.getColor(mActivity, ColorPrefs.STROKE_SYSTEM, mColorOrange);
-        mcFilmFrozen = ColorPrefs.getColor(mActivity, ColorPrefs.FILM_FROZEN, mColorFilmFrozen);
         mcFilmUninstalled = ColorPrefs.getColor(mActivity, ColorPrefs.FILM_UNINSTALLED, mColorFilmUninstalled);
-        mcFilmSuspended = ColorPrefs.getColor(mActivity, ColorPrefs.FILM_SUSPENDED, mColorFilmSuspended);
         // (The selected card's frame is deliberately NOT cached here — it is
         // read at bind time so it stays fresh in multi-window, where the
         // onResume flag consumption never runs.)
@@ -748,18 +739,17 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         // you parse the label. Painted as the card background (not a foreground
         // overlay) so the label text on top is never washed. Uninstalled takes
         // priority over frozen. Set unconditionally — the ViewHolder recycles.
+        // Fork (白い熊, +034): the film is the freeze LADDER's colour now — one per
+        // gate, deepening from step 2 to step 4 — because a freeze stopped being one
+        // state the moment each gate got its own switch. Step 1 (force-stop) has no
+        // film on purpose: such an app is not frozen at all, so its row must stay an
+        // ordinary row, and only the badge on the snowflake reports it. Uninstalled
+        // still outranks everything: it is not a freeze but an absence.
         int filmColor;
         if (!item.isInstalled) {
             filmColor = mcFilmUninstalled;
-        } else if (item.isSuspendedApp) {
-            // Fork, +81: suspended is checked BEFORE frozen — it is a kind of
-            // frozen (isFrozen is true as well), and it is the deeper state, so
-            // it has to win the film.
-            filmColor = mcFilmSuspended;
-        } else if (item.isFrozen) {
-            filmColor = mcFilmFrozen;
         } else {
-            filmColor = Color.BLACK;
+            filmColor = FreezeLevelBadge.film(context, item.freezeLevel, Color.BLACK);
         }
         cardView.setCardBackgroundColor(filmColor);
         // Fork: square cells for the edge-to-edge separator grid; the selected
@@ -879,16 +869,21 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         // for an ordinary freeze — which matters, because the app is not merely
         // asleep: the system puts a stub in its place and nothing can open it.
         // Three-way, and every branch sets both properties (recycled views).
-        if (item.isSuspendedApp) {
-            holder.freezeIndicator.setImageResource(R.drawable.ic_lock);
-            holder.freezeIndicator.setImageTintList(ColorStateList.valueOf(mcFreezeSuspended));
-        } else {
-            holder.freezeIndicator.setImageResource(item.isFrozen
-                    ? R.drawable.ic_snowflake_24dp
-                    : R.drawable.ic_snowflake_outline_24dp);
-            holder.freezeIndicator.setImageTintList(ColorStateList.valueOf(
-                    item.isFrozen ? mcFreezeFrozen : mcFreezeThawed));
-        }
+        //
+        // Fork (白い熊, +034): the glyph now carries the ladder's colour and the badge
+        // carries its number. The padlock stays for a suspended row — shape reads
+        // further than colour at 26dp — but a freeze can be deeper than suspension
+        // now, so the padlock is no longer the deepest thing on the list and takes
+        // the level's accent like everything else. An app that is only force-stopped
+        // keeps the OUTLINE snowflake in the thawed colour: it is not frozen, and the
+        // badge is the whole of what is different about it.
+        holder.freezeIndicator.setImageResource(item.isSuspendedApp
+                ? R.drawable.ic_lock
+                : (item.isFrozen ? R.drawable.ic_snowflake_24dp : R.drawable.ic_snowflake_outline_24dp));
+        holder.freezeIndicator.setImageTintList(ColorStateList.valueOf(item.isFrozen
+                ? FreezeLevelBadge.accent(context, item.freezeLevel, mcFreezeFrozen)
+                : mcFreezeThawed));
+        FreezeLevelBadge.bind(holder.freezeLevelBadge, item.freezeLevel);
         // Make the whole left icon column a tap target to toggle freeze, but
         // ONLY for eligible apps: anything that is not AppManager itself.
         // Our own package keeps the column non-clickable so taps fall
@@ -1783,6 +1778,8 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         AppCompatImageView killBadge;   // Fork: force-stop ✕ on the icon corner.
         AppCompatImageView debugIcon;
         AppCompatImageView freezeIndicator;
+        /** Fork (白い熊, +034): the numbered circle at the snowflake's corner. */
+        TextView freezeLevelBadge;
         TextView label;
         TextView packageName;
         TextView version;
@@ -1814,6 +1811,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             killBadge = itemView.findViewById(R.id.kill_badge);
             debugIcon = itemView.findViewById(R.id.favorite_icon);
             freezeIndicator = itemView.findViewById(R.id.freeze_indicator);
+            freezeLevelBadge = itemView.findViewById(R.id.freeze_level_badge);
             label = itemView.findViewById(R.id.label);
             packageName = itemView.findViewById(R.id.packageName);
 

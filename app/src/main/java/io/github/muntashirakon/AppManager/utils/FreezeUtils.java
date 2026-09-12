@@ -2,6 +2,7 @@
 
 package io.github.muntashirakon.AppManager.utils;
 
+import android.Manifest;
 import android.annotation.UserIdInt;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
@@ -347,6 +348,225 @@ public final class FreezeUtils {
         }
         if (PackageManagerCompat.getApplicationEnabledSetting(packageName, userId) != PackageManager.COMPONENT_ENABLED_STATE_ENABLED) {
             PackageManagerCompat.setApplicationEnabledSetting(packageName, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, 0, userId);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Fork (白い熊, +032): the four gates, one at a time.
+    //
+    // FREEZE_TOTAL applies force-stop, suspend, disable and hide together and is
+    // the right thing for a snowflake — one tap, everything the phone allows. It
+    // is the wrong thing for finding out WHICH gate an outside app trips over:
+    // Android Auto refuses to run against a Maps that is totally frozen, and runs
+    // against the same Maps carrying only the disable gate (measured 2026-09-12 on
+    // the second phone, where `dumpsys package` reads `installed=true hidden=false
+    // suspended=false enabled=3`). Nothing in the app could express that state,
+    // because every freeze was a method rather than a set of switches.
+    //
+    // So the gates get names, states, availability and a release each. They are
+    // NOT a new freezing method and nothing persists them: `FreezeUtils.isFrozen`
+    // is still the app-wide truth, the FREEZE_* values are still the wire format,
+    // and this is a second door onto the same platform calls.
+    //
+    // The numbers are the step numbers the Snooping page shows, in the order
+    // freezeTotal applies them — mild to severe — and are used only for that.
+    // ------------------------------------------------------------------
+
+    @IntDef({GATE_FORCE_STOP, GATE_SUSPEND, GATE_DISABLE, GATE_HIDE})
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface FreezeGate {
+    }
+
+    public static final int GATE_FORCE_STOP = 1;
+    public static final int GATE_SUSPEND = 2;
+    public static final int GATE_DISABLE = 3;
+    public static final int GATE_HIDE = 4;
+
+    /** The gates in the order {@link #freezeTotal} applies them. */
+    public static final int[] GATES = {GATE_FORCE_STOP, GATE_SUSPEND, GATE_DISABLE, GATE_HIDE};
+
+    /**
+     * Whether {@code gate} is in force right now, read from a live
+     * {@link ApplicationInfo}.
+     * <p>
+     * <b>Landmine.</b> The caller must have resolved that info with
+     * {@code MATCH_UNINSTALLED_PACKAGES | MATCH_DISABLED_COMPONENTS}, or a hidden
+     * package — precisely the one the hide gate is about — resolves to nothing and
+     * every gate reads false.
+     */
+    public static boolean isGateApplied(@NonNull ApplicationInfo info, @FreezeGate int gate) {
+        switch (gate) {
+            case GATE_FORCE_STOP:
+                return ApplicationInfoCompat.isStopped(info);
+            case GATE_SUSPEND:
+                // The FLAG, not DevicePolicyBridge.isSuspended: the platform records a
+                // suspension per suspending package, so asking the admin slot alone
+                // answers "no" for one we applied through the shell. The flag is set
+                // whichever slot holds it.
+                return ApplicationInfoCompat.isSuspended(info);
+            case GATE_DISABLE:
+                return !info.enabled;
+            case GATE_HIDE:
+                return ApplicationInfoCompat.isHidden(info);
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * How deep this app is shut, as a gate number (白い熊, +034).
+     * <p>
+     * Zero when nothing is in force, otherwise the <b>highest</b> gate standing. The
+     * gates are independent switches rather than a dial, so an app can carry 1 and 3
+     * with 2 released; the number a row shows is the strongest thing done to it,
+     * because that is what governs how the rest of the phone sees it.
+     * <p>
+     * Note that level 1 is <em>not</em> a freeze: {@link #isFrozen} stays false for a
+     * package that is merely stopped, and the row must stay an ordinary row. The
+     * number is still worth showing — force-stopped is invisible otherwise.
+     */
+    @FreezeGate
+    public static int levelOf(@NonNull ApplicationInfo info) {
+        int level = 0;
+        for (int gate : GATES) {
+            if (isGateApplied(info, gate)) level = gate;
+        }
+        return level;
+    }
+
+    /**
+     * Whether this phone lets us operate {@code gate} at all, asked of the privileges
+     * we hold right now.
+     * <p>
+     * Judged live rather than cached: 雫's delegation is granted in another app and
+     * can appear or vanish while the page is open, and the hide gate exists on this
+     * phone only because of it — the shell holds no {@code MANAGE_USERS}.
+     */
+    public static boolean canOperateGate(@FreezeGate int gate) {
+        switch (gate) {
+            case GATE_FORCE_STOP:
+                return SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.FORCE_STOP_PACKAGES);
+            case GATE_SUSPEND:
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+                    return false;
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                        ? SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.SUSPEND_APPS)
+                        : SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.MANAGE_USERS)) {
+                    return true;
+                }
+                return DevicePolicyBridge.canSuspend();
+            case GATE_DISABLE:
+                return SelfPermissions.checkSelfOrRemotePermission(Manifest.permission.CHANGE_COMPONENT_ENABLED_STATE);
+            case GATE_HIDE:
+                return SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.MANAGE_USERS)
+                        || DevicePolicyBridge.canHide();
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Apply or release one gate.
+     * <p>
+     * Applying goes through the same protection the whole-app freeze does — a gate is
+     * a freeze in every sense that matters to the 必要 profile, and letting one
+     * through here would be a hole straight past {@link #freeze}. <b>Releasing is
+     * never blocked</b>, the rule the suspend and uninstall chokepoints already
+     * follow: the way back must always exist.
+     *
+     * @return whether the platform actually did it, re-read afterwards rather than
+     * inferred from the call returning. Several of these APIs accept a write and
+     * discard it.
+     */
+    @WorkerThread
+    public static boolean setGate(@NonNull String packageName, @UserIdInt int userId,
+                                  @FreezeGate int gate, boolean apply) throws RemoteException {
+        if (apply) {
+            if (ProtectedAppsProfile.isProtected(packageName)) {
+                throw new RemoteException(packageName + (ProtectedAppsProfile.isAlwaysProtected(packageName)
+                        ? " is one of the apps 白い熊 応用管理 cannot work without and is protected from freezing."
+                        : " is in the " + ProtectedAppsProfile.PROTECTED_PROFILE_NAME
+                        + " profile and is protected from freezing."));
+            }
+            if (BuildConfig.APPLICATION_ID.equals(packageName) && userId == UserHandleHidden.myUserId()) {
+                throw new RemoteException("Could not freeze myself.");
+            }
+        }
+        switch (gate) {
+            case GATE_FORCE_STOP:
+                if (apply) {
+                    PackageManagerCompat.forceStopPackage(packageName, userId);
+                } else {
+                    // No ordinary way back from stopped except launching the app, which
+                    // is not something a switch may do on the user's behalf. See the
+                    // note on setPackageStoppedState.
+                    PackageManagerCompat.setPackageStoppedState(packageName, false, userId);
+                }
+                break;
+            case GATE_SUSPEND:
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+                    return false;
+                }
+                if (apply) {
+                    suspendBestEffort(packageName, userId);
+                    break;
+                }
+                // Both slots, in the order unfreeze lifts them: ours as the shell, then
+                // the admin's, which a shell unsuspend cannot touch.
+                try {
+                    PackageManagerCompat.suspendPackages(new String[]{packageName}, userId, false);
+                } catch (Throwable ignore) {
+                    // No privilege for the shell slot; the delegate may still hold it.
+                }
+                try {
+                    if (DevicePolicyBridge.isSuspended(packageName)) {
+                        DevicePolicyBridge.setSuspended(packageName, false);
+                    }
+                } catch (Throwable ignore) {
+                }
+                break;
+            case GATE_DISABLE:
+                PackageManagerCompat.setApplicationEnabledSetting(packageName, apply
+                        ? PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER
+                        : PackageManager.COMPONENT_ENABLED_STATE_ENABLED, 0, userId);
+                break;
+            case GATE_HIDE:
+                if (apply) {
+                    hideBestEffort(packageName, userId);
+                } else {
+                    revealBestEffort(packageName, userId);
+                }
+                break;
+            default:
+                return false;
+        }
+        // Ask the platform what it actually did. Half of these APIs accept a write
+        // and discard it — a suspension lifted in the wrong slot returns looking
+        // like success, hideBestEffort reverts itself when the row would vanish,
+        // and a PERSISTENT process is back before the force-stop returns. The page
+        // records nothing on a false, so this must be measured, never inferred.
+        ApplicationInfo after = resolveApplicationInfo(packageName, userId);
+        return after != null && isGateApplied(after, gate) == apply;
+    }
+
+    /**
+     * This package as the platform sees it now.
+     * <p>
+     * <b>Landmine.</b> The match flags are not optional: a package frozen by
+     * <em>hiding</em> is reported as not installed, so without them the one gate
+     * whose result most needs checking resolves to nothing at all.
+     */
+    @Nullable
+    @WorkerThread
+    private static ApplicationInfo resolveApplicationInfo(@NonNull String packageName,
+                                                          @UserIdInt int userId) {
+        int flags = PackageManagerCompat.MATCH_UNINSTALLED_PACKAGES
+                | PackageManager.MATCH_DISABLED_COMPONENTS;
+        try {
+            return PackageManagerCompat.getApplicationInfo(packageName, flags, userId);
+        } catch (Throwable th) {
+            return null;
         }
     }
 }

@@ -1570,11 +1570,19 @@ public class MainViewModel extends AndroidViewModel implements ListOptions.ListO
                 // suspension came from a device-policy admin, from the shell, or
                 // from our own freeze-by-suspend.
                 item.isSuspendedApp = ApplicationInfoCompat.isSuspended(liveAi);
+                // Fork (白い熊, +034): and how deep — the highest gate standing, which
+                // is what the row's film, its snowflake and its badge are drawn from.
+                // Free here: it is the same ApplicationInfo, read with the match flags
+                // a hidden package needs.
+                item.freezeLevel = FreezeUtils.levelOf(liveAi);
                 liveLastUpdateTime = livePi.lastUpdateTime;
             } catch (Throwable e) {
                 // Not installed / not accessible — fall back to cached values
                 item.isFrozen = !app.isEnabled;
                 item.isSuspendedApp = false;
+                // Disabled is all the cache can tell us; claiming a deeper rung from
+                // a stale row would be an invention.
+                item.freezeLevel = item.isFrozen ? FreezeUtils.GATE_DISABLE : 0;
             }
             item.label = app.packageLabel;
             item.targetSdk = app.sdk;

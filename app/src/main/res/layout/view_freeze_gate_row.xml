@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fork (白い熊, +032): one gate of a freeze, as a numbered step.
+
+     Included four times inside the Freeze sub-box, so every id below is
+     duplicated. That is safe only because every lookup is scoped to the row's
+     own root (findViewById on the included LinearLayout, never on the card or
+     the fragment) — the same discipline view_policy_control_box.xml follows.
+     Keep it that way when adding a view here.
+
+     A step is a row rather than a box because the four of them are a LADDER:
+     they are applied in this order and read top to bottom, which a 2×2 grid of
+     boxes would destroy. -->
+<androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/freeze_gate_row"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:baselineAligned="false"
+    android:focusable="true"
+    android:orientation="horizontal"
+    android:paddingHorizontal="4dp"
+    android:paddingVertical="6dp">
+
+    <!-- The step number, in the row's own accent. It is the whole point of the
+         numbering that these are ordered, so it is drawn as loudly as the label. -->
+    <androidx.appcompat.widget.AppCompatTextView
+        android:id="@+id/freeze_gate_number"
+        android:layout_width="24dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:gravity="end"
+        android:textAppearance="?android:attr/textAppearanceListItem"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        tools:text="1." />
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:layout_marginStart="8dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/freeze_gate_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceListItem"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            tools:text="Force-stop" />
+
+        <!-- What this gate actually does. Every step carries one: the box exists
+             to be experimented with, and a switch whose effect you have to guess
+             is not something you can experiment with. -->
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/freeze_gate_note"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_snooping_chip"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textSize="12sp"
+            tools:text="Kills the app’s processes now and marks it stopped." />
+
+        <!-- Shown only when the gate cannot be operated on this phone, naming the
+             reason. Withholding the row entirely is the page's usual rule, but
+             here the four steps are also the explanation of what a freeze IS, and
+             a ladder with a rung silently missing explains nothing. -->
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/freeze_gate_unavailable"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_snooping_chip"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textSize="12sp"
+            android:visibility="gone"
+            tools:text="Not available: no delegation from 白い熊 雫."
+            tools:visibility="visible" />
+
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
+    <!-- wrap_content plus its own padding, as everywhere else on this page: the
+         switch is tinted in code and must not be filled edge to edge by the M3
+         track. -->
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/freeze_gate_toggle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:layout_marginStart="4dp"
+        android:layout_weight="0"
+        android:clickable="false"
+        android:focusable="false"
+        android:paddingHorizontal="7dp"
+        android:paddingVertical="6dp" />
+
+</androidx.appcompat.widget.LinearLayoutCompat>

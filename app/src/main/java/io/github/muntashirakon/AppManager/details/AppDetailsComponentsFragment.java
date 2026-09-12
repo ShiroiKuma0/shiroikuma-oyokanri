@@ -89,6 +89,13 @@ public class AppDetailsComponentsFragment extends AppDetailsFragment {
     private String mPackageName;
     private AppDetailsRecyclerAdapter mAdapter;
     private MenuItem mBlockingToggler;
+    /**
+     * Fork (白い熊, +034): whether this app's components may be modified — the answer
+     * only, cached, because asking is a privileged call and the menu is built on the
+     * main thread. Null until the worker answers.
+     */
+    @Nullable
+    private Boolean mCanModifyComponentStatesForMenu;
     private boolean mIsExternalApk;
     @ComponentProperty
     private int mNeededProperty;
@@ -139,11 +146,45 @@ public class AppDetailsComponentsFragment extends AppDetailsFragment {
 
     @Override
     public void onCreateMenu(@NonNull Menu menu, @NonNull MenuInflater menuInflater) {
-        if (viewModel != null && !viewModel.isExternalApk() && SelfPermissions.canModifyAppComponentStates(
-                viewModel.getUserId(), viewModel.getPackageName(), viewModel.isTestOnlyApp())) {
+        // Fork (白い熊, +034) — LANDMINE, the same one the 盗み見 tab hit in +033:
+        // canModifyAppComponentStates reaches Users.getSelfOrRemoteUid() →
+        // LocalServices.getAmService(), which is synchronized on the service
+        // connection. It costs nothing while the :am server is bound and blocks for
+        // the whole bind while it is not — and a bind is exactly what is in flight
+        // right after an install. On the main thread that is a black window and an
+        // ANR, and a menu is inflated on the main thread by definition.
+        //
+        // So the ANSWER is cached and the menu built from the cache. A menu callback
+        // cannot be deferred, so the first pass inflates the plain menu and the
+        // worker rebuilds it through invalidateOptionsMenu() if the fuller one was
+        // earned. That is one extra inflate in the case where it matters, against a
+        // ten-second freeze in the case where it does not.
+        if (Boolean.TRUE.equals(mCanModifyComponentStatesForMenu)) {
             menuInflater.inflate(R.menu.fragment_app_details_components_actions, menu);
             mBlockingToggler = menu.findItem(R.id.action_toggle_blocking);
-        } else menuInflater.inflate(R.menu.fragment_app_details_refresh_actions, menu);
+        } else {
+            mBlockingToggler = null;
+            menuInflater.inflate(R.menu.fragment_app_details_refresh_actions, menu);
+        }
+        if (mCanModifyComponentStatesForMenu != null || viewModel == null) {
+            return;
+        }
+        // Read the cheap getters here, on the thread that owns the view model.
+        boolean externalApk = viewModel.isExternalApk();
+        int userId = viewModel.getUserId();
+        String packageName = viewModel.getPackageName();
+        boolean testOnly = viewModel.isTestOnlyApp();
+        ThreadUtils.postOnBackgroundThread(() -> {
+            boolean canModify = !externalApk
+                    && SelfPermissions.canModifyAppComponentStates(userId, packageName, testOnly);
+            ThreadUtils.postOnMainThread(() -> {
+                if (isDetached()) return;
+                mCanModifyComponentStatesForMenu = canModify;
+                if (canModify && activity != null) {
+                    activity.invalidateOptionsMenu();
+                }
+            });
+        });
     }
 
     @Override

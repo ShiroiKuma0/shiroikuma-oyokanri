@@ -2464,7 +2464,7 @@
     <string name="snooping_legend_locking_2">Because the refusal is silent, an app that assumes a denied permission can simply be asked for again may fail, loop or crash rather than explain itself. If an app starts misbehaving right after you lock something, check its locks first.</string>
     <string name="snooping_legend_locking_3">A lock outlives this app: uninstalling \u767d\u3044\u718a \u5fdc\u7528\u7ba1\u7406 does not release it, and only \u767d\u3044\u718a \u96eb can clear it then \u2014 the \u201cClear all locks\u201d box on the card at the top of this page is there for exactly that.</string>
     <string name="snooping_legend_policy_boxes">The four boxes on that card are the device-policy powers themselves, and their switches name the capability rather than the lock \u2014 exactly as the rows below do. Flipped right and red means the phone is still open to this; flipped left and yellow, with a thick frame, means device policy has shut it. None of them asks for confirmation: what each one used to say in a dialog is now the box\u2019s own description, where it can be read before the tap instead of after it. Two of them \u2014 force-stop and accessibility \u2014 are held by \u767d\u3044\u718a \u96eb, which offers no way to read them back, so their switches show what we last applied rather than what the platform confirms.</string>
-    <string name="snooping_legend_policy_suspend">\u201cSuspend this app\u201d above them reads the other way round, because it is the one control on the card that improves your position instead of describing an exposure: grey and off is the state every phone ships in, and yellow and on means you have shut the app down harder than freezing would. Same yellow, and same meaning, as a capability you closed.</string>
+    <string name="snooping_legend_policy_suspend">The “Freeze” box above them reads the other way round, because freezing improves your position instead of describing an exposure. Its top switch is the strongest freeze there is — every step at once — and the four numbered steps under it are the gates that freeze is made of, each switchable on its own so you can find out which of them an outside app actually trips over. Each step has its own colour, a ladder from pale aqua at step 1 to violet at step 4, and the box wears the colour of the deepest step standing. The app’s row on the main list wears that same colour, and its snowflake carries that number in a circle — step 1 apart, which is only force-stopped and therefore not frozen at all, so the row stays ordinary and only the badge says so. A step this phone cannot operate says so in place of its explanation, and its switch does nothing.</string>
     <string name="snooping_legend_freeze_uninstall">Under it sit two pills \u2014 the ordinary verdicts on the whole app, and neither needs device policy at all. \u201cFreeze\u201d is the same freeze as the snowflake on the main list: grey while the app runs, yellow and reading \u201cUnfreeze\u201d once it is shut, and unfreezing lifts every freeze type at once, a suspension above included. \u201cUninstall\u201d is red because it is the one thing on this page that the control which did it cannot undo; it asks first. Both refuse an app in the \u5fc5\u8981 profile, and the \u201ci\u201d in each pill explains it in full.</string>
 
     <!-- Fork: device-policy (Device Owner) locks, delegated by 白い熊 雫. -->
@@ -2506,6 +2506,43 @@
     <string name="policy_freeze">Freeze this app</string>
     <string name="policy_freeze_note">The ordinary freeze, exactly as the snowflake on the main list applies it: disable, suspend or hide, whichever method this app is set to.</string>
     <string name="policy_freeze_summary">The pill reads “Unfreeze” while the app is frozen, and unfreezing lifts every freeze type at once — a suspension set above included. Nothing is removed: the app and its data stay on the phone. An app in the 必要 profile is refused.</string>
+
+    <!-- Fork (白い熊, +032): the Freeze sub-box on the Snooping page. -->
+    <string name="freeze_box_title">Freeze</string>
+    <string name="freeze_box_note">The strongest freeze there is: on applies every step below that this phone allows, shutting the app by every means available at once; off releases all four. There is no separate unfreeze — each step’s own switch releases just that step, so you can stop anywhere on the ladder. Don’t freeze what you need to operate the phone: your keyboard, your launcher, Settings.</string>
+    <string name="freeze_box_state_none">Nothing is in force. The app runs normally.</string>
+    <string name="freeze_box_state_some">In force: <xliff:g id="steps" example="2 and 3">%1$s</xliff:g> of 4.</string>
+    <string name="freeze_box_state_all">All four steps are in force.</string>
+    <string name="freeze_box_state_separator">, </string>
+    <string name="freeze_box_state_last_separator"> and </string>
+
+    <string name="freeze_gate_number"><xliff:g id="step" example="1">%1$d</xliff:g>.</string>
+    <string name="freeze_gate_force_stop">Force-stop</string>
+    <string name="freeze_gate_force_stop_note">Kills the app’s processes now and marks it stopped, which is what withholds implicit broadcasts from it afterwards. The mildest step, and the only one the app can undo by itself: anything that launches it clears the mark.</string>
+    <string name="freeze_gate_suspend">Suspend</string>
+    <string name="freeze_gate_suspend_note">The system refuses to open the app — a stub appears in its place — silences its notifications, and blocks even an explicit broadcast sent straight to it. Its components still resolve, so other apps can still see what it offers; they just cannot reach it.</string>
+    <string name="freeze_gate_disable">Disable</string>
+    <string name="freeze_gate_disable_note">The app’s components stop resolving: nothing on the phone can find its activities, services or providers. The package still reports as installed, and that is the whole difference from step 4.</string>
+    <string name="freeze_gate_hide">Hide</string>
+    <string name="freeze_gate_hide_note">Reported as not installed for this user. An app that asks whether this one is present is told no — so this is the step an outside app is most likely to trip over.</string>
+
+    <string name="freeze_gate_unavailable_privilege">Not available: 白い熊 応用管理 holds no privilege for this step right now.</string>
+    <string name="freeze_gate_unavailable_suspend">Not available: suspending needs SUSPEND_APPS, or the package-access delegation from 白い熊 雫.</string>
+    <string name="freeze_gate_unavailable_hide">Not available: hiding needs MANAGE_USERS, which this phone’s shell does not hold, or the package-access delegation from 白い熊 雫.</string>
+    <string name="freeze_gate_unavailable_sdk">Not available: this Android version has no app suspension.</string>
+    <string name="freeze_gate_failed">The platform did not change “<xliff:g id="step" example="Hide">%1$s</xliff:g>”.</string>
+    <string name="freeze_level_badge_description">Freeze level <xliff:g id="level" example="3">%1$d</xliff:g> of 4</string>
+
+    <!-- Fork (白い熊, +034): the freeze ladder's colours, settable like every other. -->
+    <string name="pref_color_cat_freeze_levels">Freeze levels</string>
+    <string name="pref_color_freeze_level_1">1 · Force-stopped (badge only)</string>
+    <string name="pref_color_freeze_level_2">2 · Suspended</string>
+    <string name="pref_color_freeze_level_3">3 · Disabled</string>
+    <string name="pref_color_freeze_level_4">4 · Hidden</string>
+    <string name="pref_color_cat_freeze_level_films">Freeze level row shading</string>
+    <string name="pref_color_film_level_2">2 · Suspended</string>
+    <string name="pref_color_film_level_3">3 · Disabled</string>
+    <string name="pref_color_film_level_4">4 · Hidden</string>
     <string name="policy_uninstall">Uninstall this app</string>
     <string name="policy_uninstall_note">Removes the app from this user. There is no way back from this page — you would have to install it again.</string>
     <string name="policy_uninstall_summary">It asks first, and the confirmation can keep the app’s data and signing signatures. A system app is only reverted to its factory version. An app in the 必要 profile is refused.</string>

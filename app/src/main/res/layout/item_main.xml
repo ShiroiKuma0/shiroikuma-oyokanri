@@ -74,6 +74,35 @@
                     tools:ignore="ContentDescription"
                     tools:tint="@color/theme_bright_yellow" />
 
+                <!-- Fork (白い熊, +034, moved beside the glyph +036): which gate is
+                     the deepest one standing, as a numbered ring the same size as
+                     the snowflake it sits next to. It began at the snowflake's
+                     corner and overlapped it, which cost the digit most of its
+                     size; beside it, at the glyph's own 26dp, it is simply
+                     legible.
+
+                     It fits because it can never share the line with the ✕: that
+                     one is shown only for a RUNNING app (installed, not frozen,
+                     not stopped — see MainRecyclerAdapter), which is precisely
+                     freeze level 0, and this badge appears only from level 1 up.
+
+                     The ring and both colours are built in code
+                     (FreezeLevelBadge), because the ramp is configurable like
+                     every other colour on this row. includeFontPadding off, or
+                     the digit sits high in its circle. -->
+                <androidx.appcompat.widget.AppCompatTextView
+                    android:id="@+id/freeze_level_badge"
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_marginStart="3dp"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:visibility="gone"
+                    tools:text="3"
+                    tools:visibility="visible" />
+
                 <Space
                     android:layout_width="0dp"
                     android:layout_height="1dp"

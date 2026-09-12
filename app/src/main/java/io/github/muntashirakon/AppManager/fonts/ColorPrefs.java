@@ -7,6 +7,7 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import io.github.muntashirakon.AppManager.R;
@@ -76,6 +77,40 @@ public final class ColorPrefs {
     public static final String FILM_FROZEN = "film_frozen";
     public static final String FILM_UNINSTALLED = "film_uninstalled";
     public static final String FILM_SUSPENDED = "film_suspended";
+
+    // ---- Fork (白い熊, +034): the freeze ladder, one colour per gate ----
+    // Indexed by the FreezeUtils gate number, so FREEZE_LEVEL[3] is the disable
+    // gate's colour. Step 1 has no film on purpose — an app that is only
+    // force-stopped is not frozen and its row must stay an ordinary row.
+    public static final String FREEZE_LEVEL_1 = "freeze_level_1";
+    public static final String FREEZE_LEVEL_2 = "freeze_level_2";
+    public static final String FREEZE_LEVEL_3 = "freeze_level_3";
+    public static final String FREEZE_LEVEL_4 = "freeze_level_4";
+    public static final String FILM_LEVEL_2 = "film_level_2";
+    public static final String FILM_LEVEL_3 = "film_level_3";
+    public static final String FILM_LEVEL_4 = "film_level_4";
+
+    /** The accent key for a gate number, 1-4. */
+    @NonNull
+    public static String freezeLevelKey(int level) {
+        switch (level) {
+            case 1: return FREEZE_LEVEL_1;
+            case 2: return FREEZE_LEVEL_2;
+            case 3: return FREEZE_LEVEL_3;
+            default: return FREEZE_LEVEL_4;
+        }
+    }
+
+    /** The film key for a gate number. Level 1 has none — see above. */
+    @Nullable
+    public static String freezeFilmKey(int level) {
+        switch (level) {
+            case 2: return FILM_LEVEL_2;
+            case 3: return FILM_LEVEL_3;
+            case 4: return FILM_LEVEL_4;
+            default: return null;
+        }
+    }
 
     // ---- colour-role keys (process monitor / reaper row state) ----
     public static final String MONITOR_KILLABLE = "monitor_killable";        // default yellow
@@ -237,6 +272,20 @@ public final class ColorPrefs {
                 return ContextCompat.getColor(ctx, R.color.theme_film_uninstalled);
             case FILM_SUSPENDED:
                 return ContextCompat.getColor(ctx, R.color.theme_film_suspended);
+            case FREEZE_LEVEL_1:
+                return ContextCompat.getColor(ctx, R.color.theme_freeze_1);
+            case FREEZE_LEVEL_2:
+                return ContextCompat.getColor(ctx, R.color.theme_freeze_2);
+            case FREEZE_LEVEL_3:
+                return ContextCompat.getColor(ctx, R.color.theme_freeze_3);
+            case FREEZE_LEVEL_4:
+                return ContextCompat.getColor(ctx, R.color.theme_freeze_4);
+            case FILM_LEVEL_2:
+                return ContextCompat.getColor(ctx, R.color.theme_film_freeze_2);
+            case FILM_LEVEL_3:
+                return ContextCompat.getColor(ctx, R.color.theme_film_freeze_3);
+            case FILM_LEVEL_4:
+                return ContextCompat.getColor(ctx, R.color.theme_film_freeze_4);
             case VERSION_NORMAL:
             case APPTYPE_NORMAL:
             case DATE_NORMAL:

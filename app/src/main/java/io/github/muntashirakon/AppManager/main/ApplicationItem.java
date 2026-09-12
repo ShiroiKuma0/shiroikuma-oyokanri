@@ -178,6 +178,17 @@ public class ApplicationItem extends PackageItemInfo implements IFilterableAppIn
      */
     public boolean isSuspendedApp;
     /**
+     * Fork (白い熊, +034): how deep the freeze goes — the <b>highest</b> freeze gate
+     * standing, 0 for none, 1-4 otherwise (see {@link FreezeUtils#levelOf}).
+     * <p>
+     * Filled from the same live query as {@link #isFrozen} and {@link
+     * #isSuspendedApp}, and read at bind time to pick the row's film, the
+     * snowflake's tint and the number in the badge. <b>Level 1 is not a freeze</b>:
+     * a merely force-stopped app has {@code isFrozen == false} and keeps an
+     * ordinary row — only its badge says anything.
+     */
+    public int freezeLevel;
+    /**
      * Whether the app is installed
      */
     public boolean isInstalled = true;
@@ -662,6 +673,11 @@ public class ApplicationItem extends PackageItemInfo implements IFilterableAppIn
         // freeze is left alone: which mechanism it used is not known here, and the
         // package-change path that follows resolves it properly.
         if (!frozen) isSuspendedApp = false;
+        // Fork (白い熊, +034): and the ladder. An unfreeze lifts every gate, so the
+        // badge must go at once; a freeze from a batch is assumed to be the whole
+        // ladder, which is what OP_ADVANCED_FREEZE's default method applies. Either
+        // way the package-change path that follows re-reads the real level.
+        freezeLevel = frozen ? FreezeUtils.GATE_HIDE : 0;
     }
 
     // Fork: cheaply mark this row installed in memory right after a batch

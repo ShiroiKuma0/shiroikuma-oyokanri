@@ -36,6 +36,8 @@ import io.github.muntashirakon.AppManager.db.dao.BatterySampleDao;
 import io.github.muntashirakon.AppManager.fonts.ColorPrefs;
 import io.github.muntashirakon.AppManager.fonts.RunningBoxPrefs;
 import io.github.muntashirakon.AppManager.main.ApplicationItem;
+import io.github.muntashirakon.AppManager.main.FreezeLevelBadge;
+import io.github.muntashirakon.AppManager.utils.FreezeUtils;
 import io.github.muntashirakon.AppManager.main.RowPills;
 import io.github.muntashirakon.AppManager.self.imagecache.ImageLoader;
 import io.github.muntashirakon.AppManager.utils.AppNotesManager;
@@ -257,10 +259,15 @@ public final class MainCardBinder {
         boolean system = item != null ? item.isSystem
                 : applicationInfo != null && (applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
 
-        cardView.setCardBackgroundColor(frozen
-                ? ColorPrefs.getColor(context, ColorPrefs.FILM_FROZEN,
-                ContextCompat.getColor(context, R.color.theme_film_frozen))
-                : Color.BLACK);
+        // Fork (白い熊, +034): the freeze ladder, exactly as the main list draws it —
+        // shared through FreezeLevelBadge rather than copied, so the two surfaces
+        // cannot drift by a shade. An ApplicationItem already carries the level; a
+        // battery row that has only an ApplicationInfo works it out from that.
+        int freezeLevel = item != null ? item.freezeLevel
+                : (applicationInfo != null ? FreezeUtils.levelOf(applicationInfo)
+                : (frozen ? FreezeUtils.GATE_DISABLE : 0));
+        int freezeFilm = FreezeLevelBadge.film(context, freezeLevel, Color.BLACK);
+        cardView.setCardBackgroundColor(freezeFilm);
         if (!frozen) {
             float boxDp = RunningBoxPrefs.getWidthDp(context);
             cardView.setRadius(RunningBoxPrefs.getRadiusDp(context) * density);
@@ -292,8 +299,10 @@ public final class MainCardBinder {
         freeze.setImageResource(frozen
                 ? R.drawable.ic_snowflake_24dp : R.drawable.ic_snowflake_outline_24dp);
         freeze.setImageTintList(ColorStateList.valueOf(frozen
-                ? ColorPrefs.getColor(context, ColorPrefs.FREEZE_FROZEN, iceBlue)
+                ? FreezeLevelBadge.accent(context, freezeLevel,
+                ColorPrefs.getColor(context, ColorPrefs.FREEZE_FROZEN, iceBlue))
                 : ColorPrefs.getColor(context, ColorPrefs.FREEZE_THAWED, yellow)));
+        FreezeLevelBadge.bind(card.findViewById(R.id.freeze_level_badge), freezeLevel);
         View iconColumn = card.findViewById(R.id.icon_column);
         iconColumn.setOnClickListener(onFreeze);
 

@@ -639,6 +639,26 @@ public final class PackageManagerCompat {
         }
     }
 
+    /**
+     * Fork (白い熊, +032): clear — or set — the <em>stopped</em> flag without launching
+     * the app.
+     * <p>
+     * A force-stop leaves the package {@code stopped=true}, which is what withholds
+     * implicit broadcasts from it afterwards, and the only ordinary way out of that
+     * state is for something to start the app. That makes force-stop the one gate of
+     * a freeze with no release — fine for the batch path, useless for a switch the
+     * user expects to work in both directions.
+     * <p>
+     * {@code IPackageManager#setPackageStoppedState} is the release, guarded by
+     * {@code CHANGE_COMPONENT_ENABLED_STATE}, which this phone's shell holds (measured
+     * 2026-09-10 alongside {@code SUSPEND_APPS} and {@code FORCE_STOP_PACKAGES}).
+     */
+    public static void setPackageStoppedState(String packageName, boolean stopped, @UserIdInt int userId)
+            throws RemoteException {
+        getPackageManager().setPackageStoppedState(packageName, stopped, userId);
+        BroadcastUtils.sendPackageAltered(ContextUtils.getContext(), new String[]{packageName});
+    }
+
     @NonNull
     public static IPackageInstaller getPackageInstaller() throws RemoteException {
         return IPackageInstaller.Stub.asInterface(new ProxyBinder(getPackageManager().getPackageInstaller().asBinder()));

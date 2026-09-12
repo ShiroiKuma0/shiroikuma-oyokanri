@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fork (白い熊, +032): the Freeze sub-box, nested inside the device-policy card
+     on the Snooping page.
+
+     It replaces two controls that stood side by side saying different things: a
+     "Suspend this app" row (one gate, named as though it were the whole story)
+     and a "Freeze" pill that opened a method picker (four gates at once, with
+     the method hidden behind a dialog). Neither could answer the question that
+     actually comes up — WHICH gate does an outside app trip over — because
+     neither let a single gate be moved on its own.
+
+     So: a master switch that does what the snowflake does, and the four gates
+     under it as numbered steps, each with its own switch and its own
+     explanation. No unfreeze button anywhere; the master switch going off IS
+     the unfreeze, and each step's switch going off releases just that step. -->
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    style="@style/Widget.AppTheme.CardView.ListItem.Outlined"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="12dp"
+    app:cardElevation="0dp">
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="8dp">
+
+        <!-- The master row. Its switch is the whole ladder at once, which is what
+             every other freeze in the app applies. -->
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:id="@+id/freeze_box_header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:baselineAligned="false"
+            android:focusable="true"
+            android:orientation="horizontal">
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/freeze_box_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:drawablePadding="8dp"
+                android:gravity="center_vertical"
+                android:textAppearance="?android:attr/textAppearanceListItem"
+                android:textStyle="bold"
+                tools:text="Freeze" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/freeze_box_toggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_marginStart="4dp"
+                android:layout_weight="0"
+                android:clickable="false"
+                android:focusable="false"
+                android:paddingHorizontal="7dp"
+                android:paddingVertical="6dp" />
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/freeze_box_note"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:background="@drawable/bg_snooping_chip"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textSize="12sp"
+            tools:text="On applies every step below that this phone allows; off releases all four." />
+
+        <!-- The summary of what is actually standing right now — "Steps 2 and 3
+             of 4" — because four switches read one by one is not a state you can
+             hold in your head, and this box exists to be experimented with. -->
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/freeze_box_state"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            tools:text="Steps 2 and 3 of 4 are in force." />
+
+        <View
+            android:id="@+id/freeze_box_divider"
+            android:layout_width="match_parent"
+            android:layout_height="1px"
+            android:layout_marginTop="8dp" />
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:id="@+id/freeze_box_steps"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:orientation="vertical">
+
+            <include
+                android:id="@+id/freeze_gate_1"
+                layout="@layout/view_freeze_gate_row" />
+
+            <include
+                android:id="@+id/freeze_gate_2"
+                layout="@layout/view_freeze_gate_row" />
+
+            <include
+                android:id="@+id/freeze_gate_3"
+                layout="@layout/view_freeze_gate_row" />
+
+            <include
+                android:id="@+id/freeze_gate_4"
+                layout="@layout/view_freeze_gate_row" />
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
+</com.google.android.material.card.MaterialCardView>

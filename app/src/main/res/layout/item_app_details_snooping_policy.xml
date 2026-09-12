@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Fork: the device-policy card pinned to the top of the Snooping tab. States
-     whether we hold Device Owner powers at all, and carries the hard freeze
-     (suspend) — the one control on this page that is not a capability but a
-     verdict on the whole app. -->
+     whether we hold Device Owner powers at all, and carries the controls that are
+     not capabilities but verdicts on the whole app: the Freeze sub-box (白い熊,
+     +032 — master switch plus the four gates as numbered steps) and uninstall. -->
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -39,78 +39,30 @@
             android:textSize="13sp"
             tools:text="Locks set here cannot be undone from Settings." />
 
-        <!-- The hard freeze. Its own row inside the card, because it is the one
-             thing here that acts on the whole app rather than one capability. -->
-        <androidx.appcompat.widget.LinearLayoutCompat
-            android:id="@+id/policy_suspend_row"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:orientation="horizontal">
+        <!-- Fork (白い熊, +032): freezing, as its own sub-box. It carries what used
+             to be the "Suspend this app" row and the "Freeze" pill, plus the two
+             gates that had no control at all. Unlike the boxes further down it is
+             NOT gated on a delegation: three of its four steps need only the
+             shell, and the box is also the page's explanation of what a freeze
+             does — which is worth reading on a phone with no Device Owner. -->
+        <!-- No layout_width/height here ON PURPOSE. LayoutInflater.parseInclude
+             takes the <include>'s own layout params whenever it can build them,
+             and falls back to the included root's only when that throws — which
+             is exactly what a missing layout_width does. Specifying them here
+             would therefore silently DROP the card's own layout_marginTop and
+             leave the box butted against the summary above it. -->
+        <include
+            android:id="@+id/policy_freeze_box"
+            layout="@layout/view_freeze_box" />
 
-            <androidx.appcompat.widget.LinearLayoutCompat
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center_vertical"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <androidx.appcompat.widget.AppCompatTextView
-                    android:id="@+id/policy_suspend_label"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:drawablePadding="6dp"
-                    android:gravity="center_vertical"
-                    android:textAppearance="?android:attr/textAppearanceListItem"
-                    tools:text="Suspend this app" />
-
-                <!-- Bold, directly under the row's own title: what this actually is.
-                     It is not a warning — suspension is released by this same
-                     switch — it is the one fact that distinguishes it from the
-                     freeze on the main list. -->
-                <androidx.appcompat.widget.AppCompatTextView
-                    android:id="@+id/policy_suspend_note"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:textAppearance="?attr/textAppearanceBodySmall"
-                    android:textSize="13sp"
-                    android:textStyle="bold"
-                    tools:text="A stronger freeze than hiding: the app cannot be opened at all." />
-
-                <androidx.appcompat.widget.AppCompatTextView
-                    android:id="@+id/policy_suspend_summary"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:background="@drawable/bg_snooping_chip"
-                    android:paddingHorizontal="8dp"
-                    android:paddingVertical="3dp"
-                    android:textAppearance="?attr/textAppearanceBodySmall"
-                    android:textSize="13sp"
-                    tools:text="Cannot be opened at all. Settings offers no way back." />
-
-            </androidx.appcompat.widget.LinearLayoutCompat>
-
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/policy_suspend_toggle"
-                android:layout_width="56dp"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:layout_weight="0"
-                android:clickable="false"
-                android:focusable="false" />
-
-        </androidx.appcompat.widget.LinearLayoutCompat>
-
-        <!-- Fork: the two ordinary verdicts on the whole app, under the hard one
-             (白い熊). Neither needs device policy — they are what the main list's
-             snowflake and the App info page already do — so unlike everything
-             else on this card they stay visible with no Device Owner in sight.
-             Pills rather than rows: they are actions, and three lines of prose
-             each pushed the capability list off the first screen. The account
-             they used to carry lives behind the "i", which is where an
-             explanation you read once belongs. -->
+        <!-- Fork: uninstall, the other verdict on the whole app (白い熊). It needs
+             no device policy — it is what the App info page already does — so
+             unlike everything else on this card it stays visible with no Device
+             Owner in sight. A pill rather than a row: it is an action, and three
+             lines of prose pushed the capability list off the first screen. The
+             account it used to carry lives behind the "i", which is where an
+             explanation you read once belongs. Freeze stood beside it until +032
+             and is now the sub-box above. -->
         <androidx.appcompat.widget.LinearLayoutCompat
             android:id="@+id/policy_app_actions"
             android:layout_width="match_parent"
@@ -119,58 +71,14 @@
             android:baselineAligned="false"
             android:orientation="horizontal">
 
-            <!-- Half the card each, so the two pills line up with the two columns
-                 the capability list breaks into when the phone is unfolded. The
-                 weights are why the missing one goes INVISIBLE rather than GONE
-                 below: a lone pill would otherwise stretch across the whole card. -->
-            <androidx.appcompat.widget.LinearLayoutCompat
-                android:id="@+id/policy_freeze_pill"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:orientation="horizontal"
-                android:paddingStart="10dp"
-                android:paddingEnd="6dp"
-                android:paddingVertical="6dp">
-
-                <androidx.appcompat.widget.AppCompatImageView
-                    android:id="@+id/policy_freeze_icon"
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
-                    android:layout_gravity="center_vertical"
-                    android:contentDescription="@null"
-                    android:src="@drawable/ic_snowflake" />
-
-                <androidx.appcompat.widget.AppCompatTextView
-                    android:id="@+id/policy_freeze_label"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center_vertical"
-                    android:layout_marginStart="8dp"
-                    android:textAppearance="?attr/textAppearanceBodyMedium"
-                    tools:text="Freeze" />
-
-                <!-- The explanation, one tap away. Its own hit target, so tapping
-                     the pill still does the thing the pill names. -->
-                <androidx.appcompat.widget.AppCompatImageView
-                    android:id="@+id/policy_freeze_info"
-                    android:layout_width="30dp"
-                    android:layout_height="30dp"
-                    android:layout_gravity="center_vertical"
-                    android:layout_marginStart="4dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/policy_freeze"
-                    android:padding="5dp"
-                    android:src="@drawable/ic_information_circle" />
-
-            </androidx.appcompat.widget.LinearLayoutCompat>
-
+            <!-- Half the card, so the pill lines up with the left of the two
+                 columns the capability list breaks into when the phone is
+                 unfolded. The weight is why it goes INVISIBLE rather than GONE
+                 below: GONE would let the spacer take the whole row. -->
             <androidx.appcompat.widget.LinearLayoutCompat
                 android:id="@+id/policy_uninstall_pill"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
                 android:layout_weight="1"
                 android:gravity="center"
                 android:orientation="horizontal"
@@ -207,6 +115,15 @@
                     android:src="@drawable/ic_information_circle" />
 
             </androidx.appcompat.widget.LinearLayoutCompat>
+
+            <!-- Uninstall is alone here since freezing moved into its own box, but
+                 it keeps half the card: the pill lines up with the left column of
+                 the boxes below and of the capability list, and a lone pill
+                 stretched across the whole width reads as a banner. -->
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 
