@@ -19,6 +19,7 @@ import org.lsposed.hiddenapibypass.HiddenApiBypass;
 import java.security.Security;
 
 import dalvik.system.ZipPathValidator;
+import io.github.muntashirakon.AppManager.main.AppPanePrefs;
 import io.github.muntashirakon.AppManager.main.LastScreenPrefs;
 import io.github.muntashirakon.AppManager.misc.AMExceptionHandler;
 import io.github.muntashirakon.AppManager.compat.ProcessCompat;
@@ -51,6 +52,10 @@ public class AppManager extends Application {
         // changed default never reaches an existing install on its own.
         Prefs.Blocking.migrateDefaultFreezingMethod();
         Prefs.Blocking.migrateDefaultFreezingMethodToTotal();
+        // Fork (白い熊, +038): same trap one layer up — a key added to the pane's visible set is
+        // inert on an install whose pane has already been edited.
+        AppPanePrefs.migrateClearDataVisible(this);
+        AppPanePrefs.migrateFreezeLevelPills(this);
         // Fork: a Shizuku server pushes its binder whenever it likes, including while no activity of
         // ours exists, so the listeners that notice a lost/returned server have to be registered for
         // the life of the process rather than by a screen.

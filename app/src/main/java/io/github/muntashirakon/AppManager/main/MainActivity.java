@@ -1515,15 +1515,20 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                     .setNegativeButton(R.string.cancel, null)
                     .setNeutralButton(R.string.unblock, (dialog, which) ->
                             handleBatchOp(BatchOpsManager.OP_UNBLOCK_TRACKERS)));
-        } else if (id == R.id.action_clear_data_cache) {
-            ForkDialog.present(ForkDialog.builder(this)
-                    .setTitle(R.string.clear)
-                    .setMessage(R.string.choose_what_to_do)
-                    .setPositiveButton(R.string.clear_cache, (dialog, which) ->
-                            handleBatchOp(BatchOpsManager.OP_CLEAR_CACHE))
-                    .setNegativeButton(R.string.cancel, null)
-                    .setNeutralButton(R.string.clear_data, (dialog, which) ->
-                            handleBatchOp(BatchOpsManager.OP_CLEAR_DATA)));
+        } else if (id == R.id.action_clear_data) {
+            // Fork (白い熊, +038): was "Clear", a pill that opened a dialog asking data or cache —
+            // two taps to reach the one of the two that is ever wanted here. Erasing an app's data
+            // is not undoable, so it keeps the same listing confirmation an uninstall gets.
+            confirmBatchOp(R.plurals.confirm_clear_data_count, R.string.clear_data, true,
+                    () -> handleBatchOp(BatchOpsManager.OP_CLEAR_DATA));
+        } else if (id == R.id.action_freeze_level_1) {
+            confirmFreezeLevel(BatchOpsManager.OP_FREEZE_LEVEL_1, R.string.freeze_level_1);
+        } else if (id == R.id.action_freeze_level_2) {
+            confirmFreezeLevel(BatchOpsManager.OP_FREEZE_LEVEL_2, R.string.freeze_level_2);
+        } else if (id == R.id.action_freeze_level_3) {
+            confirmFreezeLevel(BatchOpsManager.OP_FREEZE_LEVEL_3, R.string.freeze_level_3);
+        } else if (id == R.id.action_freeze_level_4) {
+            confirmFreezeLevel(BatchOpsManager.OP_FREEZE_LEVEL_4, R.string.freeze_level_4);
         } else if (id == R.id.action_freeze_unfreeze) {
             warnIfSelectionHasProtectedApps();
             int freezeType = Prefs.Blocking.getDefaultFreezingMethod();
@@ -1992,6 +1997,23 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
     // are refused at the freeze/uninstall chokepoints, so the rest of the
     // batch still proceeds. Computed off the main thread because it reads the
     // profiles from disk.
+    /**
+     * Fork (白い熊, +038): one rung of the freeze ladder, applied to the whole selection.
+     *
+     * <p>Unlike the freeze pill this raises no method picker and consults no remembered method:
+     * the rung <i>is</i> the instruction, which is the point of it — the workflow 白い熊 asked for
+     * is a profile per depth, filter to the profile, select all, tap the rung, and a per-app
+     * remembered method would quietly make two rows in that selection land differently.
+     *
+     * <p>It is still a confirmation rather than a bare tap, because the selection here is
+     * typically "everything that matched a filter" and that is exactly when a miscount hurts.
+     */
+    private void confirmFreezeLevel(@BatchOpsManager.OpType int op, @StringRes int okLabelRes) {
+        warnIfSelectionHasProtectedApps();
+        confirmBatchOp(R.plurals.confirm_freeze_level_count, okLabelRes, false,
+                () -> handleBatchOp(op));
+    }
+
     private void warnIfSelectionHasProtectedApps() {
         Map<String, ApplicationItem> selected = new LinkedHashMap<>(viewModel.getSelectedPackages());
         if (selected.isEmpty()) {
@@ -2037,6 +2059,21 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         fragment.setOnActionCompleteListener((mode, failedPackages) -> showProgressIndicator(false));
         fragment.show(getSupportFragmentManager(), BackupRestoreDialogFragment.TAG);
         clearSelection();
+    }
+
+    /**
+     * Fork (白い熊, +038): run a batch op over exactly one package, for the row's own pane.
+     *
+     * <p>Deliberately the same road as the selection pane's — the foreground service, the progress
+     * page, the operation log — rather than a direct platform call in the adapter. One app is a
+     * batch of one; what it must not be is a second implementation that can disagree with the
+     * first about protection, progress or what counts as a failure.
+     */
+    void runSingleAppOp(@BatchOpsManager.OpType int op, @NonNull String packageName, int userId) {
+        BatchQueueItem item = BatchQueueItem.getBatchOpQueue(op,
+                new ArrayList<>(Collections.singletonList(packageName)),
+                new ArrayList<>(Collections.singletonList(userId)), null);
+        ContextCompat.startForegroundService(this, BatchOpsService.getServiceIntent(this, item));
     }
 
     private void handleBatchOp(@BatchOpsManager.OpType int op) {

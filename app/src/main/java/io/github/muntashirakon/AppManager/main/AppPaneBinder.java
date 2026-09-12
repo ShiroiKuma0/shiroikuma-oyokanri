@@ -75,7 +75,8 @@ public final class AppPaneBinder {
             if (title == null) {
                 continue;
             }
-            TextView pill = RowPills.actionPill(context, title, AppPanePrefs.iconForKey(key), ink, false);
+            TextView pill = RowPills.actionPill(context, title, AppPanePrefs.iconForKey(key), ink,
+                    isLit(key, item));
             pill.setOnClickListener(v -> host.onPaneAction(key, item));
             flow.addView(pill);
             placed.add(key);
@@ -103,6 +104,27 @@ public final class AppPaneBinder {
     }
 
     /**
+     * Fork (白い熊, +039): the rung this app is standing on is drawn <b>filled</b>.
+     *
+     * <p>The same rule as {@link #labelFor}'s Freeze/Unfreeze swap, which this replaced: four
+     * rungs that said nothing about where the app already sits would be less than the one pill
+     * they stand in for. It is also the shelf's own language — the lit pill is both the way in
+     * and the way out, and tapping it releases to rung zero.
+     *
+     * <p>{@code freezeLevel} is the number the row's badge shows, so the pill and the badge can
+     * never disagree.
+     */
+    private static boolean isLit(@NonNull String key, @NonNull ApplicationItem item) {
+        switch (key) {
+            case "freeze_level_1": return item.freezeLevel == 1;
+            case "freeze_level_2": return item.freezeLevel == 2;
+            case "freeze_level_3": return item.freezeLevel == 3;
+            case "freeze_level_4": return item.freezeLevel == 4;
+            default: return false;
+        }
+    }
+
+    /**
      * The freeze pill says which way it will go, and the note pill says whether there is one —
      * a pill that reads "Freeze" on an already-frozen app is worse than no pill.
      */
@@ -119,6 +141,12 @@ public final class AppPaneBinder {
                         ? context.getString(R.string.launch_app) : null;
             case "force_stop":
                 return item.isInstalled ? context.getString(R.string.force_stop) : null;
+            case "freeze_level_1":
+            case "freeze_level_2":
+            case "freeze_level_3":
+            case "freeze_level_4":
+                // A rung means nothing for an app that is not installed for this user.
+                return item.isInstalled ? context.getString(AppPanePrefs.titleForKey(key)) : null;
             case "uninstall":
             case "clear_data":
             case "clear_cache":

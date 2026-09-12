@@ -103,6 +103,10 @@ public class BatchOpsManager {
             OP_GRANT_PERMISSIONS,
             OP_IMPORT_BACKUPS,
             OP_INSTALL_EXISTING,
+            OP_FREEZE_LEVEL_1,
+            OP_FREEZE_LEVEL_2,
+            OP_FREEZE_LEVEL_3,
+            OP_FREEZE_LEVEL_4,
             OP_NET_POLICY,
             OP_REVOKE_PERMISSIONS,
             OP_RESTORE_BACKUP,
@@ -142,6 +146,13 @@ public class BatchOpsManager {
     public static final int OP_ADVANCED_FREEZE = 22;
     // Fork: reinstall (install-existing) for uninstalled system apps, as a batch op.
     public static final int OP_INSTALL_EXISTING = 23;
+    // Fork (白い熊, +038): bring every selected app to exactly one rung of the freeze ladder.
+    // Four ops rather than one carrying a level, so the notification, the operation bar and the
+    // history all say WHICH level was applied — none of those is handed the options object.
+    public static final int OP_FREEZE_LEVEL_1 = 24;
+    public static final int OP_FREEZE_LEVEL_2 = 25;
+    public static final int OP_FREEZE_LEVEL_3 = 26;
+    public static final int OP_FREEZE_LEVEL_4 = 27;
 
     private static final String GROUP_ID = BuildConfig.APPLICATION_ID + ".notification_group.BATCH_OPS";
 
@@ -273,6 +284,14 @@ public class BatchOpsManager {
                 return opUninstall(info);
             case OP_INSTALL_EXISTING:
                 return opInstallExisting(info);
+            case OP_FREEZE_LEVEL_1:
+                return opFreezeLevel(info, FreezeUtils.GATE_FORCE_STOP);
+            case OP_FREEZE_LEVEL_2:
+                return opFreezeLevel(info, FreezeUtils.GATE_SUSPEND);
+            case OP_FREEZE_LEVEL_3:
+                return opFreezeLevel(info, FreezeUtils.GATE_DISABLE);
+            case OP_FREEZE_LEVEL_4:
+                return opFreezeLevel(info, FreezeUtils.GATE_HIDE);
             case OP_UNBLOCK_TRACKERS:
                 return opUnblockTrackers(info);
             case OP_BLOCK_COMPONENTS:
@@ -667,6 +686,33 @@ public class BatchOpsManager {
                 }
             } catch (Throwable e) {
                 log("====> op=APP_FREEZE, pkg=" + pair + ", freeze = " + freeze, e);
+                failedPackages.add(pair);
+            }
+        }
+        return new Result(failedPackages);
+    }
+
+    /**
+     * Fork (白い熊, +038): every selected app to exactly {@code level}.
+     * <p>
+     * The whole walk lives in {@link FreezeUtils#setLevel}, which is also what the 盗み見 page's
+     * gate switches drive — a second copy of the release-then-apply ordering here is exactly how
+     * the two would drift apart. A package that cannot be brought to the level throws and is
+     * counted as failed, so the batch reports it rather than claiming a freeze that did not land.
+     */
+    @NonNull
+    private Result opFreezeLevel(@NonNull BatchOpsInfo info, @FreezeUtils.FreezeGate int level) {
+        List<UserPackagePair> failedPackages = new ArrayList<>();
+        float lastProgress = mProgressHandler != null ? mProgressHandler.getLastProgress() : 0;
+        int max = info.size();
+        UserPackagePair pair;
+        for (int i = 0; i < max; ++i) {
+            pair = info.getPair(i);
+            updateProgress(lastProgress, i + 1, pair.getPackageName(), pair.getUserId());
+            try {
+                FreezeUtils.setLevel(pair.getPackageName(), pair.getUserId(), level);
+            } catch (Throwable e) {
+                log("====> op=FREEZE_LEVEL, pkg=" + pair + ", level = " + level, e);
                 failedPackages.add(pair);
             }
         }
