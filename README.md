@@ -18,15 +18,15 @@ root** through a contract the sister apps implement — and which this app now i
 **lenses** re-dress the app list itself, a **sort menu** of its own,
 **per-app backup and restore tables**, the ability to **hand a backup to another device**,
 **device-policy locks** that
-Settings cannot undo, a **freeze that closes every gate the phone allows** rather than one, a configurable
+Settings cannot undo, a **freeze whose four gates are four switches**, each operable on its own and shown on every row, a configurable
 **yellow-on-black UI** with a deep customization page, a hard-blocking **protected profile**, a
 from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-tap **main-list quick
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.1+2026-09-05.03-37.g41d79af5+031`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.1+2026-09-05.03-37.g41d79af5+037`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
-<sub>Version reads as **upstream `4.1.1`**, rebased onto upstream commit **`41d79af5` of 2026-09-05 03:37 UTC**, fork build **030**.</sub>
+<sub>Version reads as **upstream `4.1.1`**, rebased onto upstream commit **`41d79af5` of 2026-09-05 03:37 UTC**, fork build **037**.</sub>
 
 </div>
 
@@ -221,7 +221,7 @@ Changes apply live the moment you leave the screen, and a reference **legend** e
 colour and style means. A four-state main list — installed, frozen (snowflake + cool film), stopped,
 uninstalled (dimmed + mauve film) — reads at a glance, with type-coloured italic labels.
 
-## 🧊 A freeze that closes every gate
+## 🧊 A freeze that closes every gate — and four switches to choose how many
 
 Stock freezes an app one way and stops there. This one applies **every gate the phone allows, at
 once** — force-stop, suspend, disable, hide — because each closes a different hole, and measurement
@@ -246,6 +246,36 @@ still get a row.
 
 One honest limit: these gates stop an app being *started*. A **persistent system app** that the OS
 brought up at boot keeps running through all four, and the app does not pretend otherwise.
+
+### Each gate is its own switch
+
+All four at once is right for a snowflake and wrong for a question that comes up constantly: *which*
+gate does some other app trip over? Android Auto, for instance, refuses to run against a totally
+frozen Google Maps and runs perfectly against the same Maps carrying only the disable gate — because
+disabling leaves the package **installed** while hiding reports it as gone, and Auto's check for Maps
+is a check that it exists.
+
+So the app's 盗み見 page carries a **Freeze box**: a master switch that applies or releases the whole
+ladder, and the four gates beneath it as numbered steps, each with its own switch and its own plain
+account of what it does. A step this phone cannot operate keeps its number, its name and its
+explanation and loses only its switch — the ladder is also the explanation of what a freeze *is*, and
+one with a rung silently missing explains nothing.
+
+Each write is **measured, not assumed**: the platform is re-read afterwards and the switch moves only
+if it actually moved, because several of these APIs accept a write and quietly discard it. Step 1
+needed a release that did not previously exist anywhere — a force-stop leaves the app *stopped* with
+no ordinary way back but launching it — so the app clears that flag directly.
+
+### The row says how deep it goes
+
+Every rung has a colour, a ladder from the fork's yellow at step 1 through cornflower and orchid to
+magenta-violet at step 4. An app's row on the main list is **shaded in the deepest rung standing**,
+its snowflake takes the same colour, and that number sits in a ring beside the snowflake — so *how
+hard is this app shut* is legible without opening anything. Every colour is settable.
+
+Step 1 is deliberately not treated as a freeze: an app that is only force-stopped resumes the moment
+anything opens it, so its row stays an ordinary row and only the badge reports it. That badge is
+worth having on its own — force-stopped is otherwise an invisible state.
 
 ---
 
