@@ -22,8 +22,10 @@ import dalvik.system.ZipPathValidator;
 import io.github.muntashirakon.AppManager.main.AppPanePrefs;
 import io.github.muntashirakon.AppManager.main.LastScreenPrefs;
 import io.github.muntashirakon.AppManager.misc.AMExceptionHandler;
+import io.github.muntashirakon.AppManager.settings.FeatureController;
 import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.settings.PrivilegeWatchdog;
+import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 import io.github.muntashirakon.AppManager.utils.Utils;
 import io.github.muntashirakon.AppManager.utils.appearance.AppearanceUtils;
 
@@ -61,6 +63,11 @@ public class AppManager extends Application {
         // Fork (白い熊, +146): remember which screen is on top, so the launcher can return to it
         // even after EMUI has dropped the task. One recorder for every screen at once.
         LastScreenPrefs.install(this);
+        // Fork (白い熊): a feature's flag travels in a settings export, its component's enabled state
+        // does not — so an import onto a fresh install leaves the flag off and the manifest entry on,
+        // and a switched-off Interceptor keeps answering every http/https link. Re-assert the disables
+        // the flags already record (never an enable). Off the main thread: these are binder calls.
+        ThreadUtils.postOnBackgroundThread(FeatureController::reassertDisabledComponents);
         Security.removeProvider(BouncyCastleProvider.PROVIDER_NAME);
         Security.addProvider(new JavaKeyStoreProvider());
         Security.addProvider(new BouncyCastleProvider());

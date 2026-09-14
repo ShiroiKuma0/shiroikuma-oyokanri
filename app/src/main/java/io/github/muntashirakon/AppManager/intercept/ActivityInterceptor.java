@@ -81,7 +81,15 @@ import io.github.muntashirakon.widget.MaterialAutoCompleteTextView;
 // Copyright 2012 Intrications
 public class ActivityInterceptor extends BaseActivity {
     public static final String TAG = ActivityInterceptor.class.getSimpleName();
-    public static final String ALIAS_BROWSER = BuildConfig.APPLICATION_ID + ".intercept.BrowserInterceptor";
+    // Fork: the alias must be named after the Java NAMESPACE, never the applicationId. AGP expands a
+    // relative <activity-alias android:name=".intercept.BrowserInterceptor"> against `namespace`
+    // (io.github.muntashirakon.AppManager), while BuildConfig.APPLICATION_ID is shiroikuma.oyokanri.
+    // Upstream those two strings are identical; here they are not, so the computed name pointed at a
+    // component that does not exist and PackageManagerService threw IllegalArgumentException (targetSdk
+    // >= P) out of FeatureController.modifyState -- before it could persist the flag. Net effect: the
+    // Interceptor could never be switched off and kept answering http/https in the system chooser.
+    // Spelled out like the sibling constants AppDetailsActivity.ALIAS_APP_INFO / CodeEditorActivity.ALIAS_EDITOR.
+    public static final String ALIAS_BROWSER = "io.github.muntashirakon.AppManager.intercept.BrowserInterceptor";
 
     public static final String EXTRA_PACKAGE_NAME = BuildConfig.APPLICATION_ID + ".intent.extra.PACKAGE_NAME";
     public static final String EXTRA_CLASS_NAME = BuildConfig.APPLICATION_ID + ".intent.extra.CLASS_NAME";

@@ -10,6 +10,7 @@ import android.content.pm.PackageManager;
 import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.WorkerThread;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.collection.SparseArrayCompat;
 
@@ -26,6 +27,7 @@ import io.github.muntashirakon.AppManager.details.manifest.ManifestViewerActivit
 import io.github.muntashirakon.AppManager.editor.CodeEditorActivity;
 import io.github.muntashirakon.AppManager.intercept.ActivityInterceptor;
 import io.github.muntashirakon.AppManager.logcat.LogViewerActivity;
+import io.github.muntashirakon.AppManager.logs.Log;
 import io.github.muntashirakon.AppManager.scanner.ScannerActivity;
 import io.github.muntashirakon.AppManager.self.SelfPermissions;
 import io.github.muntashirakon.AppManager.terminal.TermActivity;
@@ -34,6 +36,8 @@ import io.github.muntashirakon.AppManager.utils.ContextUtils;
 import io.github.muntashirakon.AppManager.viewer.ExplorerActivity;
 
 public class FeatureController {
+    public static final String TAG = FeatureController.class.getSimpleName();
+
     @IntDef(flag = true, value = {
             FEAT_INTERCEPTOR,
             FEAT_MANIFEST,
@@ -164,20 +168,7 @@ public class FeatureController {
     }
 
     private boolean isEnabled(@FeatureFlags int key) {
-        ComponentName cn;
         switch (key) {
-            case FEAT_INSTALLER:
-                cn = getComponentName(key, PackageInstallerActivity.class);
-                break;
-            case FEAT_INTERCEPTOR:
-                cn = getComponentName(key, ActivityInterceptor.class);
-                break;
-            case FEAT_MANIFEST:
-                cn = getComponentName(key, ManifestViewerActivity.class);
-                break;
-            case FEAT_SCANNER:
-                cn = getComponentName(key, ScannerActivity.class);
-                break;
             case FEAT_USAGE_ACCESS:
                 // Only depends on flag
                 return (mFlags & key) != 0;
@@ -185,25 +176,78 @@ public class FeatureController {
                 return (mFlags & key) != 0 && isEnabled(FEAT_INTERNET);
             case FEAT_INTERNET:
                 return (mFlags & key) != 0 && SelfPermissions.checkSelfPermission(Manifest.permission.INTERNET);
+        }
+        return isComponentEnabled(componentFor(key)) && (mFlags & key) != 0;
+    }
+
+    // Fork (白い熊): the primary component behind a feature, or null for the three that are flag-only
+    // (usage access, internet, VirusTotal). Extracted from isEnabled() so reassertDisabledComponents()
+    // can ask the same question without going through the flag.
+    @Nullable
+    private ComponentName componentFor(@FeatureFlags int key) {
+        switch (key) {
+            case FEAT_INSTALLER:
+                return getComponentName(key, PackageInstallerActivity.class);
+            case FEAT_INTERCEPTOR:
+                return getComponentName(key, ActivityInterceptor.class);
+            case FEAT_MANIFEST:
+                return getComponentName(key, ManifestViewerActivity.class);
+            case FEAT_SCANNER:
+                return getComponentName(key, ScannerActivity.class);
             case FEAT_LOG_VIEWER:
-                cn = getComponentName(key, LogViewerActivity.class);
-                break;
+                return getComponentName(key, LogViewerActivity.class);
             case FEAT_APP_EXPLORER:
-                cn = getComponentName(key, ExplorerActivity.class);
-                break;
+                return getComponentName(key, ExplorerActivity.class);
             case FEAT_APP_INFO:
-                cn = getComponentName(key, AppDetailsActivity.ALIAS_APP_INFO);
-                break;
+                return getComponentName(key, AppDetailsActivity.ALIAS_APP_INFO);
             case FEAT_CODE_EDITOR:
-                cn = getComponentName(key, CodeEditorActivity.ALIAS_EDITOR);
-                break;
+                return getComponentName(key, CodeEditorActivity.ALIAS_EDITOR);
             case FEAT_TERMINAL:
-                cn = getComponentName(key, TermActivity.class);
-                break;
+                return getComponentName(key, TermActivity.class);
+            case FEAT_USAGE_ACCESS:
+            case FEAT_INTERNET:
+            case FEAT_VIRUS_TOTAL:
+                return null;
             default:
                 throw new IllegalArgumentException();
         }
-        return isComponentEnabled(cn) && (mFlags & key) != 0;
+    }
+
+    /**
+     * Fork (白い熊): re-assert the component DISABLES the stored flags already record, and nothing else.
+     * <p>
+     * A feature is two pieces of state: the flag in {@code PREF_ENABLED_FEATURES_INT}, which lives in
+     * {@code shared_prefs/} and therefore travels in a settings export, and the component's enabled
+     * state, which lives in {@code system_server} and does not travel at all. Import a backup onto a
+     * fresh install — the migration kit's whole purpose — and the flag arrives switched off while the
+     * component comes up enabled. The feature then vanishes from our own UI (isEnabled() ANDs the two)
+     * while the manifest entry keeps answering the system: a switched-off Interceptor still offered for
+     * every http/https link. The applicationId rename did this to every install on its own.
+     * <p>
+     * Strictly one-directional: a flag that says <i>enabled</i> never re-enables a component, because a
+     * component disabled by some other route was disabled deliberately and is not ours to undo. Each
+     * feature is guarded separately so a name that does not resolve can never take the process down —
+     * exactly what ALIAS_BROWSER did before it was corrected to the namespace.
+     */
+    @WorkerThread
+    public static void reassertDisabledComponents() {
+        FeatureController fc = getInstance();
+        for (int key : featureFlags) {
+            if ((fc.mFlags & key) != 0) {
+                // The flag says this feature is on; leave the component alone.
+                continue;
+            }
+            try {
+                ComponentName cn = fc.componentFor(key);
+                if (cn == null || !fc.isComponentEnabled(cn)) {
+                    continue;
+                }
+                Log.i(TAG, "Re-asserting disabled feature %d (%s)", key, cn.getClassName());
+                fc.modifyState(key, false);
+            } catch (Throwable th) {
+                Log.w(TAG, "Could not re-assert feature %d", th, key);
+            }
+        }
     }
 
     public void modifyState(@FeatureFlags int key, boolean enabled) {
