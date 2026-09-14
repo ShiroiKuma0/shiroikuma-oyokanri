@@ -10,6 +10,53 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-09-05.03-37.g41d79af5+043 — 2026-09-14
+
+Settings → Appearance → *Enable/disable features* has a tick for the **Interceptor**. Switching it
+off hid the Interceptor from this app — and the system carried on offering 白い熊 応用管理 for every
+`http`/`https` link it was asked to open. Two separate causes sat behind that, and neither was
+visible from the switch.
+
+The first is a hazard this fork carries everywhere and had not met until now: the app's Java package
+is still upstream's (`io.github.muntashirakon.AppManager`) while the installed id is
+`shiroikuma.oyokanri`, and a **relative component name in the manifest is expanded against the
+package, never against the id**. Upstream those two strings are the same, so upstream code may build
+a component name out of the application id and be perfectly correct; here that names something that
+does not exist, and Android answers a nonexistent component with an **exception** rather than a
+shrug — which killed the switch half-way through, after it had disabled one component and before it
+could save anything.
+
+The second is quieter and outlives the first. A feature is two pieces of state: a preference, which
+travels in a settings export, and the component's enabled state, which lives in the system and
+travels nowhere. Restore a backup onto a clean phone — the exact thing the migration kit exists for —
+and the preference arrives switched off while the component comes up switched on. The feature then
+vanishes from this app's own screens while its manifest entry keeps answering the rest of the phone.
+The rename from `shiroikuma.appmanager` to `shiroikuma.oyokanri` did this to every install at once,
+a renamed id being a fresh install as far as Android is concerned. (Built on upstream App Manager
+`4.1.1`, commit `41d79af5` of 2026-09-05 03:37 UTC.)
+
+### 🔌 Switching a feature off now switches it off
+
+- **The Interceptor can be disabled.** Unticking it in *Enable/disable features* now removes both its
+  activity and its browser alias, so it leaves the system's open-with dialog for good instead of
+  only disappearing from this app.
+- **The switch completes and is remembered.** It used to abort on a component name that does not
+  exist in this fork, which meant the preference was never written either — so the choice could not
+  even be made, let alone kept. Ticking it back on works the same way.
+- The two sibling features that share this shape — *App info* and *Code editor* — were always
+  spelled correctly and were never affected.
+
+### 🔄 A restored phone matches its own settings
+
+- **Feature switches are re-asserted at startup.** Every feature recorded as *off* has its component
+  disabled again if the phone says otherwise, so an imported backup, or an install that arrived
+  under a new application id, comes up behaving the way its settings claim.
+- **Only in one direction.** A feature recorded as *on* never re-enables a component that something
+  else disabled — that was somebody's deliberate decision and is not this app's to undo.
+- **Each feature is guarded on its own**, so a component name that fails to resolve can never take
+  the app down with it — which is precisely what went wrong above.
+- It runs off the main thread, since every one of these is a call into the package manager.
+
 ## 4.1.1+2026-09-05.03-37.g41d79af5+042 — 2026-09-12
 
 The four gates became four switches last release, which answered *which gate does this app trip
