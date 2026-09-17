@@ -781,6 +781,45 @@ class RestoreOp implements Closeable {
         if (!dataDirectoryInfo.isExternal()) {
             Runner.runCommand(new String[]{"restorecon", "-R", dataSourceFile.getFilePath()});
         }
+        // Fork (白い熊): make restored EXTERNAL data readable by the app it belongs to.
+        //
+        // The comment above assumes /storage/emulated/0/Android/{data,obb,media} is the
+        // FUSE/sdcardfs view, where uid, gid and mode are SYNTHESISED from the path and nothing we
+        // write there can matter. On the Mate XT that is FALSE for Android/data: it is a REAL f2fs
+        // mount of its own (/dev/block/sdd88 on both /mnt/user/0/emulated/0/Android/data and
+        // /storage/emulated/0/Android/data), so the extracted entries keep the ARCHIVE's own modes
+        // -- 0700 directories and 0600 files, because that tree was backed up from the app's
+        // internal data -- under shell:shell. The app (u0_aNNN, group ext_data_rw) cannot then even
+        // traverse its own external files dir: File.listFiles() answers null and the app crashes on
+        // launch. Measured 2026-09-17 on the phone; `chmod -R a+rwX` over the restored tree fixed a
+        // crashing app on the spot.
+        //
+        // chown is NOT the fix and the skip above stays: it is EPERM for the shell on this mount.
+        // Nor is it needed -- a file the shell creates there lands as shell:ext_data_rw 0660 and the
+        // app reads it happily. Only the preserved restrictive modes break it, so widen those:
+        // a+rwX, capital X so a directory becomes traversable while a data file is never made
+        // executable.
+        //
+        // Best-effort by design. The top-level <pkg> directory is owned by the app and refuses
+        // chmod with EPERM -- expected, and harmless, since it is already traversable and only the
+        // extracted children matter. chmod -R reports such an entry and walks on, so a non-zero
+        // exit is the normal case here: log it, never throw. A restore whose files landed is not a
+        // failed restore.
+        //
+        // Internal data is deliberately left alone: there the chown above hands the app real
+        // ownership, so the archived modes are already right, and a+rwX on /data/data/<pkg> would
+        // publish an app's private files to every other app on the phone.
+        if (dataDirectoryInfo.isExternal()
+                && (dataDirectoryInfo.subtype == BackupDataDirectoryInfo.TYPE_ANDROID_DATA
+                || dataDirectoryInfo.subtype == BackupDataDirectoryInfo.TYPE_ANDROID_OBB
+                || dataDirectoryInfo.subtype == BackupDataDirectoryInfo.TYPE_ANDROID_MEDIA)) {
+            Runner.Result chmodResult = Runner.runCommand(new String[]{"chmod", "-R", "a+rwX",
+                    dataSourceFile.getFilePath()});
+            if (!chmodResult.isSuccessful()) {
+                Log.w(TAG, "Could not widen the mode of every restored entry under %s (exit %d): %s",
+                        dataSourceFile.getFilePath(), chmodResult.getExitCode(), chmodResult.getOutput());
+            }
+        }
     }
 
     private void restoreAdb(int index) throws BackupException {
