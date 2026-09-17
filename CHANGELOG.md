@@ -10,6 +10,42 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-09-05.03-37.g41d79af5+044 — 2026-09-17
+
+A restore that put every file back in the right place, reported success, and left the app crashing on
+launch. The app could not read its own restored data — asking its external files directory what was
+in it got no answer at all — and nothing in the log suggested why, because as far as the restore was
+concerned nothing had gone wrong.
+
+The cause is an assumption that is true on most phones and false on this one. `Android/data` on
+shared storage is normally an emulated view, where who owns a file and what may be done with it are
+worked out from the path rather than stored, so a restore need not set either and writing them would
+achieve nothing. On the Mate XT that directory is a **real partition with a real filesystem**, and
+there the archived permissions are kept exactly as they were recorded — which, for a tree that was
+backed up out of an app's *private* internal storage, means private: readable by nobody but the
+account that wrote it. The restore wrote it as the shell, so the app it belonged to was locked out of
+its own files.
+
+Ownership is not the lever here — handing those files to the app is not permitted on that partition,
+and it is not needed either, since a file written there is already reachable by the app that owns the
+directory. Only the carried-over permissions stood in the way, so the restore now clears them out of
+the way as its final step. (Built on upstream App Manager `4.1.1`, commit `41d79af5` of 2026-09-05
+03:37 UTC.)
+
+### 📦 A restore the app can actually read
+
+- **External data comes back usable.** After restoring `Android/data`, `Android/obb` or
+  `Android/media`, the restored tree is opened up so the owning app can read, write and walk it —
+  which is what it would have got had it written those files itself.
+- **Directories only are made traversable.** A data file is never made executable on the way through.
+- **Internal data is deliberately untouched.** There the restore already hands the app real ownership
+  of its files, so the archived permissions are right as they stand — and opening `/data/data` up the
+  same way would expose an app's private files to every other app on the phone.
+- **A restore whose files landed is no longer called a failure.** The final step is best-effort: the
+  app's own top-level directory refuses the change, which is expected and harmless, so it is written
+  to the log rather than turned into a failed restore — the same lesson as the ownership step above
+  it, which used to throw for the same class of reason.
+
 ## 4.1.1+2026-09-05.03-37.g41d79af5+043 — 2026-09-14
 
 Settings → Appearance → *Enable/disable features* has a tick for the **Interceptor**. Switching it

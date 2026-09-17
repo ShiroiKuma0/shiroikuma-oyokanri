@@ -24,9 +24,9 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.1+2026-09-05.03-37.g41d79af5+043`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.1+2026-09-05.03-37.g41d79af5+044`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
-<sub>Version reads as **upstream `4.1.1`**, rebased onto upstream commit **`41d79af5` of 2026-09-05 03:37 UTC**, fork build **043**.</sub>
+<sub>Version reads as **upstream `4.1.1`**, rebased onto upstream commit **`41d79af5` of 2026-09-05 03:37 UTC**, fork build **044**.</sub>
 
 </div>
 
@@ -498,6 +498,12 @@ nothing.
 - **A “Backup older than app” filter** on the main list, so re-backing up is a two-tap job: it lists
   exactly the installed apps whose every backup predates the version now installed. An app that
   already holds a current backup stays out of the way, however many stale ones sit beside it.
+- **Restored external data is readable by the app it belongs to.** On a phone where
+  `Android/data` is a real partition rather than the emulated view — Huawei's, among others — a
+  restore put the files back with the modes they were archived with, which an app is not allowed to
+  read from there, so it came up and crashed on a directory it could not open. The restore now widens
+  those modes as its last step, and only for external storage: an app's private internal data is
+  never opened up.
 - **Category-based settings Export/Import** at the top of the UI page: pick a directory once, see the
   latest export at a glance, then export or restore any mix of seven categories (general settings,
   colours & fonts, monitor, toolbar & filters, notes, anti-snooping settings, profiles) — so a new install comes up looking
