@@ -317,10 +317,36 @@ public class Ops {
         }
     }
 
+    /**
+     * <b>LANDMINE — this list must carry every value of {@link Mode}, {@link #MODE_SHIZUKU}
+     * included</b> (白い熊, +045).
+     * <p>
+     * Upstream added this validator in 4.1.1 ("Validate mode of operations", 2026-08-24) and wrote
+     * out five of the six modes in the {@code @StringDef} above it. Upstream never persists
+     * {@code shizuku}, so the omission costs upstream nothing — and it took this fork's privileges
+     * away completely, because here {@code shizuku} is the mode auto-detection is <em>meant</em> to
+     * land in. Two halves broke at once: {@link #setMode} <b>threw</b>
+     * {@code IllegalArgumentException: Unknown mode of operation: shizuku} out of
+     * {@link #autoDetectRootSystemOrAdbAndPersist} — after the Shizuku services had already come
+     * up — so {@code SecurityAndOpsViewModel} caught it, called {@link #fallbackToNoRoot} and
+     * reported {@code STATUS_FAILURE}; and {@link #getMode()} silently rewrote a stored
+     * {@code shizuku} back to {@code auto}, which is what made {@code case MODE_SHIZUKU} in
+     * {@link #initLocked} dead code and the Settings mode picker's own Shizuku entry throw.
+     * <p>
+     * The visible damage was not "no privileges" but a <b>frozen window</b>: every start tore the
+     * live session down, {@link PrivilegeWatchdog} then reclaimed it, and each reclaim parked
+     * {@code LocalServices.bindServices} on its daemon latch for ~45 s holding the
+     * {@code ServiceConnectionWrapper} monitor — measured 2026-09-26, "Binder not running" at
+     * 20:16:49 for a bind started at 20:16:04. Any main-thread privileged read taken during that
+     * window is an ANR ("Input dispatching timed out … Waited 5000ms for MotionEvent"), and with
+     * the reopen-last-screen feature (+146) putting App details back on screen at every launch, the
+     * app came up frozen on that page and Back could not leave it.
+     */
     private static boolean isValidMode(@NonNull String mode) {
         switch (mode) {
             case MODE_AUTO:
             case MODE_ROOT:
+            case MODE_SHIZUKU: // Fork: see above — never let a rebase drop this line again.
             case MODE_ADB_OVER_TCP:
             case MODE_ADB_WIFI:
             case MODE_NO_ROOT:
