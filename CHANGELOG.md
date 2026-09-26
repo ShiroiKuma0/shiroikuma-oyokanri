@@ -10,6 +10,60 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-09-05.03-37.g41d79af5+045 — 2026-09-26
+
+The app opened on the page it had last been left on — an app's 盗み見 page — and would not leave it.
+Back did nothing, the title never filled in, and the capability list stayed empty. It was not a page
+that had failed to load. It was a **frozen window**, and a frozen window cannot be sent anywhere,
+because the press never reaches it.
+
+Behind it sat a line upstream wrote in August. App Manager 4.1.1 added a check that a stored mode of
+operation is one the app recognises, and spelled out five of the six the app declares — leaving out
+**Shizuku**, which is the one this fork is built to run in. Upstream never stores that mode, so the
+omission cost upstream nothing; here it meant that every start brought the Shizuku session up
+successfully, refused to write down what it had just achieved, threw, and tore the working session
+back down again. Since the 4.1.1 sync this fork has therefore been starting **without privileges** on
+a phone with 白い熊 雫 running perfectly well, and spending the following minute trying to repair
+itself. Choosing *Shizuku* by hand in Settings → *Mode of operation* did not work either: the same
+check rejected it, on the main thread, as a crash.
+
+That repair is what froze the page. Re-establishing the privileged connection takes a lock every
+privileged question in the app has to pass through, and holds it for as long as the attempt runs —
+measured here at **forty-five seconds**, ending in failure. The App info tab asks three such
+questions while building its menu, and App details builds that tab whichever tab you actually land
+on. So the window sat waiting on a repair that could not succeed, the reopen-the-last-screen feature
+put the same page back at the next launch, and there was no way out of it at all.
+
+Both halves are fixed: the mode is a mode again, and App details no longer waits on the main thread
+for an answer that may take a minute to arrive. (Built on upstream App Manager `4.1.1`, commit
+`41d79af5` of 2026-09-05 03:37 UTC.)
+
+### 🔑 The Shizuku mode is a mode again
+
+- **A detected Shizuku session is written down.** Auto-detection brings the session up, records
+  `shizuku`, and keeps it — instead of throwing at the last step and discarding a session that was
+  already working.
+- **A stored Shizuku mode survives being read.** It was being quietly rewritten to *auto* on every
+  read, which also made the app's own Shizuku start-up branch unreachable code.
+- **Settings → Mode of operation can be set to Shizuku by hand.** The entry was offered whenever a
+  Shizuku-family app is installed and crashed the screen when chosen.
+- **Privileges are no longer dropped at every launch.** With nothing throwing, the session that
+  came up stays up, and the watchdog has nothing to reclaim.
+- **A rebase cannot drop this quietly again.** The one-line omission is now a documented landmine in
+  the fork's own notes, in the file and in `CLAUDE.md`, so the next upstream sync has to decide
+  about it rather than inherit it.
+
+### 🧊 A slow connection no longer freezes App details
+
+- **App info asks its three privileged questions on a worker.** Whether the sensor controls apply,
+  whether another user exists to install into, and whether this build may run the optimiser — all
+  read off the main thread, the same answer the 盗み見 tab and the component tabs already got.
+- **The entries those answers govern start hidden** and appear when the answer arrives, so an action
+  that does not apply is never briefly tappable.
+- **It matters even with the mode fixed.** A privileged connection can always take its time — a
+  Shizuku server restarting during an app update is enough — and a page that waits for one on the
+  main thread is a window that cannot be closed, whatever the reason for the wait.
+
 ## 4.1.1+2026-09-05.03-37.g41d79af5+044 — 2026-09-17
 
 A restore that put every file back in the right place, reported success, and left the app crashing on
