@@ -388,10 +388,36 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
         MenuItem netPolicyMenu = menu.findItem(R.id.action_net_policy);
         MenuItem installMenu = menu.findItem(R.id.action_install);
         MenuItem optimizeMenu = menu.findItem(R.id.action_optimize);
+        // Fork (白い熊, +045) — LANDMINE, the same one +033 answered on the 盗み見 tab and +034 on the
+        // component tabs, and this is the call site that finally bit: SelfPermissions and Users
+        // reach Users.getSelfOrRemoteUid() → LocalServices.getAmService(), which is synchronized on
+        // the service-connection wrapper. It costs microseconds while the :am server is bound and
+        // blocks for the WHOLE bind while it is not — and a bind holds that very monitor from
+        // another thread, parked on the daemon's CountDownLatch.
+        //
+        // Measured from the ANR trace of 2026-09-26 20:15:50 (/data/anr, via adb bugreport): the
+        // main thread sat in onPrepareMenu → checkSelfOrRemotePermission(MANAGE_SENSORS) →
+        // getAmService, "waiting to lock … held by thread 23", while pool-3-thread-2 held it inside
+        // PrivilegeWatchdog.reclaim → Ops.init → LocalServices.bindAmService for 45 seconds. The
+        // window was frozen, so Back was never dispatched either — with the reopen-last-screen
+        // feature (+146) putting this page back at every launch, the app opened frozen and could
+        // not be left. (The bind storm itself was Ops.isValidMode rejecting MODE_SHIZUKU; that is
+        // fixed too, but a bind can always be slow — a Shizuku server restarting is enough.)
+        //
+        // So all three privileged reads are taken on the worker that was already here, and the
+        // items they govern start hidden and are revealed when the answer arrives.
+        boolean installedByUs = BuildConfig.APPLICATION_ID.equals(mInstallerPackageName);
         mMenuPreparationResult = ThreadUtils.postOnBackgroundThread(() -> {
             boolean magiskHideAvailable = MagiskHide.available();
             boolean magiskDenyListAvailable = MagiskDenyList.available();
             boolean rootAvailable = RunnerUtils.isRootAvailable();
+            boolean sensorsAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                    && SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.MANAGE_SENSORS);
+            boolean installAvailable = Users.getUsersIds().length > 1
+                    && SelfPermissions.canInstallExistingPackages();
+            boolean optimizeAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
+                    // Ordered so the privileged read is skipped when we are the installer.
+                    && (installedByUs || SelfPermissions.isSystemOrRootOrShell());
             if (ThreadUtils.isInterrupted()) {
                 return;
             }
@@ -405,6 +431,15 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
                 if (openInTermuxMenu != null) {
                     openInTermuxMenu.setVisible(rootAvailable);
                 }
+                if (sensorsMenu != null) {
+                    sensorsMenu.setVisible(sensorsAvailable);
+                }
+                if (installMenu != null) {
+                    installMenu.setVisible(installAvailable);
+                }
+                if (optimizeMenu != null) {
+                    optimizeMenu.setVisible(optimizeAvailable);
+                }
             });
         });
         boolean isDebuggable;
@@ -417,19 +452,20 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
         if (batteryOptMenu != null) {
             batteryOptMenu.setVisible(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M);
         }
+        // Hidden until the worker above answers: these three are privileged reads and cannot be
+        // taken here (see the landmine note). Hidden rather than left showing, so an entry that
+        // does not apply is never tappable in the moment before the answer lands.
         if (sensorsMenu != null) {
-            sensorsMenu.setVisible(Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
-                    && SelfPermissions.checkSelfOrRemotePermission(ManifestCompat.permission.MANAGE_SENSORS));
+            sensorsMenu.setVisible(false);
         }
         if (netPolicyMenu != null) {
             netPolicyMenu.setVisible(Build.VERSION.SDK_INT >= Build.VERSION_CODES.N);
         }
         if (installMenu != null) {
-            installMenu.setVisible(Users.getUsersIds().length > 1 && SelfPermissions.canInstallExistingPackages());
+            installMenu.setVisible(false);
         }
         if (optimizeMenu != null) {
-            optimizeMenu.setVisible(Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
-                    && (SelfPermissions.isSystemOrRootOrShell() || BuildConfig.APPLICATION_ID.equals(mInstallerPackageName)));
+            optimizeMenu.setVisible(false);
         }
     }
 
