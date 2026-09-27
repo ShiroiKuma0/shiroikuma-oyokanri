@@ -47,7 +47,11 @@ public class ExternalComponentsImporter {
         appOpList = PackageUtils.getFilteredAppOps(pair.getPackageName(), pair.getUserId(), appOps, mode);
         try (ComponentsBlocker cb = ComponentsBlocker.getMutableInstance(pair.getPackageName(), pair.getUserId())) {
             for (int appOp : appOpList) {
-                appOpsManager.setMode(appOp, PackageUtils.getAppUid(pair), pair.getPackageName(), mode);
+                // Fork (白い熊, +050): BOTH levels -- see AppOpsManagerCompat#setModeBothLevels.
+                // This is a replay of a recorded mode, exactly like a restore's: the rule stored
+                // on the line below would then disagree with what the platform enforces, and the
+                // import would report success over an op that had not moved.
+                appOpsManager.setModeBothLevels(appOp, PackageUtils.getAppUid(pair), pair.getPackageName(), mode);
                 cb.setAppOp(appOp, mode);
             }
             cb.applyRules(true);

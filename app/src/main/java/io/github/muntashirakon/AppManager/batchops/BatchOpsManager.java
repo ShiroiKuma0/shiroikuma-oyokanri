@@ -735,12 +735,17 @@ public class BatchOpsManager {
                 continue;
             }
             try {
+                // Fork (白い熊, +050): BOTH levels -- see AppOpsManagerCompat#setModeBothLevels.
+                // A uid-only write can be accepted and discarded while a package-level entry
+                // left by adb or an older build goes on winning, and this op pair is the whole
+                // point of the operation: a batch that reports success over apps still running
+                // in the background is worse than one that says it failed.
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    appOpsManager.setMode(AppOpsManagerCompat.OP_RUN_IN_BACKGROUND, uid,
+                    appOpsManager.setModeBothLevels(AppOpsManagerCompat.OP_RUN_IN_BACKGROUND, uid,
                             pair.getPackageName(), AppOpsManager.MODE_IGNORED);
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    appOpsManager.setMode(AppOpsManagerCompat.OP_RUN_ANY_IN_BACKGROUND, uid,
+                    appOpsManager.setModeBothLevels(AppOpsManagerCompat.OP_RUN_ANY_IN_BACKGROUND, uid,
                             pair.getPackageName(), AppOpsManager.MODE_IGNORED);
                 }
                 try (ComponentsBlocker cb = ComponentsBlocker.getMutableInstance(pair.getPackageName(), pair.getUserId())) {
