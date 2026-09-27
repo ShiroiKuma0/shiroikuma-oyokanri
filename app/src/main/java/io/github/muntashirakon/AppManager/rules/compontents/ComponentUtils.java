@@ -180,7 +180,14 @@ public final class ComponentUtils {
                 appOpsManager.resetAllModes(userHandle, packageName);
                 for (AppOpRule entry : cb.getAll(AppOpRule.class)) {
                     try {
-                        appOpsManager.setMode(entry.getOp(), uid, packageName, AppOpsManager.MODE_DEFAULT);
+                        // Fork (白い熊, +050): BOTH levels -- and this is the landmine's own
+                        // worked example. MODE_DEFAULT at uid level DELETES the uid entry rather
+                        // than storing it, so a reset could clear a uid entry that was never
+                        // there while the package-level entry it was meant to undo stood
+                        // untouched: the rule was then dropped below and the block outlived the
+                        // record of it, unreachable from this screen. resetAllModes above may
+                        // cover it on some platforms; this no longer depends on that.
+                        appOpsManager.setModeBothLevels(entry.getOp(), uid, packageName, AppOpsManager.MODE_DEFAULT);
                         cb.removeEntry(entry);
                     } catch (Exception e) {
                         e.printStackTrace();
