@@ -18,11 +18,13 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.ParcelFileDescriptor;
 import android.system.ErrnoException;
+import android.text.TextUtils;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.annotation.WorkerThread;
+import androidx.core.content.pm.PackageInfoCompat;
 
 import java.io.Closeable;
 import java.io.File;
@@ -83,6 +85,7 @@ import io.github.muntashirakon.AppManager.utils.PackageUtils;
 import io.github.muntashirakon.AppManager.utils.ParcelFileDescriptorUtil;
 import io.github.muntashirakon.AppManager.utils.TarUtils;
 import io.github.muntashirakon.AppManager.utils.Utils;
+import io.github.muntashirakon.AppManager.appdata.AppDataContract;
 import io.github.muntashirakon.AppManager.appdata.AppDataHeader;
 import io.github.muntashirakon.AppManager.appdata.AppDataTransfer;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsProgressMonitor;
@@ -428,6 +431,7 @@ class RestoreOp implements Closeable {
             throw new BackupException("APK restore is requested but backup doesn't contain any source files.");
         }
         Path[] backupSourceFiles = mBackupItem.getSourceFiles();
+        reportVersionChange(listener);
         reportFiles(listener, backupSourceFiles);
         if (backupSourceFiles.length == 0) {
             // No source backup found
@@ -465,7 +469,22 @@ class RestoreOp implements Closeable {
             // The only way to restore is to reinstall the app
             synchronized (sLock) {
                 PackageInstallerCompat installer = PackageInstallerCompat.getNewInstance();
-                if (installer.uninstall(mPackageName, mUserId, false)) {
+                // Fork (白い熊, +049): the test was inverted, and it inverted the outcome too.
+                //
+                // `uninstall` returns TRUE on success (and false for a refusal — no
+                // DELETE_PACKAGES, or the 必要 guard declining at the top of the method). The
+                // condition read `if (uninstall(...))`, so a SUCCESSFUL uninstall threw "couldn't
+                // perform it" and aborted the restore, while an uninstall that had genuinely
+                // failed fell through and let the reinstall proceed to fail on the very signature
+                // mismatch this branch exists to clear. The reachable outcome was therefore the
+                // worst available one: the app removed WITH ITS DATA (keepData = false) and then
+                // the restore abandoned, so the archive was never unpacked and nothing was left to
+                // go back to.
+                //
+                // Found 2026-09-27 while documenting the third-party backup hand-off, where it is
+                // squarely in the path: a re-signed third-party APK is exactly how a signature
+                // mismatch arises, and "skip signature check" is exactly what someone reaches for.
+                if (!installer.uninstall(mPackageName, mUserId, false)) {
                     throw new BackupException("An uninstallation was necessary but couldn't perform it.");
                 }
             }
@@ -862,8 +881,31 @@ class RestoreOp implements Closeable {
                 switch (entry.type) {
                     case APP_OP:
                         if (canModifyAppOpMode) {
-                            appOpsManager.setMode(Integer.parseInt(entry.name), mUid, mPackageName,
-                                    ((AppOpRule) entry).getMode());
+                            // Fork (白い熊, +048): BOTH levels, not just the uid one.
+                            //
+                            // 白い熊's rule for a restore is that the phone comes back exactly as
+                            // the archive found it — what was granted granted, what was denied
+                            // denied — so the replay's job is to ACHIEVE the recorded mode, not
+                            // merely to issue a write that returns without throwing.
+                            //
+                            // `setMode` writes the UID mode on M+ and nothing else, while
+                            // `AppOpsService` DELETES a uid entry whose mode equals the op's
+                            // default rather than storing it (the +8 landmine, measured on the
+                            // Mate XT). So restoring an op recorded at its default cleared a uid
+                            // entry that may never have existed while a PACKAGE-level entry — put
+                            // there by `adb shell appops`, by another tool, or by an older build
+                            // of this app — went on winning. Nothing threw, and the restore
+                            // reported success over a mode that had not moved. The archive itself
+                            // records the package-level entries (`getOpsForPackage`), which is
+                            // precisely the slot the uid-only write could not reach.
+                            //
+                            // Writing both is correct in every combination: a value equal to the
+                            // op's default removes the entry at that level and any other value is
+                            // stored there, so the two levels always agree afterwards. The package
+                            // write is best-effort inside the helper — a platform that refuses it
+                            // must not cost us the uid write that already landed.
+                            appOpsManager.setModeBothLevels(Integer.parseInt(entry.name), mUid,
+                                    mPackageName, ((AppOpRule) entry).getMode());
                         }
                         break;
                     case NET_POLICY:
@@ -1085,6 +1127,15 @@ class RestoreOp implements Closeable {
                             listener.onItem(marked(detail), null);
                         }
                     }, () -> BatchOpsProgressMonitor.getInstance().isCancelled());
+            // Fork (白い熊, +046): what the app said it restored, and where it put it.
+            //
+            // Both were thrown away on the success path: the reply body was read only to build
+            // the failure message, and the location was never asked for at all. So the longest
+            // step of a restore ended with nothing but the next stage heading — and an app that
+            // had imported into the wrong directory reported success indistinguishable from an
+            // app that had got it right. Reported BEFORE the failure throw, so a failure keeps
+            // its location too.
+            reportAppDataOutcome(listener, outcome);
             if (!outcome.ok) {
                 throw new BackupException("App-supplied data restore failed: " + outcome.message);
             }
@@ -1098,6 +1149,76 @@ class RestoreOp implements Closeable {
                 LargeTransferGate.release();
             }
         }
+    }
+
+    /**
+     * Fork (白い熊, +046): the sister app's own account of what it did — its reply body (D) and,
+     * when it sends one, the path it wrote to ({@link AppDataContract#EXTRA_LOCATION}, E).
+     *
+     * <p>The location is optional and no sister app sends it yet, so absence is the ordinary case
+     * and must read as "it did not say" rather than as an empty line.
+     */
+    private void reportAppDataOutcome(@Nullable BackupProgressListener listener,
+                                      @NonNull AppDataTransfer.Outcome outcome) {
+        if (listener == null) {
+            return;
+        }
+        Context context = ContextUtils.getContext();
+        if (outcome.ok && !TextUtils.isEmpty(outcome.message)) {
+            listener.onItem(marked(context.getString(R.string.restore_item_app_data_result,
+                    outcome.message)), null);
+        }
+        if (!TextUtils.isEmpty(outcome.location)) {
+            listener.onItem(marked(context.getString(R.string.restore_item_app_data_location,
+                    outcome.location)), null);
+        }
+    }
+
+    /**
+     * Fork (白い熊, +046): say which version this restore is about to put on, and in particular
+     * say when it is a <b>downgrade</b>.
+     *
+     * <p>The log used to show "Reinstalling APK files" and the archive member's name, which
+     * between them never named a version at all. On 2026-09-27 a restore of 白い熊 暗記 rolled the
+     * app back from {@code 2.25.0beta2+002} to the {@code 2.25.0alpha4+030} in a three-week-old
+     * archive without a word, and 白い熊 found out from {@code dumpsys} afterwards.
+     *
+     * <p><b>It is a line in the log, never a refusal.</b> Rolling a build back is sometimes
+     * exactly the point of restoring an archive; being told is the part that was missing. The
+     * comparison is on {@code versionCode}, because that is what the installer and the platform
+     * actually order by — a {@code versionName} is a string an app may write anything into.
+     */
+    private void reportVersionChange(@Nullable BackupProgressListener listener) {
+        if (listener == null) {
+            return;
+        }
+        Context context = ContextUtils.getContext();
+        String archived = versionLabel(mBackupMetadata.versionName, mBackupMetadata.versionCode);
+        if (mPackageInfo == null) {
+            // Not installed: there is nothing to compare against, and the version going on is
+            // still worth recording.
+            listener.onItem(marked(context.getString(R.string.restore_item_version_new, archived)), null);
+            return;
+        }
+        long installedCode = PackageInfoCompat.getLongVersionCode(mPackageInfo);
+        String installed = versionLabel(mPackageInfo.versionName, installedCode);
+        int res;
+        if (mBackupMetadata.versionCode < installedCode) {
+            res = R.string.restore_item_version_down;
+        } else if (mBackupMetadata.versionCode > installedCode) {
+            res = R.string.restore_item_version_up;
+        } else {
+            res = R.string.restore_item_version_same;
+        }
+        listener.onItem(marked(res == R.string.restore_item_version_same
+                ? context.getString(res, archived)
+                : context.getString(res, installed, archived)), null);
+    }
+
+    /** {@code 2.25.0beta2+002 (322500204)} — the name people read, the code the platform orders by. */
+    @NonNull
+    private static String versionLabel(@Nullable String name, long code) {
+        return (name != null ? name : "?") + " (" + code + ")";
     }
 
     // Fork (+116): name each archive member and its size, and add it to the operation's byte

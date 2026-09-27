@@ -7,6 +7,7 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.SystemClock;
 import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
@@ -39,6 +40,7 @@ import io.github.muntashirakon.AppManager.fm.FmProvider;
 import io.github.muntashirakon.AppManager.fonts.ColorPrefs;
 import io.github.muntashirakon.AppManager.main.RowPills;
 import io.github.muntashirakon.AppManager.main.ShareBackupHandler;
+import io.github.muntashirakon.AppManager.settings.DirectoryChooserDialog;
 import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.types.UserPackagePair;
 import io.github.muntashirakon.AppManager.utils.ForkDialog;
@@ -401,20 +403,58 @@ public class BatchOpsProgressActivity extends BaseActivity {
     }
 
     /**
-     * Write the log beside the backups. Never automatic: a file per batch would accumulate for
-     * ever in the one directory 白い熊 actually reads.
+     * Ask where, then write the log there. Never automatic: a file per batch would accumulate
+     * for ever in whichever directory the app picked for itself.
+     *
+     * <p>Fork (白い熊, +046): it used to write straight into the settings-export directory
+     * without a word, which is wrong twice over — that directory is where the settings archives
+     * live and the log is not one of them, and the only way to learn where the file had gone was
+     * to read the toast fast enough. A log is saved in order to be looked at afterwards, so the
+     * action asks for the place.
+     *
+     * <p>{@link DirectoryChooserDialog} is the fork's own plain-path browser — the same one the
+     * backup directory and the Export/Import panel use. Not SAF: this app holds
+     * {@code MANAGE_EXTERNAL_STORAGE} and writes with plain {@link File}, and a SAF tree would
+     * hand back a URI the one writer below cannot use.
      */
     private void saveLog() {
         String text = OpLog.getInstance().asText();
         if (text.isEmpty()) {
             return;
         }
+        // Seeded with the last place a log was saved, then the settings-export directory (the
+        // old silent destination, so the first save after this change opens where the previous
+        // ones landed), then the storage root. A start path that no longer exists is not a
+        // problem: the chooser falls back to the root by itself.
+        String start = Prefs.Storage.getOpLogDirectory();
+        if (TextUtils.isEmpty(start)) {
+            start = Prefs.Storage.getSettingsExportDirectory();
+        }
+        if (TextUtils.isEmpty(start)) {
+            start = Environment.getExternalStorageDirectory().getAbsolutePath();
+        }
+        DirectoryChooserDialog.show(this, start, R.string.op_log_save_here, 0,
+                new DirectoryChooserDialog.Callback() {
+                    @Override
+                    public void onChosen(@NonNull String absolutePath) {
+                        Prefs.Storage.setOpLogDirectory(absolutePath);
+                        writeLogInto(new File(absolutePath), text);
+                    }
+
+                    @Override
+                    public void onCleared() {
+                        // No clear button is offered (clearLabelRes == 0): there is nothing to
+                        // clear — the remembered directory is only the chooser's starting point.
+                    }
+                });
+    }
+
+    /** The write itself, off the main thread — the log can be 20 000 lines. */
+    private void writeLogInto(@NonNull File parent, @NonNull String text) {
         ThreadUtils.postOnBackgroundThread(() -> {
             String path = null;
             try {
-                String dir = Prefs.Storage.getSettingsExportDirectory();
-                File parent = TextUtils.isEmpty(dir) ? getExternalFilesDir(null) : new File(dir);
-                if (parent != null && (parent.isDirectory() || parent.mkdirs())) {
+                if (parent.isDirectory() || parent.mkdirs()) {
                     path = writeLog(parent, text).getAbsolutePath();
                 }
             } catch (Throwable ignore) {

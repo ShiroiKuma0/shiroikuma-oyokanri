@@ -127,15 +127,28 @@ public class AppDataClient {
          * left to fail.
          */
         public final boolean abandoned;
+        /**
+         * Fork (白い熊, +046): where the callee says it put the data, from
+         * {@link AppDataContract#EXTRA_LOCATION} on the terminal reply. {@code null} whenever the
+         * app did not say — which is every sister app until each adds it, so every reader must
+         * treat absence as ordinary. Opaque text: displayed, never parsed.
+         */
+        @Nullable
+        public final String location;
 
         Result(boolean ok, @NonNull String message) {
-            this(ok, message, false);
+            this(ok, message, false, null);
         }
 
         Result(boolean ok, @NonNull String message, boolean abandoned) {
+            this(ok, message, abandoned, null);
+        }
+
+        Result(boolean ok, @NonNull String message, boolean abandoned, @Nullable String location) {
             this.ok = ok;
             this.message = message;
             this.abandoned = abandoned;
+            this.location = location;
         }
 
         @NonNull
@@ -208,6 +221,12 @@ public class AppDataClient {
         // where a slow one now succeeds — the worse of the two bugs to ship.
         Map<String, String> unclaimed = new ConcurrentHashMap<>();
         LinkedBlockingQueue<String> terminal = new LinkedBlockingQueue<>(1);
+        // Fork (白い熊, +046): the location rides beside the terminal reply rather than inside it.
+        // The queue carries the reply STRING, whose shape ("OK:…"/"ERROR:…") is the wire format
+        // every sister app writes — encoding a path into it would change what that string means
+        // for forty-odd apps. A field written just before the reply is offered, and read after it
+        // is taken, needs nothing of them but one extra.
+        AtomicReference<String> location = new AtomicReference<>();
         AtomicLong lastActivity = new AtomicLong(System.currentTimeMillis());
         // Bumped ONLY by something the app itself said. lastActivity is also moved by the CPU
         // probe, so it cannot be used to decide whether the log has gone quiet.
@@ -270,7 +289,14 @@ public class AppDataClient {
                 }
                 heardTerminal.incrementAndGet();
                 String result = intent.getStringExtra(AppDataContract.EXTRA_RESULT);
-                Log.d(TAG, "%s: terminal reply under id %s: %s", packageName, id, result);
+                // Set BEFORE the offer: the waiting thread wakes on the queue, so anything it is
+                // expected to read has to be in place by then.
+                String where = intent.getStringExtra(AppDataContract.EXTRA_LOCATION);
+                if (where != null && !where.trim().isEmpty()) {
+                    location.set(where.trim());
+                }
+                Log.d(TAG, "%s: terminal reply under id %s: %s (location: %s)", packageName, id,
+                        result, location.get());
                 terminal.offer(result != null ? result : AppDataContract.ERROR_PREFIX + "empty reply");
             }
         };
@@ -348,7 +374,7 @@ public class AppDataClient {
                         unclaimed.keySet(), acceptedId.get());
             }
             unclaimed.clear();
-            return await(packageName, ourId, acceptedId, terminal, lastActivity, lastReport,
+            return await(packageName, ourId, acceptedId, terminal, location, lastActivity, lastReport,
                     listener, cancellation, heardProgress, heardTerminal, heardForeign, foreignIds);
         } finally {
             try {
@@ -363,6 +389,9 @@ public class AppDataClient {
     private Result await(@NonNull String packageName, @NonNull String ourId,
                          @NonNull AtomicReference<String> jobId,
                          @NonNull LinkedBlockingQueue<String> terminal,
+                         /* Fork (白い熊, +046): filled by the receiver just before it offers the
+                          * terminal reply, so it is in place by the time this loop wakes. */
+                         @NonNull AtomicReference<String> location,
                          @NonNull AtomicLong lastActivity,
                          @NonNull AtomicLong lastReport,
                          @Nullable ProgressListener listener,
@@ -396,9 +425,12 @@ public class AppDataClient {
             }
             if (result != null) {
                 if (result.startsWith(AppDataContract.OK_PREFIX)) {
-                    return new Result(true, result.substring(AppDataContract.OK_PREFIX.length()));
+                    return new Result(true, result.substring(AppDataContract.OK_PREFIX.length()),
+                            false, location.get());
                 }
-                return new Result(false, result);
+                // A failure's location is worth as much as a success's — more, since "it failed"
+                // and "it failed over there" are different problems.
+                return new Result(false, result, false, location.get());
             }
             long now = System.currentTimeMillis();
             // Ask the OS whether the app is working before believing that silence means death.
