@@ -10,6 +10,92 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-09-05.03-37.g41d79af5+050 — 2026-09-27
+
+A restore of 白い熊 暗記 reported success and had, in fact, written a 240 MB collection's worth of
+nothing into a directory that was not the collection. The archive was three weeks old; the app's
+own preference had moved; and **nothing in the log named a path**, so there was no way to see it.
+The hunt that followed found two faults in this app and one in that one, and most of this release
+is the log learning to say the things that would have ended it on the first day.
+
+### A restore says what it is doing
+
+- **The version it is putting on**, on the APK stage: *Installing*, *Reinstalling*, *Upgrading
+  X → Y* or **Downgrading X → Y**, each rendered as `name (versionCode)`. The restore that started
+  all this rolled 暗記 back three weeks without a word — that was discovered afterwards, from
+  `dumpsys`. It is a log line and never a refusal: rolling a build back is sometimes exactly the
+  point of restoring an archive. The comparison is on `versionCode`, which is what the platform
+  orders by; a `versionName` is a string an app may write anything into.
+- **What the sister app itself reported.** Its reply body was read only to build the failure
+  message and thrown away on success, so the longest step of a restore ended with nothing but the
+  next stage heading.
+- **Where the data landed** — `Written to: <path>`, from a new optional extra on the contract's
+  terminal reply (`location`), set on failure as well as success. The app-data channel carries
+  *content* and never *location*: an app whose data lives outside its private directories imports
+  into whatever path its own preferences name, and only it knows what that is. It rides **beside**
+  the reply rather than inside it, because the `OK:`/`ERROR:` string is the wire format forty-odd
+  sister apps write and parse. No sister app is required to send it; absent, nothing is printed.
+
+### Save log asks where to put it
+
+It used to write into the settings-export directory without a word — a directory that holds the
+settings archives, which a batch log is not — and the only way to learn where the file had gone was
+to read the toast fast enough. It now opens the fork's own plain-path directory browser, the same
+one the backup directory and the Export/Import panel use. The chosen directory is remembered only
+as the next starting point, seeded from the old destination so the first save opens where the
+previous ones landed.
+
+### An app-op mode is written at both levels
+
+`AppOpsManagerCompat.setMode` writes only the **uid** mode on Android M and above, and
+`AppOpsService` *deletes* a uid entry whose mode equals the op's default instead of storing it. So
+a write could be accepted and quietly discarded while a **package**-level entry — left by
+`adb shell appops`, by another tool, or by an older build of this app — went on winning, with
+nothing thrown and the caller told it had succeeded.
+
+A restore's job is to reproduce the source phone exactly: what was granted granted, what was denied
+denied. That makes the replay's task to *achieve* the recorded mode, not merely to issue a write.
+Every app-op write in the app now goes to both levels — a value equal to the op's default removes
+the entry at that level and any other value is stored there, so the two always agree afterwards:
+
+- both of a restore's replay sites: the *permissions, ops and rules* stage, and the *blocking
+  rules* stage, which reaches the same write through `RulesImporter`;
+- the batch **disable background** pair (`RUN_IN_BACKGROUND`, `RUN_ANY_IN_BACKGROUND`) — not a
+  replay but a fresh decision, and the one where a discarded write costs most: a batch reporting
+  success over apps still running in the background is worse than one that says it failed;
+- importing rules from an external Blocker or Watt file, which writes a stored rule on the next
+  line and so left the record disagreeing with what the platform enforces;
+- **resetting configured app ops**, which is the trap's own worked example. `MODE_DEFAULT` at uid
+  level *deletes* the uid entry rather than storing it, so the reset could clear an entry that was
+  never there while the package-level block it was meant to undo stood untouched — and the rule was
+  then dropped, leaving the block alive with no record of it and no way back from that screen.
+
+### A restore that uninstalled an app and then gave up
+
+The signature-mismatch branch of the APK restore tested the uninstall's result with the wrong
+polarity. `PackageInstallerCompat.uninstall` returns `true` on success, and the call site threw
+*"An uninstallation was necessary but couldn't perform it"* when it got `true` — so a **successful**
+uninstall aborted the restore, while one that had genuinely failed was waved through into the very
+mismatch the branch exists to clear. The reachable outcome was the worst available: the app removed
+**with its data**, and the restore then abandoned, leaving nothing to go back to. Found while
+writing the hand-off document below, where it sits squarely in the path — a re-signed APK is how a
+signature mismatch arises in the first place, and skip-signature-check is what someone reaches for.
+
+### A hand-off for giving any third-party app a data door
+
+`docs/third-party-backup-restore-hand-off.md` is a stand-alone brief for a session asked to make a
+closed-source app — no source, just an APK — something this app can back up and restore properly.
+It points at the sister-app reference implementation for the wire protocol and at a completed port
+as the worked example rather than duplicating either, and covers what a no-source port needs on top:
+repo and build discipline, re-signing and what it costs, adding the door as an extra `classesN.dex`
+without touching the app's own code, what to do when `targetSdk` is 31 or higher, keeping the
+provider's `onCreate` inside the platform's ~10-second publish window, and the rule that first-run
+work must not overwrite what an import has just restored. It asks which data to include rather than
+deciding, and states what this app does and does not require of an app implementing the contract —
+no allowlist, no name prefix, no signing key: the three manifest values and nothing else.
+
+Built on upstream App Manager 4.1.1.
+
 ## 4.1.1+2026-09-05.03-37.g41d79af5+045 — 2026-09-26
 
 The app opened on the page it had last been left on — an app's 盗み見 page — and would not leave it.

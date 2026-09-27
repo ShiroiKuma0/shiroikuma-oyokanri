@@ -24,7 +24,7 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.1+2026-09-05.03-37.g41d79af5+045`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.1+2026-09-05.03-37.g41d79af5+050`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
 <sub>Version reads as **upstream `4.1.1`**, rebased onto upstream commit **`41d79af5` of 2026-09-05 03:37 UTC**, fork build **045**.</sub>
 
@@ -380,6 +380,13 @@ data holds it still for twenty minutes, which is indistinguishable from a hung o
 - **Cancel reaches inside one app**, not merely between them: stage boundaries, a cancellable copy,
   and a hook inside the sister-app transfer that tells the app to stop.
 
+- **A restore says what it is doing to the app**, not just to the files: the version it is putting
+  on — *Installing*, *Reinstalling*, *Upgrading*, **Downgrading** — so a roll-back to an old archive
+  is never silent; what the sister app itself reported; and, when the app says so, the path it
+  actually wrote to.
+- **Save log asks where to put it.** A log is saved in order to be read afterwards, so the action
+  opens a directory browser instead of choosing a folder for you and naming it in a toast.
+
 On completion the main list **snaps to its final state in one pass** instead of repainting row-by-row
 over several seconds.
 
@@ -464,6 +471,11 @@ with everything else — and **verified before it is ever handed back** at resto
   so the export cannot be refused as a background start; and the app is force-stopped the instant it
   reports a successful import — otherwise it writes its cached settings back out on the way down and
   silently undoes the restore.
+- **The app can say where it put things.** The contract carries an optional location on the reply,
+  and the restore log prints it. It exists because the channel carries *content* and never
+  *location*: an app whose data lives outside its private directories imports into whatever path its
+  own settings name, and only it knows what that is — so one of them reported success three times
+  over while writing somewhere that was not its data, and no log could have shown it.
 - **Pick what goes in, per app.** The **App data categories** button on the row asks that app what it
   can export and shows its own categories, nested and pre-ticked as it recommends. The choice is
   remembered per package, so a **bulk backup applies it silently** — per-app control inside a batch,
