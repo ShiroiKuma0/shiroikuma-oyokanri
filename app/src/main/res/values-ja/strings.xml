@@ -1184,6 +1184,7 @@
     <string name="op_log_latest">最新へ移動</string>
     <string name="op_log_copy">記録をコピー</string>
     <string name="op_log_save">記録を保存</string>
+    <string name="op_log_save_here">ここに記録を保存</string>
     <string name="op_log_saved">記録を保存しました: %s</string>
     <string name="op_log_save_failed">記録を保存できませんでした。</string>
     <string name="op_log_share">記録を共有</string>
@@ -1415,6 +1416,12 @@
     <string name="restore_stage_keystore">ｷｰｽﾄｱを復元中</string>
     <string name="restore_stage_extras">権限・AppOps・ﾙｰﾙを復元中</string>
     <string name="restore_stage_rules">ﾌﾞﾛｯｸﾙｰﾙを復元中</string>
+    <string name="restore_item_version_new">%1$s を導入</string>
+    <string name="restore_item_version_same">%1$s を再導入</string>
+    <string name="restore_item_version_up">%1$s → %2$s に更新</string>
+    <string name="restore_item_version_down">%1$s → %2$s に格下げ</string>
+    <string name="restore_item_app_data_result">応用の報告: %s</string>
+    <string name="restore_item_app_data_location">書込先: %s</string>
 
     <!-- Fork, +103: メモ付きアプリの絞り込み。メモ機能自身の語（note = メモ、全角）に合わせる。 -->
     <string name="filter_apps_with_notes">メモ付き</string>

@@ -77,6 +77,25 @@ public final class AppDataContract {
     public static final String EXTRA_TOTAL = "total";
     public static final String EXTRA_UNIT = "unit";
 
+    /**
+     * Fork (白い熊, +046): <b>where</b> the callee put the data, on a terminal reply to
+     * {@code import} — and where it read it from, on a reply to {@code export}. Optional, and
+     * additive: a sister app that does not send it costs nothing, and the restore log simply
+     * says nothing about the location.
+     *
+     * <p><b>Why the contract needs it at all.</b> The app-supplied channel carries content and
+     * never location. A sister app whose data lives outside its private directories — 白い熊 暗記,
+     * whose collection sits under {@code 〇/} — imports into whatever path its own preferences
+     * name at that moment, and <em>only the app knows what that is</em>. On 2026-09-27 a restore
+     * of 暗記 reported success three times over and had been writing to a directory that was not
+     * the collection at all; nothing in the log could have revealed it, because nothing in the
+     * log named a path. One string on the reply is the whole fix.
+     *
+     * <p>An absolute path is the expected value. It is treated as opaque text: it is displayed,
+     * never parsed, never followed and never used to decide anything.
+     */
+    public static final String EXTRA_LOCATION = "location";
+
     /** Our own reply/progress actions. Registered dynamically; never in the manifest. */
     public static final String ACTION_REPLY = BuildConfig.APPLICATION_ID + ".action.APP_DATA_REPLY";
     public static final String ACTION_PROGRESS = BuildConfig.APPLICATION_ID + ".action.APP_DATA_PROGRESS";

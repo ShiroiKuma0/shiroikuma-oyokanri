@@ -68,12 +68,24 @@ public class AppDataTransfer {
         public final String message;
         @Nullable
         public final AppDataHeader header;
+        /**
+         * Fork (白い熊, +046): where the app says it put the data — see
+         * {@link AppDataContract#EXTRA_LOCATION}. {@code null} whenever it did not say.
+         */
+        @Nullable
+        public final String location;
 
         Outcome(boolean ok, boolean skipped, @NonNull String message, @Nullable AppDataHeader header) {
+            this(ok, skipped, message, header, null);
+        }
+
+        Outcome(boolean ok, boolean skipped, @NonNull String message, @Nullable AppDataHeader header,
+                @Nullable String location) {
             this.ok = ok;
             this.skipped = skipped;
             this.message = message;
             this.header = header;
+            this.location = location;
         }
 
         Outcome(boolean ok, @NonNull String message, @Nullable AppDataHeader header) {
@@ -171,7 +183,8 @@ public class AppDataTransfer {
                 // encrypted. The callee dups before the call returns, so this is safe.
                 closeQuietly(fd);
             }
-            return new Outcome(result.ok, result.message, result.ok ? header : null);
+            return new Outcome(result.ok, false, result.message, result.ok ? header : null,
+                    result.location);
         } finally {
             restore(packageName, userId, changed);
         }
@@ -240,7 +253,7 @@ public class AppDataTransfer {
                 // STRICTLY after the reply. See the class comment.
                 forceStop(packageName, userId);
             }
-            return new Outcome(result.ok, result.message, header);
+            return new Outcome(result.ok, false, result.message, header, result.location);
         } finally {
             restore(packageName, userId, changed);
         }

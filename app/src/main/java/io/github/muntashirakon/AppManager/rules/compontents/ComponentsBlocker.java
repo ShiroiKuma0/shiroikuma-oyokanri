@@ -502,7 +502,14 @@ public final class ComponentsBlocker extends RulesStorageManager {
         // Apply all app ops
         for (AppOpRule appOp : getAll(AppOpRule.class)) {
             try {
-                appOpsManager.setMode(appOp.getOp(), uid, packageName, appOp.getMode());
+                // Fork (白い熊, +048): BOTH levels — see the same change in RestoreOp's APP_OP
+                // replay and AppOpsManagerCompat#setModeBothLevels for why a uid-only write can be
+                // accepted and discarded. This method IS the second half of a restore's op replay:
+                // RestoreOp#restoreRules → RulesImporter#applyRules → here, for the "Restoring
+                // blocking rules" stage, while the "Restoring permissions, ops and rules" stage
+                // writes its own. Both stages replay a recorded mode, so both must land it, or
+                // half a restore would be reliable and half would not.
+                appOpsManager.setModeBothLevels(appOp.getOp(), uid, packageName, appOp.getMode());
             } catch (Throwable e) {
                 isSuccessful = false;
                 Log.e(TAG, "Could not set mode %d for app op %d", e, appOp.getMode(), appOp.getOp());
