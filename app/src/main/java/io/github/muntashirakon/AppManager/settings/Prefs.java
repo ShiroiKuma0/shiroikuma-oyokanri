@@ -815,6 +815,26 @@ public final class Prefs {
                     .edit().putString(KEY_SETTINGS_EXPORT_DIR, path).apply();
         }
 
+        // Fork (白い熊, +046): where the batch operation log was last saved.
+        // Only the seed for the directory chooser that Save log now opens —
+        // 白い熊 still picks a directory every time, so a path carried over
+        // from another phone costs nothing (the chooser falls back to the
+        // storage root when it does not exist). Empty string = never saved.
+        private static final String KEY_OP_LOG_DIR = "op_log_dir";
+
+        @NonNull
+        public static String getOpLogDirectory() {
+            return ContextUtils.getContext()
+                    .getSharedPreferences(PREFS_BACKUP_OPTS, Context.MODE_PRIVATE)
+                    .getString(KEY_OP_LOG_DIR, "");
+        }
+
+        public static void setOpLogDirectory(@NonNull String path) {
+            ContextUtils.getContext()
+                    .getSharedPreferences(PREFS_BACKUP_OPTS, Context.MODE_PRIVATE)
+                    .edit().putString(KEY_OP_LOG_DIR, path).apply();
+        }
+
         @NonNull
         public static Path getAppManagerDirectory() {
             // Fork: a configured backup directory takes precedence over the

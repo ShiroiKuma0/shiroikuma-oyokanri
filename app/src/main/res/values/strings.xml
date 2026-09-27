@@ -2647,6 +2647,8 @@
     <string name="op_log_latest">Scroll to latest</string>
     <string name="op_log_copy">Copy log</string>
     <string name="op_log_save">Save log</string>
+    <!-- Fork (白い熊, +046): Save log asks where, rather than picking a directory itself. -->
+    <string name="op_log_save_here">Save the log here</string>
     <string name="op_log_saved">Log saved: %s</string>
     <string name="op_log_save_failed">Could not save the log.</string>
     <string name="op_log_share">Share log</string>
@@ -2710,6 +2712,13 @@
     <string name="restore_stage_keystore">Restoring KeyStore</string>
     <string name="restore_stage_extras">Restoring permissions, ops and rules</string>
     <string name="restore_stage_rules">Restoring blocking rules</string>
+    <!-- Fork (白い熊, +046): the restore names the version it puts on, and what the sister app said. -->
+    <string name="restore_item_version_new">Installing %1$s</string>
+    <string name="restore_item_version_same">Reinstalling %1$s</string>
+    <string name="restore_item_version_up">Upgrading %1$s → %2$s</string>
+    <string name="restore_item_version_down">Downgrading %1$s → %2$s</string>
+    <string name="restore_item_app_data_result">The app reports: %s</string>
+    <string name="restore_item_app_data_location">Written to: %s</string>
 
     <!-- Fork, +103: main-list filter for apps carrying a per-app note. A note is
          written because the app needed remembering, so the set of apps holding one
