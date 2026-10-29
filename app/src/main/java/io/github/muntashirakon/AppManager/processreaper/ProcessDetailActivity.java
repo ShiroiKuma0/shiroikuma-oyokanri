@@ -183,8 +183,68 @@ public class ProcessDetailActivity extends BaseActivity {
             }
         } catch (Throwable ignore) {
         }
+        mObjects = mPkg != null ? gatherObjects() : null;
         return buildRows(status, stat, orDash(vals.get("OA")), orDash(vals.get("OO")),
                 orDash(vals.get("SE")), orDash(vals.get("CG")), orDash(vals.get("CL")), orDash(vals.get("FD")));
+    }
+
+    // Fork: per-app object counts + GPU memory from `dumpsys meminfo <pid>` —
+    // what exposed the leaking launcher (67 Activities, 0 windows, 378 MB GPU).
+    // Written and read on the gather thread only.
+    @Nullable
+    private Map<String, Long> mObjects;
+
+    // "         Views:    17354         ViewRootImpl:        0" → name/value pairs.
+    private static final java.util.regex.Pattern OBJ_PAIR =
+            java.util.regex.Pattern.compile("([A-Za-z][A-Za-z ]*?):\\s+(\\d+)");
+
+    @Nullable
+    private Map<String, Long> gatherObjects() {
+        try {
+            Runner.Result r = Runner.runCommand("dumpsys meminfo " + mPid + " 2>/dev/null");
+            if (r == null || !r.isSuccessful()) return null;
+            Map<String, Long> out = new HashMap<>();
+            boolean inObjects = false;
+            for (String line : r.getOutputAsList()) {
+                String t = line.trim();
+                if (t.startsWith("Graphics:") && !out.containsKey("Graphics")) {
+                    java.util.regex.Matcher m = OBJ_PAIR.matcher(t);
+                    if (m.find()) out.put("Graphics", Long.parseLong(m.group(2)));
+                } else if (t.equals("Objects")) {
+                    inObjects = true;
+                } else if (inObjects) {
+                    if (t.isEmpty() || t.equals("SQL")) break;
+                    java.util.regex.Matcher m = OBJ_PAIR.matcher(t);
+                    while (m.find()) out.put(m.group(1).trim(), Long.parseLong(m.group(2)));
+                }
+            }
+            return out.isEmpty() ? null : out;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private void objectsSection(@NonNull List<String[]> rows, @NonNull Map<String, Long> o) {
+        header(rows, "App objects");
+        Long gfx = o.get("Graphics");
+        if (gfx != null) {
+            row(rows, "GPU memory", Formatter.formatShortFileSize(this, gfx * 1024L)
+                    + (gfx * 1024L >= SystemHealth.GRAPHICS_HIGH_BYTES ? "  — unusually large" : ""));
+        }
+        Long act = o.get("Activities"), win = o.get("ViewRootImpl");
+        if (act != null && win != null) {
+            row(rows, "Activities / windows", act + " / " + win
+                    + (act - win >= SystemHealth.ACTIVITY_LEAK_EXCESS
+                    ? "  — leaking destroyed screens; killing it frees them" : ""));
+        }
+        Long views = o.get("Views");
+        if (views != null) row(rows, "Views", String.valueOf(views));
+        Long ctx = o.get("AppContexts");
+        if (ctx != null) row(rows, "App contexts", String.valueOf(ctx));
+        Long wv = o.get("WebViews");
+        if (wv != null) row(rows, "WebViews", String.valueOf(wv));
+        Long binders = o.get("Proxy Binders");
+        if (binders != null) row(rows, "Proxy binders", String.valueOf(binders));
     }
 
     // ---- Build display rows ---------------------------------------------
@@ -218,6 +278,9 @@ public class ProcessDetailActivity extends BaseActivity {
         row(rows, "Data / Stack", humanKb(st.get("VmData")) + " / " + humanKb(st.get("VmStk")));
         row(rows, "Swap", humanKb(st.get("VmSwap")));
         row(rows, "Open FDs", fd);
+
+        Map<String, Long> objects = mObjects;
+        if (objects != null) objectsSection(rows, objects);
 
         header(rows, "CPU & scheduling");
         row(rows, "CPU now", orDash(in.getStringExtra(EXTRA_CPU)));

@@ -1708,6 +1708,25 @@
     <!-- Fork: process monitor / reaper screen -->
     <string name="monitor_title">Process monitor</string>
     <string name="monitor_empty">No processes</string>
+    <!-- Fork: process monitor system-health header -->
+    <string name="monitor_health_system">Up %1$s · %2$s free of %3$s · Thermal: %4$s</string>
+    <string name="monitor_health_paging">Refaults %1$s/s · Major faults %2$s/s · Graphics buffers %3$s</string>
+    <string name="monitor_health_alloc_delta">(%s since opened)</string>
+    <string name="monitor_health_checking">Checking apps for leaked screens and GPU memory…</string>
+    <string name="monitor_health_clean">No app is holding destroyed screens or unusual GPU memory.</string>
+    <string name="monitor_health_leak">⚠ %1$s — %2$d activities, %3$d windows · %4$s GPU · leaking destroyed screens</string>
+    <string name="monitor_health_gfx">⚠ %1$s — %2$s GPU memory</string>
+    <string name="monitor_health_gfx_growth">⚠ %1$s — %2$s GPU memory, %3$s since opened</string>
+    <string name="monitor_health_hint">Tap a flagged app to open it; killing it frees what it holds.</string>
+    <string name="monitor_health_not_listed">%s is not in the list right now.</string>
+    <string name="monitor_thermal_unknown">n/a</string>
+    <string name="monitor_thermal_none">normal</string>
+    <string name="monitor_thermal_light">light</string>
+    <string name="monitor_thermal_moderate">moderate</string>
+    <string name="monitor_thermal_severe">severe</string>
+    <string name="monitor_thermal_critical">critical</string>
+    <string name="monitor_thermal_emergency">emergency</string>
+    <string name="monitor_thermal_shutdown">shutdown</string>
     <string name="monitor_summary">%1$d processes · %2$d killable · %3$d leaks</string>
     <string name="monitor_badge_killable">KILLABLE</string>
     <string name="monitor_badge_protected">PROTECTED</string>
