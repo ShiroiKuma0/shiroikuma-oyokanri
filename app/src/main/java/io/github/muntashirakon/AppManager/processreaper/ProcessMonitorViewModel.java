@@ -116,7 +116,8 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
     private final MutableLiveData<int[]> mBulkKillResult = new MutableLiveData<>();  // {ok, total}
 
     private final java.util.concurrent.atomic.AtomicBoolean mBusy = new java.util.concurrent.atomic.AtomicBoolean(false);
-    private final Map<String, String> mLabelCache = new HashMap<>();
+    // Concurrent: the health sampler reads it from its own thread.
+    private final Map<String, String> mLabelCache = new java.util.concurrent.ConcurrentHashMap<>();
     private Map<Integer, Long> mPrevTicks;
     private long mPrevSampleMs;
     // pid → ppid, harvested for free from the same /proc/*/stat batch the CPU
@@ -150,12 +151,43 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
     // next refresh (one interval later). Session-only, like the toolbar toggle.
     private volatile int mSort = SORT_CPU;
 
+    // Fork: system-health header (see SystemHealth). The fast half is sampled on
+    // the serialized load thread; the slow half (dumpsys meminfo --checkin, ~9 s)
+    // on a thread of its own, at most every OBJECTS_TTL_MS, so it never holds up
+    // a refresh. Baselines are per session: "growth since you opened this".
+    private final MutableLiveData<SystemHealth> mHealth = new MutableLiveData<>();
+    @Nullable
+    private volatile SystemHealth mLastHealth;
+    private volatile List<SystemHealth.Suspect> mSuspects = SystemHealth.emptySuspects();
+    private volatile boolean mObjectsSampled;
+    private final java.util.concurrent.atomic.AtomicBoolean mObjectsBusy = new java.util.concurrent.atomic.AtomicBoolean(false);
+    private volatile long mObjectsMs;
+    private static final long OBJECTS_TTL_MS = 60_000L;
+    private final Map<Integer, Long> mGfxBaseline = new HashMap<>();  // objects thread only
+    private long[] mPrevVm;
+    private long mPrevVmMs;
+    private volatile long mAllocatorPss = -1;
+    private long mAllocatorBaseline = -1;
+
     public ProcessMonitorViewModel(@NonNull Application application) {
         super(application);
     }
 
     public MutableLiveData<List<Row>> getRows() {
         return mRows;
+    }
+
+    public MutableLiveData<SystemHealth> getHealth() {
+        return mHealth;
+    }
+
+    /** The loaded row that kills {@code pid}, if any (the health header's suspects link to it). */
+    @Nullable
+    public Row findRowByPid(int pid) {
+        for (Row r : mAllRows) {
+            if (r.pids.contains(pid)) return r;
+        }
+        return null;
     }
 
     /** Live search filter (matches the app label / process name / package). */
@@ -390,6 +422,8 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
                 sort(rows);
                 mAllRows = rows;
                 mRows.postValue(filterRows(rows));
+                publishHealth(ctx);
+                maybeSampleObjects(ctx);
             } finally {
                 mLoading.postValue(false);
                 mBusy.set(false);
@@ -732,12 +766,13 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
         return mPss;
     }
 
-    // "   707,250K: name (pid 914 / activities)" → group 1 = PSS kB, group 2 = pid.
-    private static final Pattern PSS_LINE = Pattern.compile("^\\s*([\\d,]+)K:\\s+.*\\(pid\\s+(\\d+)");
+    // "   707,250K: name (pid 914 / activities)" → group 1 = PSS kB, group 2 = name, group 3 = pid.
+    private static final Pattern PSS_LINE = Pattern.compile("^\\s*([\\d,]+)K:\\s+(.*?)\\s+\\(pid\\s+(\\d+)");
 
     @NonNull
     private Map<Integer, Long> samplePss() {
         Map<Integer, Long> map = new HashMap<>(256);
+        long allocator = -1;
         try {
             Runner.Result r = Runner.runCommand("dumpsys meminfo 2>/dev/null");
             if (r == null || !r.isSuccessful()) return map;
@@ -753,14 +788,112 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
                 if (m.find()) {
                     try {
                         long kb = Long.parseLong(m.group(1).replace(",", ""));
-                        map.put(Integer.parseInt(m.group(2)), kb * 1024L);
+                        map.put(Integer.parseInt(m.group(3)), kb * 1024L);
+                        // Fork: the graphics buffer allocator HAL holds every app's
+                        // GPU buffers on their behalf — the health header's headline.
+                        if (m.group(2).contains("graphics.allocator")) {
+                            allocator = Math.max(allocator, 0) + kb * 1024L;
+                        }
                     } catch (NumberFormatException ignore) {
                     }
                 }
             }
         } catch (Throwable ignore) {
         }
+        if (!map.isEmpty()) mAllocatorPss = allocator;
         return map;
+    }
+
+    /** Fast half of the health header — cheap reads, every refresh, load thread only. */
+    private void publishHealth(@NonNull Context ctx) {
+        long now = SystemClock.elapsedRealtime();
+        long[] mem = SystemHealth.readMeminfo();
+        long[] vm = SystemHealth.readVmstat();
+        double refault = Double.NaN, majflt = Double.NaN;
+        if (mPrevVm != null && now > mPrevVmMs) {
+            double dt = (now - mPrevVmMs) / 1000.0;
+            if (vm[0] >= 0 && mPrevVm[0] >= 0) refault = Math.max(0, vm[0] - mPrevVm[0]) / dt;
+            if (vm[1] >= 0 && mPrevVm[1] >= 0) majflt = Math.max(0, vm[1] - mPrevVm[1]) / dt;
+        }
+        mPrevVm = vm;
+        mPrevVmMs = now;
+        long alloc = mAllocatorPss;
+        if (alloc >= 0 && mAllocatorBaseline < 0) mAllocatorBaseline = alloc;
+        SystemHealth h = new SystemHealth(now, mem[0] << 10, mem[1] << 10, refault, majflt,
+                SystemHealth.readThermalStatus(ctx), alloc,
+                alloc >= 0 && mAllocatorBaseline >= 0 ? alloc - mAllocatorBaseline : 0,
+                mObjectsSampled, mSuspects);
+        mLastHealth = h;
+        mHealth.postValue(h);
+    }
+
+    /** Slow half — per-app Activity/window/GPU counts, once per OBJECTS_TTL_MS, own thread. */
+    private void maybeSampleObjects(@NonNull Context ctx) {
+        long now = SystemClock.elapsedRealtime();
+        if (mObjectsMs != 0 && now - mObjectsMs < OBJECTS_TTL_MS) return;
+        if (!mObjectsBusy.compareAndSet(false, true)) return;
+        mObjectsMs = now;
+        ThreadUtils.postOnBackgroundThread(() -> {
+            try {
+                Runner.Result r = Runner.runCommand("dumpsys meminfo --checkin 2>/dev/null");
+                if (r == null || !r.isSuccessful()) return;
+                List<SystemHealth.AppObjects> objs = SystemHealth.parseCheckin(r.getOutputAsList());
+                if (objs.isEmpty()) return;  // unreadable shape — keep what we had
+                PackageManager pm = ctx.getPackageManager();
+                List<SystemHealth.Suspect> out = new ArrayList<>();
+                Set<Integer> alive = new HashSet<>();
+                for (SystemHealth.AppObjects o : objs) {
+                    alive.add(o.pid);
+                    Long base = mGfxBaseline.get(o.pid);
+                    if (base == null) {
+                        mGfxBaseline.put(o.pid, o.graphicsBytes);
+                        base = o.graphicsBytes;
+                    }
+                    long growth = Math.max(0, o.graphicsBytes - base);
+                    boolean flag = o.activities - o.windows >= SystemHealth.ACTIVITY_LEAK_EXCESS
+                            || o.graphicsBytes >= SystemHealth.GRAPHICS_HIGH_BYTES
+                            || growth >= SystemHealth.GRAPHICS_GROWTH_BYTES;
+                    if (!flag) continue;
+                    out.add(new SystemHealth.Suspect(o.pid, o.processName, processLabel(pm, o.processName),
+                            o.activities, o.windows, o.views, o.graphicsBytes, growth, o.pssBytes));
+                }
+                mGfxBaseline.keySet().retainAll(alive);  // a recycled pid starts fresh
+                // Leaked screens first (the unambiguous finding), then by GPU memory.
+                Collections.sort(out, (a, b) -> {
+                    if (a.leaksActivities() != b.leaksActivities()) return a.leaksActivities() ? -1 : 1;
+                    return Long.compare(b.graphicsBytes, a.graphicsBytes);
+                });
+                mSuspects = out;
+                mObjectsSampled = true;
+                SystemHealth h = mLastHealth;
+                if (h != null) {
+                    h = h.withSuspects(out);
+                    mLastHealth = h;
+                    mHealth.postValue(h);
+                }
+            } catch (Throwable ignore) {
+            } finally {
+                mObjectsBusy.set(false);
+            }
+        });
+    }
+
+    @NonNull
+    private String processLabel(@NonNull PackageManager pm, @NonNull String processName) {
+        int colon = processName.indexOf(':');
+        String pkg = colon > 0 ? processName.substring(0, colon) : processName;
+        String label = mLabelCache.get(pkg);
+        if (label == null) {
+            try {
+                ApplicationInfo ai = pm.getApplicationInfo(pkg, PackageManager.MATCH_UNINSTALLED_PACKAGES
+                        | PackageManager.MATCH_DISABLED_COMPONENTS);
+                CharSequence l = ai.loadLabel(pm);
+                label = !TextUtils.isEmpty(l) ? l.toString() : pkg;
+            } catch (Throwable t) {
+                label = pkg;
+            }
+        }
+        return colon > 0 ? label + " (" + processName.substring(colon) + ")" : label;
     }
 
     @NonNull

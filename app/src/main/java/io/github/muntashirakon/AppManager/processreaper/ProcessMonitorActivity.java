@@ -59,6 +59,7 @@ public class ProcessMonitorActivity extends BaseActivity {
     private String mLayoutGeometry;
     private LinearProgressIndicator mProgress;
     private View mEmpty;
+    private android.widget.LinearLayout mHealth;
 
     private final Handler mHandler = new Handler(Looper.getMainLooper());
     private long mIntervalMs = 2000;
@@ -94,6 +95,7 @@ public class ProcessMonitorActivity extends BaseActivity {
         mProgress.setIndeterminate(true);
         mProgress.setVisibilityAfterHide(View.GONE);
         mEmpty = findViewById(R.id.monitor_empty);
+        mHealth = findViewById(R.id.monitor_health);
 
         mList = findViewById(R.id.monitor_list);
         applyListLayout();
@@ -140,6 +142,7 @@ public class ProcessMonitorActivity extends BaseActivity {
             ActionBar ab = getSupportActionBar();
             if (ab != null) ab.setSubtitle(getString(R.string.monitor_summary, pids, killable, leaks));
         });
+        mViewModel.getHealth().observe(this, this::bindHealth);
         mViewModel.getLoading().observe(this, loading -> {
             if (Boolean.TRUE.equals(loading)) mProgress.show();
             else mProgress.hide();
@@ -210,6 +213,108 @@ public class ProcessMonitorActivity extends BaseActivity {
                 realApp ? pkg : null, row.title, row.cls.killable, row.cls.method,
                 row.item.uid, row.cls.reason, row.item.user, row.cpu, row.memBytes,
                 "in use".equals(row.cls.reason)));
+    }
+
+    /**
+     * Fork: the system-health header (see {@link SystemHealth}) — what a
+     * per-process CPU/RAM ranking cannot show: memory, paging, thermal state, the
+     * graphics allocator, and apps holding destroyed screens or large GPU memory.
+     * A figure past its threshold is drawn in the leak colour; a flagged app is
+     * one tappable line that opens its process detail page.
+     */
+    private void bindHealth(@Nullable SystemHealth h) {
+        if (h == null || mHealth == null) return;
+        mHealth.removeAllViews();
+        mHealth.setVisibility(View.VISIBLE);
+        int yellow = ContextCompat.getColor(this, R.color.theme_bright_yellow);
+        int warn = io.github.muntashirakon.AppManager.fonts.ColorPrefs.getColor(this,
+                io.github.muntashirakon.AppManager.fonts.ColorPrefs.MONITOR_LEAK);
+        int dim = 0xFF9A9A9A;
+
+        String alloc = h.allocatorBytes < 0 ? "—" : android.text.format.Formatter.formatShortFileSize(this, h.allocatorBytes);
+        if (h.allocatorBytes >= 0 && Math.abs(h.allocatorDeltaBytes) >= (16L << 20)) {
+            String d = android.text.format.Formatter.formatShortFileSize(this, Math.abs(h.allocatorDeltaBytes));
+            alloc += " " + getString(R.string.monitor_health_alloc_delta, (h.allocatorDeltaBytes > 0 ? "+" : "−") + d);
+        }
+        addHealthLine(getString(R.string.monitor_health_system, uptimeLabel(h.uptimeMs),
+                        android.text.format.Formatter.formatShortFileSize(this, h.memAvailableBytes),
+                        android.text.format.Formatter.formatShortFileSize(this, h.memTotalBytes),
+                        thermalLabel(h.thermalStatus)),
+                h.memoryLow() || h.thermalHot() ? warn : yellow, null);
+        addHealthLine(getString(R.string.monitor_health_paging, rate(h.refaultsPerSec), rate(h.majorFaultsPerSec), alloc),
+                h.pagingHeavy() ? warn : yellow, null);
+        if (!h.objectsSampled) {
+            addHealthLine(getString(R.string.monitor_health_checking), dim, null);
+            return;
+        }
+        if (h.suspects.isEmpty()) {
+            addHealthLine(getString(R.string.monitor_health_clean), dim, null);
+            return;
+        }
+        for (SystemHealth.Suspect s : h.suspects) {
+            String gpu = android.text.format.Formatter.formatShortFileSize(this, s.graphicsBytes);
+            String text;
+            if (s.leaksActivities()) {
+                text = getString(R.string.monitor_health_leak, s.label, s.activities, s.windows, gpu);
+            } else if (s.graphicsGrowthBytes >= SystemHealth.GRAPHICS_GROWTH_BYTES) {
+                text = getString(R.string.monitor_health_gfx_growth, s.label, gpu,
+                        "+" + android.text.format.Formatter.formatShortFileSize(this, s.graphicsGrowthBytes));
+            } else {
+                text = getString(R.string.monitor_health_gfx, s.label, gpu);
+            }
+            addHealthLine(text, warn, v -> {
+                ProcessMonitorViewModel.Row row = mViewModel.findRowByPid(s.pid);
+                if (row != null) onRowClick(row);
+                else UIUtils.displayShortToast(getString(R.string.monitor_health_not_listed, s.label));
+            });
+        }
+        addHealthLine(getString(R.string.monitor_health_hint), dim, null);
+    }
+
+    private void addHealthLine(@NonNull CharSequence text, int color, @Nullable View.OnClickListener click) {
+        androidx.appcompat.widget.AppCompatTextView tv = new androidx.appcompat.widget.AppCompatTextView(this);
+        tv.setText(text);
+        tv.setTextColor(color);
+        tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13);
+        int pad = Math.round(getResources().getDisplayMetrics().density * 2);
+        tv.setPadding(0, pad, 0, pad);
+        if (click != null) {
+            tv.setOnClickListener(click);
+            android.util.TypedValue tvBg = new android.util.TypedValue();
+            if (getTheme().resolveAttribute(android.R.attr.selectableItemBackground, tvBg, true)) {
+                tv.setBackgroundResource(tvBg.resourceId);
+            }
+        }
+        mHealth.addView(tv);
+    }
+
+    @NonNull
+    private static String rate(double perSec) {
+        if (Double.isNaN(perSec)) return "—";
+        return perSec >= 10 ? String.valueOf(Math.round(perSec)) : String.format(java.util.Locale.US, "%.1f", perSec);
+    }
+
+    @NonNull
+    private static String uptimeLabel(long ms) {
+        long m = ms / 60_000L;
+        long d = m / (24 * 60), hr = (m / 60) % 24, min = m % 60;
+        if (d > 0) return d + " d " + hr + " h";
+        if (hr > 0) return hr + " h " + min + " m";
+        return min + " m";
+    }
+
+    @NonNull
+    private String thermalLabel(int status) {
+        switch (status) {
+            case 0: return getString(R.string.monitor_thermal_none);
+            case 1: return getString(R.string.monitor_thermal_light);
+            case 2: return getString(R.string.monitor_thermal_moderate);
+            case 3: return getString(R.string.monitor_thermal_severe);
+            case 4: return getString(R.string.monitor_thermal_critical);
+            case 5: return getString(R.string.monitor_thermal_emergency);
+            case 6: return getString(R.string.monitor_thermal_shutdown);
+            default: return getString(R.string.monitor_thermal_unknown);
+        }
     }
 
     @NonNull
