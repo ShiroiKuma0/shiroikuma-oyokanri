@@ -258,7 +258,7 @@ public class ProcessDetailActivity extends BaseActivity {
         List<String[]> rows = new ArrayList<>();
 
         header(rows, "Process");
-        row(rows, "Name", orDash(st.get("Name")));
+        row(rows, "Name", processName(st.get("Name"), cmdline, mPkg));
         row(rows, "Package", orDash(mPkg));
         row(rows, "PID", String.valueOf(mPid));
         row(rows, "PPID", firstTok(st.get("PPid")));
@@ -547,6 +547,34 @@ public class ProcessDetailActivity extends BaseActivity {
     }
 
     // ---- Formatting helpers ---------------------------------------------
+
+    /**
+     * Fork (白い熊, +067): the kernel comm — {@code /proc/<pid>/status} "Name" and
+     * {@code /proc/<pid>/stat} field 2 — is truncated to 15 characters
+     * (TASK_COMM_LEN − 1), and ART keeps the TAIL of a long process name, so an app
+     * whose process name is longer than 15 chars shows a Name missing its first
+     * characters: {@code shiroikuma.ongaku} (17) rendered as the misleading
+     * {@code iroikuma.ongaku} (its last 15). We already have the real process name in
+     * full — argv[0] of cmdline, else the package — so when the comm is merely a
+     * truncation of it (a suffix on this ART, a prefix on a kernel that keeps the
+     * head) show the full name. A comm that genuinely differs (a renamed thread, e.g.
+     * our {@code :priv:0} server whose comm is "main") is shown verbatim — that is
+     * real diagnostic information, not a truncation.
+     */
+    @NonNull
+    private static String processName(@Nullable String comm, @NonNull String cmdline, @Nullable String pkg) {
+        String kernel = comm == null ? "" : comm.trim();
+        String full = cmdline.trim();
+        int sp = full.indexOf(' ');          // argv[0] — cmdline is space-joined
+        if (sp > 0) full = full.substring(0, sp);
+        if (TextUtils.isEmpty(full)) full = pkg == null ? "" : pkg.trim();
+        if (TextUtils.isEmpty(kernel)) return orDash(full);
+        if (!TextUtils.isEmpty(full) && full.length() > kernel.length()
+                && (full.endsWith(kernel) || full.startsWith(kernel))) {
+            return full;
+        }
+        return kernel;
+    }
 
     @NonNull
     private static String[] parseStat(@NonNull String stat) {
