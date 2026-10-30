@@ -10,6 +10,43 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-10-19.01-45.g15d835d6+067 — 2026-10-30
+
+Built on upstream App Manager **4.1.1**, rebased from commit `41d79af5` (2026-09-05) onto
+`15d835d6` (2026-10-19) — about **95 new upstream commits**, headlined by a new **Actions**
+framework (package- and global-scoped actions, action plans, a logger, and device-state, reboot,
+setting, install-existing, uninstall, backup and backup/restore actions), a **mode-of-operations
+rework**, **VirusTotal history**, pinch-to-zoom in the PDF viewer, and a run of upstream crash
+fixes. The whole fork stack — all ~206 commits — was replayed on top and its call sites
+re-anchored onto the upstream API moves, with no change to fork behaviour, plus one process-monitor
+display fix.
+
+### Upstream 4.1.1 master sync
+
+- **The fork stack rebased onto upstream master of 2026-10-19** (`15d835d6`), up from 2026-09-05
+  (`41d79af5`). Every fork feature is carried across unchanged; the pin in the version name records
+  the new base. The upstream base literal did not move (still `4.1.1`), so the fork build counter
+  kept counting rather than resetting.
+- **Re-anchored onto upstream's API moves.** The mode-of-operations rework replaced
+  `LocalServer.alive` with `checkServerHealth`, so the two fork call sites that watch for a lost
+  privileged session now use it. Upstream backed VirusTotal with a new history component, so the
+  feature controller manages that component too, while keeping the fork's extra “needs internet”
+  requirement.
+- **Room database migrated to v12.** The fork's live v1–v11 chain — the battery sampler and the
+  permission-override table — is kept intact, and upstream's new file-manager and VirusTotal tables
+  are appended as a fresh migration rather than renumbering the schema an installed phone already
+  sits at, so the upgrade carries your battery history and settings across untouched.
+
+### Process monitor
+
+- **The detail page's Name row no longer looks like a different app.** It showed the kernel's
+  15-character process name verbatim, and Android keeps the *tail* of a longer name — so
+  `shiroikuma.ongaku` rendered as `iroikuma.ongaku`, missing its first characters while Package and
+  cmdline directly below it were correct. The Name is now un-truncated to the full process name
+  whenever the kernel name is merely a piece of it; a genuinely different name (a renamed thread,
+  such as the privileged server's `main`) is still shown as-is, since that is real diagnostic
+  information.
+
 ## 4.1.1+2026-09-05.03-37.g41d79af5+065 — 2026-10-30
 
 Built on upstream App Manager **4.1.1**, rebased on commit `41d79af5` (2026-09-05). This release
