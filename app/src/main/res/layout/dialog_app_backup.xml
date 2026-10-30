@@ -57,6 +57,19 @@
 
     </io.github.muntashirakon.widget.MaxHeightScrollView>
 
+    <!-- Fork (白い熊, +056): per-app install-source override — the main setting lives on the App info
+         page; this line READS it and lets you make an emergency change on restore. Subdued, no icon. -->
+    <TextView
+        android:id="@+id/install_source_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/selectableItemBackground"
+        android:paddingVertical="8dp"
+        android:textColor="@color/theme_bright_yellow"
+        android:textSize="12sp"
+        android:alpha="0.75"
+        tools:text="Install source: Default · tap to change" />
+
     <io.github.muntashirakon.widget.FlowLayout
         android:id="@+id/backup_actions"
         android:layout_width="match_parent"

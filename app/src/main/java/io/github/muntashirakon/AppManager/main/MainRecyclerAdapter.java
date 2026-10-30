@@ -74,7 +74,6 @@ import io.github.muntashirakon.AppManager.fonts.RunningBoxPrefs;
 import io.github.muntashirakon.AppManager.fonts.SelectionFramePrefs;
 import io.github.muntashirakon.AppManager.apk.installer.PackageInstallerCompat;
 import io.github.muntashirakon.AppManager.backup.dialog.AppBackupDialogFragment;
-import io.github.muntashirakon.AppManager.backup.dialog.BackupRestoreDialogFragment;
 import io.github.muntashirakon.AppManager.compat.ApplicationInfoCompat;
 import io.github.muntashirakon.AppManager.compat.PackageManagerCompat;
 import io.github.muntashirakon.AppManager.details.AppDetailsActivity;
@@ -1484,10 +1483,10 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                 showBackupDialog(item);
                 break;
             case "restore":
-                openBackupSheet(item, BackupRestoreDialogFragment.MODE_RESTORE);
+                showBackupDialog(item);
                 break;
             case "delete_backup":
-                openBackupSheet(item, BackupRestoreDialogFragment.MODE_DELETE);
+                showBackupDialog(item);
                 break;
             case "share_backup":
                 // Fork (白い熊): pick one of this app's backups, hand its directory to 魔法絨毯.
@@ -1655,19 +1654,10 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         // meant here is a restore. This used to open the unrestricted sheet, which for a mixed
         // state produced the backup tab, its "not installed and cannot be backed up" banner and a
         // delete icon — for an app that by definition cannot be backed up.
-        openBackupSheet(item, BackupRestoreDialogFragment.MODE_RESTORE);
+        showBackupDialog(item);
     }
 
     /** Fork (白い熊): the sheet for ONE app, restricted to one action. */
-    private void openBackupSheet(@NonNull ApplicationItem item,
-                                 @BackupRestoreDialogFragment.ActionMode int actionMode) {
-        BackupRestoreDialogFragment fragment = BackupRestoreDialogFragment.getInstance(
-                Collections.singletonList(new UserPackagePair(
-                        item.packageName, UserHandleHidden.myUserId())), actionMode);
-        fragment.setOnActionBeginListener(mode -> mActivity.showProgressIndicator(true));
-        fragment.setOnActionCompleteListener((mode, failedPackages) -> mActivity.showProgressIndicator(false));
-        fragment.show(mActivity.getSupportFragmentManager(), BackupRestoreDialogFragment.TAG);
-    }
 
     /**
      * Toggle the freeze state of {@code item} via the freeze-indicator click.

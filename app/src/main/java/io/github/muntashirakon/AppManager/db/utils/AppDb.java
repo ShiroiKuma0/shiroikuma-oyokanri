@@ -24,6 +24,7 @@ import androidx.annotation.WorkerThread;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
@@ -84,6 +85,19 @@ public class AppDb {
         synchronized (sLock) {
             return mAppDao.getAll(packageName);
         }
+    }
+
+    // Fork (白い熊, 2026-10-29): read a package's rows without sLock. The read-only restore dialog
+    // used the locked variants and therefore blocked for minutes behind the first-load
+    // updateApplications(), which holds sLock for its whole run. Room is itself thread-safe for a
+    // read concurrent with a write, and the dialog re-reads on every operation, so a row that is a
+    // few seconds stale is harmless -- a blocked dialog is not. See getAllBackupsNoLock().
+    public List<App> getAllApplicationsNoLock(String packageName) {
+        return mAppDao.getAll(packageName);
+    }
+
+    public List<App> getAllApplicationsNoLock(String packageName, @UserIdInt int userId) {
+        return mAppDao.getAll(packageName, userId);
     }
 
     public List<App> getAllApplications(String packageName, @UserIdInt int userId) {
@@ -249,6 +263,33 @@ public class AppDb {
 
     @WorkerThread
     public void updateApplications(@NonNull Context context) {
+        // Fork (白い熊, 2026-10-29): getInstalledPackages() for every package across users, with full
+        // component lists + signing certs, through the privileged binder, is this method's dominant
+        // cost -- minutes on a phone with many apps on first load. It used to run INSIDE sLock, which
+        // every other sLock holder then waited on: the restore dialog's getAllApplications()/
+        // getAllBackups() among them, so pressing Restore right after launch hung for minutes. The
+        // query reads nothing from our DB, so it is gathered here, OUTSIDE the lock; only the
+        // read-modify-write below is held. A package that changes in the small window between the
+        // query and the lock is picked up by the next broadcast-driven update, exactly as before.
+        List<Integer> userIds = new ArrayList<>();
+        Map<Integer, List<PackageInfo>> packagesByUser = new LinkedHashMap<>();
+        for (int userId : Users.getUsersIds()) {
+            // Interrupt thread on request
+            if (ThreadUtils.isInterrupted()) return;
+
+            if (!SelfPermissions.checkCrossUserPermission(userId, false)) {
+                // No support for cross user
+                continue;
+            }
+            List<PackageInfo> packageInfoList = PackageManagerCompat.getInstalledPackages(
+                    GET_SIGNING_CERTIFICATES | PackageManager.GET_ACTIVITIES
+                            | PackageManager.GET_RECEIVERS | PackageManager.GET_PROVIDERS
+                            | PackageManager.GET_SERVICES | MATCH_DISABLED_COMPONENTS
+                            | MATCH_UNINSTALLED_PACKAGES | MATCH_STATIC_SHARED_AND_SDK_LIBRARIES, userId);
+            userIds.add(userId);
+            packagesByUser.put(userId, packageInfoList);
+        }
+        if (ThreadUtils.isInterrupted()) return;
         synchronized (sLock) {
             Map<String, Backup> backups = getBackups(false);
             List<App> oldApps = new ArrayList<>(mAppDao.getAll());
@@ -259,20 +300,14 @@ public class AppDb {
             // Interrupt thread on request
             if (ThreadUtils.isInterrupted()) return;
 
-            for (int userId : Users.getUsersIds()) {
+            for (int userId : userIds) {
                 // Interrupt thread on request
                 if (ThreadUtils.isInterrupted()) return;
 
-                if (!SelfPermissions.checkCrossUserPermission(userId, false)) {
-                    // No support for cross user
+                List<PackageInfo> packageInfoList = packagesByUser.get(userId);
+                if (packageInfoList == null) {
                     continue;
                 }
-
-                List<PackageInfo> packageInfoList = PackageManagerCompat.getInstalledPackages(
-                        GET_SIGNING_CERTIFICATES | PackageManager.GET_ACTIVITIES
-                                | PackageManager.GET_RECEIVERS | PackageManager.GET_PROVIDERS
-                                | PackageManager.GET_SERVICES | MATCH_DISABLED_COMPONENTS
-                                | MATCH_UNINSTALLED_PACKAGES | MATCH_STATIC_SHARED_AND_SDK_LIBRARIES, userId);
 
                 for (PackageInfo packageInfo : packageInfoList) {
                     // Interrupt thread on request

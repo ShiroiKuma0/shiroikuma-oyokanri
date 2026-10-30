@@ -66,6 +66,12 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
         public final String cpu;
         public final double cpuPercent;                 // for sorting
         public final long memBytes;                     // for sorting
+        // Fork (白い熊, +062): set after construction when this row's process matches a leak suspect
+        // (the slow objects sampler). A suspect is pinned to the top, shown with its leak note, and
+        // is killable + restartable even when the reaper would otherwise protect it.
+        public boolean isLeakSuspect;
+        public String leakNote;
+        public String leakPackage;   // package to force-stop + relaunch, or null
 
         Row(ProcessItem item, ProcessClassifier.Result cls, List<Integer> pids, int memberCount,
             boolean isLeak, String title, String subtitle, String meta, String ram, String cpu,
@@ -113,6 +119,7 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
     private volatile int mFilterType = 0;
     private final MutableLiveData<Boolean> mLoading = new MutableLiveData<>();
     private final MutableLiveData<Pair<Row, Boolean>> mKillResult = new MutableLiveData<>();
+    private final MutableLiveData<Pair<Row, Boolean>> mRestartResult = new MutableLiveData<>();
     private final MutableLiveData<int[]> mBulkKillResult = new MutableLiveData<>();  // {ok, total}
 
     private final java.util.concurrent.atomic.AtomicBoolean mBusy = new java.util.concurrent.atomic.AtomicBoolean(false);
@@ -270,6 +277,10 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
         return mKillResult;
     }
 
+    public MutableLiveData<Pair<Row, Boolean>> getRestartResult() {
+        return mRestartResult;
+    }
+
     public MutableLiveData<int[]> getBulkKillResult() {
         return mBulkKillResult;
     }
@@ -419,6 +430,7 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
                     }
                 }
 
+                markLeakSuspects(rows);
                 sort(rows);
                 mAllRows = rows;
                 mRows.postValue(filterRows(rows));
@@ -520,13 +532,53 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
                 cpuStr(cpu), cpu, mem);
     }
 
+    // Fork (白い熊, +062): mark the rows whose process is a current leak suspect, so they render as
+    // ordinary cards (not header text), pin to the top, and offer kill + restart. Matching by pid to
+    // an existing row means a killed suspect's row is simply gone on the next refresh — which is why
+    // killing one removes it from the "leaking" set, where the old header text (cached 60 s) did not.
+    private void markLeakSuspects(@NonNull List<Row> rows) {
+        List<SystemHealth.Suspect> suspects = mSuspects;
+        if (suspects.isEmpty()) return;
+        Map<Integer, SystemHealth.Suspect> byPid = new HashMap<>(suspects.size());
+        for (SystemHealth.Suspect s : suspects) byPid.put(s.pid, s);
+        Context ctx = getApplication();
+        for (Row r : rows) {
+            SystemHealth.Suspect s = null;
+            for (Integer pid : r.pids) {
+                s = byPid.get(pid);
+                if (s != null) break;
+            }
+            if (s == null) continue;
+            r.isLeakSuspect = true;
+            r.leakNote = leakNoteFor(ctx, s);
+            r.leakPackage = (r.item instanceof AppProcessItem)
+                    ? ((AppProcessItem) r.item).packageInfo.packageName : null;
+        }
+    }
+
+    @NonNull
+    private String leakNoteFor(@NonNull Context ctx, @NonNull SystemHealth.Suspect s) {
+        StringBuilder sb = new StringBuilder();
+        if (s.leaksActivities()) {
+            sb.append(s.activities).append(" activities · ").append(s.windows)
+                    .append(s.windows == 1 ? " window · " : " windows · ")
+                    .append(Formatter.formatShortFileSize(ctx, s.graphicsBytes)).append(" GPU · leaking screens");
+        } else if (s.graphicsGrowthBytes >= SystemHealth.GRAPHICS_GROWTH_BYTES) {
+            sb.append(Formatter.formatShortFileSize(ctx, s.graphicsBytes)).append(" GPU · +")
+                    .append(Formatter.formatShortFileSize(ctx, s.graphicsGrowthBytes)).append(" since opened");
+        } else {
+            sb.append(Formatter.formatShortFileSize(ctx, s.graphicsBytes)).append(" GPU memory");
+        }
+        return sb.toString();
+    }
+
     private void sort(@NonNull List<Row> rows) {
         final boolean byCpu = mSort == SORT_CPU;
         Collections.sort(rows, (a, b) -> {
-            // Leaks pinned to the top — they're the most actionable, and (being
-            // tiny orphaned helpers) would otherwise sink to the bottom of a
-            // RAM/CPU sort and be missed.
-            if (a.isLeak != b.isLeak) return a.isLeak ? -1 : 1;
+            // Leak suspects and leak clusters pinned to the top — the most actionable rows.
+            boolean ap = a.isLeak || a.isLeakSuspect;
+            boolean bp = b.isLeak || b.isLeakSuspect;
+            if (ap != bp) return ap ? -1 : 1;
             if (byCpu) {
                 double ca = Double.isNaN(a.cpuPercent) ? -1 : a.cpuPercent;
                 double cb = Double.isNaN(b.cpuPercent) ? -1 : b.cpuPercent;
@@ -538,7 +590,47 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
     }
 
     public void kill(@NonNull Row row) {
-        ThreadUtils.postOnBackgroundThread(() -> mKillResult.postValue(new Pair<>(row, doKill(row))));
+        ThreadUtils.postOnBackgroundThread(() -> {
+            boolean ok = doKill(row);
+            mObjectsMs = 0;  // a kill changes who leaks — re-sample the suspects at once
+            mKillResult.postValue(new Pair<>(row, ok));
+        });
+    }
+
+    /**
+     * Fork (白い熊, +062): force-stop a LEAKING app and relaunch it, even one the reaper protects —
+     * the protection stops accidental kills, but a leak is a reason to kill, and apps that must keep
+     * running (e.g. the automation driver) are restarted so they shed the leak and carry on. Always
+     * a force-stop of the package (the system allows it regardless of the reaper's own policy).
+     */
+    public void killAndRestartLeak(@NonNull Row row) {
+        ThreadUtils.postOnBackgroundThread(() -> {
+            boolean ok = false;
+            String pkg = row.leakPackage;
+            if (pkg != null) {
+                try {
+                    PackageManagerCompat.forceStopPackage(pkg, UserHandleHidden.getUserId(row.item.uid));
+                    ok = true;
+                } catch (Throwable ignore) {
+                }
+                if (ok) relaunch(pkg);
+            }
+            mObjectsMs = 0;  // force the suspect set to be recomputed on the next sample
+            mRestartResult.postValue(new Pair<>(row, ok));
+        });
+    }
+
+    private void relaunch(@NonNull String pkg) {
+        try {
+            Context ctx = getApplication();
+            android.content.Intent launch = ctx.getPackageManager().getLaunchIntentForPackage(pkg);
+            if (launch != null) {
+                launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                ctx.startActivity(launch);
+            }
+        } catch (Throwable ignore) {
+            // No launcher entry, or launch refused — the force-stop still shed the leak.
+        }
     }
 
     public void killSelected(@NonNull List<Row> rows) {

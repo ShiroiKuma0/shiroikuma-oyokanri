@@ -98,11 +98,12 @@ import io.github.muntashirakon.AppManager.apk.ApkUtils;
 import io.github.muntashirakon.AppManager.apk.behavior.FreezeUnfreeze;
 import io.github.muntashirakon.AppManager.apk.dexopt.DexOptDialog;
 import io.github.muntashirakon.AppManager.apk.behavior.FreezeUnfreezeShortcutInfo;
+import io.github.muntashirakon.AppManager.apk.installer.InstallSourcePrefs;
 import io.github.muntashirakon.AppManager.apk.installer.PackageInstallerActivity;
 import io.github.muntashirakon.AppManager.apk.installer.PackageInstallerCompat;
 import io.github.muntashirakon.AppManager.apk.signing.SignerInfo;
 import io.github.muntashirakon.AppManager.apk.whatsnew.WhatsNewDialogFragment;
-import io.github.muntashirakon.AppManager.backup.dialog.BackupRestoreDialogFragment;
+import io.github.muntashirakon.AppManager.backup.dialog.AppBackupDialogFragment;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsManager;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsService;
 import io.github.muntashirakon.AppManager.batchops.BatchQueueItem;
@@ -197,6 +198,9 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
     private ApplicationInfo mApplicationInfo;
     private ViewGroup mHorizontalLayout;
     private ViewGroup mTagCloud;
+    // Fork (白い熊, +057): the per-app install-source box.
+    private com.google.android.material.card.MaterialCardView mInstallSourceCard;
+    private TextView mInstallSourceValue;
     private SwipeRefreshLayout mSwipeRefresh;
     private CharSequence mAppLabel;
     private LinearProgressIndicator mProgressIndicator;
@@ -264,8 +268,14 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
         mPackageNameView = view.findViewById(R.id.packageName);
         mIconView = view.findViewById(R.id.icon);
         mVersionView = view.findViewById(R.id.version);
+        // Fork (白い熊, +057): the install-source box.
+        mInstallSourceCard = view.findViewById(R.id.install_source_card);
+        mInstallSourceValue = view.findViewById(R.id.install_source_value);
+        view.findViewById(R.id.install_source_set).setOnClickListener(v -> showInstallSourceChooser());
         mAdapter = new AppInfoRecyclerAdapter(requireContext());
         recyclerView.setAdapter(mAdapter);
+        // Fork (白い熊, +057): draw each info group inside a rounded box (Snooping card language).
+        recyclerView.addItemDecoration(new AppInfoGroupDecoration(requireContext()));
         mActivity.addMenuProvider(this, getViewLifecycleOwner(), Lifecycle.State.RESUMED);
         // Set observer
         mMainModel.get(AppDetailsFragment.APP_INFO).observe(getViewLifecycleOwner(), appDetailsItems -> {
@@ -496,17 +506,16 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
             });
         } else if (itemId == R.id.action_backup) {
             if (mMainModel == null) return true;
-            // Fork (白い熊): App info's own action backs up. Restoring is the "Backup" tag below,
-            // and deleting is the app pane's own pill — one action per control.
-            BackupRestoreDialogFragment fragment = BackupRestoreDialogFragment.getInstanceWithPref(
-                    Collections.singletonList(new UserPackagePair(mPackageName, mUserId)), mUserId,
-                    BackupRestoreDialogFragment.MODE_BACKUP);
+            // Fork (白い熊, +056): one unified single-app backup/restore/delete dialog — the pretty
+            // AppBackupDialogFragment — replacing the bottom sheet here too.
+            AppBackupDialogFragment fragment = AppBackupDialogFragment.getInstance(
+                    mPackageName, mUserId, mAppLabel);
             fragment.setOnActionBeginListener(mode -> showProgressIndicator(true));
             fragment.setOnActionCompleteListener((mode, failedPackages) -> {
                 showProgressIndicator(false);
                 mMainModel.getTagsAlteredLiveData().setValue(true);
             });
-            fragment.show(getParentFragmentManager(), BackupRestoreDialogFragment.TAG);
+            fragment.show(getParentFragmentManager(), AppBackupDialogFragment.TAG);
         } else if (itemId == R.id.action_view_settings) {
             try {
                 ActivityManagerCompat.startActivity(IntentUtils.getAppDetailsSettings(mPackageName), mUserId);
@@ -784,8 +793,33 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
         mMainModel.triggerPackageChange();
     }
 
+    // Fork (白い熊, +057): the install-source box, in the Snooping cards' language (stroke set in
+    // code to the fork ink). Shows the current value; the "Set" button opens the chooser.
+    private void bindInstallSourceCard() {
+        if (mInstallSourceCard == null) return;
+        if (mIsExternalApk || mPackageName == null) {
+            mInstallSourceCard.setVisibility(View.GONE);
+            return;
+        }
+        mInstallSourceCard.setStrokeColor(io.github.muntashirakon.AppManager.utils.ForkThemeUtils.getTextColor());
+        mInstallSourceCard.setVisibility(View.VISIBLE);
+        String store = InstallSourcePrefs.getInstallSource(mPackageName);
+        String label;
+        if (store == null) {
+            label = getString(R.string.install_source_default);
+        } else if (InstallSourcePrefs.STORE_PLAY.equals(store)) {
+            label = getString(R.string.install_source_play) + " (" + store + ")";
+        } else if (InstallSourcePrefs.STORE_APPGALLERY.equals(store)) {
+            label = getString(R.string.install_source_appgallery) + " (" + store + ")";
+        } else {
+            label = store;
+        }
+        mInstallSourceValue.setText(label);
+    }
+
     @MainThread
     private void setupTagCloud(@NonNull AppInfoViewModel.TagCloud tagCloud) {
+        bindInstallSourceCard();
         if (mTagCloudFuture != null) mTagCloudFuture.cancel(true);
         mTagCloudFuture = ThreadUtils.postOnBackgroundThread(() -> {
             List<TagItem> tagItems = getTagCloudItems(tagCloud);
@@ -820,8 +854,16 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
             }
             TagItem trackerTag = new TagItem();
             tagItems.add(trackerTag);
+            // Fork (白い熊, +060): count DISTINCT tracker names, exactly as the Snooping page's
+            // trackers row does (TrackerScan.fromManifest groups by name) — several components can
+            // belong to one tracker, so a component count disagreed with Snooping. The block dialog
+            // below still lists the components, which is the right granularity for blocking.
+            int trackerCount = io.github.muntashirakon.AppManager.trackers.TrackerScan
+                    .fromManifest(mPackageInfo).size();
+            if (trackerCount == 0) trackerCount = tagCloud.trackerComponents.size();
+            final int trackerCountFinal = trackerCount;
             trackerTag.setText(getResources().getQuantityString(R.plurals.no_of_trackers,
-                            tagCloud.trackerComponents.size(), tagCloud.trackerComponents.size()))
+                            trackerCountFinal, trackerCountFinal))
                     .setColor(tagCloud.areAllTrackersBlocked
                             ? ColorCodes.getComponentTrackerBlockedIndicatorColor(context)
                             : ColorCodes.getComponentTrackerIndicatorColor(context))
@@ -1069,15 +1111,14 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
             tagItems.add(backupTag);
             backupTag.setTextRes(R.string.backup)
                     .setOnClickListener(v -> {
-                        BackupRestoreDialogFragment fragment = BackupRestoreDialogFragment.getInstance(
-                                Collections.singletonList(new UserPackagePair(mPackageName, mUserId)),
-                                // Fork (白い熊): restore only. The tag says "this app has backups",
-                                // so tapping it offers to put one back; it never also offers to
-                                // destroy them from the same surface.
-                                BackupRestoreDialogFragment.MODE_RESTORE);
+                        // Fork (白い熊, +056): the unified single-app dialog. It opens on its backup
+                        // list with Restore/Delete/Back up, so the "has backups" tag lands you where
+                        // you can put one back.
+                        AppBackupDialogFragment fragment = AppBackupDialogFragment.getInstance(
+                                mPackageName, mUserId, mAppLabel);
                         fragment.setOnActionBeginListener(mode -> showProgressIndicator(true));
                         fragment.setOnActionCompleteListener((mode, failedPackages) -> showProgressIndicator(false));
-                        fragment.show(getParentFragmentManager(), BackupRestoreDialogFragment.TAG);
+                        fragment.show(getParentFragmentManager(), AppBackupDialogFragment.TAG);
                     });
         }
         if (!tagCloud.isBatteryOptimized) {
@@ -1283,6 +1324,50 @@ public class AppInfoFragment extends Fragment implements SwipeRefreshLayout.OnRe
     }
 
     @UiThread
+    // Fork (白い熊, +056): the per-app install-source override chooser. Primary home for the setting;
+    // the backup/restore dialog reads the same InstallSourcePrefs and offers an emergency change.
+    private void showInstallSourceChooser() {
+        String current = InstallSourcePrefs.getInstallSource(mPackageName);
+        int checked;
+        if (current == null) checked = 0;
+        else if (InstallSourcePrefs.STORE_PLAY.equals(current)) checked = 1;
+        else if (InstallSourcePrefs.STORE_APPGALLERY.equals(current)) checked = 2;
+        else checked = 3;
+        CharSequence[] items = {
+                getString(R.string.install_source_default),
+                getString(R.string.install_source_play),
+                getString(R.string.install_source_appgallery),
+                current != null && checked == 3
+                        ? getString(R.string.install_source_current, current)
+                        : getString(R.string.install_source_custom),
+        };
+        ForkDialog.present(ForkDialog.builder(mActivity)
+                .setTitle(R.string.install_source_label)
+                .setSingleChoiceItems(items, checked, (dialog, which) -> {
+                    if (which == 3) {
+                        dialog.dismiss();
+                        new io.github.muntashirakon.dialog.TextInputDialogBuilder(mActivity, R.string.install_source_custom_hint)
+                                .setTitle(R.string.install_source_label)
+                                .setInputText(current != null ? current : InstallSourcePrefs.STORE_PLAY)
+                                .setPositiveButton(R.string.ok, (d, w, inputText, isChecked) -> {
+                                    InstallSourcePrefs.setInstallSource(mPackageName,
+                                            inputText == null ? null : inputText.toString().trim());
+                                    UIUtils.displayShortToast(R.string.saved_successfully);
+                                    bindInstallSourceCard();
+                                })
+                                .setNegativeButton(R.string.cancel, null)
+                                .show();
+                        return;
+                    }
+                    InstallSourcePrefs.setInstallSource(mPackageName,
+                            which == 1 ? InstallSourcePrefs.STORE_PLAY
+                                    : which == 2 ? InstallSourcePrefs.STORE_APPGALLERY : null);
+                    UIUtils.displayShortToast(R.string.saved_successfully);
+                    bindInstallSourceCard();
+                    dialog.dismiss();
+                }));
+    }
+
     private void displayMagiskHideDialog() {
         SearchableMultiChoiceDialogBuilder<MagiskProcess> builder;
         builder = getMagiskProcessDialog(mMagiskHiddenProcesses, (dialog, which, mp, isChecked) ->

@@ -331,7 +331,7 @@ public class AppDetailsOtherFragment extends AppDetailsFragment {
                     break;
                 }
             }
-            holder.itemView.setStrokeColor(Color.TRANSPARENT);
+            holder.itemView.setStrokeColor(io.github.muntashirakon.AppManager.utils.ForkThemeUtils.getTextColor());
         }
 
         private void getFeaturesView(@NonNull Context context, @NonNull ViewHolder holder, int index) {
@@ -344,7 +344,7 @@ public class AppDetailsOtherFragment extends AppDetailsFragment {
             } else if (!item.available) {
                 view.setStrokeColor(ContextCompat.getColor(context, io.github.muntashirakon.ui.R.color.disabled_user));
             } else {
-                view.setStrokeColor(Color.TRANSPARENT);
+                view.setStrokeColor(io.github.muntashirakon.AppManager.utils.ForkThemeUtils.getTextColor());
             }
             // Set feature name
             if (featureInfo.name == null) {
@@ -369,7 +369,7 @@ public class AppDetailsOtherFragment extends AppDetailsFragment {
         private void getConfigurationView(@NonNull ViewHolder holder, int index) {
             MaterialCardView view = holder.itemView;
             final ConfigurationInfo configurationInfo = (ConfigurationInfo) getItem(index).item;
-            view.setStrokeColor(Color.TRANSPARENT);
+            view.setStrokeColor(io.github.muntashirakon.AppManager.utils.ForkThemeUtils.getTextColor());
             // GL ES version
             holder.textView1.setText(String.format(Locale.ROOT, "%s %s",
                     getString(R.string.gles_version), Utils.getGlEsVersion(configurationInfo.reqGlEsVersion)));
@@ -402,7 +402,7 @@ public class AppDetailsOtherFragment extends AppDetailsFragment {
             }
             textView.setText(builder);
             textView.setTextIsSelectable(true);
-            holder.itemView.setStrokeColor(Color.TRANSPARENT);
+            holder.itemView.setStrokeColor(io.github.muntashirakon.AppManager.utils.ForkThemeUtils.getTextColor());
         }
     }
 }

@@ -50,6 +50,9 @@ public class ProcessMonitorAdapter extends RecyclerView.Adapter<ProcessMonitorAd
 
         void onKill(@NonNull ProcessMonitorViewModel.Row row);
 
+        /** Fork (白い熊, +062): force-stop + relaunch a leaking app, even a protected one. */
+        void onKillRestart(@NonNull ProcessMonitorViewModel.Row row);
+
         /** Long-press on a built-in-denylist app — toggle the user override. */
         void onOverrideToggle(@NonNull ProcessMonitorViewModel.Row row);
     }
@@ -121,22 +124,27 @@ public class ProcessMonitorAdapter extends RecyclerView.Adapter<ProcessMonitorAd
         ProcessMonitorViewModel.Row row = mRows.get(position);
         boolean killable = row.cls.killable;
         boolean leak = row.isLeak;
+        boolean suspect = row.isLeakSuspect;
         boolean userProt = "you".equals(row.cls.reason);
 
         int killableColor = ColorPrefs.getColor(mCtx, ColorPrefs.MONITOR_KILLABLE);
         int leakColor = ColorPrefs.getColor(mCtx, ColorPrefs.MONITOR_LEAK);
         int protColor = ColorPrefs.getColor(mCtx, ColorPrefs.MONITOR_PROTECTED);
         int userProtColor = ColorPrefs.getColor(mCtx, ColorPrefs.MONITOR_USER_PROTECTED);
-        int stateColor = leak ? leakColor : (userProt ? userProtColor : (killable ? killableColor : protColor));
+        int stateColor = (leak || suspect) ? leakColor : (userProt ? userProtColor : (killable ? killableColor : protColor));
 
         h.title.setText(row.title);
         h.title.setTextColor(stateColor);
-        h.subtitle.setText(row.subtitle);
+        // Fork (白い熊, +062): a leak suspect shows its leak note in place of the process line.
+        h.subtitle.setText(suspect && row.leakNote != null ? row.leakNote : row.subtitle);
         h.meta.setText(row.meta);
         h.ram.setText(row.ram);
         h.ram.setTextColor(stateColor);
         h.cpu.setText(row.cpu);
-        if (leak) {
+        if (suspect) {
+            h.badge.setText(R.string.monitor_badge_leaking);
+            h.badge.setTextColor(leakColor);
+        } else if (leak) {
             h.badge.setText(mCtx.getString(R.string.monitor_badge_leak) + "  ×" + row.memberCount);
             h.badge.setTextColor(leakColor);
         } else if (userProt) {
@@ -212,9 +220,17 @@ public class ProcessMonitorAdapter extends RecyclerView.Adapter<ProcessMonitorAd
         h.btnProtect.setImageResource(userProt ? R.drawable.ic_lock : R.drawable.ic_unlock);
         h.btnProtect.setColorFilter(userProt ? userProtColor : killableColor);
         h.btnProtect.setOnClickListener(v -> mActions.onProtect(row));
-        h.btnKill.setVisibility(killable ? View.VISIBLE : View.INVISIBLE);
+        // Fork (白い熊, +062): a leaking app is killable + restartable even when protected.
+        boolean canKill = killable || (suspect && row.leakPackage != null);
+        h.btnKill.setVisibility(canKill ? View.VISIBLE : View.INVISIBLE);
         h.btnKill.setColorFilter(leakColor);
-        h.btnKill.setOnClickListener(v -> mActions.onKill(row));
+        h.btnKill.setOnClickListener(v -> {
+            if (suspect && row.leakPackage != null && !killable) {
+                mActions.onKillRestart(row);
+            } else {
+                mActions.onKill(row);
+            }
+        });
     }
 
     @Override

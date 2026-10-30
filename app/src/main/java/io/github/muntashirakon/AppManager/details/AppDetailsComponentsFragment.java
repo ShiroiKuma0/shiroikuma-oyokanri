@@ -589,7 +589,7 @@ public class AppDetailsComponentsFragment extends AppDetailsFragment {
             } else if (componentItem.isTracker()) {
                 holder.itemView.setStrokeColor(mTrackerIndicatorColor);
             } else {
-                holder.itemView.setStrokeColor(Color.TRANSPARENT);
+                holder.itemView.setStrokeColor(io.github.muntashirakon.AppManager.utils.ForkThemeUtils.getTextColor());
             }
             if (componentItem.isTracker()) {
                 holder.chipType.setText(R.string.tracker);
@@ -710,7 +710,7 @@ public class AppDetailsComponentsFragment extends AppDetailsFragment {
             } else if (serviceItem.isTracker()) {
                 holder.itemView.setStrokeColor(mTrackerIndicatorColor);
             } else {
-                holder.itemView.setStrokeColor(Color.TRANSPARENT);
+                holder.itemView.setStrokeColor(io.github.muntashirakon.AppManager.utils.ForkThemeUtils.getTextColor());
             }
             if (serviceItem.isTracker()) {
                 holder.chipType.setText(R.string.tracker);
@@ -779,7 +779,7 @@ public class AppDetailsComponentsFragment extends AppDetailsFragment {
             } else if (componentItem.isTracker()) {
                 holder.itemView.setStrokeColor(mTrackerIndicatorColor);
             } else {
-                holder.itemView.setStrokeColor(Color.TRANSPARENT);
+                holder.itemView.setStrokeColor(io.github.muntashirakon.AppManager.utils.ForkThemeUtils.getTextColor());
             }
             if (componentItem.isTracker()) {
                 holder.chipType.setText(R.string.tracker);
@@ -840,7 +840,7 @@ public class AppDetailsComponentsFragment extends AppDetailsFragment {
             } else if (componentItem.isTracker()) {
                 holder.itemView.setStrokeColor(mTrackerIndicatorColor);
             } else {
-                holder.itemView.setStrokeColor(Color.TRANSPARENT);
+                holder.itemView.setStrokeColor(io.github.muntashirakon.AppManager.utils.ForkThemeUtils.getTextColor());
             }
             if (componentItem.isTracker()) {
                 holder.chipType.setText(R.string.tracker);

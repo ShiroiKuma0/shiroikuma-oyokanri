@@ -532,6 +532,14 @@ class RestoreOp implements Closeable {
             } catch (Throwable th) {
                 throw new BackupException("Failed to extract the apk file(s).", th);
             }
+            // Fork (白い熊, +055): if this backup carries a per-app install-source override, write it
+            // into InstallSourcePrefs BEFORE installing — PackageInstallerCompat.openSession reads it
+            // by package name to own the session as that store (e.g. com.android.vending), so a RASP-
+            // hardened app restores looking store-installed. Also restores the setting on this phone.
+            if (!TextUtils.isEmpty(mBackupMetadata.installerSourceOverride)) {
+                io.github.muntashirakon.AppManager.apk.installer.InstallSourcePrefs.setInstallSource(
+                        mPackageName, mBackupMetadata.installerSourceOverride);
+            }
             // A normal update will do it now
             InstallerOptions options = InstallerOptions.getDefault();
             options.setInstallerName(mBackupMetadata.installer);

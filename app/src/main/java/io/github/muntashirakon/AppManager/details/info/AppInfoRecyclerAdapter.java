@@ -211,6 +211,14 @@ class AppInfoRecyclerAdapter extends ListAdapter<ListItem, AppInfoRecyclerAdapte
                 case LIST_ITEM_GROUP_BEGIN: {
                     title = itemView.findViewById(android.R.id.title);
                     itemView.findViewById(android.R.id.summary).setVisibility(View.GONE);
+                    // Fork (白い熊, +057): section headings in the Snooping page's style —
+                    // textAppearanceTitleSmall + bold.
+                    android.util.TypedValue tv = new android.util.TypedValue();
+                    if (itemView.getContext().getTheme().resolveAttribute(
+                            com.google.android.material.R.attr.textAppearanceTitleSmall, tv, true)) {
+                        androidx.core.widget.TextViewCompat.setTextAppearance(title, tv.resourceId);
+                    }
+                    title.setTypeface(title.getTypeface(), android.graphics.Typeface.BOLD);
                     break;
                 }
                 case LIST_ITEM_REGULAR:

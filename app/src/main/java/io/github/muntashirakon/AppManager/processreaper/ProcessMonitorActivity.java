@@ -60,6 +60,7 @@ public class ProcessMonitorActivity extends BaseActivity {
     private LinearProgressIndicator mProgress;
     private View mEmpty;
     private android.widget.LinearLayout mHealth;
+    private com.google.android.material.card.MaterialCardView mHealthCard;
 
     private final Handler mHandler = new Handler(Looper.getMainLooper());
     private long mIntervalMs = 2000;
@@ -96,6 +97,10 @@ public class ProcessMonitorActivity extends BaseActivity {
         mProgress.setVisibilityAfterHide(View.GONE);
         mEmpty = findViewById(R.id.monitor_empty);
         mHealth = findViewById(R.id.monitor_health);
+        mHealthCard = findViewById(R.id.monitor_health_card);
+        if (mHealthCard != null) {
+            mHealthCard.setStrokeColor(io.github.muntashirakon.AppManager.utils.ForkThemeUtils.getTextColor());
+        }
 
         mList = findViewById(R.id.monitor_list);
         applyListLayout();
@@ -111,6 +116,13 @@ public class ProcessMonitorActivity extends BaseActivity {
                     @Override
                     public void onKill(@NonNull ProcessMonitorViewModel.Row row) {
                         onKillQuick(row);
+                    }
+
+                    @Override
+                    public void onKillRestart(@NonNull ProcessMonitorViewModel.Row row) {
+                        // Flash immediately that we are restarting the app.
+                        UIUtils.displayShortToast(getString(R.string.monitor_restarting, row.title));
+                        mViewModel.killAndRestartLeak(row);
                     }
 
                     @Override
@@ -153,6 +165,14 @@ public class ProcessMonitorActivity extends BaseActivity {
                     pair.second ? R.string.monitor_killed : R.string.monitor_kill_failed,
                     pair.first.title));
             mViewModel.load();  // reflect the new state immediately
+        });
+        // Fork (白い熊, +063): kill-and-restart of a protected leaking app finished.
+        mViewModel.getRestartResult().observe(this, pair -> {
+            if (pair == null) return;
+            if (!Boolean.TRUE.equals(pair.second)) {
+                UIUtils.displayShortToast(getString(R.string.monitor_kill_failed, pair.first.title));
+            }
+            mViewModel.load();
         });
         mViewModel.getBulkKillResult().observe(this, res -> {
             if (res == null) return;
@@ -225,6 +245,7 @@ public class ProcessMonitorActivity extends BaseActivity {
     private void bindHealth(@Nullable SystemHealth h) {
         if (h == null || mHealth == null) return;
         mHealth.removeAllViews();
+        if (mHealthCard != null) mHealthCard.setVisibility(View.VISIBLE);
         mHealth.setVisibility(View.VISIBLE);
         int yellow = ContextCompat.getColor(this, R.color.theme_bright_yellow);
         int warn = io.github.muntashirakon.AppManager.fonts.ColorPrefs.getColor(this,
@@ -236,39 +257,108 @@ public class ProcessMonitorActivity extends BaseActivity {
             String d = android.text.format.Formatter.formatShortFileSize(this, Math.abs(h.allocatorDeltaBytes));
             alloc += " " + getString(R.string.monitor_health_alloc_delta, (h.allocatorDeltaBytes > 0 ? "+" : "−") + d);
         }
-        addHealthLine(getString(R.string.monitor_health_system, uptimeLabel(h.uptimeMs),
+
+        // Fork (白い熊, +065): every figure is its own tappable pill; the whole-line
+        // text is gone. Tapping a pill opens a dismissable OK dialog explaining it.
+        boolean memThermalWarn = h.memoryLow() || h.thermalHot();
+        android.widget.LinearLayout sys = addHealthRow();
+        addHealthPill(sys, getString(R.string.monitor_health_pill_uptime, uptimeLabel(h.uptimeMs)),
+                yellow, R.string.monitor_health_title_uptime, R.string.monitor_health_explain_uptime);
+        addHealthPill(sys, getString(R.string.monitor_health_pill_memory,
                         android.text.format.Formatter.formatShortFileSize(this, h.memAvailableBytes),
-                        android.text.format.Formatter.formatShortFileSize(this, h.memTotalBytes),
-                        thermalLabel(h.thermalStatus)),
-                h.memoryLow() || h.thermalHot() ? warn : yellow, null);
-        addHealthLine(getString(R.string.monitor_health_paging, rate(h.refaultsPerSec), rate(h.majorFaultsPerSec), alloc),
-                h.pagingHeavy() ? warn : yellow, null);
+                        android.text.format.Formatter.formatShortFileSize(this, h.memTotalBytes)),
+                h.memoryLow() ? warn : yellow, R.string.monitor_health_title_memory,
+                R.string.monitor_health_explain_memory);
+        addHealthPill(sys, getString(R.string.monitor_health_pill_thermal, thermalLabel(h.thermalStatus)),
+                h.thermalHot() ? warn : yellow, R.string.monitor_health_title_thermal,
+                R.string.monitor_health_explain_thermal);
+
+        int pagingColor = h.pagingHeavy() ? warn : yellow;
+        android.widget.LinearLayout paging = addHealthRow();
+        addHealthPill(paging, getString(R.string.monitor_health_pill_refaults, rate(h.refaultsPerSec)),
+                pagingColor, R.string.monitor_health_title_refaults, R.string.monitor_health_explain_refaults);
+        addHealthPill(paging, getString(R.string.monitor_health_pill_major, rate(h.majorFaultsPerSec)),
+                pagingColor, R.string.monitor_health_title_major, R.string.monitor_health_explain_major);
+        addHealthPill(paging, getString(R.string.monitor_health_pill_graphics, alloc),
+                yellow, R.string.monitor_health_title_graphics, R.string.monitor_health_explain_graphics);
+
         if (!h.objectsSampled) {
             addHealthLine(getString(R.string.monitor_health_checking), dim, null);
             return;
         }
+        // Fork (白い熊, +062): the leaking apps are no longer listed here as text — they are shown as
+        // ordinary cards, pinned at the top of the list, with the leak note and a kill (+ restart)
+        // button. The header just says how many, so the stats and the count stay together.
         if (h.suspects.isEmpty()) {
-            addHealthLine(getString(R.string.monitor_health_clean), dim, null);
-            return;
+            addHealthLine(getString(R.string.monitor_health_clean), dim,
+                    v -> showHealthExplain(R.string.monitor_health_title_leak, R.string.monitor_health_explain_leak));
+        } else {
+            android.widget.LinearLayout leak = addHealthRow();
+            addHealthPill(leak, getResources().getQuantityString(R.plurals.monitor_health_leak_summary,
+                            h.suspects.size(), h.suspects.size()), warn,
+                    R.string.monitor_health_title_leak, R.string.monitor_health_explain_leak);
         }
-        for (SystemHealth.Suspect s : h.suspects) {
-            String gpu = android.text.format.Formatter.formatShortFileSize(this, s.graphicsBytes);
-            String text;
-            if (s.leaksActivities()) {
-                text = getString(R.string.monitor_health_leak, s.label, s.activities, s.windows, gpu);
-            } else if (s.graphicsGrowthBytes >= SystemHealth.GRAPHICS_GROWTH_BYTES) {
-                text = getString(R.string.monitor_health_gfx_growth, s.label, gpu,
-                        "+" + android.text.format.Formatter.formatShortFileSize(this, s.graphicsGrowthBytes));
-            } else {
-                text = getString(R.string.monitor_health_gfx, s.label, gpu);
-            }
-            addHealthLine(text, warn, v -> {
-                ProcessMonitorViewModel.Row row = mViewModel.findRowByPid(s.pid);
-                if (row != null) onRowClick(row);
-                else UIUtils.displayShortToast(getString(R.string.monitor_health_not_listed, s.label));
-            });
+    }
+
+    /** Fork (白い熊, +065): a horizontal, left-and-right scrollable row of health pills. */
+    @NonNull
+    private android.widget.LinearLayout addHealthRow() {
+        android.widget.HorizontalScrollView scroller = new android.widget.HorizontalScrollView(this);
+        scroller.setHorizontalScrollBarEnabled(false);
+        scroller.setClipToPadding(false);
+        android.widget.LinearLayout row = new android.widget.LinearLayout(this);
+        row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        scroller.addView(row, new android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        int top = Math.round(getResources().getDisplayMetrics().density * 3);
+        lp.topMargin = top;
+        mHealth.addView(scroller, lp);
+        return row;
+    }
+
+    /**
+     * Fork (白い熊, +065): a figure drawn as the fork's pill (transparent fill,
+     * stadium stroke in its accent) that opens a dismissable OK dialog explaining
+     * what it means. Replaces the +064 long-press toast, which was too brief.
+     */
+    private void addHealthPill(@NonNull android.widget.LinearLayout row, @NonNull CharSequence text,
+                               int color, int titleRes, int explainRes) {
+        float density = getResources().getDisplayMetrics().density;
+        androidx.appcompat.widget.AppCompatTextView tv = new androidx.appcompat.widget.AppCompatTextView(this);
+        tv.setText(text);
+        tv.setTextColor(color);
+        tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
+        tv.setSingleLine(true);
+        int hp = Math.round(density * 10), vp = Math.round(density * 4);
+        tv.setPadding(hp, vp, hp, vp);
+
+        android.graphics.drawable.GradientDrawable pill = new android.graphics.drawable.GradientDrawable();
+        pill.setColor(android.graphics.Color.TRANSPARENT);
+        pill.setCornerRadius(density * 1000f);  // clamped to half-height → a stadium
+        pill.setStroke(Math.max(1, Math.round(density * 1.2f)), color);
+        tv.setBackground(pill);
+        // Ripple of the same hue on tap, as the row pills elsewhere in the fork.
+        android.util.TypedValue fg = new android.util.TypedValue();
+        if (getTheme().resolveAttribute(android.R.attr.selectableItemBackground, fg, true)) {
+            tv.setForeground(androidx.core.content.ContextCompat.getDrawable(this, fg.resourceId));
         }
-        addHealthLine(getString(R.string.monitor_health_hint), dim, null);
+        tv.setOnClickListener(v -> showHealthExplain(titleRes, explainRes));
+
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        if (row.getChildCount() > 0) lp.leftMargin = Math.round(density * 6);
+        row.addView(tv, lp);
+    }
+
+    /** Fork (白い熊, +065): a bordered yellow-on-black dialog explaining one health figure, dismissed with OK. */
+    private void showHealthExplain(int titleRes, int explainRes) {
+        io.github.muntashirakon.AppManager.utils.ForkDialog.present(
+                io.github.muntashirakon.AppManager.utils.ForkDialog.builder(this)
+                        .setTitle(titleRes)
+                        .setMessage(explainRes)
+                        .setPositiveButton(android.R.string.ok, null));
     }
 
     private void addHealthLine(@NonNull CharSequence text, int color, @Nullable View.OnClickListener click) {

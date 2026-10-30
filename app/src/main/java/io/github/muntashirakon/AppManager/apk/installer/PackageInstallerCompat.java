@@ -934,7 +934,27 @@ public final class PackageInstallerCompat {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P && canChangeInstaller) {
             installerPackageName = installerName;
         } else if (SelfPermissions.isSystemOrRootOrShell()) {
-            installerPackageName = null;
+            // Fork (白い熊, +055, superseding the global +052/+054): default back to the +160 behaviour
+            // — leave the session owner null so the platform attributes it to the shell and a fresh
+            // install does not fail computeUserActionRequirement(). The store-source trick is NOT
+            // applied to every restore; it is per-app opt-in via InstallSourcePrefs.
+            //
+            // When a package HAS an override, present the session as OWNED by that store: the
+            // createSession owner arg is what `pm install -i <X>` sets, and on this stock Huawei build
+            // it becomes BOTH the installing and the initiating package — the fields a RASP install-
+            // source check reads. Measured 2026-10-29: `pm install -i com.android.vending <apk>` on a
+            // FRESH package → Success, no prompt, even though this phone's com.android.vending is
+            // microG's FakeStore (no INSTALL_PACKAGES), so no "must hold INSTALL_PACKAGES" guard is
+            // needed. Never our own package (the +160 trap), and only a store that is actually
+            // installed, or createSession would fail. No store code runs; it is recorded as metadata.
+            String storeOverride = InstallSourcePrefs.getInstallSource(mPackageName);
+            if (storeOverride != null && !storeOverride.equals(BuildConfig.APPLICATION_ID)
+                    && PackageUtils.getAppUid(new UserPackagePair(storeOverride, UserHandleHidden.myUserId())) >= 0) {
+                installerPackageName = storeOverride;
+                Log.d(TAG, "Install: presenting %s as installed from %s", mPackageName, storeOverride);
+            } else {
+                installerPackageName = null;
+            }
         } else {
             installerPackageName = BuildConfig.APPLICATION_ID;
         }
