@@ -102,7 +102,6 @@ public class AppDetailsPermissionsFragment extends AppDetailsFragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        emptyView.setText(getNotFoundString(mNeededProperty));
         mAdapter = new AppDetailsRecyclerAdapter();
         recyclerView.setAdapter(mAdapter);
         alertView.setEndIconOnClickListener(v -> {
@@ -118,13 +117,27 @@ public class AppDetailsPermissionsFragment extends AppDetailsFragment {
                 TipsPrefs.getInstance().setDisplayInPermissionsTab(false);
             }
         });
-        int helpStringRes = getHelpString(mNeededProperty);
-        if (helpStringRes != 0) alertView.setText(helpStringRes);
-        if (helpStringRes == 0) {
-            alertView.setVisibility(View.GONE);
-        } else {
-            alertView.postDelayed(() -> alertView.hide(), 15_000);
-        }
+        // Fork (白い熊, +060): getNotFoundString/getHelpString reach SelfPermissions →
+        // LocalServices.getAmService(), which is synchronized on the service-connection wrapper and
+        // BLOCKS the main thread for the whole bind when the privileged service is not ready — the
+        // ANR that made switching to the App ops / Uses permissions / Permissions tabs hang the whole
+        // window. Compute both off the main thread and apply when they return. (CLAUDE.md: "no
+        // SelfPermissions/Users/LocalServices call belongs in a lifecycle or menu callback.")
+        alertView.setVisibility(View.GONE);
+        final int property = mNeededProperty;
+        ThreadUtils.postOnBackgroundThread(() -> {
+            int notFound = getNotFoundString(property);
+            int helpStringRes = getHelpString(property);
+            ThreadUtils.postOnMainThread(() -> {
+                if (!isAdded() || emptyView == null) return;
+                emptyView.setText(notFound);
+                if (helpStringRes != 0) {
+                    alertView.setText(helpStringRes);
+                    alertView.setVisibility(View.VISIBLE);
+                    alertView.postDelayed(() -> alertView.hide(), 15_000);
+                }
+            });
+        });
         if (viewModel == null) return;
         mSortOrder = viewModel.getSortOrder(mNeededProperty);
         mSearchQuery = viewModel.getSearchQuery();
@@ -705,7 +718,7 @@ public class AppDetailsPermissionsFragment extends AppDetailsFragment {
             if (item.isDangerous) {
                 holder.itemView.setStrokeColor(ColorCodes.getPermissionDangerousIndicatorColor(context));
             } else {
-                holder.itemView.setStrokeColor(Color.TRANSPARENT);
+                holder.itemView.setStrokeColor(io.github.muntashirakon.AppManager.utils.ForkThemeUtils.getTextColor());
             }
             // Op Switch
             holder.toggleSwitch.setVisibility(mCanModifyAppOpMode ? View.VISIBLE : View.GONE);
@@ -775,7 +788,7 @@ public class AppDetailsPermissionsFragment extends AppDetailsFragment {
             if (permissionItem.isDangerous) {
                 holder.itemView.setStrokeColor(ColorCodes.getPermissionDangerousIndicatorColor(context));
             } else {
-                holder.itemView.setStrokeColor(Color.TRANSPARENT);
+                holder.itemView.setStrokeColor(io.github.muntashirakon.AppManager.utils.ForkThemeUtils.getTextColor());
             }
             // Set package name
             if (permissionInfo.packageName != null) {
@@ -889,7 +902,7 @@ public class AppDetailsPermissionsFragment extends AppDetailsFragment {
             if (protectionLevel.contains("dangerous")) {
                 holder.itemView.setStrokeColor(ColorCodes.getPermissionDangerousIndicatorColor(context));
             } else {
-                holder.itemView.setStrokeColor(Color.TRANSPARENT);
+                holder.itemView.setStrokeColor(io.github.muntashirakon.AppManager.utils.ForkThemeUtils.getTextColor());
             }
         }
 

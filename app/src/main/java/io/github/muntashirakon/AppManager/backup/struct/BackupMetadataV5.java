@@ -261,6 +261,12 @@ public class BackupMetadataV5 implements LocalizedString {
         public boolean keyStore;  // key_store
         @Nullable
         public String installer;  // installer
+        // Fork (白い熊, +055): the per-app install-source override (a store package name, e.g.
+        // com.android.vending), so a RASP-hardened app can be restored on another phone looking
+        // store-installed. Opt-in per package via InstallSourcePrefs; null/absent = no override.
+        // Optional and read with optString, so older backups (which lack it) restore unchanged.
+        @Nullable
+        public String installerSourceOverride;  // installer_source_override
 
         public Metadata(@Nullable String backupName) {
             this.version = MetadataManager.getCurrentBackupMetaVersion();
@@ -287,6 +293,7 @@ public class BackupMetadataV5 implements LocalizedString {
             instructionSet = metadata.instructionSet;
             keyStore = metadata.keyStore;
             installer = metadata.installer;
+            installerSourceOverride = metadata.installerSourceOverride;
         }
 
         public Metadata(@NonNull JSONObject rootObject) throws JSONException {
@@ -305,6 +312,7 @@ public class BackupMetadataV5 implements LocalizedString {
             instructionSet = rootObject.getString("instruction_set");
             keyStore = rootObject.getBoolean("key_store");
             installer = JSONUtils.optString(rootObject, "installer");
+            installerSourceOverride = JSONUtils.optString(rootObject, "installer_source_override");
         }
 
         @NonNull
@@ -326,6 +334,7 @@ public class BackupMetadataV5 implements LocalizedString {
             rootObject.put("instruction_set", instructionSet);
             rootObject.put("key_store", keyStore);
             rootObject.put("installer", installer);
+            rootObject.put("installer_source_override", installerSourceOverride);
             return rootObject;
         }
     }

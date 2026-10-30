@@ -27,12 +27,12 @@
         android:orientation="vertical"
         app:layout_behavior="com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior">
 
-        <com.google.android.material.tabs.TabLayout
+        <!-- Fork (白い熊, +059): folder-style tab bar (shiroikuma-shoruikanri look). -->
+        <io.github.muntashirakon.AppManager.details.FolderTabBar
             android:id="@+id/tab_layout"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:fitsSystemWindows="true"
-            app:tabMode="scrollable" />
+            android:layout_height="46dp"
+            android:fitsSystemWindows="true" />
 
         <androidx.viewpager2.widget.ViewPager2
             android:id="@+id/pager"

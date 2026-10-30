@@ -1795,12 +1795,38 @@
     <string name="monitor_health_paging">Refaults %1$s/s · Major faults %2$s/s · Graphics buffers %3$s</string>
     <string name="monitor_health_alloc_delta">(%s since opened)</string>
     <string name="monitor_health_checking">Checking apps for leaked screens and GPU memory…</string>
+    <plurals name="monitor_health_leak_summary">
+        <item quantity="one">⚠ %d app leaking — shown at the top</item>
+        <item quantity="other">⚠ %d apps leaking — shown at the top</item>
+    </plurals>
     <string name="monitor_health_clean">No app is holding destroyed screens or unusual GPU memory.</string>
     <string name="monitor_health_leak">⚠ %1$s — %2$d activities, %3$d windows · %4$s GPU · leaking destroyed screens</string>
     <string name="monitor_health_gfx">⚠ %1$s — %2$s GPU memory</string>
     <string name="monitor_health_gfx_growth">⚠ %1$s — %2$s GPU memory, %3$s since opened</string>
     <string name="monitor_health_hint">Tap a flagged app to open it; killing it frees what it holds.</string>
     <string name="monitor_health_not_listed">%s is not in the list right now.</string>
+    <!-- Fork (白い熊, +065): each health figure is a pill; tapping it opens a dismissable
+         dialog that explains that one figure. -->
+    <string name="monitor_health_pill_uptime">Up %s</string>
+    <string name="monitor_health_pill_memory">%1$s free / %2$s</string>
+    <string name="monitor_health_pill_thermal">Thermal: %s</string>
+    <string name="monitor_health_pill_refaults">Refaults %s/s</string>
+    <string name="monitor_health_pill_major">Major faults %s/s</string>
+    <string name="monitor_health_pill_graphics">Graphics %s</string>
+    <string name="monitor_health_title_uptime">Uptime</string>
+    <string name="monitor_health_title_memory">Free memory</string>
+    <string name="monitor_health_title_thermal">Thermal state</string>
+    <string name="monitor_health_title_refaults">Refaults</string>
+    <string name="monitor_health_title_major">Major faults</string>
+    <string name="monitor_health_title_graphics">Graphics buffers</string>
+    <string name="monitor_health_title_leak">Leaking apps</string>
+    <string name="monitor_health_explain_uptime">How long since the phone last booted. A long uptime is fine on its own — it means the phone has been stable and is not a reason to reboot.</string>
+    <string name="monitor_health_explain_memory">On the left, the memory the system can still hand out right now; on the right, the total. When the free figure runs low the kernel starts evicting pages, which is what drives the refault rate up.</string>
+    <string name="monitor_health_explain_thermal">The kernel\'s own heat state. Above “normal” the system throttles the CPU to cool down, which by itself can make everything feel slow.</string>
+    <string name="monitor_health_explain_refaults">Pages the kernel dropped and then had to re-read from storage because an app wanted them again — the memory-pressure (thrashing) signal. It is a per-second rate; “—/s” means it has not been measured yet, which needs two samples a refresh apart.</string>
+    <string name="monitor_health_explain_major">Page faults served from storage instead of RAM — each one is a process stalled waiting on I/O. It is a per-second rate; “—/s” means it has not been measured yet.</string>
+    <string name="monitor_health_explain_graphics">Memory held by the system\'s graphics allocator for on-screen buffers. It does not track any one app\'s GPU memory one-for-one, so the figure beside it is only how much it has grown since you opened this screen.</string>
+    <string name="monitor_health_explain_leak">A leaking app is holding screens it already destroyed, or an unusual amount of GPU memory, and never gives it back — which is what makes the phone crawl while a per-app CPU or RAM ranking shows nothing. They are pinned at the top of the list; killing one frees what it holds.</string>
     <string name="monitor_thermal_unknown">n/a</string>
     <string name="monitor_thermal_none">normal</string>
     <string name="monitor_thermal_light">light</string>
@@ -1813,6 +1839,8 @@
     <string name="monitor_badge_killable">KILLABLE</string>
     <string name="monitor_badge_protected">PROTECTED</string>
     <string name="monitor_badge_leak">LEAK</string>
+    <string name="monitor_badge_leaking">LEAKING</string>
+    <string name="monitor_restarting">Restarting %s…</string>
     <string name="monitor_leak_subtitle">leak — %d identical processes, one-tap kill all</string>
     <string name="monitor_kill_method_sigkill_multi">Sends SIGKILL to %d processes.</string>
     <string name="monitor_kill_selected">Kill selected</string>
@@ -2656,6 +2684,17 @@
     <string name="backup_part_written_by">Written by %1$s · archive format %2$d</string>
     <string name="backup_part_categories">%d categories</string>
     <string name="backup_part_format">format %d</string>
+    <!-- Fork (白い熊, +055): per-app install-source override -->
+    <string name="install_source_label">Restore as installed from</string>
+    <string name="install_source_set">Set</string>
+    <string name="install_source_dialog_row">Install source: %s · tap to change</string>
+    <string name="install_source_current">Restore as installed from: %s</string>
+    <string name="install_source_default">Default</string>
+    <string name="install_source_play">Play Store</string>
+    <string name="install_source_appgallery">Huawei App Gallery</string>
+    <string name="install_source_custom">Custom package name…</string>
+    <string name="install_source_custom_hint">Installer package name</string>
+    <string name="install_source_message">Present this app\'s install session as owned by the chosen store, so an app that refuses to run unless installed from a store (e.g. a banking app) accepts a restore. Saved with the backup and applied on restore. Leave as Default for everything else.</string>
     <string name="backups_existing">Existing backups</string>
     <string name="shelf_section_filters">Filters</string>
     <string name="shelf_section_profiles">Profiles</string>

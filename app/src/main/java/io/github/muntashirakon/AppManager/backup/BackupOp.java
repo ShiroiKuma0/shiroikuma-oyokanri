@@ -520,6 +520,10 @@ class BackupOp implements Closeable {
             }
         }
         metadata.installer = PackageManagerCompat.getInstallerPackageName(mPackageInfo.packageName, mUserId);
+        // Fork (白い熊, +055): carry the per-app install-source override into the backup so it reaches
+        // another phone (on this phone InstallSourcePrefs already holds it). null = no override.
+        metadata.installerSourceOverride = io.github.muntashirakon.AppManager.apk.installer
+                .InstallSourcePrefs.getInstallSource(mPackageInfo.packageName);
         return new BackupMetadataV5(backupInfo, metadata);
     }
 

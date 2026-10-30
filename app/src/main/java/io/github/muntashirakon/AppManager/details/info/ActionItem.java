@@ -42,7 +42,30 @@ class ActionItem {
 
     public MaterialButton toActionButton(@NonNull Context context, @NonNull ViewGroup parent) {
         MaterialButton button = (MaterialButton) LayoutInflater.from(context).inflate(R.layout.item_app_info_action, parent, false);
-        button.setBackgroundTintList(ColorStateList.valueOf(ColorCodes.getListItemColor1(context)));
+        // Fork (白い熊, +057): a rounded outlined pill in the fork's ink, not a filled connected
+        // button-group segment. Half-height corner radius = a stadium; the framework clamps it.
+        int ink = io.github.muntashirakon.AppManager.utils.ForkThemeUtils.getTextColor();
+        float density = context.getResources().getDisplayMetrics().density;
+        button.setBackgroundTintList(ColorStateList.valueOf(android.graphics.Color.TRANSPARENT));
+        button.setCornerRadius(Math.round(density * 1000));
+        button.setStrokeColor(ColorStateList.valueOf(ink));
+        button.setStrokeWidth(Math.round(density * 1.5f));
+        button.setTextColor(ink);
+        button.setIconTint(ColorStateList.valueOf(ink));
+        button.setRippleColor(ColorStateList.valueOf((ink & 0x00FFFFFF) | 0x33000000));
+        // Fork (白い熊, +057): compact pills — the default MaterialButton is far too tall/wide here.
+        button.setInsetTop(0);
+        button.setInsetBottom(0);
+        button.setMinHeight(0);
+        button.setMinimumHeight(0);
+        button.setMinWidth(0);
+        button.setMinimumWidth(0);
+        int padH = Math.round(density * 14);
+        int padV = Math.round(density * 6);
+        button.setPadding(padH, padV, padH, padV);
+        button.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13f);
+        button.setIconSize(Math.round(density * 18));
+        button.setIconPadding(Math.round(density * 4));
         button.setText(mTitleRes);
         button.setIconResource(mIconRes);
         if (mOnClickListener != null) {
