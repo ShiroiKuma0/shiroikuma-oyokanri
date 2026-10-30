@@ -10,6 +10,55 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-09-05.03-37.g41d79af5+065 — 2026-10-30
+
+Built on upstream App Manager **4.1.1**, rebased on commit `41d79af5` (2026-09-05). This release
+began with a phone that crawled while the process monitor showed nothing wrong, and grew into a
+redrawn app-details screen, a fix for a banking app that would not run after a restore, and a
+restore dialog that no longer hangs on first open.
+
+### Process monitor — a system-health header
+
+- **System-health header** for what a per-process CPU/RAM ranking can never show: uptime, free
+  memory, the paging rates (**refaults**, **major faults**), thermal state and the graphics
+  allocator. The case it was built for is the Huawei launcher after many days up — 67 destroyed
+  Activities and 378 MB of GPU memory it never gave back — which crawls the phone while every CPU
+  and memory figure looks clean.
+- **Leaking apps are shown as ordinary process rows**, pinned at the top of the list, instead of a
+  line of red text. Killing one **removes it** from the list (the objects are re-sampled on the
+  kill), and a **protected** app that is leaking is made **killable and restartable** — it flashes
+  “Restarting …” while it comes back.
+- The header is a **rounded outlined card** in the Snooping page's card language, and **every
+  figure is a tappable pill** — uptime, free memory, thermal, refaults, major faults, graphics
+  buffers, the leak count — that opens a dismissable dialog explaining what it means.
+
+### Per-app install source — restore a RASP-hardened banking app
+
+- A per-app, opt-in **install-source override** set on the App info page. On restore the app is
+  installed **owning the session as the chosen store** (Play Store, App Gallery, or any installed
+  store), exactly as `pm install -i` or Aurora would — so a bank's app that checks where it came
+  from runs instead of refusing. The choice rides **inside the backup** and applies on whatever
+  phone the backup lands on. Replaces an earlier global behaviour: every other restore still looks
+  like an ordinary restore.
+
+### App details, redrawn
+
+- App info and the component/permission/signature tabs are redrawn in the **Snooping page's card
+  language**: outlined rounded group boxes, **compact outlined pill actions** in a single
+  left-and-right scrollable row, section headings at the Snooping page's size and weight, and a
+  large app icon beside the three header lines.
+- **Folder-style tabs** across the top, ported from 白い熊 書類管理 (shiroikuma-shoruikanri).
+- The App info **tracker count** now matches the Snooping page (grouped by tracker name).
+
+### Fixes & behaviour
+
+- **The restore dialog no longer hangs for minutes on first open.** `AppDb`'s one coarse lock was
+  held across a heavy privileged scan of every installed package, so the read-only dialog blocked
+  behind the app list's first-load rebuild. The scan is hoisted out of the lock and the dialog reads
+  without taking it.
+- **Tab-switch and page-open latency cut** — privileged reads moved off the main thread on the
+  permissions tab, and the app-details pager keeps one off-screen page instead of four.
+
 ## 4.1.1+2026-09-05.03-37.g41d79af5+050 — 2026-09-27
 
 A restore of 白い熊 暗記 reported success and had, in fact, written a 240 MB collection's worth of
