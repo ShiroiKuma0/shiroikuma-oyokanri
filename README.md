@@ -24,9 +24,9 @@ from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-t
 actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
 Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.1+2026-09-05.03-37.g41d79af5+050`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.1+2026-09-05.03-37.g41d79af5+065`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
-<sub>Version reads as **upstream `4.1.1`**, rebased onto upstream commit **`41d79af5` of 2026-09-05 03:37 UTC**, fork build **045**.</sub>
+<sub>Version reads as **upstream `4.1.1`**, rebased onto upstream commit **`41d79af5` of 2026-09-05 03:37 UTC**, fork build **065**.</sub>
 
 </div>
 
@@ -358,6 +358,12 @@ A from-scratch replacement for the legacy "Running apps" screen, built for actua
 - **Actively-in-use protection** so you can't one-tap kill the foreground app or something playing
   media, a **per-process detail page** (memory / CPU / scheduling / lifecycle / security / app
   metadata), a **faceted filter** (killability × type) and a **toolbar search**.
+- A **system-health header** for what a per-process ranking can never show: uptime, free memory,
+  the paging rates (refaults, major faults), thermal state and the graphics allocator — and the apps
+  **leaking destroyed screens or GPU memory**, the real reason a phone crawls while every CPU and RAM
+  figure looks fine. A leaking app is drawn as an ordinary row pinned at the top, killable (and
+  **restartable** even when protected); every figure in the header is a **tappable pill** that
+  explains itself in a dialog.
 
 ## ⏯️ A full page for a running batch, and a log that survives it
 
@@ -520,6 +526,16 @@ nothing.
   latest export at a glance, then export or restore any mix of seven categories (general settings,
   colours & fonts, monitor, toolbar & filters, notes, anti-snooping settings, profiles) — so a new install comes up looking
   and behaving exactly like the old one.
+
+## 🏪 Per-app install source — restore a banking app that refuses to run
+
+A RASP-hardened app (a bank's, say) refuses to start unless it can see that it was installed from a
+store, and a plain restore installs it from nowhere — so a restored banking app shows a security
+warning and closes. Set an **install source** for that one app on its App info page (Play Store,
+App Gallery or any installed store), and the restore installs it owning the session **as that store**,
+exactly as `pm install -i` or Aurora would, and the app runs. It is **per-app and opt-in** — every
+other restore still looks like a restore — and the choice travels **inside the backup**, so it
+applies on whatever phone the backup lands on.
 
 ## 🧳 Migration kit — a wiped phone becomes this phone
 
