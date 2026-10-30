@@ -10,7 +10,7 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
-## 4.1.1+2026-10-19.01-45.g15d835d6+067 — 2026-10-30
+## 4.1.1+2026-10-19.01-45.g15d835d6+067 — 2026-10-31
 
 Built on upstream App Manager **4.1.1**, rebased from commit `41d79af5` (2026-09-05) onto
 `15d835d6` (2026-10-19) — about **95 new upstream commits**, headlined by a new **Actions**
