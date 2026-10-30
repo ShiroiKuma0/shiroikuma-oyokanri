@@ -26,8 +26,6 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.viewpager2.adapter.FragmentStateAdapter;
 import androidx.viewpager2.widget.ViewPager2;
 
-import com.google.android.material.tabs.TabLayout;
-import com.google.android.material.tabs.TabLayoutMediator;
 
 import java.util.Objects;
 
@@ -223,7 +221,7 @@ public class AppDetailsActivity extends BaseActivity {
             searchView = UIUtils.setupAdvancedSearchView(actionBar);
         }
         mViewPager = findViewById(R.id.pager);
-        TabLayout tabLayout = findViewById(R.id.tab_layout);
+        FolderTabBar tabLayout = findViewById(R.id.tab_layout);
         UiUtils.applyWindowInsetsAsPadding(tabLayout, false, true);
         final AlertDialog progressDialog = UIUtils.getProgressDialog(this, getText(R.string.loading), true);
         if (mPackageName == null) {
@@ -231,7 +229,13 @@ public class AppDetailsActivity extends BaseActivity {
             progressDialog.show();
         }
         // Set tabs
-        mViewPager.setOffscreenPageLimit(4);
+        // Fork (白い熊, +061): keep only the neighbouring tabs offscreen, not four on each side. The
+        // old limit of 4 eagerly built and loaded 6–9 tabs on every open — all contending on the
+        // view model's 4-thread executor and the privileged binder, which is what made opening the
+        // landing tab (App info / Snooping) feel slow. Switching to a far tab now reloads on a worker
+        // with a spinner (never blocking the main thread, since +060), so pre-building them all costs
+        // speed for no benefit. It also shrinks the ANR surface the +045 note describes.
+        mViewPager.setOffscreenPageLimit(1);
         mViewPager.setAdapter(new AppDetailsFragmentPagerAdapter(this));
         // Fork: land on the requested tab. Posted, because setCurrentItem before
         // the mediator has attached is silently dropped.
@@ -239,8 +243,12 @@ public class AppDetailsActivity extends BaseActivity {
         if (requestedTab >= 0) {
             mViewPager.post(() -> mViewPager.setCurrentItem(requestedTab, false));
         }
-        new TabLayoutMediator(tabLayout, mViewPager, (tab, position) -> tab.setText(mTabTitleIds.getString(position)))
-                .attach();
+        // Fork (白い熊, +059): drive the folder-style tab bar instead of a TabLayoutMediator.
+        CharSequence[] tabTitles = new CharSequence[mTabTitleIds.length()];
+        for (int i = 0; i < tabTitles.length; i++) {
+            tabTitles[i] = mTabTitleIds.getString(i);
+        }
+        tabLayout.setup(mViewPager, tabTitles);
         // Load package info
         (mPackageName != null
                 ? model.setPackage(mPackageName)

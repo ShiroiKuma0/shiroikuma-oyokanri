@@ -75,6 +75,7 @@ import io.github.muntashirakon.AppManager.appdata.AppDataCategory;
 import io.github.muntashirakon.AppManager.appdata.AppDataContract;
 import io.github.muntashirakon.AppManager.appdata.AppDataSelection;
 import io.github.muntashirakon.AppManager.appdata.AppDataTransfer;
+import io.github.muntashirakon.AppManager.apk.installer.InstallSourcePrefs;
 import io.github.muntashirakon.AppManager.backup.BackupFlags;
 import io.github.muntashirakon.AppManager.backup.struct.BackupMetadataV5;
 import io.github.muntashirakon.AppManager.batchops.BatchOpsManager;
@@ -152,6 +153,8 @@ public class AppBackupDialogFragment extends DialogFragment {
     private BackupRestoreDialogViewModel mViewModel;
     private AlertDialog mDialog;
     private Context mDialogContext;
+    // Fork (白い熊, +055): the per-app install-source override row.
+    private TextView mInstallSourceRow;
     // Fork: kept for the app-data category picker, which needs both after onCreateDialog.
     private String mPackageName;
     private int mUserId;
@@ -209,6 +212,7 @@ public class AppBackupDialogFragment extends DialogFragment {
         mViewModel = new ViewModelProvider(this).get(BackupRestoreDialogViewModel.class);
         Bundle args = requireArguments();
         String packageName = Objects.requireNonNull(args.getString(ARG_PACKAGE_NAME));
+        mPackageName = packageName;
         int userId = args.getInt(ARG_USER_ID, UserHandleHidden.myUserId());
         mPackageName = packageName;
         mUserId = userId;
@@ -232,6 +236,9 @@ public class AppBackupDialogFragment extends DialogFragment {
         mRestoreButton = body.findViewById(R.id.action_restore);
         mDeleteButton = body.findViewById(R.id.action_delete);
         mShareButton = body.findViewById(R.id.action_share);
+        mInstallSourceRow = body.findViewById(R.id.install_source_row);
+        renderInstallSourceRow();
+        mInstallSourceRow.setOnClickListener(v -> showInstallSourceChooser());
         mRestoreButton.setOnClickListener(v -> {
             List<BackupMetadataV5> selected = getSelectedBackups();
             if (selected.size() == 1) {
@@ -274,6 +281,71 @@ public class AppBackupDialogFragment extends DialogFragment {
             mViewModel.processPackages(Collections.singletonList(new UserPackagePair(packageName, userId)));
         }
         return mDialog;
+    }
+
+    // ------------------------------------------------------------------
+    // Fork (白い熊, +055): per-app install-source override
+    // ------------------------------------------------------------------
+
+    private void renderInstallSourceRow() {
+        if (mInstallSourceRow == null) return;
+        String store = InstallSourcePrefs.getInstallSource(mPackageName);
+        String label;
+        if (store == null) {
+            label = getString(R.string.install_source_default);
+        } else if (InstallSourcePrefs.STORE_PLAY.equals(store)) {
+            label = getString(R.string.install_source_play);
+        } else if (InstallSourcePrefs.STORE_APPGALLERY.equals(store)) {
+            label = getString(R.string.install_source_appgallery);
+        } else {
+            label = store;
+        }
+        mInstallSourceRow.setText(getString(R.string.install_source_dialog_row, label));
+    }
+
+    private void showInstallSourceChooser() {
+        CharSequence[] items = {
+                getString(R.string.install_source_default),
+                getString(R.string.install_source_play),
+                getString(R.string.install_source_appgallery),
+                getString(R.string.install_source_custom),
+        };
+        ForkDialog.present(ForkDialog.builder(requireActivity())
+                .setTitle(R.string.install_source_label)
+                .setItems(items, (dialog, which) -> {
+                    switch (which) {
+                        case 0:
+                            InstallSourcePrefs.setInstallSource(mPackageName, null);
+                            renderInstallSourceRow();
+                            break;
+                        case 1:
+                            InstallSourcePrefs.setInstallSource(mPackageName, InstallSourcePrefs.STORE_PLAY);
+                            renderInstallSourceRow();
+                            break;
+                        case 2:
+                            InstallSourcePrefs.setInstallSource(mPackageName, InstallSourcePrefs.STORE_APPGALLERY);
+                            renderInstallSourceRow();
+                            break;
+                        default:
+                            new TextInputDialogBuilder(requireActivity(), R.string.install_source_custom_hint)
+                                    .setTitle(R.string.install_source_label)
+                                    .setInputText(nonNullStore())
+                                    .setPositiveButton(R.string.ok, (d, w, inputText, isChecked) -> {
+                                        InstallSourcePrefs.setInstallSource(mPackageName,
+                                                inputText == null ? null : inputText.toString().trim());
+                                        renderInstallSourceRow();
+                                    })
+                                    .setNegativeButton(R.string.cancel, null)
+                                    .show();
+                            break;
+                    }
+                }));
+    }
+
+    @NonNull
+    private String nonNullStore() {
+        String s = InstallSourcePrefs.getInstallSource(mPackageName);
+        return s != null ? s : InstallSourcePrefs.STORE_PLAY;
     }
 
     @Override
