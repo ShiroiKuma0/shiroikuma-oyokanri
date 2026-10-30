@@ -175,8 +175,9 @@ public class FeatureController {
                 // Only depends on flag
                 return (mFlags & key) != 0;
             case FEAT_VIRUS_TOTAL:
-                cn = getComponentName(key, VtHistoryActivity.class);
-                break;
+                // Fork: VirusTotal also needs internet; upstream 4.1.1 additionally backs it with
+                // the VtHistoryActivity component, which componentFor() now returns.
+                return (mFlags & key) != 0 && isEnabled(FEAT_INTERNET) && isComponentEnabled(componentFor(key));
             case FEAT_INTERNET:
                 return (mFlags & key) != 0 && SelfPermissions.checkSelfPermission(Manifest.permission.INTERNET);
         }
@@ -207,9 +208,11 @@ public class FeatureController {
                 return getComponentName(key, CodeEditorActivity.ALIAS_EDITOR);
             case FEAT_TERMINAL:
                 return getComponentName(key, TermActivity.class);
+            case FEAT_VIRUS_TOTAL:
+                // Fork: upstream 4.1.1 backs VirusTotal with the history activity; reassert manages it.
+                return getComponentName(key, VtHistoryActivity.class);
             case FEAT_USAGE_ACCESS:
             case FEAT_INTERNET:
-            case FEAT_VIRUS_TOTAL:
                 return null;
             default:
                 throw new IllegalArgumentException();

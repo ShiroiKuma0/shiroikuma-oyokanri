@@ -528,7 +528,7 @@ public class Ops {
                         LocalServices.stopServices();
                     }
                     ExUtils.exceptionAsIgnored(() -> {
-                        if (LocalServer.alive(context)) {
+                        if (LocalServer.checkServerHealth(context)) {
                             LocalServer.getInstance().closeBgServer();
                         }
                     });
