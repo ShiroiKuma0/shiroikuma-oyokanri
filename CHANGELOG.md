@@ -10,6 +10,25 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-10-19.01-45.g15d835d6+068 — 2026-11-02
+
+Built on the same upstream base as +067 (App Manager **4.1.1**, rebased onto `15d835d6` of
+2026-10-19). One fix.
+
+### Main list
+
+- **Fixed the main list collapsing on a multi-column grid.** On any grid of two or more columns the
+  right-hand column (version, user/system, SDK, signature, and the backup values) was pinned to a
+  fixed pixel width sized for a one-column full-width row, so on a narrow grid card it overran the
+  row and starved the weighted centre column — the app name, uid, package and install date — to
+  nothing: the app name vanished and the uid and date truncated to “10…” / “11/…”, with the note and
+  tag pills crowding the icon. The widening of the width reference to a full fork version name in
+  +067's predecessor work made it worst on exactly the two-column folded view. The right column now
+  takes the collapse-proof weighted split (the same one the lenses already use) on any multi-column
+  grid, reading the live column count straight from the grid so it can never disagree with what is
+  drawn; the long version string shrinks or middle-ellipsises to fit rather than overflowing. The
+  one-column full-width list keeps its original layout.
+
 ## 4.1.1+2026-10-19.01-45.g15d835d6+067 — 2026-10-31
 
 Built on upstream App Manager **4.1.1**, rebased from commit `41d79af5` (2026-09-05) onto
