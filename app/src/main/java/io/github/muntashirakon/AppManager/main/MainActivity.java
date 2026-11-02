@@ -930,6 +930,26 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
     }
 
     /**
+     * Fork (白い熊): the number of columns the list is <b>actually</b> drawn at right now, read
+     * from the live {@code GridLayoutManager} rather than inferred from the preference.
+     *
+     * <p>{@code AutoFitGridLayoutManager} recomputes its span count on measure, and a fixed pick
+     * is whatever {@code applyListLayout} built the grid with, so this is the one source that can
+     * never disagree with what is on screen. The adapter asks it per bind to decide whether the
+     * right-hand column must take the collapse-proof weighted proportions — on any multi-column
+     * grid a fixed-pixel right column can overrun the narrow card and starve the weighted centre
+     * (the app name, uid, package and date) to nothing. Returns 1 for a single-column list or a
+     * non-grid manager, where the fixed-pixel block is the designed full-width-version layout.
+     */
+    public int getListSpanCount() {
+        RecyclerView.LayoutManager lm = mRecyclerView == null ? null : mRecyclerView.getLayoutManager();
+        if (lm instanceof GridLayoutManager) {
+            return Math.max(1, ((GridLayoutManager) lm).getSpanCount());
+        }
+        return 1;
+    }
+
+    /**
      * Fork: re-read the layout when the geometry changed under a surviving
      * activity. Folding or rotating normally recreates us (no configChanges is
      * declared), and then onCreate applies the right pick; this covers the paths

@@ -700,7 +700,20 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         // needed -- so without this reset the column width would follow the last row bound, and
         // the columns would go ragged down the list.
         resetVersionSizes(holder);
-        applyColumnProportions(context, holder, lens != null && lens.wideRight());
+        // Fork (白い熊, +068): take the collapse-proof weighted proportions on ANY multi-column
+        // grid, not only under a display lens. The non-wide path pins the right column to a FIXED
+        // pixel width sized against RIGHT_COLUMN_REFERENCE -- a full 36-character fork version name
+        // since +173 -- while the centre column (app name, uid, package, date) is the one weighted
+        // child, so a LinearLayout hands it only the slack the fixed sibling leaves. On a narrow
+        // grid card that fixed width overruns the row and the centre collapses to nothing: the app
+        // name vanishes and the uid/date truncate to "10.../11/...". The weighted path (centre 1.35
+        // : right 1) cannot be squeezed to zero, and the only visible change on a grid is the long
+        // version string shrinking/middle-ellipsizing via fitVersionPair. The fixed-pixel block is
+        // kept for the genuine one-column list, where it is the designed full-width-version layout.
+        // The span count is the LIVE one (getListSpanCount), so it can never disagree with what is
+        // actually on screen -- neither a fixed pick nor an adaptive grid is second-guessed.
+        boolean wideRight = (lens != null && lens.wideRight()) || mActivity.getListSpanCount() > 1;
+        applyColumnProportions(context, holder, wideRight);
         bindAppPane(holder, item);
         // Add click listeners
         cardView.setOnClickListener(v -> {
