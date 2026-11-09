@@ -250,7 +250,8 @@ public class ProcessMonitorActivity extends BaseActivity {
         int yellow = ContextCompat.getColor(this, R.color.theme_bright_yellow);
         int warn = io.github.muntashirakon.AppManager.fonts.ColorPrefs.getColor(this,
                 io.github.muntashirakon.AppManager.fonts.ColorPrefs.MONITOR_LEAK);
-        int dim = 0xFF9A9A9A;
+        int dim = io.github.muntashirakon.AppManager.fonts.ColorPrefs.getColor(this,
+                io.github.muntashirakon.AppManager.fonts.ColorPrefs.SETTINGS_DESCRIPTION);
 
         String alloc = h.allocatorBytes < 0 ? "—" : android.text.format.Formatter.formatShortFileSize(this, h.allocatorBytes);
         if (h.allocatorBytes >= 0 && Math.abs(h.allocatorDeltaBytes) >= (16L << 20)) {

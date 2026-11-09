@@ -1960,6 +1960,9 @@
     <string name="pref_selframe_cat">Frame</string>
     <string name="pref_selframe_width">Border width (0 = none)</string>
     <string name="pref_selframe_radius">Corner roundness (0 = square)</string>
+    <!-- Fork (白い熊, +076): the UI settings page's own dim-gold description colour -->
+    <string name="pref_settings_page_group">UI settings page</string>
+    <string name="pref_color_settings_description">Explanatory text &amp; left rules</string>
     <!-- Main-list layout picker (fork) -->
     <string name="list_layout">List layout</string>
     <string name="layout_adaptive">Adaptive (default)</string>
@@ -2923,4 +2926,21 @@
     <string name="restore_stage_importing">The app is restoring its data</string>
     <!-- Fork (白い熊, +143): Cancel, once it has been heard. -->
     <string name="op_cancelling">Cancelling…</string>
+
+    <!-- Fork (白い熊, 2026-11-07): the App-launch block in the expanded row. The open button
+         delegates to 白い熊 自由作業盤 (this EMUI build won't let 応用管理 open 起動マネージャー
+         itself); the switch is plain-Android doze exemption via Shizuku. -->
+    <string name="app_launch_open">起動マネージャー</string>
+    <string name="app_launch_exempt_label">Exempt from battery optimization</string>
+    <string name="app_launch_state_checking">Checking…</string>
+    <string name="app_launch_state_exempt">Exempt</string>
+    <string name="app_launch_state_optimised">Optimized</string>
+    <string name="app_launch_state_locked">Can\'t change here</string>
+    <string name="app_launch_opening">Opening 起動マネージャー for %s…</string>
+    <string name="app_launch_jiyu_missing">白い熊 自由作業盤 is not installed</string>
+    <string name="app_launch_error">白い熊 自由作業盤: %s</string>
+    <string name="app_launch_exempt_failed">Couldn\'t change battery optimization</string>
+    <string name="app_launch_exempt_pinned">The system pins this app\'s battery-optimization setting; it can\'t be changed here.</string>
+    <string name="app_launch_exempt_toast_on">%s — now exempt from battery optimization</string>
+    <string name="app_launch_exempt_toast_off">%s — now battery-optimized</string>
 </resources>

@@ -45,6 +45,7 @@ import java.util.concurrent.Executors;
 
 import io.github.muntashirakon.AppManager.BaseActivity;
 import io.github.muntashirakon.AppManager.R;
+import io.github.muntashirakon.AppManager.fonts.ColorPrefs;
 import io.github.muntashirakon.AppManager.compat.DeviceIdleManagerCompat;
 import io.github.muntashirakon.AppManager.compat.PackageManagerCompat;
 import io.github.muntashirakon.AppManager.db.AppsDb;
@@ -275,7 +276,7 @@ public class BatteryAppDetailActivity extends BaseActivity {
         int padH = Math.round(density * 20);
         row.setPadding(padH, Math.round(density * 3), padH, Math.round(density * 3));
 
-        TextView k = plainText(13, 0xFF9A9A9A);
+        TextView k = plainText(13, descColor());
         k.setLayoutParams(new LinearLayoutCompat.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         k.setText(label);
@@ -293,7 +294,7 @@ public class BatteryAppDetailActivity extends BaseActivity {
         } else {
             double change = 100 * (now - before) / before;
             // Down is good here — every metric on this panel is a cost.
-            colour = change <= -10 ? 0xFF6ADf6A : change >= 10 ? 0xFFFF0028 : 0xFF9A9A9A;
+            colour = change <= -10 ? 0xFF6ADf6A : change >= 10 ? 0xFFFF0028 : descColor();
             arrow = String.format(Locale.getDefault(), "  (%s%.0f%%)", change > 0 ? "+" : "", change);
         }
         v.setText(String.format(Locale.getDefault(), fmt, now)
@@ -360,7 +361,7 @@ public class BatteryAppDetailActivity extends BaseActivity {
         TextView title = plainText(16, accent);
         title.setText(getString(s.titleRes));
         row.addView(title);
-        TextView reason = plainText(13, 0xFF9A9A9A);
+        TextView reason = plainText(13, descColor());
         reason.setText(s.reason);
         row.addView(reason);
         // A recommendation that maps to a switch carries the switch, so acting
@@ -464,7 +465,7 @@ public class BatteryAppDetailActivity extends BaseActivity {
         mContainer.addView(chart);
         mContainer.addView(caption);
 
-        TextView legend = plainText(13, 0xFF9A9A9A);
+        TextView legend = plainText(13, descColor());
         legend.setPadding(m, 0, m, Math.round(density * 4));
         legend.setText(R.string.battery_history_legend);
         mContainer.addView(legend);
@@ -756,6 +757,15 @@ public class BatteryAppDetailActivity extends BaseActivity {
         return out.resourceId;
     }
 
+    /**
+     * Fork (白い熊, +076): the secondary-text colour — a key label, a legend, a recommendation's
+     * reason, a no-change comparison. The black-yellow skill forbids grey here; this is the
+     * settable dim-gold description role, so one swatch governs it and the settings page alike.
+     */
+    private int descColor() {
+        return ColorPrefs.getColor(this, ColorPrefs.SETTINGS_DESCRIPTION);
+    }
+
     @NonNull
     private TextView plainText(float sizeSp, int color) {
         AppCompatTextView tv = new AppCompatTextView(this);
@@ -788,7 +798,7 @@ public class BatteryAppDetailActivity extends BaseActivity {
         row.setOrientation(LinearLayoutCompat.HORIZONTAL);
         int padH = Math.round(density * 20);
         row.setPadding(padH, Math.round(density * 2), padH, Math.round(density * 2));
-        TextView k = plainText(13, 0xFF9A9A9A);
+        TextView k = plainText(13, descColor());
         k.setLayoutParams(new LinearLayoutCompat.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         k.setText(key);
@@ -866,7 +876,7 @@ public class BatteryAppDetailActivity extends BaseActivity {
         t.setText(title);
         texts.addView(t);
         if (summary != null) {
-            TextView s = plainText(12, 0xFF9A9A9A);
+            TextView s = plainText(12, descColor());
             s.setText(summary);
             texts.addView(s);
         }
@@ -890,7 +900,7 @@ public class BatteryAppDetailActivity extends BaseActivity {
         t.setText(title);
         row.addView(t);
         if (summary != null) {
-            TextView s = plainText(12, 0xFF9A9A9A);
+            TextView s = plainText(12, descColor());
             s.setText(summary);
             row.addView(s);
         }

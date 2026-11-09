@@ -139,6 +139,15 @@ public final class ColorPrefs {
     // ---- colour-role key (selected card frame; width/radius in SelectionFramePrefs) ----
     public static final String SELECTED_FRAME = "selected_frame";
 
+    /**
+     * Fork (白い熊, +076): the dim gold the black-yellow skill allows for explanatory text — the
+     * one non-accent colour on the UI settings pages, and NEVER grey. It is the single settable
+     * role shared by the page's descriptions, its colour-role labels and its left rules, and it is
+     * reused for the secondary text on the battery and process-monitor screens so one swatch
+     * governs every "said, not shouted" line in the app. Default = {@code @color/settings_description}.
+     */
+    public static final String SETTINGS_DESCRIPTION = "settings_description";
+
     // ---- colour-role keys (batch operation log; text size in OpLogPrefs) ----
     // Fork (白い熊, +116): the running backup/restore log. Every kind of line is settable,
     // because the whole point of the colours is orientation while scrolling past thousands of
@@ -198,6 +207,8 @@ public final class ColorPrefs {
      */
     public static int defaultColor(@NonNull Context ctx, @NonNull String key) {
         switch (key) {
+            case SETTINGS_DESCRIPTION:
+                return ContextCompat.getColor(ctx, R.color.settings_description);
             case LABEL_FROZEN:
                 return ContextCompat.getColor(ctx, R.color.theme_ice_blue);
             case LABEL_SYSTEM:

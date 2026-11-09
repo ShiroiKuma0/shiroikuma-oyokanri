@@ -50,7 +50,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/pref_sep_width"
-            android:textColor="#9A9A9A"
+            android:textColor="@color/settings_description"
             android:textSize="14sp" />
 
         <androidx.appcompat.widget.AppCompatTextView

@@ -43,6 +43,7 @@ public final class AppPanePrefs {
     private static final String PREF_HIDDEN_ORDER = "hidden_order";
     private static final String PREF_MIGRATED_CLEAR_DATA = "migrated_clear_data";
     private static final String PREF_MIGRATED_FREEZE_LEVELS = "migrated_freeze_levels";
+    private static final String PREF_MIGRATED_APP_LAUNCH = "migrated_app_launch";
     private static final String DELIM = ",";
 
     /** Every action the pane can offer. Stable wire keys — never rename one. */
@@ -71,13 +72,16 @@ public final class AppPanePrefs {
             "battery",
             "manifest",
             "scanner",
-            "app_settings"));
+            "app_settings",
+            // Fork (白い熊): 起動マネージャー — opens EMUI's App-launch screen at this app, via
+            // 白い熊 自由作業盤. A regular, drag-reorderable pane pill; last in the default order.
+            "app_launch"));
 
     /** What a fresh install shows, in this order. */
     private static final List<String> DEFAULT_VISIBLE = Collections.unmodifiableList(Arrays.asList(
             "open", "app_info", "snooping", "freeze_level_1", "freeze_level_2", "freeze_level_3",
             "freeze_level_4", "force_stop", "backup", "restore", "share_backup", "note",
-            "uninstall", "clear_data"));
+            "uninstall", "clear_data", "app_launch"));
 
     /**
      * Fork (白い熊, +038): one-shot promotion of {@code clear_data} into the visible set.
@@ -159,6 +163,36 @@ public final class AppPanePrefs {
         save(ctx, visible, hidden);
     }
 
+    /**
+     * Fork (白い熊): one-shot promotion of {@code app_launch} (起動マネージャー) into the visible set,
+     * at the <b>end</b> so it is last by default — the same trap and the same answer as
+     * {@link #migrateClearDataVisible}. On an edited pane both stored orders exist, and a new key
+     * missing from both is otherwise added to <em>both</em> {@link #loadVisibleOrder} and
+     * {@link #loadHiddenOrder} at once; this settles it in one place. Fires once, only while the key
+     * is actually hidden, so hiding it again afterwards stands.
+     */
+    public static void migrateAppLaunchVisible(@NonNull Context ctx) {
+        SharedPreferences sp = sp(ctx);
+        if (sp.getBoolean(PREF_MIGRATED_APP_LAUNCH, false)) {
+            return;
+        }
+        sp.edit().putBoolean(PREF_MIGRATED_APP_LAUNCH, true).apply();
+        String visibleRaw = sp.getString(PREF_VISIBLE_ORDER, null);
+        String hiddenRaw = sp.getString(PREF_HIDDEN_ORDER, null);
+        if (visibleRaw == null && hiddenRaw == null) {
+            // Never edited: DEFAULT_VISIBLE already carries it, last.
+            return;
+        }
+        List<String> visible = new ArrayList<>(parseKeys(visibleRaw));
+        List<String> hidden = new ArrayList<>(parseKeys(hiddenRaw));
+        if (visible.contains("app_launch")) {
+            return;
+        }
+        hidden.remove("app_launch");
+        visible.add("app_launch");
+        save(ctx, visible, hidden);
+    }
+
     @StringRes
     public static int titleForKey(@NonNull String key) {
         switch (key) {
@@ -188,6 +222,7 @@ public final class AppPanePrefs {
             case "manifest":        return R.string.manifest;
             case "scanner":         return R.string.scanner;
             case "app_settings":    return R.string.view_in_settings;
+            case "app_launch":      return R.string.app_launch_open;
             default: return 0;
         }
     }
@@ -218,6 +253,7 @@ public final class AppPanePrefs {
             case "manifest":        return R.drawable.ic_package;
             case "scanner":         return R.drawable.ic_security;
             case "app_settings":    return R.drawable.ic_settings;
+            case "app_launch":      return R.drawable.ic_open_in_new;
             default: return 0;
         }
     }

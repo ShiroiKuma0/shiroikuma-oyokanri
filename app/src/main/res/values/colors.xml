@@ -69,4 +69,8 @@
     <color name="theme_film_freeze_2">#122038</color>
     <color name="theme_film_freeze_3">#1F1440</color>
     <color name="theme_film_freeze_4">#33103A</color>
+    <!-- Fork (白い熊): dim gold for explanatory text on the UI settings pages — the one
+         place the black-yellow skill allows a non-accent colour, and NEVER grey. Centralised
+         here so the descriptions, color-role labels and left rules share it. -->
+    <color name="settings_description">#FFC8C800</color>
 </resources>
