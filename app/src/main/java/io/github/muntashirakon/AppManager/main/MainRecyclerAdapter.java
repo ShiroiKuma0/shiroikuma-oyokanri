@@ -64,6 +64,8 @@ import java.util.Objects;
 import java.util.Set;
 
 import io.github.muntashirakon.AppManager.BuildConfig;
+import io.github.muntashirakon.AppManager.appstartup.AppLaunchDelegate;
+import io.github.muntashirakon.AppManager.appstartup.BatteryExemptPill;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.apk.installer.PackageInstallerActivity;
 import io.github.muntashirakon.AppManager.fonts.ColorPrefs;
@@ -502,6 +504,31 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             showNoteDialog(holder, pkg, label);
         });
         holder.notePill.setOnLongClickListener(v -> holder.itemView.performLongClick());
+    }
+
+    /**
+     * Fork (白い熊): the battery-exemption icon on the date line. Its visual state (exempt /
+     * optimized / pinned / checking) is {@link BatteryExemptPill}'s business — read off the main
+     * thread and cached; the adapter only owns the click, because it alone knows selection mode.
+     * The same two guards the note pill and the app icon carry (+82): a tap during multi-select
+     * extends the selection, and the long-press is handed back to the card so range selection works.
+     */
+    private void bindExemptIcon(@NonNull ViewHolder holder, @NonNull ApplicationItem item) {
+        if (holder.exemptIcon == null) {
+            return;
+        }
+        BatteryExemptPill.apply(holder.exemptIcon, item);
+        holder.exemptIcon.setOnClickListener(v -> {
+            int currentPos = holder.getBindingAdapterPosition();
+            if (currentPos == RecyclerView.NO_POSITION) return;
+            if (isInSelectionMode()) {
+                toggleSelection(currentPos);
+                AccessibilityUtils.requestAccessibilityFocus(holder.itemView);
+                return;
+            }
+            BatteryExemptPill.toggle(mActivity, holder.exemptIcon, item);
+        });
+        holder.exemptIcon.setOnLongClickListener(v -> holder.itemView.performLongClick());
     }
 
     /**
@@ -978,6 +1005,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         FontUtil.apply(holder.label, FontPrefs.LABEL);
         holder.label.setTypeface(holder.label.getTypeface(), dormantItalic ? Typeface.ITALIC : Typeface.NORMAL);
         bindNotePill(holder, item);
+        bindExemptIcon(holder, item);
         // Set package name
         if (!TextUtils.isEmpty(mSearchQuery) && item.packageName.toLowerCase(Locale.ROOT).contains(mSearchQuery)) {
             // Highlight searched query
@@ -1468,6 +1496,11 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             case "snooping":
                 handleClick(item, AppDetailsActivity.TAB_SNOOPING);
                 break;
+            case "app_launch":
+                // Fork (白い熊): 起動マネージャー is a regular, drag-reorderable pane pill now.
+                // It delegates to 白い熊 自由作業盤, which drives EMUI's startup screen.
+                AppLaunchDelegate.open(mActivity, item.packageName, item.label);
+                break;
             case "freeze":
                 toggleFreeze(item);
                 break;
@@ -1882,6 +1915,8 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         // Fork (+094): one pill for the note in both states. How wide it may
         // grow is LabelLineLayout's business, not the holder's.
         TextView notePill;
+        // Fork (白い熊): the battery-exemption icon on the date line's right edge.
+        AppCompatImageView exemptIcon;
         // Fork (+118): the pane a tap unrolls. Part of the row, not an inserted item.
         LinearLayoutCompat appPane;
 
@@ -1915,6 +1950,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
             profilePills = itemView.findViewById(R.id.profile_pills);
             addPill = itemView.findViewById(R.id.profile_add_pill);
             notePill = itemView.findViewById(R.id.note_pill);
+            exemptIcon = itemView.findViewById(R.id.exempt_icon);
         }
     }
 }

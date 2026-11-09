@@ -385,7 +385,7 @@ public final class MainCardBinder {
                 sb.append(windowLabel).append("  ");
                 // Grey, lighter and smaller — it is a qualifier, and at the
                 // headline's weight it pushed two-digit percentages out of view.
-                sb.setSpan(new ForegroundColorSpan(0xFF9A9A9A), 0, sb.length(),
+                sb.setSpan(new ForegroundColorSpan(ColorPrefs.getColor(context, ColorPrefs.SETTINGS_DESCRIPTION)), 0, sb.length(),
                         Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 sb.setSpan(new RelativeSizeSpan(0.72f), 0, sb.length(),
                         Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);

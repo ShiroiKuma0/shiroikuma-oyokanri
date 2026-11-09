@@ -258,13 +258,42 @@
 
                 </androidx.appcompat.widget.LinearLayoutCompat>
 
-                <androidx.appcompat.widget.AppCompatTextView
-                    android:id="@+id/date"
+                <!-- Fork (白い熊): the date line, now carrying the battery-exemption
+                     icon at its right edge — stacked in the same column as the note
+                     pill above and the tag "+" below. The date takes the slack
+                     (0dp + weight) so a long date ellipsizes before the icon rather
+                     than pushing it off the row. The icon is GONE for an app that is
+                     not installed, and bound by MainRecyclerAdapter / BatteryExemptPill. -->
+                <androidx.appcompat.widget.LinearLayoutCompat
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:singleLine="true"
-                    android:textAppearance="?attr/textAppearanceBodySmall"
-                    tools:text="@tools:sample/date/mmddyy" />
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:baselineAligned="false">
+
+                    <androidx.appcompat.widget.AppCompatTextView
+                        android:id="@+id/date"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:singleLine="true"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        tools:text="@tools:sample/date/mmddyy" />
+
+                    <androidx.appcompat.widget.AppCompatImageView
+                        android:id="@+id/exempt_icon"
+                        android:layout_width="34dp"
+                        android:layout_height="21dp"
+                        android:layout_marginStart="6dp"
+                        android:scaleType="fitXY"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:visibility="gone"
+                        tools:ignore="ContentDescription"
+                        tools:visibility="visible" />
+
+                </androidx.appcompat.widget.LinearLayoutCompat>
 
                 <!-- Fork (白い熊, +094): the tag (profile) line — memberships,
                      then the "+" that adds one.

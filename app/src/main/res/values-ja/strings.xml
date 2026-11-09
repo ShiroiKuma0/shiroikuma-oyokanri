@@ -1465,4 +1465,19 @@
     <string name="restore_stage_decrypting">復号中</string>
     <string name="restore_stage_staging">書庫を展開中</string>
     <string name="op_cancelling">中止中…</string>
+
+    <!-- Fork (白い熊, 2026-11-07): 展開した行のアプリ起動ブロック。開くボタンは白い熊 自由作業盤へ委譲
+         （このEMUIでは応用管理が起動マネージャーを自力で開けない）、スイッチはShizuku経由の素のAndroidの
+         電池最適化除外。 -->
+    <string name="app_launch_open">起動マネージャー</string>
+    <string name="app_launch_exempt_label">電池最適化から除外</string>
+    <string name="app_launch_state_checking">確認中…</string>
+    <string name="app_launch_state_exempt">除外中</string>
+    <string name="app_launch_state_optimised">最適化対象</string>
+    <string name="app_launch_state_locked">ここでは変更不可</string>
+    <string name="app_launch_opening">%s の起動マネージャーを開いています…</string>
+    <string name="app_launch_jiyu_missing">白い熊 自由作業盤 がインストールされていません</string>
+    <string name="app_launch_error">白い熊 自由作業盤: %s</string>
+    <string name="app_launch_exempt_failed">電池最適化を変更できませんでした</string>
+    <string name="app_launch_exempt_pinned">このアプリの電池最適化設定はシステムに固定されており、ここでは変更できません。</string>
 </resources>

@@ -53,7 +53,7 @@
                 android:layout_marginTop="1dp"
                 android:singleLine="true"
                 android:ellipsize="end"
-                android:textColor="#9A9A9A"
+                android:textColor="@color/settings_description"
                 android:textSize="13sp"
                 tools:text="com.some.app:service" />
 
@@ -64,7 +64,7 @@
                 android:layout_marginTop="1dp"
                 android:singleLine="true"
                 android:ellipsize="end"
-                android:textColor="#7A7A7A"
+                android:textColor="@color/settings_description"
                 android:textSize="12sp"
                 tools:text="PID 1234  ·  u0_a1  ·  S" />
 
@@ -125,7 +125,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="1dp"
-                android:textColor="#9A9A9A"
+                android:textColor="@color/settings_description"
                 android:textSize="12sp"
                 tools:text="3.2% cpu" />
 

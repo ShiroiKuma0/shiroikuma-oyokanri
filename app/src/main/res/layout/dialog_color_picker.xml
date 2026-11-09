@@ -35,7 +35,7 @@
         android:orientation="horizontal">
         <androidx.appcompat.widget.AppCompatTextView android:layout_width="22dp" android:layout_height="wrap_content" android:text="A" android:textColor="@color/theme_bright_yellow" android:textStyle="bold" />
         <androidx.appcompat.widget.AppCompatSeekBar android:id="@+id/cp_alpha" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" />
-        <androidx.appcompat.widget.AppCompatTextView android:id="@+id/cp_alpha_val" android:layout_width="40dp" android:layout_height="wrap_content" android:gravity="end" android:textColor="#9A9A9A" />
+        <androidx.appcompat.widget.AppCompatTextView android:id="@+id/cp_alpha_val" android:layout_width="40dp" android:layout_height="wrap_content" android:gravity="end" android:textColor="@color/settings_description" />
     </androidx.appcompat.widget.LinearLayoutCompat>
 
     <androidx.appcompat.widget.LinearLayoutCompat
@@ -45,7 +45,7 @@
         android:orientation="horizontal">
         <androidx.appcompat.widget.AppCompatTextView android:layout_width="22dp" android:layout_height="wrap_content" android:text="R" android:textColor="@color/theme_bright_yellow" android:textStyle="bold" />
         <androidx.appcompat.widget.AppCompatSeekBar android:id="@+id/cp_red" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" />
-        <androidx.appcompat.widget.AppCompatTextView android:id="@+id/cp_red_val" android:layout_width="40dp" android:layout_height="wrap_content" android:gravity="end" android:textColor="#9A9A9A" />
+        <androidx.appcompat.widget.AppCompatTextView android:id="@+id/cp_red_val" android:layout_width="40dp" android:layout_height="wrap_content" android:gravity="end" android:textColor="@color/settings_description" />
     </androidx.appcompat.widget.LinearLayoutCompat>
 
     <androidx.appcompat.widget.LinearLayoutCompat
@@ -55,7 +55,7 @@
         android:orientation="horizontal">
         <androidx.appcompat.widget.AppCompatTextView android:layout_width="22dp" android:layout_height="wrap_content" android:text="G" android:textColor="@color/theme_bright_yellow" android:textStyle="bold" />
         <androidx.appcompat.widget.AppCompatSeekBar android:id="@+id/cp_green" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" />
-        <androidx.appcompat.widget.AppCompatTextView android:id="@+id/cp_green_val" android:layout_width="40dp" android:layout_height="wrap_content" android:gravity="end" android:textColor="#9A9A9A" />
+        <androidx.appcompat.widget.AppCompatTextView android:id="@+id/cp_green_val" android:layout_width="40dp" android:layout_height="wrap_content" android:gravity="end" android:textColor="@color/settings_description" />
     </androidx.appcompat.widget.LinearLayoutCompat>
 
     <androidx.appcompat.widget.LinearLayoutCompat
@@ -65,7 +65,7 @@
         android:orientation="horizontal">
         <androidx.appcompat.widget.AppCompatTextView android:layout_width="22dp" android:layout_height="wrap_content" android:text="B" android:textColor="@color/theme_bright_yellow" android:textStyle="bold" />
         <androidx.appcompat.widget.AppCompatSeekBar android:id="@+id/cp_blue" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" />
-        <androidx.appcompat.widget.AppCompatTextView android:id="@+id/cp_blue_val" android:layout_width="40dp" android:layout_height="wrap_content" android:gravity="end" android:textColor="#9A9A9A" />
+        <androidx.appcompat.widget.AppCompatTextView android:id="@+id/cp_blue_val" android:layout_width="40dp" android:layout_height="wrap_content" android:gravity="end" android:textColor="@color/settings_description" />
     </androidx.appcompat.widget.LinearLayoutCompat>
 
     <androidx.appcompat.widget.LinearLayoutCompat

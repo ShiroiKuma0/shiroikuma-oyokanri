@@ -6,7 +6,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.text.TextUtils;
 import android.text.format.Formatter;
-import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
@@ -16,6 +15,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.widget.AppCompatTextView;
 import androidx.appcompat.widget.LinearLayoutCompat;
 
+
 import java.text.DateFormat;
 import java.util.Date;
 import java.util.ArrayList;
@@ -24,6 +24,7 @@ import java.util.List;
 import io.github.muntashirakon.AppManager.R;
 import io.github.muntashirakon.AppManager.fonts.ColorPrefs;
 import io.github.muntashirakon.AppManager.utils.ForkThemeUtils;
+import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 
 /**
  * Fork (白い熊, +118): fills the pane that a tap unrolls under a row.
@@ -63,6 +64,9 @@ public final class AppPaneBinder {
 
         pane.addView(rule(context, ink));
         pane.addView(facts(context, item, ink, dim));
+        // Fork (白い熊): 起動マネージャー is now an ordinary, drag-reorderable pane pill (last by
+        // default), and the battery-exemption control moved up to the row's strip — so there is no
+        // special App-launch block here any more; both ride the action pills / the row.
 
         // The actions, in the order they were configured. Wrapping is what makes the labels
         // readable — the bar this replaced had to cut them off because it was one row that could
@@ -153,6 +157,9 @@ public final class AppPaneBinder {
             case "save_apk":
             case "app_settings":
                 return item.isInstalled ? context.getString(AppPanePrefs.titleForKey(key)) : null;
+            case "app_launch":
+                // EMUI's 起動マネージャー lists nothing for an app that is not installed.
+                return item.isInstalled ? context.getString(R.string.app_launch_open) : null;
             default: {
                 int res = AppPanePrefs.titleForKey(key);
                 return res == 0 ? null : context.getString(res);

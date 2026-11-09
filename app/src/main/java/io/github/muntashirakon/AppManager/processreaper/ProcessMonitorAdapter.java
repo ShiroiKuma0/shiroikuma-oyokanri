@@ -141,6 +141,13 @@ public class ProcessMonitorAdapter extends RecyclerView.Adapter<ProcessMonitorAd
         h.ram.setText(row.ram);
         h.ram.setTextColor(stateColor);
         h.cpu.setText(row.cpu);
+        // Fork (白い熊, +076): the secondary row text is the settable dim-gold description role, not
+        // grey — the black-yellow skill's "never grey" rule. The meta line keeps a tier below the
+        // rest, as it did when it was a dimmer grey, by dropping the role's alpha.
+        int descColor = ColorPrefs.getColor(mCtx, ColorPrefs.SETTINGS_DESCRIPTION);
+        h.subtitle.setTextColor(descColor);
+        h.cpu.setTextColor(descColor);
+        h.meta.setTextColor((descColor & 0x00FFFFFF) | 0xB3000000);
         if (suspect) {
             h.badge.setText(R.string.monitor_badge_leaking);
             h.badge.setTextColor(leakColor);

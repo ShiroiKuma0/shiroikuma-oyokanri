@@ -7,14 +7,17 @@ import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.text.Editable;
 import android.text.InputType;
+import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -223,6 +226,15 @@ public class FontsPreferences extends Fragment {
     @Nullable
     private Runnable mRefreshPending;
 
+    // Fork (白い熊, +076): the page's whole view tree, and the dim-gold colour currently painted on
+    // every description label and left rule in it. The description colour is a settable role now
+    // (ColorPrefs.SETTINGS_DESCRIPTION), but the labels are coloured in XML, so the role is applied
+    // by a single recolour pass — from whatever is painted now to the role — kept honest by this
+    // field so a later swatch change recolours cleanly. 0 = never applied yet (treat as the default).
+    @Nullable
+    private LinearLayoutCompat mFontsContainer;
+    private int mDescColorApplied = 0;
+
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -249,6 +261,7 @@ public class FontsPreferences extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         LinearLayoutCompat container = view.findViewById(R.id.fonts_container);
+        mFontsContainer = container;
         LayoutInflater inflater = LayoutInflater.from(requireContext());
         for (Group g : GROUPS) {
             View groupView = inflater.inflate(R.layout.view_font_group, container, false);
@@ -348,6 +361,17 @@ public class FontsPreferences extends Fragment {
         LinearLayoutCompat frameContent = frameGroup.findViewById(R.id.group_content);
         frameContent.addView(buildSelectionFrameElement(inflater, frameContent));
         container.addView(frameGroup);
+        // Fork (白い熊, +076): the one swatch that governs this page's own dim-gold — every
+        // description, colour-role label and left rule, and the secondary text on the battery and
+        // process-monitor screens. The skill asks for a settable role rather than a hard-coded
+        // constant; this is it. Changing it recolours the open page live.
+        View pageGroup = inflater.inflate(R.layout.view_font_group, container, false);
+        ((AppCompatTextView) pageGroup.findViewById(R.id.group_header)).setText(R.string.pref_settings_page_group);
+        LinearLayoutCompat pageContent = pageGroup.findViewById(R.id.group_content);
+        addColorRow(pageContent,
+                new ColorSpec(ColorPrefs.SETTINGS_DESCRIPTION, R.string.pref_color_settings_description),
+                () -> { if (mFontsContainer != null) applyDescriptionColor(mFontsContainer); });
+        container.addView(pageGroup);
         // Fork: a reference legend at the TOP of the page — sample chips styled
         // in code to mirror the live list, with what each colour/style means.
         View legendGroup = inflater.inflate(R.layout.view_font_group, container, false);
@@ -392,43 +416,147 @@ public class FontsPreferences extends Fragment {
             View hairline = container.getChildAt(i).findViewById(R.id.group_hairline);
             if (hairline != null) hairline.setVisibility(i == 0 ? View.GONE : View.VISIBLE);
         }
+        // Fork (白い熊, +076): apply the settable description colour over the whole page in one pass.
+        // When the role sits at its default this is a no-op, so an untouched install looks exactly
+        // as it did before the role existed.
+        applyDescriptionColor(container);
     }
 
     /**
-     * Fork: the Export/Import row (kxkb item style: 16sp title over a 13sp dim
-     * summary, 72dp indent, ripple). Tapping opens the category panel; the
-     * summary is re-queried from the export directory on every page open and
-     * whenever the panel closes.
+     * Fork (白い熊, +076): paint every description/left-rule drawn in the <em>currently applied</em>
+     * dim gold with the {@link ColorPrefs#SETTINGS_DESCRIPTION} role. The labels and rules are
+     * coloured in XML (so an unset role still renders), so the role governs them through this
+     * recolour rather than through a resource — the same shape as the list's "reopen to refresh",
+     * except here it also runs live when the swatch changes.
+     */
+    private void applyDescriptionColor(@NonNull View root) {
+        int from = mDescColorApplied != 0
+                ? mDescColorApplied
+                : ContextCompat.getColor(requireContext(), R.color.settings_description);
+        int role = ColorPrefs.getColor(requireContext(), ColorPrefs.SETTINGS_DESCRIPTION);
+        if (from != role) recolorMatching(root, from, role);
+        mDescColorApplied = role;
+    }
+
+    /**
+     * Recolour every {@link TextView} whose ink is exactly {@code from}, and every flat-colour
+     * background (the left rules) at {@code from}, to {@code to}. The only things painted in the
+     * description dim gold are the descriptions and the left rules, so matching on the colour is
+     * precise — nothing else on the page uses that value.
+     */
+    private void recolorMatching(@NonNull View v, int from, int to) {
+        if (v instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) {
+                recolorMatching(g.getChildAt(i), from, to);
+            }
+            return;
+        }
+        if (v instanceof TextView && ((TextView) v).getCurrentTextColor() == from) {
+            ((TextView) v).setTextColor(to);
+        }
+        android.graphics.drawable.Drawable bg = v.getBackground();
+        if (bg instanceof android.graphics.drawable.ColorDrawable
+                && ((android.graphics.drawable.ColorDrawable) bg).getColor() == from) {
+            v.setBackgroundColor(to);
+        }
+    }
+
+    /**
+     * Fork: the Export/Import row. This is the page's <b>main</b> pressable row — the section's one
+     * panel — so it is the thick (3dp) bold pill with a › (it opens the category panel), per the
+     * black-yellow pill rule for settings pages. Its summary (the export directory + latest export)
+     * is re-queried on every page open and whenever the panel closes.
      */
     @NonNull
     private View buildEimRow() {
+        AppCompatTextView summary = pillSummary(getString(R.string.settings_eim_desc));
+        refreshEimSummary(summary);
+        return actionRow(R.string.settings_eim_title, summary, true, true,
+                v -> SettingsExportImportPanel.show(requireActivity(),
+                        () -> refreshEimSummary(summary),
+                        () -> requireActivity().getOnBackPressedDispatcher().onBackPressed()));
+    }
+
+    /**
+     * Fork (白い熊, 2026-11-07): a pressable settings row drawn as the black-yellow pill — an
+     * outlined pill (never filled) holding the label, its explanation beneath it in dim gold. A
+     * thick 3dp bold frame for the section's main action, a thin 1.25dp frame otherwise; a › at the
+     * right when it opens something, none when it acts in place. Mirrors 白い熊 読書's
+     * {@code DokshoUiActivity.actionRow}.
+     */
+    @NonNull
+    private View actionRow(@StringRes int titleRes, @Nullable AppCompatTextView summary,
+                           boolean main, boolean opens, @NonNull View.OnClickListener onClick) {
         final float density = getResources().getDisplayMetrics().density;
+        final int ink = ContextCompat.getColor(requireContext(), R.color.theme_bright_yellow);
+        // The pill and its explanation stack vertically; the whole item is then wrapped with the
+        // skill's dim-gold left rule, which spans pill + explanation (白い熊). Minimal padding.
         LinearLayoutCompat row = new LinearLayoutCompat(requireContext());
         row.setOrientation(LinearLayoutCompat.VERTICAL);
-        row.setPaddingRelative(Math.round(72 * density), Math.round(5 * density),
-                Math.round(16 * density), Math.round(5 * density));
-        TypedValue ripple = new TypedValue();
-        requireContext().getTheme().resolveAttribute(android.R.attr.selectableItemBackground, ripple, true);
-        row.setBackgroundResource(ripple.resourceId);
-        row.setClickable(true);
-        row.setFocusable(true);
+
+        LinearLayoutCompat pill = new LinearLayoutCompat(requireContext());
+        pill.setOrientation(LinearLayoutCompat.HORIZONTAL);
+        pill.setGravity(Gravity.CENTER_VERTICAL);
+        pill.setPaddingRelative(Math.round(18 * density), Math.round(9 * density),
+                Math.round(16 * density), Math.round(9 * density));
+        GradientDrawable frame = new GradientDrawable();
+        frame.setColor(Color.TRANSPARENT);
+        frame.setStroke(Math.max(1, Math.round((main ? 3f : 1.25f) * density)), ink);
+        frame.setCornerRadius(50 * density);
+        pill.setBackground(new RippleDrawable(
+                ColorStateList.valueOf((ink & 0x00FFFFFF) | 0x33000000), frame, null));
+        pill.setClickable(true);
+        pill.setFocusable(true);
+        pill.setOnClickListener(onClick);
 
         AppCompatTextView title = new AppCompatTextView(requireContext());
-        title.setText(R.string.settings_eim_title);
-        title.setTextColor(ContextCompat.getColor(requireContext(), R.color.theme_bright_yellow));
+        title.setText(titleRes);
+        title.setTextColor(ink);
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
-        row.addView(title);
-        AppCompatTextView summary = new AppCompatTextView(requireContext());
-        summary.setTextColor(0xFFC8C800);
-        summary.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-        summary.setText(R.string.settings_eim_desc);
-        row.addView(summary);
-        refreshEimSummary(summary);
+        title.setTypeface(null, main ? Typeface.BOLD : Typeface.NORMAL);
+        pill.addView(title, new LinearLayoutCompat.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        if (opens) {
+            AppCompatTextView chevron = new AppCompatTextView(requireContext());
+            chevron.setText("›");
+            chevron.setTextColor(ink);
+            chevron.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
+            chevron.setTypeface(null, main ? Typeface.BOLD : Typeface.NORMAL);
+            chevron.setIncludeFontPadding(false);
+            LinearLayoutCompat.LayoutParams clp = new LinearLayoutCompat.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            clp.setMarginStart(Math.round(10 * density));
+            pill.addView(chevron, clp);
+        }
+        row.addView(pill, new LinearLayoutCompat.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        if (summary != null) {
+            summary.setPaddingRelative(Math.round(18 * density), Math.round(3 * density), 0, 0);
+            row.addView(summary);
+        }
+        // Wrap pill + explanation with the left rule, at minimal vertical padding; the pill's own
+        // inner padding (≈9dp) stays, so the touch target is still easy to hit.
+        LinearLayoutCompat outer = new LinearLayoutCompat(requireContext());
+        outer.setOrientation(LinearLayoutCompat.HORIZONTAL);
+        outer.setPaddingRelative(Math.round(60 * density), Math.round(3 * density),
+                Math.round(16 * density), Math.round(3 * density));
+        outer.addView(leftRule(density));
+        outer.addView(row, new LinearLayoutCompat.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        return outer;
+    }
 
-        row.setOnClickListener(v -> SettingsExportImportPanel.show(requireActivity(),
-                () -> refreshEimSummary(summary),
-                () -> requireActivity().getOnBackPressedDispatcher().onBackPressed()));
-        return row;
+    /** A dim-gold explanation line for an {@link #actionRow} pill. */
+    @NonNull
+    private AppCompatTextView pillSummary(@Nullable CharSequence text) {
+        AppCompatTextView sum = new AppCompatTextView(requireContext());
+        sum.setTextColor(0xFFC8C800);
+        sum.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        if (!TextUtils.isEmpty(text)) {
+            sum.setText(text);
+        }
+        return sum;
     }
 
     /**
@@ -442,17 +570,33 @@ public class FontsPreferences extends Fragment {
         LinearLayoutCompat row = new LinearLayoutCompat(requireContext());
         row.setOrientation(LinearLayoutCompat.HORIZONTAL);
         row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        row.setPaddingRelative(Math.round(72 * density), Math.round(5 * density),
-                Math.round(16 * density), Math.round(5 * density));
+        // Fork (白い熊): minimal vertical padding (2dp — the skill's row-padding rule); the text
+        // stays at its ~72dp indent, with the dim-gold left rule sitting ~12dp before it.
+        row.setPaddingRelative(Math.round(60 * density), Math.round(2 * density),
+                Math.round(16 * density), Math.round(2 * density));
         TypedValue ripple = new TypedValue();
         requireContext().getTheme().resolveAttribute(android.R.attr.selectableItemBackground, ripple, true);
         row.setBackgroundResource(ripple.resourceId);
         row.setClickable(true);
         row.setFocusable(true);
+        // The skill's left rule: a thin dim-gold bar down the whole item's left edge, ~10dp before
+        // the text. It marks a settings item that carries an explanation.
+        row.addView(leftRule(density));
         texts.setOrientation(LinearLayoutCompat.VERTICAL);
         row.addView(texts, new LinearLayoutCompat.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         return row;
+    }
+
+    /** The skill's 2dp dim-gold left rule — the whole item's height, a 10dp gap before the text. */
+    private View leftRule(float density) {
+        View bar = new View(requireContext());
+        LinearLayoutCompat.LayoutParams lp = new LinearLayoutCompat.LayoutParams(
+                Math.round(2 * density), ViewGroup.LayoutParams.MATCH_PARENT);
+        lp.setMarginEnd(Math.round(10 * density));
+        bar.setLayoutParams(lp);
+        bar.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.settings_description));
+        return bar;
     }
 
     @NonNull
@@ -461,6 +605,8 @@ public class FontsPreferences extends Fragment {
         tv.setText(textRes);
         tv.setTextColor(ContextCompat.getColor(requireContext(), R.color.theme_bright_yellow));
         tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        // Fork (白い熊): the skill's row label is bold, so a bold tag below can never outweigh it.
+        tv.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         return tv;
     }
 
@@ -511,25 +657,23 @@ public class FontsPreferences extends Fragment {
     @NonNull
     private View buildMigrationKitRow() {
         final Context appContext = requireContext().getApplicationContext();
-        LinearLayoutCompat texts = new LinearLayoutCompat(requireContext());
-        texts.addView(rowTitle(R.string.migration_kit_row));
-        texts.addView(rowSummary(R.string.migration_kit_row_desc));
-        LinearLayoutCompat row = automationRow(texts);
-        row.setOnClickListener(v -> {
-            UIUtils.displayShortToast(R.string.migration_kit_writing);
-            ThreadUtils.postOnBackgroundThread(() -> {
-                String where;
-                try {
-                    where = MigrationKit.write(appContext).getFilePath();
-                } catch (Throwable th) {
-                    ThreadUtils.postOnMainThread(() -> UIUtils.displayLongToast(R.string.failed));
-                    return;
-                }
-                ThreadUtils.postOnMainThread(() ->
-                        UIUtils.displayLongToast(R.string.migration_kit_written, where));
-            });
-        });
-        return row;
+        // A regular (thin) pill with no › — it acts in place (writes the kit to disk) rather than
+        // opening a screen.
+        return actionRow(R.string.migration_kit_row, pillSummary(getString(R.string.migration_kit_row_desc)),
+                false, false, v -> {
+                    UIUtils.displayShortToast(R.string.migration_kit_writing);
+                    ThreadUtils.postOnBackgroundThread(() -> {
+                        String where;
+                        try {
+                            where = MigrationKit.write(appContext).getFilePath();
+                        } catch (Throwable th) {
+                            ThreadUtils.postOnMainThread(() -> UIUtils.displayLongToast(R.string.failed));
+                            return;
+                        }
+                        ThreadUtils.postOnMainThread(() ->
+                                UIUtils.displayLongToast(R.string.migration_kit_written, where));
+                    });
+                });
     }
 
     /**
@@ -653,7 +797,11 @@ public class FontsPreferences extends Fragment {
             ThreadUtils.postOnMainThread(() -> {
                 if (!isAdded()) return;
                 summary.setText(text);
-                summary.setTextColor(warn ? 0xFFFF5252 : 0xFFC8C800);
+                // Dim-gold normally, warn-red when there is no export yet. The dim case follows the
+                // settable description role (this runs after the page's recolour pass, so a literal
+                // would revert just this line while the rest followed the swatch).
+                summary.setTextColor(warn ? 0xFFFF5252
+                        : ColorPrefs.getColor(appContext, ColorPrefs.SETTINGS_DESCRIPTION));
             });
         });
     }
@@ -1465,6 +1613,11 @@ public class FontsPreferences extends Fragment {
 
     private void openColorPicker(@NonNull ColorSpec spec, @NonNull Runnable onChanged) {
         View body = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_color_picker, null);
+        // The dialog's A/R/G/B value labels are the dim-gold description colour too; this is a
+        // separate view tree painted at the XML default, so recolour it to the role straight.
+        int cpDef = ContextCompat.getColor(requireContext(), R.color.settings_description);
+        int cpRole = ColorPrefs.getColor(requireContext(), ColorPrefs.SETTINGS_DESCRIPTION);
+        if (cpDef != cpRole) recolorMatching(body, cpDef, cpRole);
         final View preview = body.findViewById(R.id.cp_preview);
         final EditText hexInput = body.findViewById(R.id.cp_hex);
         final LinearLayoutCompat presets = body.findViewById(R.id.cp_presets);
@@ -1612,7 +1765,11 @@ public class FontsPreferences extends Fragment {
                 } else {
                     boolean isFile = o.value.startsWith(FontUtil.FILE_PREFIX);
                     caption.setVisibility(isFile ? View.VISIBLE : View.GONE);
-                    if (isFile) caption.setText(o.label);
+                    if (isFile) {
+                        caption.setText(o.label);
+                        // The caption is the dim-gold description colour; follow the settable role.
+                        caption.setTextColor(ColorPrefs.getColor(requireContext(), ColorPrefs.SETTINGS_DESCRIPTION));
+                    }
                     previewLine.setText(isFile ? stripExtension(o.label) : o.label);
                     Typeface tf = FontUtil.resolveTypeface(o.value, weight, null);
                     previewLine.setTypeface(tf != null ? tf : Typeface.DEFAULT);

@@ -58,6 +58,7 @@ public class AppManager extends Application {
         // inert on an install whose pane has already been edited.
         AppPanePrefs.migrateClearDataVisible(this);
         AppPanePrefs.migrateFreezeLevelPills(this);
+        AppPanePrefs.migrateAppLaunchVisible(this);
         // Fork: a Shizuku server pushes its binder whenever it likes, including while no activity of
         // ours exists, so the listeners that notice a lost/returned server have to be registered for
         // the life of the process rather than by a screen.
