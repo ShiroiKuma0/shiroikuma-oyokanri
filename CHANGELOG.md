@@ -10,6 +10,65 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-10-19.01-45.g15d835d6+077 — 2026-11-09
+
+Built on the same upstream base as +068 (App Manager **4.1.1**, rebased onto `15d835d6` of
+2026-10-19); the upstream base literal did not move, so the fork build counter kept counting. This
+release rolls up the fork builds +069 through +077, which had accumulated on top of the +068
+release: the 白い熊 応用管理 UI page given the black-yellow treatment, a new settable description
+colour the battery and process-monitor screens also adopt, and a new EMUI startup-manager hand-off
+surfaced on the app list alongside a per-row battery-exemption toggle.
+
+### UI settings page — black-yellow theme
+
+- **Every pressable row on the 白い熊 応用管理 UI page is now an outlined pill** (never filled), the
+  settled convention shared across the sister apps: the section's main action a thick 3 dp
+  bold-framed pill, the rest thin 1.25 dp ones. On this page *Export / Import…* is the main pill and
+  *Migration kit* a regular one; switches, colour swatches, sliders and font rows stay plain, since
+  the control on the right is already the affordance.
+- **Explanatory text is no longer grey.** Every grey label on the page — and on its colour-picker
+  and font-picker dialogs — is now dim gold; the row labels are bold, a 2 dp dim-gold rule runs down
+  the left edge of each explained row, and the spacing between rows is minimal rather than the old
+  double-spaced list.
+
+### A settable description colour
+
+- **The dim gold is a real, settable colour role**, not a hard-coded constant: it has its own swatch
+  in *UI colors & fonts → “UI settings page”*. Because the page colours its labels and left rules in
+  XML (so an unset role still renders), the role is applied by a recolour pass that repaints them —
+  on the page and in the colour-picker dialog — and updates **live** when you move the swatch. At the
+  default it changes nothing, so an untouched install looks exactly as before.
+
+### Battery & process-monitor screens de-greyed
+
+- **The same role now carries the secondary text on the battery-history and process-monitor
+  screens.** On the battery detail page: the key labels, the legend, the recommendation reasons and
+  the neutral of the up/down comparison (neutral is dim gold now). On the monitor: the health
+  summary's “dim” text and each row's subtitle and CPU, with the pid·uid·state meta line kept a tier
+  fainter. The code sites read the role at bind time, so they follow the swatch live. No grey
+  `#9A9A9A` remains anywhere in the app.
+
+### EMUI startup-manager (起動マネージャー) hand-off
+
+- **A new per-app 起動マネージャー action** opens EMUI's *Settings → Apps & services → startup
+  manager* and searches straight for the app. EMUI exposes no non-root way to read or set App-launch
+  — its framework service rejects every caller but the system uid — so the fork hands the job to the
+  automation sister app **白い熊 自由作業盤** over an identity-checked (PendingIntent) broadcast,
+  opening the Settings page itself in the foreground first so the automation lands on the right
+  window rather than on this app's own look-alike control. It is an ordinary drag-reorderable pane
+  pill, last by default.
+
+### Battery-exemption toggle on every row
+
+- **Each main-list row's strip carries a crossed-battery Doze-exemption icon**, drawn in the fork's
+  configurable ink to match the note and tag pills. Its brightness is the state — exempt, optimized,
+  system-pinned, or still checking — and a tap toggles the app's battery-optimization exemption. The
+  privileged Doze state is read off the main thread and cached per app, so a list of hundreds of
+  apps never re-asks on every bind or hangs the window.
+- **A tap now flashes a toast naming the state it toggled to** (“… — now exempt from battery
+  optimization” / “… — now battery-optimized”), since the glyph brightening alone was easy to miss;
+  the tap always visibly registers, even while the state is still being read.
+
 ## 4.1.1+2026-10-19.01-45.g15d835d6+068 — 2026-11-02
 
 Built on the same upstream base as +067 (App Manager **4.1.1**, rebased onto `15d835d6` of
