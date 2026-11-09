@@ -21,12 +21,13 @@ root** through a contract the sister apps implement — and which this app now i
 Settings cannot undo, a **freeze whose four gates are four switches**, each operable on its own, shown on every row and **applicable to a whole selection as one rung**, a configurable
 **yellow-on-black UI** with a deep customization page, a hard-blocking **protected profile**, a
 from-scratch **process monitor / reaper**, a **pausable batch-op dialog**, one-tap **main-list quick
-actions**, readable **per-app backups**, a **remote-triggerable settings export**, and the **AM
-Debug** toolset unlocked in a normal release build.
+actions**, readable **per-app backups**, a **remote-triggerable settings export**, a per-row
+**battery-exemption toggle** and an **EMUI startup-manager hand-off** to the automation sister app,
+and the **AM Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.1+2026-10-19.01-45.g15d835d6+068`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.1+2026-10-19.01-45.g15d835d6+077`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
-<sub>Version reads as **upstream `4.1.1`**, rebased onto upstream commit **`15d835d6` of 2026-10-19 01:45 UTC**, fork build **068**.</sub>
+<sub>Version reads as **upstream `4.1.1`**, rebased onto upstream commit **`15d835d6` of 2026-10-19 01:45 UTC**, fork build **077**.</sub>
 
 </div>
 
