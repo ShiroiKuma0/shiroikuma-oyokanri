@@ -10,6 +10,38 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-11-03.19-47.gdc4154f4+078 — 2026-11-10
+
+Rebased onto a fresher App Manager **4.1.1** master — upstream commit `dc4154f4` of 2026-11-03, up
+from `15d835d6`. The upstream base literal did not move (still **4.1.1**, version code 451), so the
+fork build counter kept counting; the pin is what records that upstream advanced. **No fork feature
+changed** — this release only carries the fork forward onto newer upstream code, so an install over
++077 should look and behave identically.
+
+### Absorbed from upstream
+
+The **Actions** automation subsystem gained eight commits:
+
+- a new **`TrimCachesAction`**;
+- **per-app freeze/unfreeze** in `FreezeAction`;
+- **wildcard** support in `PermissionStateAction`;
+- a *requires restart* field on `ActionResult`;
+- a **sub-progress handler** for backup/restore actions, with its tests;
+- a rework of the Actions **notification handling**.
+
+### Re-anchored on top of it
+
+Three fork touch-points met upstream's changes during the rebase and were resolved so both sides
+survive, then confirmed by a clean `assembleRelease`:
+
+- **Batch freeze** follows upstream's `isPreferCustom()` → `isPreferPerApp()` rename at the freeze
+  call site, while keeping the fork's four-argument `updateProgress` that records each item's package
+  and user in the operation log.
+- **The progress notification** keeps the fork's themed completion flash (`applyForkTheme`) layered
+  over upstream's reworked progress handler (chronometer, `newSubProgressHandler(operationName)`).
+- **Strings** adopt upstream's two new progress keys in place of the single one it renamed; every
+  fork string is untouched.
+
 ## 4.1.1+2026-10-19.01-45.g15d835d6+077 — 2026-11-09
 
 Built on the same upstream base as +068 (App Manager **4.1.1**, rebased onto `15d835d6` of
