@@ -70,7 +70,12 @@ public class AppManager extends Application {
         // does not — so an import onto a fresh install leaves the flag off and the manifest entry on,
         // and a switched-off Interceptor keeps answering every http/https link. Re-assert the disables
         // the flags already record (never an enable). Off the main thread: these are binder calls.
-        ThreadUtils.postOnBackgroundThread(FeatureController::reassertDisabledComponents);
+        // Fork (白い熊, +083): first switch our own installer back on (one-shot) — it must run before
+        // the re-assert, which would otherwise disable the component the stale flag still names.
+        ThreadUtils.postOnBackgroundThread(() -> {
+            FeatureController.migrateInstallerBackOn(this);
+            FeatureController.reassertDisabledComponents();
+        });
         Security.removeProvider(BouncyCastleProvider.PROVIDER_NAME);
         Security.addProvider(new JavaKeyStoreProvider());
         Security.addProvider(new BouncyCastleProvider());

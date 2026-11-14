@@ -166,7 +166,7 @@ public class InstallerOptionsFragment extends DialogFragment {
         forceDexOptSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> mOptions.setForceDexOpt(isChecked));
         updateBlockTrackersAvailability(selectedUser);
         mBlockTrackersSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> mOptions.setBlockTrackers(isChecked));
-        return new MaterialAlertDialogBuilder(requireActivity())
+        return io.github.muntashirakon.AppManager.utils.ForkDialog.bordered(io.github.muntashirakon.AppManager.utils.ForkDialog.builder(requireActivity())
                 .setTitle(R.string.installer_options)
                 .setView(mDialogView)
                 .setCancelable(false)
@@ -177,7 +177,7 @@ public class InstallerOptionsFragment extends DialogFragment {
                     getParentFragmentManager().setFragmentResult(REQUEST_KEY, result);
                 })
                 .setNegativeButton(R.string.cancel, null)
-                .create();
+                .create());
     }
 
     @Override

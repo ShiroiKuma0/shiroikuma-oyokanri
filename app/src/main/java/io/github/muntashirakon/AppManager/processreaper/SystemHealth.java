@@ -75,6 +75,21 @@ public final class SystemHealth {
         public boolean leaksActivities() {
             return activities - windows >= ACTIVITY_LEAK_EXCESS;
         }
+
+        /**
+         * Fork (白い熊 / 地図, 2026-11-12): a <b>genuine leak</b> — destroyed screens
+         * still held, or GPU memory still growing — as against a merely heavy but
+         * steady footprint. Only a genuine leak is called LEAKING, wears the alarm
+         * colour, is pinned as actionable and is offered the force-stop-and-relaunch
+         * action. A high <i>absolute</i> GPU size is NOT a leak: the 3D map renderer
+         * {@code shiroikuma.chizu} held 304 MB flat for its whole session and was
+         * wrongly flagged LEAKING by the {@link #GRAPHICS_HIGH_BYTES} threshold
+         * alone — measured on the phone, byte-for-byte steady. Such an app is still
+         * surfaced (its row carries a calm "high GPU" mark) but never called a leak.
+         */
+        public boolean isLeak() {
+            return leaksActivities() || graphicsGrowthBytes >= GRAPHICS_GROWTH_BYTES;
+        }
     }
 
     /** Per-process figures parsed from one {@code dumpsys meminfo --checkin} line. */

@@ -1009,22 +1009,71 @@ public final class Prefs {
     }
 
     public static final class VirusTotal {
+        // Fork (白い熊, APK-vetting chain): the key is stored encrypted via VtApiKeyStore. getApiKey()
+        // decrypts it; a legacy plain value is returned and re-saved encrypted on the spot (the
+        // one-time migration), so Settings → VirusTotal and every scan see the same decrypted value.
         @Nullable
         public static String getApiKey() {
-            String apiKey = AppPref.getString(AppPref.PrefKey.PREF_VIRUS_TOTAL_API_KEY_STR);
-            if (TextUtils.isEmpty(apiKey)) {
+            String stored = AppPref.getString(AppPref.PrefKey.PREF_VIRUS_TOTAL_API_KEY_STR);
+            if (TextUtils.isEmpty(stored)) {
                 return null;
             }
-            return apiKey;
+            String plain = io.github.muntashirakon.AppManager.scanner.vt.VtApiKeyStore.decrypt(stored);
+            if (plain == null || plain.isEmpty()) {
+                return null;
+            }
+            if (!io.github.muntashirakon.AppManager.scanner.vt.VtApiKeyStore.isEncrypted(stored)) {
+                // Migrate a plain value to the encrypted form in place.
+                setApiKey(plain);
+            }
+            return plain;
         }
 
+        public static boolean hasApiKey() {
+            return getApiKey() != null;
+        }
+
+        /**
+         * The key masked to its last four characters for a settings summary — never the whole key.
+         */
+        @Nullable
+        public static CharSequence getMaskedApiKey() {
+            String apiKey = getApiKey();
+            if (apiKey == null) return null;
+            if (apiKey.length() <= 4) return "••••";
+            return "•••• " + apiKey.substring(apiKey.length() - 4);
+        }
 
         public static void setApiKey(@Nullable String apiKey) {
-            AppPref.set(AppPref.PrefKey.PREF_VIRUS_TOTAL_API_KEY_STR, apiKey);
+            String toStore = apiKey == null ? null
+                    : io.github.muntashirakon.AppManager.scanner.vt.VtApiKeyStore.encrypt(apiKey);
+            AppPref.set(AppPref.PrefKey.PREF_VIRUS_TOTAL_API_KEY_STR, toStore);
         }
 
         public static boolean promptBeforeUpload() {
             return AppPref.getBoolean(AppPref.PrefKey.PREF_VIRUS_TOTAL_PROMPT_BEFORE_UPLOADING_BOOL);
+        }
+
+        // Fork (白い熊, APK-vetting chain, item 8): upload unknown files without asking (default on,
+        // i.e. prompt-before-upload off), a Wi-Fi-only switch, and the rescan-age threshold in days.
+        public static void setPromptBeforeUpload(boolean prompt) {
+            AppPref.set(AppPref.PrefKey.PREF_VIRUS_TOTAL_PROMPT_BEFORE_UPLOADING_BOOL, prompt);
+        }
+
+        public static boolean uploadOnWifiOnly() {
+            return AppPref.getBoolean(AppPref.PrefKey.PREF_VIRUS_TOTAL_WIFI_ONLY_BOOL);
+        }
+
+        public static void setUploadOnWifiOnly(boolean wifiOnly) {
+            AppPref.set(AppPref.PrefKey.PREF_VIRUS_TOTAL_WIFI_ONLY_BOOL, wifiOnly);
+        }
+
+        public static int getRescanAgeDays() {
+            return AppPref.getInt(AppPref.PrefKey.PREF_VIRUS_TOTAL_RESCAN_AGE_DAYS_INT);
+        }
+
+        public static void setRescanAgeDays(int days) {
+            AppPref.set(AppPref.PrefKey.PREF_VIRUS_TOTAL_RESCAN_AGE_DAYS_INT, Math.max(1, days));
         }
     }
 }

@@ -147,11 +147,17 @@ public abstract class BaseActivity extends PerProcessActivity {
                         super.onAuthenticationFailed();
                     }
                 });
-        mAlertDialogView = getLayoutInflater().inflate(R.layout.dialog_progress_circular, null);
-        mAlertDialog = new MaterialAlertDialogBuilder(this)
+        // Fork (白い熊, +087): the "Authenticating… / Determining working mode…" dialog is the first
+        // thing a freshly installed build shows, on whichever screen was opened — so it pins the
+        // black-and-yellow overlay itself and takes the yellow frame, whatever the host's theme.
+        MaterialAlertDialogBuilder progressBuilder =
+                io.github.muntashirakon.AppManager.utils.ForkDialog.builder(this);
+        mAlertDialogView = android.view.LayoutInflater.from(progressBuilder.getContext())
+                .inflate(R.layout.dialog_progress_circular, null);
+        mAlertDialog = io.github.muntashirakon.AppManager.utils.ForkDialog.bordered(progressBuilder
                 .setCancelable(false)
                 .setView(mAlertDialogView)
-                .create();
+                .create());
         setProgressText(R.string.authenticating);
         Log.d(TAG, "Waiting to be authenticated.");
         mViewModel.authenticationStatus().observe(this, status -> {

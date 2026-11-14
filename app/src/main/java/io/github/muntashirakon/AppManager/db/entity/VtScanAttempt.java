@@ -38,6 +38,7 @@ public class VtScanAttempt {
 
     @StringDef({
             STATUS_PENDING_CONSENT,
+            STATUS_PENDING_KEY,
             STATUS_QUEUED,
             STATUS_LOOKING_UP,
             STATUS_UPLOADING,
@@ -49,6 +50,10 @@ public class VtScanAttempt {
     public @interface VtScanStatus {
     }
     public static final String STATUS_PENDING_CONSENT = "pending_consent";
+    // Fork (白い熊, APK-vetting chain, item 10): parked because no VirusTotal API key is stored (or
+    // the stored key stopped working). Resumes when a key is saved. It is an ACTIVE status, so the
+    // attempt stays in the active set and the history screen lists it as pending.
+    public static final String STATUS_PENDING_KEY = "pending_key";
     public static final String STATUS_QUEUED = "queued";
     public static final String STATUS_LOOKING_UP = "looking_up";
     public static final String STATUS_UPLOADING = "uploading";
@@ -56,6 +61,10 @@ public class VtScanAttempt {
     public static final String STATUS_COMPLETED = "completed";
     public static final String STATUS_FAILED = "failed";
     public static final String STATUS_CANCELLED = "cancelled";
+
+    // Fork (白い熊, +081): on an ACTIVE attempt, error_code = this and error_message = the reason
+    // it is parked (quota, waiting for Wi-Fi). Cleared as soon as the attempt moves on.
+    public static final String CODE_WAITING = "Waiting";
 
     @PrimaryKey(autoGenerate = true)
     public long id;
@@ -115,4 +124,9 @@ public class VtScanAttempt {
 
     @ColumnInfo(name = "read_at")
     public long readAt;
+
+    // Fork (白い熊, APK-vetting chain, item 2): a parked attempt must not run before this epoch-ms
+    // (quota back-off, or a Wi-Fi-only upload deferred off Wi-Fi). 0 = runnable now.
+    @ColumnInfo(name = "next_attempt_at", defaultValue = "0")
+    public long nextAttemptAt;
 }

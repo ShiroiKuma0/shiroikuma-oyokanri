@@ -6,6 +6,7 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
 import android.os.IBinder;
 
 import androidx.annotation.NonNull;
@@ -18,13 +19,18 @@ import androidx.core.content.ContextCompat;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Calendar;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import io.github.muntashirakon.AppManager.BuildConfig;
@@ -33,6 +39,7 @@ import io.github.muntashirakon.AppManager.db.entity.VtFile;
 import io.github.muntashirakon.AppManager.db.entity.VtScanAttempt;
 import io.github.muntashirakon.AppManager.progress.NotificationProgressHandler;
 import io.github.muntashirakon.AppManager.progress.ProgressHandler;
+import io.github.muntashirakon.AppManager.settings.Prefs;
 import io.github.muntashirakon.AppManager.types.ForegroundService;
 import io.github.muntashirakon.AppManager.utils.ThreadUtils;
 import io.github.muntashirakon.AppManager.utils.NotificationUtils;
@@ -47,10 +54,33 @@ public class VtScanService extends Service {
     private static final int NOTIFICATION_ID = 0x5654;
     private static final long POLL_DELAY_MS = 30_000L;
     private static final int MAX_POLLS = 20;
+    // Fork (白い熊, +081): a large APK routinely sits in VirusTotal's queue for longer than ten
+    // minutes, and timing out there threw away an upload that had already succeeded. Half an hour.
+    private static final int MAX_ANALYSIS_POLLS = 60;
     private static final int MAX_CONCURRENT_SCANS = 3;
+    private static final long MAX_UPLOAD_BYTES = 650_000_000L;
+    private static final long LARGE_FILE_BYTES = 32_000_000L;
+    // Fork (白い熊, APK-vetting chain, item 2): how long the service stays alive waiting on a parked
+    // attempt. A minute-quota back-off (60 s) is waited out here; a daily-quota park (hours) exceeds
+    // the window, so the service stops and the attempt resumes on the next start (screen open, scan).
+    private static final long PARK_KEEPALIVE_WINDOW_MS = 5 * 60_000L;
+    private static final long MINUTE_BACKOFF_MS = 60_000L;
+    private static final long WIFI_RETRY_MS = 10 * 60_000L;
+    // Fork (白い熊, APK-vetting chain, item 7): the one-shot post-upload refresh fires ~4 days on.
+    private static final long AUTO_REFRESH_DELAY_MS = 4 * 24 * 60 * 60_000L;
+
+    // Fork (白い熊, APK-vetting chain, item 5): live upload percentage per attempt, so the report
+    // screen can show the upload bar (the DB only carries the coarse status, not the byte count).
+    private static final Map<Long, Integer> sUploadPercent = new ConcurrentHashMap<>();
+
+    public static int getUploadPercent(long attemptId) {
+        Integer p = sUploadPercent.get(attemptId);
+        return p == null ? -1 : p;
+    }
 
     private final ExecutorService mDispatcher = Executors.newSingleThreadExecutor();
     private final ExecutorService mScanExecutor = Executors.newFixedThreadPool(MAX_CONCURRENT_SCANS);
+    private final ScheduledExecutorService mScheduler = Executors.newSingleThreadScheduledExecutor();
     private final Map<Long, Future<?>> mRunningScans = new ConcurrentHashMap<>();
     private volatile boolean mStopping;
     @Nullable
@@ -98,17 +128,48 @@ public class VtScanService extends Service {
         }
     }
 
+    private void scheduleDispatchAfter(long delayMs) {
+        if (mStopping) return;
+        try {
+            mScheduler.schedule(this::scheduleDispatch, Math.max(500L, delayMs), TimeUnit.MILLISECONDS);
+        } catch (Throwable ignored) {
+            // Scheduler shutting down.
+        }
+    }
+
     private void dispatch() {
         if (mStopping || mRepository == null) {
             return;
         }
-        List<VtScanAttempt> attempts = mRepository.getActiveAttempts();
-        boolean hasRunnableAttempt = false;
+        VtScanRepository repository = mRepository;
+        boolean hasKey = VirusTotal.getInstance() != null;
+        // A key now exists: resume everything parked for a missing/invalid key (e.g. after restart).
+        if (hasKey) {
+            repository.resumeKeyParkedAttempts();
+        }
+        // Item 7: enqueue any due post-upload auto-refreshes.
+        enqueueDueAutoRefreshes(repository);
+        List<VtScanAttempt> attempts = repository.getActiveAttempts();
+        long now = System.currentTimeMillis();
+        boolean hasRunnable = false;
+        long earliestPark = Long.MAX_VALUE;
         for (VtScanAttempt attempt : attempts) {
             if (VtScanAttempt.STATUS_PENDING_CONSENT.equals(attempt.status)) {
                 continue;
             }
-            hasRunnableAttempt = true;
+            if (VtScanAttempt.STATUS_PENDING_KEY.equals(attempt.status) && !hasKey) {
+                continue;
+            }
+            if (attempt.nextAttemptAt > now) {
+                earliestPark = Math.min(earliestPark, attempt.nextAttemptAt);
+                continue;
+            }
+            if (!hasKey) {
+                // No key: park as needs-key rather than running (which would only fail).
+                repository.parkAttempt(attempt.id, VtScanAttempt.STATUS_PENDING_KEY, 0);
+                continue;
+            }
+            hasRunnable = true;
             if (mRunningScans.containsKey(attempt.id)) {
                 continue;
             }
@@ -119,6 +180,7 @@ public class VtScanService extends Service {
                 } finally {
                     progress.detach();
                     mRunningScans.remove(attempt.id);
+                    sUploadPercent.remove(attempt.id);
                     scheduleDispatch();
                 }
                 return null;
@@ -127,28 +189,57 @@ public class VtScanService extends Service {
                 mScanExecutor.execute(future);
             }
         }
-        if (!hasRunnableAttempt && mRunningScans.isEmpty()) {
-            stopSelf();
+        if (!hasRunnable && mRunningScans.isEmpty()) {
+            if (earliestPark != Long.MAX_VALUE && earliestPark - now <= PARK_KEEPALIVE_WINDOW_MS) {
+                scheduleDispatchAfter(earliestPark - now + 500L);
+            } else {
+                stopSelf();
+            }
+        }
+    }
+
+    private void enqueueDueAutoRefreshes(@NonNull VtScanRepository repository) {
+        try {
+            for (VtFile file : repository.getFilesDueForAutoRefresh()) {
+                repository.setAutoRefreshAt(file.id, 0);
+                if (file.latestReportJson != null) {
+                    repository.createRescanAttempt(file.id);
+                }
+            }
+        } catch (Throwable ignored) {
+            // Best-effort maintenance; never block the dispatch.
         }
     }
 
     private void cancelAttempt(long attemptId) {
         if (attemptId == 0) return;
-        if (mRepository != null) {
-            mRepository.cancelAttempt(attemptId);
-        }
-        Future<?> future = mRunningScans.get(attemptId);
-        if (future != null) {
-            future.cancel(true);
-        }
+        // Fork (白い熊, +088): onStartCommand runs on the MAIN thread, and Room refuses a database
+        // write there — "Cancel scan" crashed the app (and crashed it again when the sticky service
+        // was restarted). Mark it cancelled on the dispatcher thread, then interrupt the scan; in
+        // that order, because the interrupted scan reads the status to tell a cancel from a failure.
+        VtScanRepository repository = mRepository;
+        mDispatcher.submit(() -> {
+            try {
+                if (repository != null) repository.cancelAttempt(attemptId);
+            } catch (Throwable th) {
+                th.printStackTrace();
+            }
+            Future<?> future = mRunningScans.get(attemptId);
+            if (future != null) {
+                future.cancel(true);
+            }
+        });
     }
 
     private void execute(@NonNull VtScanAttempt attempt, @NonNull ScanProgress progress) {
         VirusTotal virusTotal = VirusTotal.getInstance();
         if (virusTotal == null) {
-            fail(attempt.id, "Unavailable", "VirusTotal is disabled or no API key is configured.", progress);
+            // Item 10: park as needs-key instead of failing; resumes when a key is saved.
+            requireRepository().parkAttempt(attempt.id, VtScanAttempt.STATUS_PENDING_KEY, 0);
+            progress.needsKey(attempt.fileId);
             return;
         }
+        boolean uploaded = false;
         try {
             VtScanRepository repository = requireRepository();
             VtFile file = repository.getFile(attempt.fileId);
@@ -170,6 +261,7 @@ public class VtScanService extends Service {
                 report = pollAnalysis(virusTotal, file.sha256, analysisId, attempt.id, progress);
             } else if (VtScanAttempt.TYPE_UPLOAD.equals(attempt.type)) {
                 report = uploadAndPoll(virusTotal, file, attempt, progress);
+                uploaded = true;
                 VtScanAttempt updated = repository.getAttempt(attempt.id);
                 analysisId = updated == null ? null : updated.analysisId;
             } else {
@@ -178,9 +270,26 @@ public class VtScanService extends Service {
                 VirusTotal.ResponseV3<VtFileReport> response = virusTotal.fetchFileReport(file.sha256);
                 if (response.isSuccessful() && response.response.hasReport()) {
                     report = response.response;
+                } else if (response.isSuccessful()) {
+                    // Fork (白い熊, +081): VirusTotal knows the file (an earlier upload landed) but
+                    // has not finished analysing it. That is not an error — wait for the report.
+                    // It used to fall through to error(response) with no error, i.e. the
+                    // meaningless "VirusTotal request failed."
+                    repository.setAttemptStatus(attempt.id, VtScanAttempt.STATUS_ANALYSING);
+                    report = pollReport(virusTotal, file.sha256, attempt.id, progress, MAX_ANALYSIS_POLLS, false);
+                } else if (VtScanAttempt.TYPE_LOOKUP.equals(attempt.type)
+                        && response.error != null && "NotFoundError".equals(response.error.code)
+                        && Prefs.VirusTotal.promptBeforeUpload()) {
+                    // Fork (白い熊, +084): VirusTotal really does not know this file, and 白い熊 wants
+                    // to be asked before anything is uploaded. Park for consent; approval turns the
+                    // attempt into an upload and re-queues it.
+                    repository.parkAttempt(attempt.id, VtScanAttempt.STATUS_PENDING_CONSENT, 0);
+                    progress.parked(getString(R.string.vt_pending_consent));
+                    return;
                 } else if (VtScanAttempt.TYPE_LOOKUP.equals(attempt.type)
                         && response.error != null && "NotFoundError".equals(response.error.code)) {
                     report = uploadAndPoll(virusTotal, file, attempt, progress);
+                    uploaded = true;
                     VtScanAttempt updated = repository.getAttempt(attempt.id);
                     analysisId = updated == null ? null : updated.analysisId;
                 } else {
@@ -188,8 +297,29 @@ public class VtScanService extends Service {
                 }
             }
             repository.completeAttempt(attempt.id, report, analysisId);
+            if (uploaded) {
+                // Item 7: a freshly uploaded file re-reads better a few days on, when more engines
+                // have weighed in — schedule the one-shot post-upload auto-refresh.
+                repository.setAutoRefreshAt(attempt.fileId, System.currentTimeMillis() + AUTO_REFRESH_DELAY_MS);
+            }
             progress.complete(getString(R.string.vt_success, report.getPositives(), report.getTotal()),
                     file.displayName == null ? file.sha256 : file.displayName);
+        } catch (VtAuthException e) {
+            // Item 10: the key stopped working — park as needs-key, do not fail.
+            requireRepository().parkAttempt(attempt.id, VtScanAttempt.STATUS_PENDING_KEY, 0);
+            progress.needsKey(attempt.fileId);
+        } catch (VtQuotaException e) {
+            // Item 2: back off and park, keeping the current status so a mid-poll scan resumes.
+            requireRepository().setNextAttemptAt(attempt.id, e.nextAttemptAt, getString(R.string.vt_quota_waiting));
+            progress.parked(getString(R.string.vt_quota_waiting));
+            scheduleDispatchAfter(e.nextAttemptAt - System.currentTimeMillis());
+        } catch (VtDeferException e) {
+            requireRepository().setNextAttemptAt(attempt.id, e.nextAttemptAt, getString(R.string.vt_waiting_wifi));
+            progress.parked(getString(R.string.vt_waiting_wifi));
+            scheduleDispatchAfter(e.nextAttemptAt - System.currentTimeMillis());
+        } catch (VtTooLargeException e) {
+            // Item 9: too large for VirusTotal — local analysis only, no upload.
+            fail(attempt.id, "TooLarge", getString(R.string.vt_too_large), progress);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             VtScanAttempt current = requireRepository().getAttempt(attempt.id);
@@ -214,14 +344,27 @@ public class VtScanService extends Service {
             throws IOException, InterruptedException {
         VtScanRepository repository = requireRepository();
         Path path = repository.resolveSource(file.id);
-        if (path.length() > 650_000_000L) throw new IOException("File is larger than 650 MB.");
+        long length = path.length();
+        if (length > MAX_UPLOAD_BYTES) {
+            throw new VtTooLargeException("File is larger than 650 MB.");
+        }
+        // Item 8/10: honour the Wi-Fi-only upload setting — defer off an unmetered network.
+        if (Prefs.VirusTotal.uploadOnWifiOnly() && isMeteredOrOffline()) {
+            throw new VtDeferException("Waiting for Wi-Fi.", System.currentTimeMillis() + WIFI_RETRY_MS);
+        }
         repository.setAttemptStatus(attempt.id, VtScanAttempt.STATUS_UPLOADING);
         progress.update(getString(R.string.vt_uploading));
+        long total = length;
+        VirusTotal.UploadProgressListener listener = (written, t) -> {
+            int pct = total > 0 ? (int) Math.min(100, written * 100 / Math.max(1, t)) : 0;
+            sUploadPercent.put(attempt.id, pct);
+            progress.update(getString(R.string.vt_uploading_pct, pct), pct, 100);
+        };
         VirusTotal.ResponseV3<String> response;
         try (InputStream inputStream = path.openInputStream()) {
-            response = path.length() > 32_000_000L
-                    ? virusTotal.uploadLargeFile(path.getName(), inputStream)
-                    : virusTotal.uploadFile(path.getName(), inputStream);
+            response = length > LARGE_FILE_BYTES
+                    ? virusTotal.uploadLargeFile(path.getName(), inputStream, length, listener)
+                    : virusTotal.uploadFile(path.getName(), inputStream, length, listener);
         }
         if (!response.isSuccessful()) throw error(response);
         String analysisId = response.response;
@@ -235,31 +378,65 @@ public class VtScanService extends Service {
                                       @NonNull ScanProgress progress)
             throws IOException, InterruptedException {
         requireRepository().setAttemptStatus(attemptId, VtScanAttempt.STATUS_ANALYSING);
-        for (int i = 0; i < MAX_POLLS; ++i) {
+        for (int i = 0; i < MAX_ANALYSIS_POLLS; ++i) {
             VirusTotal.ResponseV3<VtAnalysis> analysis = virusTotal.fetchAnalysis(analysisId);
             if (analysis.isSuccessful() && analysis.response.isCompleted()) {
                 return pollReport(virusTotal, fileId, attemptId, progress);
             }
-            if (!analysis.isSuccessful() && !analysis.shouldRetry()) throw error(analysis);
-            progress.update(getString(R.string.vt_checking), i + 1, MAX_POLLS);
+            if (!analysis.isSuccessful()) {
+                // Item 2/10: park on quota or auth instead of looping; resumes with the analysisId.
+                if (VirusTotal.isQuotaError(analysis.error) || VirusTotal.isAuthError(analysis.error)) {
+                    throw error(analysis);
+                }
+                if (!analysis.shouldRetry()) throw error(analysis);
+            }
+            progress.update(getString(R.string.vt_analysing), i + 1, MAX_ANALYSIS_POLLS);
             waitForNextPoll();
         }
-        throw new IOException("VirusTotal analysis timed out.");
+        throw new IOException(getString(R.string.vt_error_analysis_timeout));
     }
 
     @NonNull
     private VtFileReport pollReport(@NonNull VirusTotal virusTotal, @NonNull String fileId,
                                     long attemptId, @NonNull ScanProgress progress)
             throws IOException, InterruptedException {
-        requireRepository().setAttemptStatus(attemptId, VtScanAttempt.STATUS_LOOKING_UP);
-        for (int i = 0; i < MAX_POLLS; ++i) {
+        return pollReport(virusTotal, fileId, attemptId, progress, MAX_POLLS, true);
+    }
+
+    @NonNull
+    private VtFileReport pollReport(@NonNull VirusTotal virusTotal, @NonNull String fileId,
+                                    long attemptId, @NonNull ScanProgress progress, int maxPolls,
+                                    boolean markLookingUp)
+            throws IOException, InterruptedException {
+        if (markLookingUp) {
+            requireRepository().setAttemptStatus(attemptId, VtScanAttempt.STATUS_LOOKING_UP);
+        }
+        for (int i = 0; i < maxPolls; ++i) {
             VirusTotal.ResponseV3<VtFileReport> response = virusTotal.fetchFileReport(fileId);
             if (response.isSuccessful() && response.response.hasReport()) return response.response;
-            if (!response.shouldRetry() && !response.isSuccessful()) throw error(response);
-            progress.update(getString(R.string.vt_checking), i + 1, MAX_POLLS);
+            if (!response.isSuccessful()) {
+                if (VirusTotal.isQuotaError(response.error) || VirusTotal.isAuthError(response.error)) {
+                    throw error(response);
+                }
+                if (!response.shouldRetry()) throw error(response);
+            }
+            progress.update(getString(R.string.vt_checking), i + 1, maxPolls);
             waitForNextPoll();
         }
-        throw new IOException("VirusTotal report timed out.");
+        throw new IOException(getString(R.string.vt_error_analysis_timeout));
+    }
+
+    private boolean isMeteredOrOffline() {
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (cm == null) return false;
+        try {
+            if (cm.getActiveNetworkInfo() == null || !cm.getActiveNetworkInfo().isConnected()) {
+                return true;
+            }
+            return cm.isActiveNetworkMetered();
+        } catch (Throwable e) {
+            return false;
+        }
     }
 
     private void waitForNextPoll() throws InterruptedException {
@@ -270,7 +447,30 @@ public class VtScanService extends Service {
     private IOException error(@NonNull VirusTotal.ResponseV3<?> response) {
         if (response.error == null) return new IOException("VirusTotal request failed.");
         String message = response.error.message != null ? response.error.message : response.error.toString();
+        if (VirusTotal.isAuthError(response.error)) {
+            return new VtAuthException(message);
+        }
+        if (VirusTotal.isQuotaError(response.error)) {
+            return new VtQuotaException(message, computeBackoff(response.error));
+        }
         return new IOException(response.error.code + ": " + message);
+    }
+
+    private static long computeBackoff(@NonNull VtError error) {
+        long now = System.currentTimeMillis();
+        String message = error.message != null ? error.message.toLowerCase(Locale.ROOT) : "";
+        if (message.contains("day")) {
+            // Daily quota — back off until the next UTC midnight (when VirusTotal resets it).
+            Calendar c = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+            c.setTimeInMillis(now);
+            c.add(Calendar.DAY_OF_MONTH, 1);
+            c.set(Calendar.HOUR_OF_DAY, 0);
+            c.set(Calendar.MINUTE, 0);
+            c.set(Calendar.SECOND, 0);
+            c.set(Calendar.MILLISECOND, 0);
+            return c.getTimeInMillis();
+        }
+        return now + MINUTE_BACKOFF_MS;
     }
 
     private void fail(long attemptId, @NonNull String code, @Nullable String message,
@@ -299,6 +499,38 @@ public class VtScanService extends Service {
                         .build(),
                 ForegroundService.FOREGROUND_SERVICE_TYPE_DATA_SYNC
                         | ForegroundService.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+    }
+
+    // ── Typed outcomes that park rather than fail (白い熊, APK-vetting chain) ─────────────────────
+
+    private static class VtAuthException extends IOException {
+        VtAuthException(@Nullable String message) {
+            super(message == null ? "VirusTotal rejected the API key." : message);
+        }
+    }
+
+    private static class VtQuotaException extends IOException {
+        final long nextAttemptAt;
+
+        VtQuotaException(@Nullable String message, long nextAttemptAt) {
+            super(message == null ? "VirusTotal quota exceeded." : message);
+            this.nextAttemptAt = nextAttemptAt;
+        }
+    }
+
+    private static class VtDeferException extends IOException {
+        final long nextAttemptAt;
+
+        VtDeferException(@NonNull String message, long nextAttemptAt) {
+            super(message);
+            this.nextAttemptAt = nextAttemptAt;
+        }
+    }
+
+    private static class VtTooLargeException extends IOException {
+        VtTooLargeException(@NonNull String message) {
+            super(message);
+        }
     }
 
     private class ScanProgress {
@@ -354,6 +586,19 @@ public class VtScanService extends Service {
             postResult(isNotificationAllowed() ? createInfo(getString(R.string.vt_cancel_scan)) : null);
         }
 
+        // Item 2: a transient parked state — keep the ongoing progress text, no result notification.
+        void parked(@NonNull CharSequence text) {
+            update(text);
+        }
+
+        // Item 10: the scan is parked for a missing/invalid key — post a result notification that
+        // opens the report screen, which asks for the key and then resumes this same scan.
+        void needsKey(long fileId) {
+            mText.set(getString(R.string.vt_needs_key));
+            postResult(isNotificationAllowed()
+                    ? keyNeededInfo(getString(R.string.vt_needs_key)) : null);
+        }
+
         void detach() {
             ThreadUtils.postOnMainThread(() -> mHandler.onDetach(null));
         }
@@ -364,8 +609,8 @@ public class VtScanService extends Service {
 
         @NonNull
         private NotificationProgressHandler.NotificationInfo createInfo(@NonNull CharSequence body) {
-            Intent openIntent = new Intent(VtScanService.this, VtHistoryActivity.class)
-                    .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            Intent openIntent = VtReportActivity.intentForAttempt(VtScanService.this, mAttempt.id, mAttempt.fileId)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             PendingIntent open = PendingIntentCompat.getActivity(VtScanService.this,
                     (int) mAttempt.id, openIntent, PendingIntent.FLAG_UPDATE_CURRENT, false);
             Intent cancelIntent = new Intent(VtScanService.this, VtScanService.class)
@@ -378,8 +623,19 @@ public class VtScanService extends Service {
                     .addAction(R.drawable.ic_default_notification, getString(R.string.vt_cancel_scan), cancel);
         }
 
+        @NonNull
+        private NotificationProgressHandler.NotificationInfo keyNeededInfo(@NonNull CharSequence body) {
+            Intent openIntent = VtReportActivity.intentForFile(VtScanService.this, mAttempt.fileId)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            PendingIntent open = PendingIntentCompat.getActivity(VtScanService.this,
+                    (int) mAttempt.id, openIntent, PendingIntent.FLAG_UPDATE_CURRENT, false);
+            return new NotificationProgressHandler.NotificationInfo()
+                    .setTitle(mTitle).setOperationName("VirusTotal").setBody(body)
+                    .setDefaultAction(open).setAutoCancel(true);
+        }
+
         private boolean isNotificationAllowed() {
-            return !VtHistoryActivity.isVisible();
+            return !VtHistoryActivity.isVisible() && !VtReportActivity.isVisible();
         }
     }
 
@@ -395,6 +651,7 @@ public class VtScanService extends Service {
         for (Future<?> future : mRunningScans.values()) future.cancel(true);
         mDispatcher.shutdownNow();
         mScanExecutor.shutdownNow();
+        mScheduler.shutdownNow();
         if (mRepository != null) mRepository.close();
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE);
         super.onDestroy();

@@ -21,15 +21,20 @@ public interface VtScanAttemptDao {
     List<VtScanAttempt> getForFile(long fileId);
 
     @Query("SELECT * FROM vt_scan_attempt WHERE status IN " +
-            "('pending_consent', 'queued', 'looking_up', 'uploading', 'analysing') " +
+            "('pending_consent', 'pending_key', 'queued', 'looking_up', 'uploading', 'analysing') " +
             "ORDER BY updated_at ASC")
     List<VtScanAttempt> getActive();
 
     @Nullable
     @Query("SELECT * FROM vt_scan_attempt WHERE file_id = :fileId AND status IN " +
-            "('pending_consent', 'queued', 'looking_up', 'uploading', 'analysing') " +
+            "('pending_consent', 'pending_key', 'queued', 'looking_up', 'uploading', 'analysing') " +
             "ORDER BY updated_at DESC LIMIT 1")
     VtScanAttempt getActiveForFile(long fileId);
+
+    // Fork (白い熊, APK-vetting chain, item 10): resume every key-parked attempt once a key is saved.
+    @Query("UPDATE vt_scan_attempt SET status = 'queued', next_attempt_at = 0, updated_at = :now " +
+            "WHERE status = 'pending_key'")
+    int resumeKeyParked(long now);
 
     @Nullable
     @Query("SELECT * FROM vt_scan_attempt WHERE id = :id LIMIT 1")

@@ -284,10 +284,11 @@ public class UIUtils {
             TextView tv = view.findViewById(android.R.id.text1);
             tv.setText(text);
         }
-        return new MaterialAlertDialogBuilder(activity)
+        // Fork (白い熊, +087): framed like every other dialog (a no-op off the fork's theme).
+        return ForkDialog.bordered(new MaterialAlertDialogBuilder(activity)
                 .setCancelable(false)
                 .setView(view)
-                .create();
+                .create());
     }
 
     @NonNull
@@ -295,10 +296,11 @@ public class UIUtils {
         View view = activity.getLayoutInflater().inflate(R.layout.dialog_progress2, null);
         TextView tv = view.findViewById(android.R.id.text1);
         tv.setText(text);
-        return new MaterialAlertDialogBuilder(activity)
+        // Fork (白い熊, +087): framed like every other dialog (a no-op off the fork's theme).
+        return ForkDialog.bordered(new MaterialAlertDialogBuilder(activity)
                 .setCancelable(false)
                 .setView(view)
-                .create();
+                .create());
     }
 
     @NonNull

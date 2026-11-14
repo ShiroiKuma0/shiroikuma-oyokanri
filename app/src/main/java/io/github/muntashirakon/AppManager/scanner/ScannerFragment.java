@@ -96,9 +96,16 @@ public class ScannerFragment extends Fragment {
         MaterialCardView missingLibsView = view.findViewById(R.id.missing_libs);
         missingLibsView.setCardBackgroundColor(cardColor);
         // VirusTotal
-        if (!FeatureController.isVirusTotalEnabled() || Prefs.VirusTotal.getApiKey() == null) {
+        if (!FeatureController.isVirusTotalEnabled()) {
             mVtContainerView.setVisibility(View.GONE);
             view.findViewById(R.id.vt_disclaimer).setVisibility(View.GONE);
+        } else if (!Prefs.VirusTotal.hasApiKey()) {
+            // Fork (白い熊, APK-vetting chain, item 10): no key — offer to set one up rather than
+            // hiding the card. The scan parks as needs-key and resumes once a key is saved.
+            mVtTitleView.setText(R.string.vt_set_up);
+            mVtDescriptionView.setText(R.string.vt_apikey_dialog_helper);
+            mVtContainerView.setOnClickListener(v ->
+                    io.github.muntashirakon.AppManager.scanner.vt.VtApiKeyDialog.prompt(mActivity, null));
         }
         // Checksum
         mViewModel.apkChecksumsLiveData().observe(getViewLifecycleOwner(), checksums -> {
@@ -212,6 +219,9 @@ public class ScannerFragment extends Fragment {
         mViewModel.loadSummary();
     }
 
+    // Fork (白い熊, APK-vetting chain, item 5): the per-engine list and the verdict now live in the
+    // shared VtReportActivity (merged with VtHistoryActivity.displayReport), so the scanner card only
+    // shows the summary and taps through to that screen — VtFileReport.fileId is the SHA-256.
     private void publishVirusTotalReport(@NonNull VtFileReport vtFileReport) {
         int positives = Objects.requireNonNull(vtFileReport.getPositives());
         CharSequence resultSummary = getString(R.string.vt_success, positives, vtFileReport.getTotal());
@@ -222,51 +232,11 @@ public class ScannerFragment extends Fragment {
         } else if (positives <= 12) {
             color = ColorCodes.getVirusTotalUnsafeIndicatorColor(mActivity);
         } else color = ColorCodes.getVirusTotalExtremelyUnsafeIndicatorColor(mActivity);
-        CharSequence scanDate = getString(R.string.vt_scan_date, DateUtils.formatDateTime(mActivity, vtFileReport.scanDate));
-        String permalink = vtFileReport.permalink;
-        Spanned result;
-        List<VtAvEngineResult> vtFileReportScanItems = vtFileReport.results;
-        if (!vtFileReportScanItems.isEmpty()) {
-            int colorUnsafe = ColorCodes.getVirusTotalExtremelyUnsafeIndicatorColor(mActivity);
-            int colorSafe = ColorCodes.getVirusTotalSafeIndicatorColor(mActivity);
-            ArrayList<Spannable> detectedList = new ArrayList<>();
-            ArrayList<Spannable> suspiciousList = new ArrayList<>();
-            ArrayList<Spannable> undetectedList = new ArrayList<>();
-            ArrayList<Spannable> neutralList = new ArrayList<>();
-            for (VtAvEngineResult item : vtFileReportScanItems) {
-                SpannableStringBuilder sb = new SpannableStringBuilder();
-                Spannable title = getPrimaryText(mActivity, item.engineName);
-                if (item.category < VtAvEngineResult.CAT_UNDETECTED) {
-                    sb.append(title);
-                    neutralList.add(sb);
-                } else if (item.category < VtAvEngineResult.CAT_SUSPICIOUS) {
-                    sb.append(getColoredText(title, colorSafe));
-                    undetectedList.add(sb);
-                } else if (item.category == VtAvEngineResult.CAT_SUSPICIOUS) {
-                    sb.append(getColoredText(title, colorUnsafe));
-                    suspiciousList.add(sb);
-                } else { // malicious
-                    sb.append(getColoredText(title, colorUnsafe));
-                    detectedList.add(sb);
-                }
-                sb.append(getSmallerText(" (" + item.engineVersion + ")"));
-                if (item.result != null) {
-                    sb.append("\n").append(item.result);
-                }
-            }
-            detectedList.addAll(suspiciousList);
-            detectedList.addAll(undetectedList);
-            detectedList.addAll(neutralList);
-            result = UiUtils.getOrderedList(detectedList);
-        } else result = null;
         mVtTitleView.setText(getColoredText(resultSummary, color));
-        if (result != null) {
-            mVtDescriptionView.setText(R.string.tap_to_see_details);
-            mVtContainerView.setOnClickListener(v -> {
-                VirusTotalDialog fragment = VirusTotalDialog.getInstance(resultSummary, scanDate, result, permalink);
-                fragment.show(getParentFragmentManager(), VirusTotalDialog.TAG);
-            });
-        }
+        mVtDescriptionView.setText(R.string.tap_to_see_details);
+        mVtContainerView.setOnClickListener(v -> startActivity(
+                io.github.muntashirakon.AppManager.scanner.vt.VtReportActivity.intentForSha(
+                        mActivity, vtFileReport.fileId)));
     }
 
     @NonNull

@@ -52,7 +52,8 @@ public class VirusTotalPreferences extends PreferenceFragment {
         infoNoInternetPref.setVisible(!hasInternet);
         enablePrefs(isVtEnabled, vtApiKeyPref, promptBeforeUploadPref);
         if (apiKey != null) {
-            vtApiKeyPref.setSummary(apiKey);
+            // Fork (白い熊, APK-vetting chain, item 10): never show the whole key — mask to last four.
+            vtApiKeyPref.setSummary(Prefs.VirusTotal.getMaskedApiKey());
         } else {
             vtApiKeyPref.setSummary(R.string.key_not_set);
         }
@@ -68,7 +69,7 @@ public class VirusTotalPreferences extends PreferenceFragment {
                         String newApiKey = !TextUtils.isEmpty(inputText) ? inputText.toString() : null;
                         Prefs.VirusTotal.setApiKey(newApiKey);
                         if (newApiKey != null) {
-                            vtApiKeyPref.setSummary(newApiKey);
+                            vtApiKeyPref.setSummary(Prefs.VirusTotal.getMaskedApiKey());
                         } else {
                             vtApiKeyPref.setSummary(R.string.key_not_set);
                         }

@@ -39,9 +39,21 @@ public interface VtFileDao {
 
     @Query("SELECT id FROM vt_file WHERE NOT EXISTS (SELECT 1 FROM vt_scan_attempt " +
             "WHERE vt_scan_attempt.file_id = vt_file.id AND status IN " +
-            "('pending_consent', 'queued', 'looking_up', 'uploading', 'analysing')) " +
+            "('pending_consent', 'pending_key', 'queued', 'looking_up', 'uploading', 'analysing')) " +
+            "AND bundle_of IS NULL " +
             "ORDER BY last_accessed_at ASC, updated_at ASC LIMIT :limit")
     List<Long> getLeastRecentlyAccessedIds(int limit);
+
+    // Fork (白い熊, APK-vetting chain, item 7): files whose one-shot post-upload auto-refresh is due.
+    @Query("SELECT * FROM vt_file WHERE auto_refresh_at > 0 AND auto_refresh_at <= :now")
+    List<VtFile> getDueForAutoRefresh(long now);
+
+    // Fork (白い熊, APK-vetting chain, bundles): the extracted parts of a bundle container.
+    @Query("SELECT * FROM vt_file WHERE bundle_of = :bundleSha256 ORDER BY display_name ASC")
+    List<VtFile> getBundleParts(@NonNull String bundleSha256);
+
+    @Query("UPDATE vt_file SET auto_refresh_at = :at, updated_at = :updatedAt WHERE id = :id")
+    void setAutoRefreshAt(long id, long at, long updatedAt);
 
     @Delete
     void delete(@NonNull VtFile file);

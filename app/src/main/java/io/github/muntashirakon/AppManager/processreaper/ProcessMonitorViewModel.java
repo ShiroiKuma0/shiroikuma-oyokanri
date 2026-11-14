@@ -70,8 +70,13 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
         // (the slow objects sampler). A suspect is pinned to the top, shown with its leak note, and
         // is killable + restartable even when the reaper would otherwise protect it.
         public boolean isLeakSuspect;
+        // Fork (白い熊 / 地図, 2026-11-12): true only when the suspect is a GENUINE leak (retained
+        // screens or growing GPU), false for a merely heavy-but-steady GPU footprint. A heavy row
+        // keeps its ordinary colour and position and a calm "high GPU" badge; only a genuine leak is
+        // pinned to the top, coloured orange, called LEAKING and offered the kill-and-relaunch pill.
+        public boolean leakGenuine;
         public String leakNote;
-        public String leakPackage;   // package to force-stop + relaunch, or null
+        public String leakPackage;   // package to force-stop + relaunch, or null (genuine leaks only)
 
         Row(ProcessItem item, ProcessClassifier.Result cls, List<Integer> pids, int memberCount,
             boolean isLeak, String title, String subtitle, String meta, String ram, String cpu,
@@ -550,8 +555,11 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
             }
             if (s == null) continue;
             r.isLeakSuspect = true;
+            r.leakGenuine = s.isLeak();
             r.leakNote = leakNoteFor(ctx, s);
-            r.leakPackage = (r.item instanceof AppProcessItem)
+            // Only a genuine leak gets a kill-and-relaunch target — a heavy-but-fine map must not be
+            // force-stopped just for holding GPU memory.
+            r.leakPackage = s.isLeak() && (r.item instanceof AppProcessItem)
                     ? ((AppProcessItem) r.item).packageInfo.packageName : null;
         }
     }
@@ -575,9 +583,10 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
     private void sort(@NonNull List<Row> rows) {
         final boolean byCpu = mSort == SORT_CPU;
         Collections.sort(rows, (a, b) -> {
-            // Leak suspects and leak clusters pinned to the top — the most actionable rows.
-            boolean ap = a.isLeak || a.isLeakSuspect;
-            boolean bp = b.isLeak || b.isLeakSuspect;
+            // Genuine leaks and leak clusters pinned to the top — the most actionable rows. A merely
+            // heavy GPU app is NOT pinned (it already sorts high by its memory) — only marked.
+            boolean ap = a.isLeak || a.leakGenuine;
+            boolean bp = b.isLeak || b.leakGenuine;
             if (ap != bp) return ap ? -1 : 1;
             if (byCpu) {
                 double ca = Double.isNaN(a.cpuPercent) ? -1 : a.cpuPercent;
@@ -950,9 +959,9 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
                             o.activities, o.windows, o.views, o.graphicsBytes, growth, o.pssBytes));
                 }
                 mGfxBaseline.keySet().retainAll(alive);  // a recycled pid starts fresh
-                // Leaked screens first (the unambiguous finding), then by GPU memory.
+                // Genuine leaks first (the unambiguous finding), heavy-but-steady apps after, each by GPU memory.
                 Collections.sort(out, (a, b) -> {
-                    if (a.leaksActivities() != b.leaksActivities()) return a.leaksActivities() ? -1 : 1;
+                    if (a.isLeak() != b.isLeak()) return a.isLeak() ? -1 : 1;
                     return Long.compare(b.graphicsBytes, a.graphicsBytes);
                 });
                 mSuspects = out;

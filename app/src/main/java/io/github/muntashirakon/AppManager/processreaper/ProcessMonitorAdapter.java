@@ -125,13 +125,17 @@ public class ProcessMonitorAdapter extends RecyclerView.Adapter<ProcessMonitorAd
         boolean killable = row.cls.killable;
         boolean leak = row.isLeak;
         boolean suspect = row.isLeakSuspect;
+        boolean genuineLeak = row.leakGenuine;          // retained screens or growing GPU
+        boolean heavyGpu = suspect && !genuineLeak;      // high but steady GPU — not a leak
         boolean userProt = "you".equals(row.cls.reason);
 
         int killableColor = ColorPrefs.getColor(mCtx, ColorPrefs.MONITOR_KILLABLE);
         int leakColor = ColorPrefs.getColor(mCtx, ColorPrefs.MONITOR_LEAK);
         int protColor = ColorPrefs.getColor(mCtx, ColorPrefs.MONITOR_PROTECTED);
         int userProtColor = ColorPrefs.getColor(mCtx, ColorPrefs.MONITOR_USER_PROTECTED);
-        int stateColor = (leak || suspect) ? leakColor : (userProt ? userProtColor : (killable ? killableColor : protColor));
+        // A genuine leak and a leak cluster wear the alarm colour; a heavy-but-steady GPU app keeps
+        // its ordinary row colour (it is noteworthy, not alarming).
+        int stateColor = (leak || genuineLeak) ? leakColor : (userProt ? userProtColor : (killable ? killableColor : protColor));
 
         h.title.setText(row.title);
         h.title.setTextColor(stateColor);
@@ -148,9 +152,14 @@ public class ProcessMonitorAdapter extends RecyclerView.Adapter<ProcessMonitorAd
         h.subtitle.setTextColor(descColor);
         h.cpu.setTextColor(descColor);
         h.meta.setTextColor((descColor & 0x00FFFFFF) | 0xB3000000);
-        if (suspect) {
+        if (genuineLeak) {
             h.badge.setText(R.string.monitor_badge_leaking);
             h.badge.setTextColor(leakColor);
+        } else if (heavyGpu) {
+            // Fork (白い熊 / 地図, 2026-11-12): steady high GPU use — the screen's own yellow, never
+            // the orange leak colour, so it does not read as an alarm.
+            h.badge.setText(R.string.monitor_badge_heavy_gpu);
+            h.badge.setTextColor(killableColor);
         } else if (leak) {
             h.badge.setText(mCtx.getString(R.string.monitor_badge_leak) + "  ×" + row.memberCount);
             h.badge.setTextColor(leakColor);
@@ -227,12 +236,13 @@ public class ProcessMonitorAdapter extends RecyclerView.Adapter<ProcessMonitorAd
         h.btnProtect.setImageResource(userProt ? R.drawable.ic_lock : R.drawable.ic_unlock);
         h.btnProtect.setColorFilter(userProt ? userProtColor : killableColor);
         h.btnProtect.setOnClickListener(v -> mActions.onProtect(row));
-        // Fork (白い熊, +062): a leaking app is killable + restartable even when protected.
-        boolean canKill = killable || (suspect && row.leakPackage != null);
+        // Fork (白い熊, +062): a genuine leak is killable + restartable even when protected. A heavy
+        // GPU app is not — it is only killable by the ordinary path if it was killable anyway.
+        boolean canKill = killable || (genuineLeak && row.leakPackage != null);
         h.btnKill.setVisibility(canKill ? View.VISIBLE : View.INVISIBLE);
         h.btnKill.setColorFilter(leakColor);
         h.btnKill.setOnClickListener(v -> {
-            if (suspect && row.leakPackage != null && !killable) {
+            if (genuineLeak && row.leakPackage != null && !killable) {
                 mActions.onKillRestart(row);
             } else {
                 mActions.onKill(row);

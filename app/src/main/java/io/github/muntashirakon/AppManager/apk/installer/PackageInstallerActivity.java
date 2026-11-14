@@ -100,6 +100,25 @@ public class PackageInstallerActivity extends BaseActivity implements InstallerD
         return intent;
     }
 
+    /**
+     * Fork (白い熊, +083): an install the user has ALREADY decided on in the VirusTotal dialog,
+     * which showed installed version → new version and whose button was the decision. The what's-new
+     * and "do you want to install?" steps are skipped; everything that is a genuinely new question —
+     * choosing splits, a downgrade that needs an uninstall, a signature mismatch — is still asked.
+     *
+     * <p>The mark is an in-process static, not an intent extra: this activity is exported, and an
+     * extra would let any app on the phone start an install with the confirmation switched off.
+     */
+    @NonNull
+    public static Intent getConfirmedInstance(@NonNull Context context, @NonNull Uri uri) {
+        sConfirmedUri = uri;
+        return getLaunchableInstance(context, uri);
+    }
+
+    @Nullable
+    private static volatile Uri sConfirmedUri;
+    private boolean mConfirmedAlready;
+
     @NonNull
     public static Intent getLaunchableInstance(@NonNull Context context, ApkSource apkSource) {
         Intent intent = new Intent(context, PackageInstallerActivity.class);
@@ -227,6 +246,12 @@ public class PackageInstallerActivity extends BaseActivity implements InstallerD
             mOperationId = savedInstanceState.getString(STATE_OPERATION_ID);
         }
         Log.d(TAG, "On create, intent: %s", intent);
+        // Fork (白い熊, +083): consume the one-shot "already confirmed" mark (see getConfirmedInstance).
+        Uri confirmed = sConfirmedUri;
+        if (savedInstanceState == null && confirmed != null && confirmed.equals(intent.getData())) {
+            sConfirmedUri = null;
+            mConfirmedAlready = true;
+        }
         mModel = new ViewModelProvider(this).get(PackageInstallerViewModel.class);
         if (ACTION_PACKAGE_INSTALLED.equals(intent.getAction())) {
             onNewIntent(intent);
@@ -365,6 +390,13 @@ public class PackageInstallerActivity extends BaseActivity implements InstallerD
                 // Downgrade
                 actionRes = R.string.downgrade;
             }
+        }
+        if (mConfirmedAlready) {
+            // Fork (白い熊, +083): decided in the VirusTotal dialog. One use only — a later item in
+            // the queue was never shown there.
+            mConfirmedAlready = false;
+            displayInstallationPrompt(actionRes, true);
+            return;
         }
         if (displayChanges) {
             WhatsNewFragment dialogFragment = WhatsNewFragment.getInstance(currentPackage.getNewPackageInfo(),
@@ -643,12 +675,11 @@ public class PackageInstallerActivity extends BaseActivity implements InstallerD
 
     public void showInstallationFinishedDialog(String packageName, CharSequence message,
                                                @Nullable String statusMessage, boolean displayOpenAndAppInfo) {
-        SpannableStringBuilder ssb = new SpannableStringBuilder(message);
-        if (statusMessage != null) {
-            ssb.append("\n\n").append(UIUtils.getItalicString(statusMessage));
-        }
         Intent intent = PackageManagerCompat.getLaunchIntentForPackage(packageName, UserHandleHidden.myUserId());
-        mDialogHelper.showInstallFinishedDialog(ssb, hasNext() ? R.string.next : R.string.close, v -> goToNext(),
+        // Fork (白い熊, +091): the result is drawn as a hero (icon in a ring, a filled verdict pill),
+        // so the headline, the raw status and whether it worked travel separately.
+        mDialogHelper.showInstallFinishedDialog(message, statusMessage, displayOpenAndAppInfo,
+                hasNext() ? R.string.next : R.string.close, v -> goToNext(),
                 displayOpenAndAppInfo && intent != null ? v -> {
                     try {
                         startActivity(intent);

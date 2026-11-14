@@ -39,7 +39,7 @@ import io.github.muntashirakon.AppManager.utils.ContextUtils;
 
 @Database(entities = {App.class, LogFilter.class, Backup.class, OpHistory.class, FmFavorite.class, FreezeType.class,
         BatterySample.class, PermissionOverride.class, FmDirectorySort.class, FmDirectorySize.class, VtFile.class,
-        VtFileSource.class, VtScanAttempt.class}, version = 12)
+        VtFileSource.class, VtScanAttempt.class}, version = 13)
 public abstract class AppsDb extends RoomDatabase {
     private static AppsDb sAppsDb;
 
@@ -204,10 +204,25 @@ public abstract class AppsDb extends RoomDatabase {
         }
     };
 
+    // Fork (白い熊, APK-vetting chain): the VirusTotal scan-and-report flow. Adds the quota/Wi-Fi
+    // back-off park (vt_scan_attempt.next_attempt_at), the one-shot post-upload auto-refresh
+    // (vt_file.auto_refresh_at) and bundle grouping (vt_file.is_bundle, vt_file.bundle_of). Each
+    // @ColumnInfo defaultValue on the entity must match the ALTER … DEFAULT here exactly or Room
+    // refuses to open the DB at start (see the battery M_8_9 note). Never renumber the live ones.
+    public static final Migration M_12_13 = new Migration(12, 13) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase db) {
+            db.execSQL("ALTER TABLE `vt_scan_attempt` ADD COLUMN `next_attempt_at` INTEGER NOT NULL DEFAULT 0");
+            db.execSQL("ALTER TABLE `vt_file` ADD COLUMN `auto_refresh_at` INTEGER NOT NULL DEFAULT 0");
+            db.execSQL("ALTER TABLE `vt_file` ADD COLUMN `is_bundle` INTEGER NOT NULL DEFAULT 0");
+            db.execSQL("ALTER TABLE `vt_file` ADD COLUMN `bundle_of` TEXT");
+        }
+    };
+
     public static AppsDb getInstance() {
         if (sAppsDb == null) {
             sAppsDb = Room.databaseBuilder(ContextUtils.getContext(), AppsDb.class, "apps.db")
-                    .addMigrations(M_2_3, M_3_4, M_4_5, M_5_6, M_6_7, M_7_8, M_8_9, M_9_10, M_10_11, M_11_12)
+                    .addMigrations(M_2_3, M_3_4, M_4_5, M_5_6, M_6_7, M_7_8, M_8_9, M_9_10, M_10_11, M_11_12, M_12_13)
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .build();
             try {

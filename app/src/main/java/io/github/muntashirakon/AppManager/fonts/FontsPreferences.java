@@ -409,6 +409,14 @@ public class FontsPreferences extends Fragment {
         LinearLayoutCompat screensContent = screensGroup.findViewById(R.id.group_content);
         screensContent.addView(buildReopenSwitchRow());
         container.addView(screensGroup, 1);
+        // Fork (白い熊, APK-vetting chain, item 8): VirusTotal scan settings.
+        View vtGroup = inflater.inflate(R.layout.view_font_group, container, false);
+        ((AppCompatTextView) vtGroup.findViewById(R.id.group_header)).setText(R.string.virus_total);
+        LinearLayoutCompat vtContent = vtGroup.findViewById(R.id.group_content);
+        vtContent.addView(buildVtAutoUploadRow());
+        vtContent.addView(buildVtWifiOnlyRow());
+        vtContent.addView(buildVtRescanAgeRow());
+        container.addView(vtGroup);
         // kxkb rhythm: every section except the first is preceded by a
         // full-width 1px hairline (part of view_font_group; hidden on the
         // first section so the page starts flush).
@@ -627,6 +635,72 @@ public class FontsPreferences extends Fragment {
      * Fork (白い熊, +146): reopen the screen the app was left on. Default ON — it is what the app
      * already tries to do while the task survives (+97), and this only makes it survive the task.
      */
+    // Fork (白い熊, APK-vetting chain, item 8): a themed switch row, same shape as buildReopenSwitchRow.
+    @NonNull
+    private View buildVtSwitchRow(@StringRes int titleRes, @StringRes int descRes,
+                                  boolean initial, @NonNull androidx.core.util.Consumer<Boolean> onChange) {
+        final int yellow = ContextCompat.getColor(requireContext(), R.color.theme_bright_yellow);
+        LinearLayoutCompat texts = new LinearLayoutCompat(requireContext());
+        texts.addView(rowTitle(titleRes));
+        texts.addView(rowSummary(descRes));
+        LinearLayoutCompat row = automationRow(texts);
+        MaterialSwitch sw = (MaterialSwitch) View.inflate(requireContext(), R.layout.item_switch, null);
+        sw.setLayoutParams(new LinearLayoutCompat.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        int[][] states = {{android.R.attr.state_checked}, {}};
+        sw.setThumbTintList(new ColorStateList(states, new int[]{0xFF000000, 0xFF808000}));
+        sw.setTrackTintList(new ColorStateList(states,
+                new int[]{yellow, ColorUtils.setAlphaComponent(yellow, 0x33)}));
+        sw.setChecked(initial);
+        sw.setOnCheckedChangeListener((v, checked) -> onChange.accept(checked));
+        row.addView(sw);
+        row.setOnClickListener(v -> sw.toggle());
+        return row;
+    }
+
+    @NonNull
+    private View buildVtAutoUploadRow() {
+        // "Upload automatically" is the inverse of the stored prompt-before-upload flag.
+        return buildVtSwitchRow(R.string.vt_upload_auto_title, R.string.vt_upload_auto_desc,
+                !io.github.muntashirakon.AppManager.settings.Prefs.VirusTotal.promptBeforeUpload(),
+                checked -> io.github.muntashirakon.AppManager.settings.Prefs.VirusTotal
+                        .setPromptBeforeUpload(!checked));
+    }
+
+    @NonNull
+    private View buildVtWifiOnlyRow() {
+        return buildVtSwitchRow(R.string.vt_wifi_only_title, R.string.vt_wifi_only_desc,
+                io.github.muntashirakon.AppManager.settings.Prefs.VirusTotal.uploadOnWifiOnly(),
+                io.github.muntashirakon.AppManager.settings.Prefs.VirusTotal::setUploadOnWifiOnly);
+    }
+
+    @NonNull
+    private View buildVtRescanAgeRow() {
+        AppCompatTextView summary = pillSummary(rescanAgeSummary());
+        return actionRow(R.string.vt_rescan_age_title, summary, false, false, v ->
+                new io.github.muntashirakon.dialog.TextInputDialogBuilder(requireContext(), R.string.vt_rescan_age_title)
+                        .setTitle(R.string.vt_rescan_age_title)
+                        .setInputText(String.valueOf(io.github.muntashirakon.AppManager.settings.Prefs
+                                .VirusTotal.getRescanAgeDays()))
+                        .setInputInputType(android.text.InputType.TYPE_CLASS_NUMBER)
+                        .setNegativeButton(R.string.cancel, null)
+                        .setPositiveButton(R.string.save, (d, w, text, checked) -> {
+                            try {
+                                int days = Integer.parseInt(text.toString().trim());
+                                io.github.muntashirakon.AppManager.settings.Prefs.VirusTotal.setRescanAgeDays(days);
+                                summary.setText(rescanAgeSummary());
+                            } catch (NumberFormatException ignored) {
+                            }
+                        })
+                        .show());
+    }
+
+    @NonNull
+    private CharSequence rescanAgeSummary() {
+        int days = io.github.muntashirakon.AppManager.settings.Prefs.VirusTotal.getRescanAgeDays();
+        return getString(R.string.vt_rescan_age_desc) + "  ·  " + getString(R.string.vt_rescan_age_value, days);
+    }
+
     @NonNull
     private View buildReopenSwitchRow() {
         final Context appContext = requireContext().getApplicationContext();

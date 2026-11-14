@@ -28,9 +28,11 @@ import io.github.muntashirakon.io.Path;
 import io.github.muntashirakon.io.Paths;
 
 public class VtScanRepository implements Closeable {
-    public static final int MAX_FILES = 100;
+    // Fork (白い熊, APK-vetting chain, item 7): this app is the scan-and-report home now, so the
+    // history is a real store rather than a scratch cache of the last few scans.
+    public static final int MAX_FILES = 5_000;
     public static final int MAX_ATTEMPTS_PER_FILE = 5;
-    public static final int MAX_TERMINAL_ATTEMPTS = 500;
+    public static final int MAX_TERMINAL_ATTEMPTS = 5_000;
 
     @StringDef({
             SOURCE_INSTALLED_APK,
@@ -38,6 +40,8 @@ public class VtScanRepository implements Closeable {
             SOURCE_FILE_PICKER,
             SOURCE_SHARE_INTENT,
             SOURCE_VIEW_INTENT,
+            SOURCE_SCAN_REQUEST,
+            SOURCE_BUNDLE_PART,
     })
     public @interface FileSource {
     }
@@ -47,6 +51,10 @@ public class VtScanRepository implements Closeable {
     public static final String SOURCE_FILE_PICKER = "file_picker";
     public static final String SOURCE_SHARE_INTENT = "share_intent";
     public static final String SOURCE_VIEW_INTENT = "view_intent";
+    // Fork (白い熊, APK-vetting chain): the VT_SCAN request from the file manager / installer.
+    public static final String SOURCE_SCAN_REQUEST = "scan_request";
+    // Fork (白い熊, APK-vetting chain, bundles): a code-bearing APK extracted from a bundle.
+    public static final String SOURCE_BUNDLE_PART = "bundle_part";
 
     private final AppsDb mDatabase;
     private final VtFileDao mFileDao;
@@ -90,8 +98,26 @@ public class VtScanRepository implements Closeable {
     public ObservedFile observeUri(@NonNull Uri uri, @Nullable String mimeType, @FileSource @Nullable String sourceType)
             throws IOException {
         Path sourcePath = Paths.get(uri);
+        // Fork (白い熊, APK-vetting chain, item 1): a readable real file (file:// or a bare path) is
+        // observed in place — no whole-file cache copy. Only a content:// URI (whose grant may be
+        // gone by upload time) is staged.
+        if (isDirectlyReadable(uri, sourcePath)) {
+            return observePath(sourcePath, uri.toString(), sourcePath.getName(), mimeType, sourceType);
+        }
         File cachedFile = mFileCache.getCachedFile(sourcePath);
-        return observePath(Paths.get(cachedFile), uri.toString(), sourcePath.getName(), mimeType, sourceType);
+        return observePath(Paths.get(cachedFile), uri.toString(), sourcePath.getName(), mimeType, sourceType, null);
+    }
+
+    private static boolean isDirectlyReadable(@NonNull Uri uri, @NonNull Path path) {
+        String scheme = uri.getScheme();
+        if (scheme != null && !"file".equals(scheme)) {
+            return false;
+        }
+        try {
+            return path.isFile();
+        } catch (Throwable e) {
+            return false;
+        }
     }
 
     @WorkerThread
@@ -100,10 +126,26 @@ public class VtScanRepository implements Closeable {
                                 @Nullable String displayName, @Nullable String mimeType,
                                 @FileSource @Nullable String sourceType)
             throws IOException {
+        return observePath(path, sourceUri, displayName, mimeType, sourceType, null);
+    }
+
+    /**
+     * Fork (白い熊, APK-vetting chain, item 1): {@code precomputedDigests}, when non-null, are the
+     * MD5/SHA-1/SHA-256/… pairs {@link DigestUtils#getDigests(Path)} returns for exactly this file,
+     * so a caller that already hashed it (the scanner) does not hash it a second time.
+     */
+    @WorkerThread
+    @NonNull
+    public ObservedFile observePath(@NonNull Path path, @NonNull String sourceUri,
+                                @Nullable String displayName, @Nullable String mimeType,
+                                @FileSource @Nullable String sourceType,
+                                @Nullable Pair<String, String>[] precomputedDigests)
+            throws IOException {
         if (!path.isFile()) {
             throw new IOException("Not a readable file: " + path);
         }
-        Pair<String, String>[] digests = DigestUtils.getDigests(path);
+        Pair<String, String>[] digests = precomputedDigests != null
+                ? precomputedDigests : DigestUtils.getDigests(path);
         long now = System.currentTimeMillis();
         VtFile observedFile = new VtFile();
         observedFile.md5 = digests[0].second;
@@ -164,8 +206,12 @@ public class VtScanRepository implements Closeable {
         if (file.latestReportJson != null) return null;
         VtScanAttempt activeAttempt = mAttemptDao.getActiveForFile(file.id);
         if (activeAttempt != null) return activeAttempt;
-        return createAttempt(file.id, VtScanAttempt.TYPE_LOOKUP,
-                promptBeforeUpload ? VtScanAttempt.STATUS_PENDING_CONSENT : VtScanAttempt.STATUS_QUEUED);
+        // Fork (白い熊, +084): never ask BEFORE looking. The attempt used to be born waiting for
+        // consent, so "The file was not found in the VirusTotal database" was shown for a file
+        // nobody had looked up yet — a hash lookup uploads nothing and needs no permission. The
+        // service now looks first and parks for consent only on a real NotFound (see
+        // VtScanService#execute), so a file VirusTotal already knows shows its report unasked.
+        return createAttempt(file.id, VtScanAttempt.TYPE_LOOKUP, VtScanAttempt.STATUS_QUEUED);
     }
 
     @WorkerThread
@@ -182,7 +228,17 @@ public class VtScanRepository implements Closeable {
 
     @WorkerThread
     public void approveUpload(long attemptId) {
-        updateAttemptStatus(attemptId, VtScanAttempt.STATUS_QUEUED);
+        // Fork (白い熊, +084): approval turns the lookup into an upload, which is how the service
+        // knows on the next run that the question has been answered.
+        mDatabase.runInTransaction(() -> {
+            VtScanAttempt attempt = mAttemptDao.get(attemptId);
+            if (attempt == null) return;
+            attempt.type = VtScanAttempt.TYPE_UPLOAD;
+            attempt.status = VtScanAttempt.STATUS_QUEUED;
+            attempt.nextAttemptAt = 0;
+            attempt.updatedAt = System.currentTimeMillis();
+            mAttemptDao.update(attempt);
+        });
     }
 
     @WorkerThread
@@ -217,6 +273,20 @@ public class VtScanRepository implements Closeable {
     @NonNull
     public List<VtScanAttempt> getActiveAttempts() {
         return mAttemptDao.getActive();
+    }
+
+    @WorkerThread
+    @Nullable
+    public VtScanAttempt getActiveAttempt(long fileId) {
+        return mAttemptDao.getActiveForFile(fileId);
+    }
+
+    /** Fork (白い熊, +081): the newest attempt of any status — the report dialog names its outcome. */
+    @WorkerThread
+    @Nullable
+    public VtScanAttempt getLatestAttempt(long fileId) {
+        List<VtScanAttempt> attempts = mAttemptDao.getForFile(fileId);
+        return attempts.isEmpty() ? null : attempts.get(0);
     }
 
     @WorkerThread
@@ -285,6 +355,12 @@ public class VtScanRepository implements Closeable {
     }
 
     @WorkerThread
+    @Nullable
+    public VtFile getFileBySha256(@NonNull String sha256) {
+        return mFileDao.getBySha256(sha256);
+    }
+
+    @WorkerThread
     public void setLocalAnalysisJson(long fileId, @NonNull String json) {
         mDatabase.runInTransaction(() -> {
             VtFile file = mFileDao.get(fileId);
@@ -317,7 +393,14 @@ public class VtScanRepository implements Closeable {
         IOException lastError = null;
         for (VtFileSource source : sources) {
             try {
-                Path sourcePath = Paths.get(Uri.parse(source.sourceUri));
+                Uri uri = Uri.parse(source.sourceUri);
+                Path sourcePath = Paths.get(uri);
+                // Fork (白い熊, APK-vetting chain, item 1): upload straight from the original path
+                // when it is a readable real file — no whole-file cache copy. A content:// source
+                // is staged, since its read grant may be gone by the time the upload runs.
+                if (isDirectlyReadable(uri, sourcePath)) {
+                    return sourcePath;
+                }
                 File cachedFile = mFileCache.getCachedFile(sourcePath);
                 Path path = Paths.get(cachedFile);
                 if (path.isFile()) return path;
@@ -339,6 +422,10 @@ public class VtScanRepository implements Closeable {
                 attempt.startedAt = now;
             }
             attempt.status = status;
+            // Fork (白い熊, +081): the attempt moved on, so whatever it was waiting for is over.
+            attempt.errorCode = null;
+            attempt.errorMessage = null;
+            attempt.nextAttemptAt = 0;
             attempt.updatedAt = now;
             mAttemptDao.update(attempt);
         });
@@ -352,6 +439,90 @@ public class VtScanRepository implements Closeable {
             attempt.analysisId = analysisId;
             attempt.updatedAt = System.currentTimeMillis();
             mAttemptDao.update(attempt);
+        });
+    }
+
+    /**
+     * Fork (白い熊, APK-vetting chain, items 2/10): park an attempt in an active status until
+     * {@code nextAttemptAt} (0 = immediately runnable). Used for quota back-off (status stays
+     * {@code queued}), a Wi-Fi-only upload deferred off Wi-Fi, and "needs key" ({@code pending_key}).
+     */
+    @WorkerThread
+    public void parkAttempt(long attemptId, @NonNull String status, long nextAttemptAt) {
+        mDatabase.runInTransaction(() -> {
+            VtScanAttempt attempt = mAttemptDao.get(attemptId);
+            if (attempt == null) return;
+            attempt.status = status;
+            attempt.nextAttemptAt = nextAttemptAt;
+            attempt.updatedAt = System.currentTimeMillis();
+            mAttemptDao.update(attempt);
+        });
+    }
+
+    /**
+     * Fork (白い熊, APK-vetting chain, item 2): set only the quota/Wi-Fi back-off time, keeping the
+     * attempt's current status — so a scan parked mid-poll resumes polling (not a fresh upload).
+     */
+    @WorkerThread
+    public void setNextAttemptAt(long attemptId, long nextAttemptAt, @Nullable String reason) {
+        mDatabase.runInTransaction(() -> {
+            VtScanAttempt attempt = mAttemptDao.get(attemptId);
+            if (attempt == null) return;
+            attempt.nextAttemptAt = nextAttemptAt;
+            // Fork (白い熊, +081): WHY it is parked, shown by the report dialog while it waits.
+            attempt.errorCode = reason == null ? null : VtScanAttempt.CODE_WAITING;
+            attempt.errorMessage = reason;
+            attempt.updatedAt = System.currentTimeMillis();
+            mAttemptDao.update(attempt);
+        });
+    }
+
+    /** Resume every attempt parked for a missing/invalid key; returns how many were resumed. */
+    @WorkerThread
+    public int resumeKeyParkedAttempts() {
+        final int[] count = new int[1];
+        mDatabase.runInTransaction(() -> count[0] = mAttemptDao.resumeKeyParked(System.currentTimeMillis()));
+        return count[0];
+    }
+
+    // Fork (白い熊, APK-vetting chain, item 7): the one-shot post-upload auto-refresh.
+    @WorkerThread
+    @NonNull
+    public List<VtFile> getFilesDueForAutoRefresh() {
+        return mFileDao.getDueForAutoRefresh(System.currentTimeMillis());
+    }
+
+    @WorkerThread
+    public void setAutoRefreshAt(long fileId, long at) {
+        mFileDao.setAutoRefreshAt(fileId, at, System.currentTimeMillis());
+    }
+
+    // Fork (白い熊, APK-vetting chain, bundles): a bundle container's extracted parts.
+    @WorkerThread
+    @NonNull
+    public List<VtFile> getBundleParts(@NonNull String bundleSha256) {
+        return mFileDao.getBundleParts(bundleSha256);
+    }
+
+    @WorkerThread
+    public void markBundleContainer(long fileId) {
+        mDatabase.runInTransaction(() -> {
+            VtFile file = mFileDao.get(fileId);
+            if (file == null) return;
+            file.isBundle = true;
+            file.updatedAt = System.currentTimeMillis();
+            mFileDao.update(file);
+        });
+    }
+
+    @WorkerThread
+    public void setBundleOf(long partFileId, @NonNull String bundleSha256) {
+        mDatabase.runInTransaction(() -> {
+            VtFile file = mFileDao.get(partFileId);
+            if (file == null) return;
+            file.bundleOf = bundleSha256;
+            file.updatedAt = System.currentTimeMillis();
+            mFileDao.update(file);
         });
     }
 

@@ -49,11 +49,11 @@ public class WhatsNewDialogFragment extends DialogFragment {
     @Override
     public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
         mDialogView = View.inflate(requireContext(), R.layout.dialog_whats_new, null);
-        return new MaterialAlertDialogBuilder(requireContext())
+        return io.github.muntashirakon.AppManager.utils.ForkDialog.bordered(new MaterialAlertDialogBuilder(requireContext())
                 .setTitle(R.string.whats_new)
                 .setView(mDialogView)
                 .setNegativeButton(R.string.ok, null)
-                .create();
+                .create());
     }
 
     @Nullable

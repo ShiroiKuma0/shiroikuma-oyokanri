@@ -163,6 +163,9 @@ public class VtHistoryActivity extends BaseActivity {
         if (uri == null) {
             return;
         }
+        if (promptForKeyIfMissing(() -> handleIncomingIntent(intent))) {
+            return;
+        }
         int readPermission = intent.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION;
         if (ContentResolver.SCHEME_CONTENT.equals(uri.getScheme()) && readPermission != 0) {
             try {
@@ -179,6 +182,9 @@ public class VtHistoryActivity extends BaseActivity {
 
     private void onFilePicked(@Nullable Uri uri) {
         if (uri == null || mViewModel == null) {
+            return;
+        }
+        if (promptForKeyIfMissing(() -> onFilePicked(uri))) {
             return;
         }
         mProgress.show();
@@ -241,12 +247,28 @@ public class VtHistoryActivity extends BaseActivity {
         }
     }
 
+    // Fork (白い熊, APK-vetting chain, item 5): the report is a full screen now, not a dialog.
     void openReport(long fileId) {
-        mViewModel.loadReport(fileId, 0, true);
+        startActivity(VtReportActivity.intentForFile(this, fileId));
     }
 
     void openAttemptReport(long attemptId) {
-        mViewModel.loadReport(0, attemptId, false);
+        startActivity(VtReportActivity.intentForAttempt(this, attemptId, 0));
+    }
+
+    // Fork (白い熊, APK-vetting chain, item 6): hand a reviewed file straight to the installer.
+    void requestInstall(@NonNull VtHistoryItem item) {
+        mViewModel.resolveForInstall(item.file.id, (path, pathString, file) ->
+                runOnUiThread(() -> VtReportActivity.installFile(this, file, path, pathString, false)));
+    }
+
+    // Fork (白い熊, APK-vetting chain, item 10): ask for the key before scanning when none is stored.
+    private boolean promptForKeyIfMissing(@NonNull Runnable retry) {
+        if (io.github.muntashirakon.AppManager.settings.Prefs.VirusTotal.hasApiKey()) {
+            return false;
+        }
+        VtApiKeyDialog.prompt(this, retry::run);
+        return true;
     }
 
     private void displayReport(@NonNull VtFileReport report) {
@@ -465,6 +487,27 @@ public class VtHistoryActivity extends BaseActivity {
                 }
             }
             mHistoryLiveData.postValue(result);
+        }
+
+        interface InstallResolved {
+            void onResolved(@Nullable io.github.muntashirakon.io.Path path, @Nullable String pathString,
+                            @NonNull VtFile file);
+        }
+
+        void resolveForInstall(long fileId, @NonNull InstallResolved callback) {
+            mExecutor.execute(() -> {
+                VtFile file = mRepository.getFile(fileId);
+                if (file == null) return;
+                io.github.muntashirakon.io.Path path = null;
+                String pathString = null;
+                try {
+                    path = mRepository.resolveSource(fileId);
+                    android.net.Uri uri = path.getUri();
+                    if ("file".equals(uri.getScheme())) pathString = uri.getPath();
+                } catch (Throwable ignored) {
+                }
+                callback.onResolved(path, pathString, file);
+            });
         }
 
         void loadReport(long fileId, long attemptId, boolean latest) {
@@ -698,6 +741,10 @@ public class VtHistoryActivity extends BaseActivity {
                 });
                 if (hasReport) menu.add(R.string.vt_rescan).setOnMenuItemClickListener(i -> {
                     mActivity.startAttempt(item.file.id, VtScanAttempt.TYPE_RESCAN);
+                    return true;
+                });
+                if (hasReport) menu.add(R.string.vt_install).setOnMenuItemClickListener(i -> {
+                    mActivity.requestInstall(item);
                     return true;
                 });
                 menu.add(R.string.delete).setOnMenuItemClickListener(i -> {

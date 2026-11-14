@@ -256,6 +256,30 @@ public class FeatureController {
         }
     }
 
+    /**
+     * Fork (白い熊, +083): 応用管理 is the installer again. 白い熊 had switched the Package installer
+     * feature off while a separate app did the installing; the VirusTotal dialog now installs here,
+     * and a tap on an APK anywhere should too. A switch already thrown by hand never reaches a new
+     * default, so this turns it on once. One-shot (guarded in the device-local migration prefs, which
+     * no export carries) so that switching it off again afterwards is respected.
+     */
+    @WorkerThread
+    public static void migrateInstallerBackOn(@NonNull android.content.Context context) {
+        try {
+            android.content.SharedPreferences prefs = context.getSharedPreferences(
+                    io.github.muntashirakon.AppManager.appdata.self.MigrationKit.PREF_FILE,
+                    android.content.Context.MODE_PRIVATE);
+            if (prefs.getBoolean("installer_back_on_083", false)) return;
+            FeatureController fc = getInstance();
+            if (!fc.isEnabled(FEAT_INSTALLER)) {
+                fc.modifyState(FEAT_INSTALLER, true);
+            }
+            prefs.edit().putBoolean("installer_back_on_083", true).apply();
+        } catch (Throwable th) {
+            Log.w(TAG, "Could not switch the installer back on", th);
+        }
+    }
+
     public void modifyState(@FeatureFlags int key, boolean enabled) {
         switch (key) {
             case FEAT_INSTALLER:

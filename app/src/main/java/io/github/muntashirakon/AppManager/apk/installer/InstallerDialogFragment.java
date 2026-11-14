@@ -36,17 +36,20 @@ public class InstallerDialogFragment extends DialogFragment {
     @NonNull
     @Override
     public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
-        mDialogView = View.inflate(requireContext(), R.layout.dialog_installer, null);
-        mTitleBuilder = new DialogTitleBuilder(requireContext());
+        // Fork (白い熊, +085): the fork's black-and-yellow dialog with its yellow frame. Everything
+        // is inflated from the builder's own (overlay) context so the title and body take its ink.
+        MaterialAlertDialogBuilder builder = io.github.muntashirakon.AppManager.utils.ForkDialog.builder(requireContext());
+        mDialogView = View.inflate(builder.getContext(), R.layout.dialog_installer, null);
+        mTitleBuilder = new DialogTitleBuilder(builder.getContext());
         View titleView = mTitleBuilder.build();
-        return new MaterialAlertDialogBuilder(requireContext())
+        return io.github.muntashirakon.AppManager.utils.ForkDialog.bordered(builder
                 .setCustomTitle(titleView)
                 .setView(mDialogView)
                 .setPositiveButton(" ", null)
                 .setNegativeButton(" ", null)
                 .setNeutralButton(" ", null)
                 .setCancelable(false)
-                .create();
+                .create());
     }
 
     @Nullable

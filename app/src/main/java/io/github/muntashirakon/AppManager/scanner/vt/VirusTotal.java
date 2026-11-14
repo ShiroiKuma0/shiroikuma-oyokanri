@@ -16,6 +16,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -146,8 +147,8 @@ public class VirusTotal {
                 ResponseV3<String> uploadResponse;
                 try (InputStream is = file.openInputStream()) {
                     uploadResponse = largeFile
-                            ? uploadLargeFile(filename, is)
-                            : uploadFile(filename, is);
+                            ? uploadLargeFile(filename, is, fileSize, null)
+                            : uploadFile(filename, is, fileSize, null);
                 }
                 if (uploadResponse.response != null) {
                     response.onUploadCompleted(getPermalink(checksum));
@@ -178,102 +179,126 @@ public class VirusTotal {
         }
     }
 
-    @WorkerThread
-    @NonNull
-    public ResponseV3<String> uploadFile(@NonNull String filename, @NonNull InputStream is)
-            throws IOException {
-        return uploadFile(filename, is, null);
+    /**
+     * Fork (白い熊, APK-vetting chain, item 1): reports upload progress so the scan service can show
+     * it in the notification. {@code total} is the full multipart length, not the file size.
+     */
+    public interface UploadProgressListener {
+        void onProgress(long bytesWritten, long totalBytes);
     }
 
     @WorkerThread
     @NonNull
     public ResponseV3<String> uploadFile(@NonNull String filename, @NonNull InputStream is,
-                                         @Nullable String password) throws IOException {
-        URL url = new URL(URL_FILE_UPLOAD);
-        return uploadAnyFile(url, filename, is, password);
-    }
-
-    @WorkerThread
-    @NonNull
-    public ResponseV3<String> uploadLargeFile(@NonNull String filename, @NonNull InputStream is)
+                                         long fileLength, @Nullable UploadProgressListener progress)
             throws IOException {
-        return uploadLargeFile(filename, is, null);
+        return uploadAnyFile(new URL(URL_FILE_UPLOAD), filename, is, fileLength, null, progress);
     }
 
     @WorkerThread
     @NonNull
     public ResponseV3<String> uploadLargeFile(@NonNull String filename, @NonNull InputStream is,
-                                              @Nullable String password) throws IOException {
-        // First retrieve the upload URL
+                                              long fileLength, @Nullable UploadProgressListener progress)
+            throws IOException {
+        // First retrieve the one-time upload URL
         URL url = new URL(URL_LARGE_FILE_UPLOAD);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         try {
+            applyTimeouts(connection);
             connection.setUseCaches(false);
             connection.setRequestMethod("POST");
             connection.setDoInput(true);
-            // Set headers
             connection.setRequestProperty("accept", "application/json");
             connection.setRequestProperty("x-apikey", mApiKey);
-            // Response
             int status = connection.getResponseCode();
             if (status < 300) {
-                // Success
-                // Upload the actual file
                 URL uploadUrl = getLargeFileUploadUrl(connection);
-                return uploadAnyFile(uploadUrl, filename, is, password);
-            } else {
-                // Failed
-                return new ResponseV3<>(null, getErrorResponse(connection));
+                return uploadAnyFile(uploadUrl, filename, is, fileLength, null, progress);
             }
+            return new ResponseV3<>(null, getErrorResponse(connection));
         } finally {
             connection.disconnect();
         }
     }
 
+    /**
+     * Fork (白い熊, APK-vetting chain, item 1): streams the multipart body with a fixed content
+     * length (no in-memory buffering of a 300–650 MB file), a counting copy that feeds
+     * {@code progress}, connect/read timeouts, and the plain {@code filename="…"} parameter
+     * VirusTotal's upload handler expects — never the RFC 5987 {@code filename*} form, and no bogus
+     * {@code Content-Transfer-Encoding: chunked} part header.
+     */
     @WorkerThread
     @NonNull
     public ResponseV3<String> uploadAnyFile(@NonNull URL uploadUrl, @NonNull String filename,
-                                            @NonNull InputStream is, @Nullable String password)
+                                            @NonNull InputStream is, long fileLength,
+                                            @Nullable String password,
+                                            @Nullable UploadProgressListener progress)
             throws IOException {
         HttpURLConnection connection = (HttpURLConnection) uploadUrl.openConnection();
         try {
+            applyTimeouts(connection);
             connection.setUseCaches(false);
             connection.setDoOutput(true);
             connection.setRequestMethod("POST");
             connection.setDoInput(true);
-            // Set headers
             connection.setRequestProperty("accept", "application/json");
             connection.setRequestProperty("x-apikey", mApiKey);
             connection.setRequestProperty("content-type", "multipart/form-data; boundary=" + FORM_DATA_BOUNDARY);
-            // Set form data
-            OutputStream outputStream = connection.getOutputStream();
-            if (password != null) {
-                addMultipartFormData(outputStream, "password", password);
+            byte[] passwordPart = password != null ? textPartBytes("password", password) : EMPTY;
+            byte[] fileHeader = filePartHeaderBytes(filename);
+            byte[] epilogue = epilogueBytes();
+            long total = (long) passwordPart.length + fileHeader.length + fileLength + epilogue.length;
+            // Fixed-length streaming: the whole body is written straight to the socket.
+            connection.setFixedLengthStreamingMode(total);
+            try (OutputStream os = connection.getOutputStream()) {
+                if (passwordPart.length > 0) os.write(passwordPart);
+                os.write(fileHeader);
+                copyCounting(is, os, total, fileHeader.length + passwordPart.length, progress);
+                os.write(epilogue);
+                os.flush();
             }
-            addMultipartFormData(outputStream, "file", filename, is);
-            outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
-            outputStream.write(("--" + FORM_DATA_BOUNDARY + "--\r\n").getBytes(StandardCharsets.UTF_8));
-            outputStream.flush();
-            // Response
             int status = connection.getResponseCode();
             if (status < 300) {
-                // Success
-                // Example response: {
-                //  "data": {
-                //    "type": "analysis",
-                //    "id": "base64_hash",
-                //    "links": {
-                //      "self": "https://www.virustotal.com/api/v3/analyses/base64_hash"
-                //    }
-                //  }
-                //}
+                // Example: { "data": { "type": "analysis", "id": "…" } }
                 return new ResponseV3<>(getAnalysisId(connection), null);
-            } else {
-                // Failed
-                return new ResponseV3<>(null, getErrorResponse(connection));
             }
+            return new ResponseV3<>(null, getErrorResponse(connection));
         } finally {
             connection.disconnect();
+        }
+    }
+
+    private static final byte[] EMPTY = new byte[0];
+    private static final int CONNECT_TIMEOUT_MS = 30_000;
+    private static final int READ_TIMEOUT_MS = 120_000;
+    private static final long PROGRESS_STEP_BYTES = 1_000_000L;
+
+    private static void applyTimeouts(@NonNull HttpURLConnection connection) {
+        connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        connection.setReadTimeout(READ_TIMEOUT_MS);
+    }
+
+    private static void copyCounting(@NonNull InputStream is, @NonNull OutputStream os, long total,
+                                     long preWritten, @Nullable UploadProgressListener progress)
+            throws IOException {
+        byte[] buffer = new byte[IoUtils.DEFAULT_BUFFER_SIZE];
+        long written = preWritten;
+        long lastReport = 0;
+        int length;
+        while ((length = is.read(buffer)) != -1) {
+            if (Thread.interrupted()) {
+                throw new InterruptedIOException("Upload cancelled.");
+            }
+            os.write(buffer, 0, length);
+            written += length;
+            if (progress != null && (written - lastReport >= PROGRESS_STEP_BYTES)) {
+                lastReport = written;
+                progress.onProgress(written, total);
+            }
+        }
+        if (progress != null) {
+            progress.onProgress(written, total);
         }
     }
 
@@ -283,6 +308,7 @@ public class VirusTotal {
         URL url = new URL(String.format(Locale.ROOT, URL_FILE_REPORT, id));
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         try {
+            applyTimeouts(connection);
             connection.setUseCaches(false);
             connection.setRequestMethod("GET");
             connection.setDoInput(true);
@@ -318,6 +344,7 @@ public class VirusTotal {
         URL url = new URL(String.format(Locale.ROOT, URL_FILE_ANALYSE, fileId));
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         try {
+            applyTimeouts(connection);
             connection.setUseCaches(false);
             connection.setRequestMethod("POST");
             connection.setDoInput(true);
@@ -343,6 +370,7 @@ public class VirusTotal {
         URL url = new URL(String.format(Locale.ROOT, URL_ANALYSIS, analysisId));
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         try {
+            applyTimeouts(connection);
             connection.setUseCaches(false);
             connection.setRequestMethod("GET");
             connection.setDoInput(true);
@@ -394,21 +422,108 @@ public class VirusTotal {
         }
     }
 
-    public static void addMultipartFormData(@NonNull OutputStream os, @NonNull String key, String value) throws IOException {
-        os.write(("--" + FORM_DATA_BOUNDARY + "\r\n").getBytes(StandardCharsets.UTF_8));
-        os.write(("Content-Disposition: form-data; name=\"" + key + "\"\r\n").getBytes(StandardCharsets.UTF_8));
-        os.write(("Content-Type: text/plain; charset=UTF-8\r\n").getBytes(StandardCharsets.UTF_8));
-        os.write(("\r\n" + value + "\r\n").getBytes(StandardCharsets.UTF_8));
+    @NonNull
+    private static byte[] textPartBytes(@NonNull String key, @NonNull String value) {
+        return ("--" + FORM_DATA_BOUNDARY + "\r\n"
+                + "Content-Disposition: form-data; name=\"" + key + "\"\r\n"
+                + "Content-Type: text/plain; charset=UTF-8\r\n\r\n"
+                + value + "\r\n").getBytes(StandardCharsets.UTF_8);
     }
 
-    public static void addMultipartFormData(@NonNull OutputStream os, @NonNull String key, @NonNull String filename,
-                                            @NonNull InputStream is) throws IOException {
-        os.write(("--" + FORM_DATA_BOUNDARY + "\r\n").getBytes(StandardCharsets.UTF_8));
-        os.write(("Content-Disposition: form-data; name=\"" + key + "\"; filename=\"" + filename + "\"\r\n")
-                .getBytes(StandardCharsets.UTF_8));
-        os.write(("Content-Type: application/octet-stream\r\n").getBytes(StandardCharsets.UTF_8));
-        os.write(("Content-Transfer-Encoding: chunked\r\n\r\n").getBytes(StandardCharsets.UTF_8));
-        IoUtils.copy(is, os);
+    @NonNull
+    private static byte[] filePartHeaderBytes(@NonNull String filename) {
+        // Plain filename="…" only — VirusTotal's upload handler rejects the RFC 5987 filename*
+        // form (per vt-py) — and no Content-Transfer-Encoding part header.
+        return ("--" + FORM_DATA_BOUNDARY + "\r\n"
+                + "Content-Disposition: form-data; name=\"file\"; filename=\"" + sanitizeFilename(filename) + "\"\r\n"
+                + "Content-Type: application/octet-stream\r\n\r\n").getBytes(StandardCharsets.UTF_8);
+    }
+
+    @NonNull
+    private static byte[] epilogueBytes() {
+        return ("\r\n--" + FORM_DATA_BOUNDARY + "--\r\n").getBytes(StandardCharsets.UTF_8);
+    }
+
+    @NonNull
+    private static String sanitizeFilename(@NonNull String filename) {
+        // Strip CR/LF and double quotes so they cannot break out of the quoted parameter.
+        String cleaned = filename.replaceAll("[\\r\\n\"]", "_").trim();
+        return cleaned.isEmpty() ? "file" : cleaned;
+    }
+
+    // ── API-key validation and error classification (白い熊, APK-vetting chain, item 10) ──────────
+
+    public enum KeyCheck {
+        /** The key authenticated (a report was returned, or the file was simply not found). */
+        VALID,
+        /** The key was rejected (401 / WrongCredentialsError / AuthenticationRequiredError). */
+        INVALID,
+        /** The key is fine but the quota is exhausted — never reported as a bad key. */
+        QUOTA,
+        /** Could not reach VirusTotal to decide. */
+        NETWORK_ERROR
+    }
+
+    /** The EICAR anti-malware test file's SHA-256 — always present on VirusTotal, so a lookup of it
+     *  is the fallback that tells a working key (200 or NotFound) from a rejected one (401). */
+    private static final String WELL_KNOWN_SHA256 =
+            "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f";
+
+    /**
+     * One cheap authenticated call to decide whether this instance's key works. Primary: the user
+     * object for the key itself; fallback: a lookup of a well-known file hash.
+     */
+    @WorkerThread
+    @NonNull
+    public KeyCheck checkApiKey() {
+        try {
+            URL url = new URL(API_V3_PREFIX + "/users/" + mApiKey);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            try {
+                applyTimeouts(connection);
+                connection.setUseCaches(false);
+                connection.setRequestMethod("GET");
+                connection.setDoInput(true);
+                connection.setRequestProperty("accept", "application/json");
+                connection.setRequestProperty("x-apikey", mApiKey);
+                int status = connection.getResponseCode();
+                if (status < 300) return KeyCheck.VALID;
+                VtError error = getErrorResponse(connection);
+                if (isAuthError(error)) return KeyCheck.INVALID;
+                if (isQuotaError(error)) return KeyCheck.QUOTA;
+                // Anything else (e.g. the user endpoint behaving oddly): fall through to a lookup.
+            } finally {
+                connection.disconnect();
+            }
+            ResponseV3<VtFileReport> report = fetchFileReport(WELL_KNOWN_SHA256);
+            if (report.isSuccessful()) return KeyCheck.VALID;
+            if (isAuthError(report.error)) return KeyCheck.INVALID;
+            if (isQuotaError(report.error)) return KeyCheck.QUOTA;
+            if (report.error != null && "NotFoundError".equals(report.error.code)) return KeyCheck.VALID;
+            return KeyCheck.NETWORK_ERROR;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return KeyCheck.NETWORK_ERROR;
+        }
+    }
+
+    public static boolean isAuthError(@Nullable VtError error) {
+        if (error == null) return false;
+        if (error.httpErrorCode == HttpURLConnection.HTTP_UNAUTHORIZED
+                || error.httpErrorCode == HttpURLConnection.HTTP_FORBIDDEN) {
+            return true;
+        }
+        return "WrongCredentialsError".equals(error.code)
+                || "AuthenticationRequiredError".equals(error.code)
+                || "ForbiddenError".equals(error.code)
+                || "UserNotActiveError".equals(error.code);
+    }
+
+    public static boolean isQuotaError(@Nullable VtError error) {
+        if (error == null) return false;
+        if (error.httpErrorCode == 429) return true;
+        return "QuotaExceededError".equals(error.code)
+                || "TooManyRequestsError".equals(error.code);
     }
 
     @WorkerThread

@@ -35,6 +35,7 @@ public final class VtScanCoordinator implements AutoCloseable {
 
     private final Context mContext;
     private final VtScanRepository mRepository = new VtScanRepository();
+    private final java.util.Set<Long> mConsentAsked = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
     private final ScheduledExecutorService mExecutor = Executors.newSingleThreadScheduledExecutor();
 
     public VtScanCoordinator(@NonNull Context context) {
@@ -79,6 +80,7 @@ public final class VtScanCoordinator implements AutoCloseable {
             return;
         }
         if (VtScanAttempt.STATUS_PENDING_CONSENT.equals(attempt.status)) {
+            mConsentAsked.add(attempt.id);
             callback.onConsentRequired(attempt, observed.file);
         } else {
             callback.onQueued(attempt);
@@ -119,6 +121,18 @@ public final class VtScanCoordinator implements AutoCloseable {
         } else if (VtScanAttempt.STATUS_FAILED.equals(attempt.status)
                 || VtScanAttempt.STATUS_CANCELLED.equals(attempt.status)) {
             callback.onFailed(attempt.errorMessage);
+        } else if (VtScanAttempt.STATUS_PENDING_CONSENT.equals(attempt.status)) {
+            // Fork (白い熊, +084): consent is now asked AFTER the lookup, so it can turn up here.
+            VtFile file = mRepository.getFile(attempt.fileId);
+            if (file == null) {
+                callback.onFailed("VirusTotal scan was removed.");
+                return;
+            }
+            // Ask once, then keep watching: approval re-queues this same attempt.
+            if (mConsentAsked.add(attemptId)) callback.onConsentRequired(attempt, file);
+            if (!mExecutor.isShutdown()) {
+                mExecutor.schedule(() -> poll(attemptId, callback), 500, TimeUnit.MILLISECONDS);
+            }
         } else if (!mExecutor.isShutdown()) {
             // Schedule one poll after the previous one finishes
             mExecutor.schedule(() -> poll(attemptId, callback), 500, TimeUnit.MILLISECONDS);

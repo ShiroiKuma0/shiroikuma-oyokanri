@@ -290,14 +290,27 @@ public class ProcessMonitorActivity extends BaseActivity {
         // Fork (白い熊, +062): the leaking apps are no longer listed here as text — they are shown as
         // ordinary cards, pinned at the top of the list, with the leak note and a kill (+ restart)
         // button. The header just says how many, so the stats and the count stay together.
-        if (h.suspects.isEmpty()) {
+        // Fork (白い熊 / 地図, 2026-11-12): only a genuine leak (retained screens or growing GPU) is
+        // called leaking; a heavy-but-steady GPU app is counted and named separately, calmly.
+        int leaking = 0;
+        for (SystemHealth.Suspect s : h.suspects) if (s.isLeak()) leaking++;
+        int heavy = h.suspects.size() - leaking;
+        if (leaking == 0 && heavy == 0) {
             addHealthLine(getString(R.string.monitor_health_clean), dim,
                     v -> showHealthExplain(R.string.monitor_health_title_leak, R.string.monitor_health_explain_leak));
         } else {
-            android.widget.LinearLayout leak = addHealthRow();
-            addHealthPill(leak, getResources().getQuantityString(R.plurals.monitor_health_leak_summary,
-                            h.suspects.size(), h.suspects.size()), warn,
-                    R.string.monitor_health_title_leak, R.string.monitor_health_explain_leak);
+            if (leaking > 0) {
+                android.widget.LinearLayout leak = addHealthRow();
+                addHealthPill(leak, getResources().getQuantityString(R.plurals.monitor_health_leak_summary,
+                                leaking, leaking), warn,
+                        R.string.monitor_health_title_leak, R.string.monitor_health_explain_leak);
+            }
+            if (heavy > 0) {
+                addHealthLine(getResources().getQuantityString(R.plurals.monitor_health_heavy_summary,
+                                heavy, heavy), dim,
+                        v -> showHealthExplain(R.string.monitor_health_title_heavy,
+                                R.string.monitor_health_explain_heavy));
+            }
         }
     }
 

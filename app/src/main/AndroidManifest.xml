@@ -183,6 +183,11 @@
     <queries>
         <package android:name="shiroikuma.shizuku" />
         <package android:name="moe.shizuku.privileged.api" />
+        <!-- Fork (白い熊, APK-vetting chain): the universal installer the Install pill hands off to,
+             and the file manager that sends scan requests. resolveActivity for the Install intent
+             must see the installer even though QUERY_ALL_PACKAGES is already held. -->
+        <package android:name="shiroikuma.universalinstaller" />
+        <package android:name="shiroikuma.shoruikanri" />
     </queries>
 
     <application
@@ -490,6 +495,24 @@
                 <data
                     android:mimeType="*/*"
                     android:scheme="content" />
+            </intent-filter>
+        </activity>
+        <!-- Fork (白い熊, APK-vetting chain): the scan-and-report home. Exported for the VT_SCAN
+             contract (the file manager and the installer target it by explicit component; the
+             action filter is kept per the sub-plan). It stays a separate, always-enabled component
+             from VtHistoryActivity (which FeatureController toggles), so a scan request keeps
+             working whatever the feature switches say. -->
+        <activity
+            android:name=".scanner.vt.VtReportActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:exported="true"
+            android:label="@string/virus_total"
+            android:launchMode="singleTop"
+            android:theme="@style/AppTheme.YellowOnBlack.Floating">
+            <intent-filter>
+                <action android:name="shiroikuma.oyokanri.action.VT_SCAN" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
             </intent-filter>
         </activity>
         <activity

@@ -228,8 +228,10 @@ public class ProcessDetailActivity extends BaseActivity {
         header(rows, "App objects");
         Long gfx = o.get("Graphics");
         if (gfx != null) {
+            // A large GPU footprint is noted, not judged: steady high GPU use (a 3D map, a game) is
+            // normal and is not a leak — only retained screens or growth are (白い熊 / 地図, 2026-11-12).
             row(rows, "GPU memory", Formatter.formatShortFileSize(this, gfx * 1024L)
-                    + (gfx * 1024L >= SystemHealth.GRAPHICS_HIGH_BYTES ? "  — unusually large" : ""));
+                    + (gfx * 1024L >= SystemHealth.GRAPHICS_HIGH_BYTES ? "  — large (normal for maps and games)" : ""));
         }
         Long act = o.get("Activities"), win = o.get("ViewRootImpl");
         if (act != null && win != null) {

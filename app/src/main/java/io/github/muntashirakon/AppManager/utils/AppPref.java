@@ -161,6 +161,9 @@ public class AppPref {
 
         PREF_VIRUS_TOTAL_API_KEY_STR,
         PREF_VIRUS_TOTAL_PROMPT_BEFORE_UPLOADING_BOOL,
+        // Fork (白い熊, APK-vetting chain): upload only on Wi-Fi, and the rescan-age threshold (days).
+        PREF_VIRUS_TOTAL_WIFI_ONLY_BOOL,
+        PREF_VIRUS_TOTAL_RESCAN_AGE_DAYS_INT,
 
         PREF_USE_SYSTEM_FONT_BOOL,
         PREF_ZIP_ALIGN_BOOL,
@@ -441,6 +444,10 @@ public class AppPref {
             case PREF_SHIZUKU_AUTO_RECHECKED_BOOL:
             case PREF_FREEZE_TYPE_MIGRATED_ADV_SUSPEND_BOOL:
             case PREF_FREEZE_TYPE_MIGRATED_TOTAL_BOOL:
+            // Fork (白い熊, APK-vetting chain): unknown files upload automatically, so the
+            // prompt-before-upload flag defaults OFF; Wi-Fi-only is off by default too.
+            case PREF_VIRUS_TOTAL_PROMPT_BEFORE_UPLOADING_BOOL:
+            case PREF_VIRUS_TOTAL_WIFI_ONLY_BOOL:
                 return false;
             case PREF_APP_OP_SHOW_DEFAULT_BOOL:
             case PREF_SHOW_DISCLAIMER_BOOL:
@@ -449,7 +456,6 @@ public class AppPref {
             case PREF_INSTALLER_DISPLAY_CHANGES_BOOL:
             case PREF_INSTALLER_SET_ORIGIN_BOOL:
             case PREF_INSTALLER_UPDATE_OWNERSHIP_BOOL:
-            case PREF_VIRUS_TOTAL_PROMPT_BEFORE_UPLOADING_BOOL:
             case PREF_ZIP_ALIGN_BOOL:
             case PREF_SEND_NOTIFICATIONS_TO_CONNECTED_DEVICES_BOOL:
             case PREF_ENABLE_AUTO_LOCK_BOOL:
@@ -459,6 +465,9 @@ public class AppPref {
             case PREF_APP_THEME_CUSTOM_INT:
             case PREF_TIPS_PREFS_INT:
                 return 0;
+            // Fork (白い熊, APK-vetting chain): default rescan-age threshold, 30 days.
+            case PREF_VIRUS_TOTAL_RESCAN_AGE_DAYS_INT:
+                return 30;
             case PREF_LAST_VERSION_CODE_LONG:
             case PREF_DISPLAY_CHANGELOG_LAST_VERSION_LONG:
                 return 0L;

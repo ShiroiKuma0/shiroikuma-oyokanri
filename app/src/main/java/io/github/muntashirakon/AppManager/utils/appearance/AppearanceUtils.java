@@ -149,7 +149,14 @@ public final class AppearanceUtils {
                     // activity's onCreate, and setting android:theme in the
                     // manifest would otherwise be wiped by the generic
                     // getAppTheme() call in the else branch.
-                    theme = R.style.AppTheme_YellowOnBlack;
+                    // Fork (白い熊, +081): the VirusTotal report is a framed dialog — same
+                    // palette, translucent window.
+                    theme = activity instanceof io.github.muntashirakon.AppManager.scanner.vt.VtReportActivity
+                            ? R.style.AppTheme_YellowOnBlack_Floating
+                            // Fork (白い熊, +085): the installer's dialogs, on a see-through window.
+                            : activity instanceof io.github.muntashirakon.AppManager.apk.installer.PackageInstallerActivity
+                            ? R.style.AppTheme_YellowOnBlack_Transparent
+                            : R.style.AppTheme_YellowOnBlack;
                 } else {
                     boolean transparentBackground = ((PerProcessActivity) activity).getTransparentBackground();
                     theme = transparentBackground
@@ -197,6 +204,8 @@ public final class AppearanceUtils {
                     || activity instanceof BatteryAppDetailActivity
                     || activity instanceof AppUsageActivity
                     || activity instanceof FinderActivity
+                    || activity instanceof io.github.muntashirakon.AppManager.scanner.vt.VtReportActivity
+                    || activity instanceof io.github.muntashirakon.AppManager.apk.installer.PackageInstallerActivity
                     || activity instanceof MainActivity;
         }
 

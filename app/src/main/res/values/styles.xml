@@ -173,6 +173,34 @@
         <item name="elevationOverlayColor">@android:color/black</item>
     </style>
 
+    <!-- Fork (白い熊, +081): the VirusTotal report is a framed, almost page-big DIALOG over whatever
+         asked for the scan, not a page of its own. The window is translucent and dimmed; the rounded
+         yellow frame is the layout's own panel (painted in code — the ink is configurable).
+         Must be the MANIFEST theme too: the system decides from the manifest whether to keep
+         drawing the activity underneath. -->
+    <!-- Fork (白い熊, +085): the package installer's window is see-through (only its dialog shows),
+         and that dialog is the fork's black-and-yellow one. The transparent items are the same ones
+         libcore's AppTheme.TransparentBackground sets. -->
+    <style name="AppTheme.YellowOnBlack.Transparent">
+        <item name="android:background">@null</item>
+        <item name="background">@null</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:colorBackgroundCacheHint">@null</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+
+    <style name="AppTheme.YellowOnBlack.Floating">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:backgroundDimAmount">0.72</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.Dialog</item>
+    </style>
+
+
     <!-- Dialog theme overlay for MaterialAlertDialogs under
          AppTheme.YellowOnBlack. The default M3 dialog window background is a
          MaterialShapeDrawable with a tonal elevation overlay, which on a

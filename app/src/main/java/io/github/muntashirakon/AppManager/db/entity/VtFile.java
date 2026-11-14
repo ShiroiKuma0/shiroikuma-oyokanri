@@ -69,6 +69,23 @@ public class VtFile {
     @ColumnInfo(name = "local_analysis_json")
     public String localAnalysisJson;
 
+    // Fork (白い熊, APK-vetting chain): when > 0, the epoch-ms at which the one-shot post-upload
+    // auto-refresh becomes due (set ~3–7 days after a fresh first-seen upload; cleared to 0 once
+    // the refresh fires). See VtScanRepository.enqueueDueAutoRefreshes.
+    @ColumnInfo(name = "auto_refresh_at", defaultValue = "0")
+    public long autoRefreshAt;
+
+    // Fork (白い熊, APK-vetting chain, bundles): this row is a bundle container (.apks/.xapk/.apkm)
+    // whose verdict is synthesised from its parts; it is never itself uploaded.
+    @ColumnInfo(name = "is_bundle", defaultValue = "0")
+    public boolean isBundle;
+
+    // Fork (白い熊, APK-vetting chain, bundles): for a part extracted from a bundle, the SHA-256 of
+    // the containing bundle; null for a standalone file and for a bundle container itself.
+    @Nullable
+    @ColumnInfo(name = "bundle_of")
+    public String bundleOf;
+
     @ColumnInfo(name = "last_accessed_at")
     public long lastAccessedAt;
 
