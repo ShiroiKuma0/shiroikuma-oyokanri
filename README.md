@@ -25,9 +25,9 @@ actions**, readable **per-app backups**, a **remote-triggerable settings export*
 **battery-exemption toggle** and an **EMUI startup-manager hand-off** to the automation sister app,
 and the **AM Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.1+2026-11-03.19-47.gdc4154f4+091`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.1+2026-11-03.19-47.gdc4154f4+093`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
-<sub>Version reads as **upstream `4.1.1`**, rebased onto upstream commit **`dc4154f4` of 2026-11-03 19:47 UTC**, fork build **091**.</sub>
+<sub>Version reads as **upstream `4.1.1`**, rebased onto upstream commit **`dc4154f4` of 2026-11-03 19:47 UTC**, fork build **093**.</sub>
 
 </div>
 

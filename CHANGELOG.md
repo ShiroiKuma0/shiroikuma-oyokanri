@@ -10,6 +10,32 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-11-03.19-47.gdc4154f4+093 — 2026-11-14
+
+Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.
+A small release that makes the VirusTotal report speak **one vocabulary**. The verdict card could
+read "Riskware only" while the tile, the filter pill and the engine row beneath it read "Malicious"
+in red — for the very same engine. VirusTotal files every detection under its raw "malicious"
+category whatever the label says; the verdict reads the label itself. Everything under the verdict
+card now uses the verdict's reading.
+
+### VirusTotal report
+
+- **The bucket is "Flagged"**, on the count tile and on the full report's filter pill, matching the
+  ring's "1/75 flagged". VirusTotal's raw category name no longer appears.
+- **Each engine row's badge is the class of its label**: "Riskware" for riskware / repack / patcher /
+  PUA-class labels, "Malware" for anything else the engine detected.
+- **Colour follows the worst class in the bucket**: the tile, the filter pill and the ring's sliver
+  are amber when every flag is riskware-class and red only when at least one is not.
+- **Sandbox rows follow the same rule**: a run filed as malicious whose every classification and
+  name is riskware-class (greyware included) reads "Riskware" in amber, otherwise "Malware" in red;
+  a run that names nothing stays "Malware". "Suspicious" and "Clean" replace the raw lowercase words.
+- The verdict rules themselves are unchanged.
+
+### Packaging
+
+- Signed `arm64-v8a` release APK: `shiroikuma-oyokanri_4.1.1+2026-11-03.19-47.gdc4154f4+093_arm64-v8a.apk`.
+
 ## 4.1.1+2026-11-03.19-47.gdc4154f4+091 — 2026-11-14
 
 Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.
