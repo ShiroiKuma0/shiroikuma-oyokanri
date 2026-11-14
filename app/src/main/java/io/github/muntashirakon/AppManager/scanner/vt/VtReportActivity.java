@@ -120,7 +120,7 @@ public class VtReportActivity extends BaseActivity {
     private VtReportViewModel.State mLastState;
     private boolean mShowAllEngines;
     // Fork (白い熊, +084): the full report is a second page of this same dialog. SUMMARY = the
-    // verdict page; ALL or a category index (0 malicious · 1 suspicious · 2 clean · 3 no answer)
+    // verdict page; ALL or a category index (0 flagged · 1 suspicious · 2 clean · 3 no answer)
     // = the full report filtered to it.
     private static final int PAGE_SUMMARY = -2;
     private static final int FILTER_ALL = -1;
@@ -677,7 +677,7 @@ public class VtReportActivity extends BaseActivity {
         if (report != null) {
             int[] c = countEngines(report);
             gauge.showResult(new int[]{c[0], c[1], c[2], c[3]},
-                    new int[]{danger(), warn(), safe(), RowPills.withAlpha(dim(), 0.55f)},
+                    new int[]{flaggedColor(report), warn(), safe(), RowPills.withAlpha(dim(), 0.55f)},
                     (c[0] + c[1]) + "/" + (c[0] + c[1] + c[2] + c[3]), color,
                     getString(R.string.vt_gauge_flagged));
         } else {
@@ -712,7 +712,7 @@ public class VtReportActivity extends BaseActivity {
         return box;
     }
 
-    /** malicious · suspicious · clean (undetected + harmless) · no answer. */
+    /** flagged (VirusTotal's "malicious") · suspicious · clean (undetected + harmless) · no answer. */
     @NonNull
     private static int[] countEngines(@NonNull VtFileReport report) {
         int[] c = new int[4];
@@ -738,9 +738,9 @@ public class VtReportActivity extends BaseActivity {
 
     private void addStatTiles(@NonNull VtFileReport report) {
         int[] c = countEngines(report);
-        int[] labels = {R.string.vt_stat_malicious, R.string.vt_stat_suspicious, R.string.vt_stat_clean,
+        int[] labels = {R.string.vt_stat_flagged, R.string.vt_stat_suspicious, R.string.vt_stat_clean,
                 R.string.vt_stat_no_answer};
-        int[] colors = {danger(), warn(), safe(), dim()};
+        int[] colors = {flaggedColor(report), warn(), safe(), dim()};
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         for (int i = 0; i < 4; ++i) {
@@ -803,7 +803,25 @@ public class VtReportActivity extends BaseActivity {
     }
 
     /**
-     * Everything VirusTotal returned, in colour: a filter strip over the engines (all · malicious ·
+     * Fork: the colour of the "Flagged" bucket is the worst class INSIDE it, by our own reading of
+     * each label ({@link VtVerdict#classify}) — red only when at least one engine names something
+     * other than riskware/patcher/PUA noise. VirusTotal files every detection under "malicious"
+     * whatever the label says, so colouring by that raw category painted a red "Malicious 1"
+     * beside a verdict card that read "Riskware only" for the very same engine.
+     */
+    @ColorInt
+    private int flaggedColor(@NonNull VtFileReport report) {
+        for (VtAvEngineResult r : report.results) {
+            if (r.category == VtAvEngineResult.CAT_MALICIOUS
+                    && VtVerdict.classify(r.result) != VtVerdict.LabelClass.NOISE) {
+                return danger();
+            }
+        }
+        return warn();
+    }
+
+    /**
+     * Everything VirusTotal returned, in colour: a filter strip over the engines (all · flagged ·
      * suspicious · clean · no answer), one row per engine with its verdict, label, version and
      * signature date, and — on "All" — the threat classification, sandbox verdicts, permissions
      * and signing certificate VirusTotal extracted from the file.
@@ -821,11 +839,12 @@ public class VtReportActivity extends BaseActivity {
         scroller.setHorizontalScrollBarEnabled(false);
         LinearLayout strip = new LinearLayout(this);
         strip.setOrientation(LinearLayout.HORIZONTAL);
-        int[] labels = {R.string.vt_stat_malicious, R.string.vt_stat_suspicious, R.string.vt_stat_clean,
+        int[] labels = {R.string.vt_stat_flagged, R.string.vt_stat_suspicious, R.string.vt_stat_clean,
                 R.string.vt_stat_no_answer};
         strip.addView(filterChip(getString(R.string.vt_filter_all) + "  " + total, accent(), FILTER_ALL));
         for (int i = 0; i < 4; ++i) {
-            strip.addView(filterChip(getString(labels[i]) + "  " + counts[i], categoryColor(i), i));
+            strip.addView(filterChip(getString(labels[i]) + "  " + counts[i],
+                    i == 0 ? flaggedColor(report) : categoryColor(i), i));
         }
         scroller.addView(strip);
         LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(
@@ -886,7 +905,11 @@ public class VtReportActivity extends BaseActivity {
         if (category <= 1 && VtVerdict.classify(r.result) == VtVerdict.LabelClass.NOISE) color = warn();
         String word;
         switch (r.category) {
-            case VtAvEngineResult.CAT_MALICIOUS: word = getString(R.string.vt_stat_malicious); break;
+            // Fork: our class of the label, never VirusTotal's raw category name.
+            case VtAvEngineResult.CAT_MALICIOUS:
+                word = getString(VtVerdict.classify(r.result) == VtVerdict.LabelClass.NOISE
+                        ? R.string.vt_engine_riskware : R.string.vt_engine_malware);
+                break;
             case VtAvEngineResult.CAT_SUSPICIOUS: word = getString(R.string.vt_stat_suspicious); break;
             case VtAvEngineResult.CAT_UNDETECTED:
             case VtAvEngineResult.CAT_HARMLESS: word = getString(R.string.vt_engine_clean); break;
@@ -950,6 +973,28 @@ public class VtReportActivity extends BaseActivity {
         return row;
     }
 
+    /**
+     * Fork: whether everything a sandbox named is riskware-class. A sandbox that names nothing at
+     * all is NOT noise — a bare "malicious" with no label is the sandbox's whole statement, where
+     * for an engine a missing label is merely a missing detail.
+     */
+    private static boolean sandboxIsNoise(@NonNull JSONObject verdict) {
+        boolean any = false;
+        for (String key : new String[]{"malware_classification", "malware_names"}) {
+            JSONArray arr = verdict.optJSONArray(key);
+            if (arr == null) continue;
+            for (int i = 0; i < arr.length(); ++i) {
+                String label = arr.optString(i, "");
+                if (label.isEmpty()) continue;
+                any = true;
+                String l = label.toLowerCase(java.util.Locale.ROOT);
+                boolean grey = l.contains("greyware") || l.contains("grayware");
+                if (!grey && VtVerdict.classify(label) != VtVerdict.LabelClass.NOISE) return false;
+            }
+        }
+        return any;
+    }
+
     /** What VirusTotal says beyond the engines — shown on the "All" filter. */
     private void addFullExtras(@NonNull VtReportViewModel.State state) {
         JSONObject attrs = state.attrs;
@@ -982,9 +1027,26 @@ public class VtReportActivity extends BaseActivity {
                 JSONObject v = sandboxes.optJSONObject(name);
                 if (v == null) continue;
                 String category = v.optString("category", "?");
-                int color = "malicious".equals(category) ? danger() : "suspicious".equals(category) ? warn()
-                        : "harmless".equals(category) || "undetected".equals(category) ? safe() : dim();
-                mContent.addView(coloredRow(color, name, category,
+                // Fork: as for the engines — our class of what the sandbox named, never
+                // VirusTotal's raw category word. A "malicious" run whose every classification
+                // and name is riskware-class reads Riskware, in amber.
+                int color;
+                String word;
+                if ("malicious".equals(category)) {
+                    boolean noise = sandboxIsNoise(v);
+                    color = noise ? warn() : danger();
+                    word = getString(noise ? R.string.vt_engine_riskware : R.string.vt_engine_malware);
+                } else if ("suspicious".equals(category)) {
+                    color = warn();
+                    word = getString(R.string.vt_stat_suspicious);
+                } else if ("harmless".equals(category) || "undetected".equals(category)) {
+                    color = safe();
+                    word = getString(R.string.vt_engine_clean);
+                } else {
+                    color = dim();
+                    word = category;
+                }
+                mContent.addView(coloredRow(color, name, word,
                         joinArray(v.optJSONArray("malware_classification"), 8), null));
             }
         }

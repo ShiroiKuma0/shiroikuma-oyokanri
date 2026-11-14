@@ -1732,7 +1732,11 @@
     <string name="vt_next_try">Next try at %s</string>
     <string name="vt_gauge_flagged">flagged</string>
     <string name="vt_gauge_engines">engines</string>
-    <string name="vt_stat_malicious">Malicious</string>
+    <!-- Fork: the bucket VirusTotal calls "malicious" holds every detection, riskware included,
+         so it is named for what it is; each engine row then says which kind (riskware / malware). -->
+    <string name="vt_stat_flagged">Flagged</string>
+    <string name="vt_engine_riskware">Riskware</string>
+    <string name="vt_engine_malware">Malware</string>
     <string name="vt_stat_suspicious">Suspicious</string>
     <string name="vt_stat_clean">Clean</string>
     <string name="vt_stat_no_answer">No answer</string>
