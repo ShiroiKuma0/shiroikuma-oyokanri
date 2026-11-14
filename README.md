@@ -25,9 +25,9 @@ actions**, readable **per-app backups**, a **remote-triggerable settings export*
 **battery-exemption toggle** and an **EMUI startup-manager hand-off** to the automation sister app,
 and the **AM Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.1+2026-11-03.19-47.gdc4154f4+078`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.1+2026-11-03.19-47.gdc4154f4+091`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
-<sub>Version reads as **upstream `4.1.1`**, rebased onto upstream commit **`dc4154f4` of 2026-11-03 19:47 UTC**, fork build **078**.</sub>
+<sub>Version reads as **upstream `4.1.1`**, rebased onto upstream commit **`dc4154f4` of 2026-11-03 19:47 UTC**, fork build **091**.</sub>
 
 </div>
 
@@ -527,6 +527,22 @@ nothing.
   latest export at a glance, then export or restore any mix of seven categories (general settings,
   colours & fonts, monitor, toolbar & filters, notes, anti-snooping settings, profiles) — so a new install comes up looking
   and behaving exactly like the old one.
+
+## 🛡️ VirusTotal scan-and-report — vet an APK before it is installed
+
+Tap an APK in the file manager and it opens here, in one framed dialog that says what the file
+**is** before anything is uploaded: the app's icon and name, the version already installed against
+the version in the file, and a filled pill naming it a new install, an update, the same version, or
+a **downgrade** in red. Then the scan: a hash lookup first (nothing is uploaded for a file
+VirusTotal already knows), an upload with live progress only when it does not and you agree, and a
+verdict that tells a crack's riskware labels from a real threat — one vote per engine family, with
+a ring of flagged-against-total engines.
+
+Tap the verdict or any count tile for the **full report** in colour: every engine with its label,
+version and signature date behind a filter strip, plus the threat classification, sandbox verdicts,
+signing certificate and permissions VirusTotal extracted. A failed scan names its reason and offers
+Retry. The install button is the decision — the app's own installer carries on without asking the
+same question twice, and still stops for a signature mismatch or a data-losing downgrade.
 
 ## 🏪 Per-app install source — restore a banking app that refuses to run
 

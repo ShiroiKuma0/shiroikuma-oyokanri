@@ -10,6 +10,69 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-11-03.19-47.gdc4154f4+091 — 2026-11-14
+
+Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.
+This release makes the app the place an APK is **vetted and installed**: tap a file in the file
+manager, see what it is and what VirusTotal says, and install it from the same dialog.
+
+### VirusTotal scan-and-report
+
+- **One framed dialog** answers the scan request (`shiroikuma.oyokanri.action.VT_SCAN`), the scanner
+  card, the history rows and the scan notification. Almost page-big, rounded yellow frame, dimmed
+  background.
+- **What the file is, before anything is uploaded**: app icon, name, package, installed version →
+  the file's version, size, and a filled pill — new install, update, same version already installed
+  (green), or downgrade (red).
+- **Lookup first, ask second.** A hash lookup uploads nothing, so a file VirusTotal already knows
+  shows its report unasked; the upload question appears only for a file it really does not know.
+- **Visible progress**: a ring with the upload percentage, the stage in words, bytes sent, elapsed
+  time, and a Look up → Upload → Analyse → Report ladder. A scan waiting on quota or Wi-Fi says so
+  and when it retries.
+- **A verdict, not a count**: one vote per engine family; riskware/patcher/adware labels are told
+  apart from banker/spy/stealer/RAT/ransom and named families; sandbox verdicts and VirusTotal's own
+  threat classification are read too. Malicious · Suspicious · Riskware only · Clean · Clean
+  (provisional) · Incomplete · Not analysed.
+- **The full report in colour**, a second page of the same dialog: a filter strip (all · malicious ·
+  suspicious · clean · no answer) over one row per engine with its label, version and signature
+  date; threat categories and family names; sandbox verdicts; app facts; the signing certificate;
+  every permission, dangerous ones first.
+- **Every decision at the foot of the dialog**: the state's actions in one row, a full-width Cancel
+  beneath. No second pop-up.
+- **Reliable large uploads** (streamed with a fixed length, up to 650 MB), bundles (`.apks` /
+  `.xapk` / `.apkm`) unpacked and scanned part by part, attempts that **park** on quota, Wi-Fi-only
+  or a missing key instead of failing, a one-shot refresh a few days after an upload, and the API
+  key stored encrypted and asked for in place when it is missing.
+- **Failures are named.** A scan that ended without a report shows the attempt's own error with
+  Retry. The analysis wait is 30 minutes (a large APK routinely outlasted the old 10), and a file
+  VirusTotal knows but has not finished analysing is waited for rather than reported as
+  “request failed”.
+
+### Install from the same dialog
+
+- The install button (Install / Update / Reinstall / Downgrade) starts **this app's own installer**,
+  which skips its what's-new and confirmation steps for a decision already made — and still asks
+  about bundle splits, a downgrade that needs an uninstall, and a signature mismatch.
+- The **Package installer** feature is switched back on once on first start of this build.
+- Installing here means the **per-app install source** applies again.
+- **Installer dialogs redrawn** in black and yellow with the yellow frame: progress and result show
+  the app icon inside a ring, a filled “App installed” / “Not installed” pill and the platform's raw
+  status beneath. The installer options, what's-new, “Determining working mode…” and generic
+  progress dialogs get the frame too.
+
+### Process monitor
+
+- **Steady high GPU memory is no longer called a leak.** A leak is screens kept after they were
+  destroyed, or GPU memory that keeps growing — never the absolute size. A heavy but steady renderer
+  (a 3D map, a game) is marked **HIGH GPU**, is not pinned to the top, and is not offered the
+  force-stop-and-relaunch pill.
+
+### Fixes
+
+- **“Cancel scan” crashed the app** (a database write on the main thread, replayed when the service
+  restarted).
+- The report's quiet text was drawn in a near-black colour on black, hiding a failed scan entirely.
+
 ## 4.1.1+2026-11-03.19-47.gdc4154f4+078 — 2026-11-10
 
 Rebased onto a fresher App Manager **4.1.1** master — upstream commit `dc4154f4` of 2026-11-03, up
