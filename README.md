@@ -25,9 +25,9 @@ actions**, readable **per-app backups**, a **remote-triggerable settings export*
 **battery-exemption toggle** and an **EMUI startup-manager hand-off** to the automation sister app,
 and the **AM Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.1+2026-11-03.19-47.gdc4154f4+093`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.1+2026-11-03.19-47.gdc4154f4+107`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
-<sub>Version reads as **upstream `4.1.1`**, rebased onto upstream commit **`dc4154f4` of 2026-11-03 19:47 UTC**, fork build **093**.</sub>
+<sub>Version reads as **upstream `4.1.1`**, rebased onto upstream commit **`dc4154f4` of 2026-11-03 19:47 UTC**, fork build **107**.</sub>
 
 </div>
 
@@ -222,6 +222,12 @@ Changes apply live the moment you leave the screen, and a reference **legend** e
 colour and style means. A four-state main list — installed, frozen (snowflake + cool film), stopped,
 uninstalled (dimmed + mauve film) — reads at a glance, with type-coloured italic labels.
 
+**Menus and switches follow the same rule as buttons.** Every row of every menu — popup, long-press,
+submenu, the toolbar overflow — that does something is a full-width outlined pill with its icon
+inside and a › when it opens something; a destructive row takes the warning colour; a toggle row
+carries an outlined switch, never a checkbox. Every switch is an outline with one solid dot, bright
+when on and a darker yellow when off — nothing is ever filled.
+
 ## 🧊 A freeze that closes every gate — and four switches to choose how many
 
 Stock freezes an app one way and stops there. This one applies **every gate the phone allows, at
@@ -365,6 +371,13 @@ A from-scratch replacement for the legacy "Running apps" screen, built for actua
   figure looks fine. A leaking app is drawn as an ordinary row pinned at the top, killable (and
   **restartable** even when protected); every figure in the header is a **tappable pill** that
   explains itself in a dialog.
+- A **process-start watch** for the failure no memory figure shows: after weeks of uptime the kernel
+  runs out of room for the security filter every new process needs, and apps die the moment they
+  start while gigabytes are free. The monitor probes it with two real test processes, records each
+  burst with what led up to it, raises an alert with a one-tap **Free memory** that ends cached apps
+  until starts work again, and measures the **filter-program room** itself — a page of its own with
+  a chart, the bursts shaded on it, a second curve to hold against it, the trend per day and the days
+  left before a restart is due.
 
 ## ⏯️ A full page for a running batch, and a log that survives it
 

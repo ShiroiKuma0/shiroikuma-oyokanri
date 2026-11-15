@@ -10,6 +10,100 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-11-03.19-47.gdc4154f4+107 — 2026-11-15
+
+Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.
+This release finds, proves and watches a failure no memory figure shows. After 63 days of uptime
+the phone could no longer start processes in bursts: every new app died with "Could not set seccomp
+filter … Out of memory" while gigabytes were free. The cause is the kernel's **pool for filter
+programs** — about 1,500 on this phone, one held by every app process — being full: with no room
+left every request is refused, and the moment one program is given back exactly one new one is
+accepted. Only a restart returns what was lost. The release also brings the black-yellow theme's
+menu and switch rules to every menu and every switch.
+
+### Process starts — the watch
+
+- **A probe with two real processes.** An isolated and an ordinary process of the app are started
+  side by side, taking turns at going first; a connection proves a process can start, a time-out
+  that it cannot. Each kills itself when released, so every probe forks anew.
+- **Episodes.** A failure in the system log or a failed probe opens an episode: probes every 15
+  seconds, a pre-trigger buffer of the ten minutes before, kernel snapshots (memory, paging, slab
+  caches, control groups, pressure) and their differences, and the log lines around each failure.
+- **A background watch**, opt-in, as a foreground service that survives the app being closed and
+  restarts at boot. It probes every five minutes while all is well.
+- **An alert with Free memory.** One tap ends the apps the system itself lists as cached — only
+  those whose every process is cached — in two random halves with a probe after each, sparing the
+  second half when the first already cured it. The permanent notification carries the button too
+  while starts fail. 雫, 自由作業盤 and this app are never ended.
+- **In the monitor:** a process-start pill in the health header, the main pill in the warning colour
+  while starts fail, with a panel of its own — state, the two test processes, failure counts, the
+  figures, the apps that crashed with it — and **Free memory**, **Choose apps…**, **Probe**.
+
+### Process starts — the cause, measured
+
+- **The kernel-call probe.** A throwaway child of the app makes the failing call itself — a filter of
+  one and of 224 instructions — beside a neighbouring call that draws on the per-CPU pool. It showed
+  that the kernel refuses every caller, that filter size is irrelevant and that the per-CPU pool is
+  not involved.
+- **Filter programs on plain sockets, with a reserve.** The same kind of program on a UDP socket
+  needs no new process and leaves nothing behind. One is held while the phone is healthy and
+  released when every request is refused: the very next request is then accepted.
+- **The filter-program room**, measured three ways: a quick reading of up to six every half hour, a
+  reading to the end once a day and after each restart, and a churn test (2,000 programs created and
+  released, room before and after).
+- **A page for it:** the room as one large figure with a bar against the pool at its fullest, six
+  tiles, a chart of the room over time with bursts shaded on it, a second curve to hold against it
+  (app processes, processes, creations, mounts, kernel memory), ranges that reach back across
+  restarts, the burst list, and every reading with **Show all**.
+- **A Filter room pill** in the monitor's header, in the warning colour when fewer than 64 are left.
+
+### Kernel memory
+
+- **A growth record** every ten minutes: memory figures, exact object counts of the main caches,
+  activity in the interval (creations, context switches, packets per interface) and the phone's
+  state (screen, charging, USB, Wi-Fi, VPN, Bluetooth, car, displays, top app), a marker at each
+  boot and a full snapshot daily.
+- **A comparison tool** — snapshot, change one thing, compare — and a **report**: totals and hourly
+  rates since the boot, how closely growth follows each activity counter, and the rate with each
+  state on and off.
+
+### Diagnostics
+
+- A **Diagnostics** section in the UI settings: process-start failures, kernel memory growth and
+  filter-program room, each behind its own switch and off by default; stored size and span, keep for
+  N days, export to a dated directory, share, purge behind a warning, and a recording notification
+  with **Mark** and **Turn all off**. Files are `.txt` in the app's own diag directory.
+
+### Black-yellow theme
+
+- **Menus.** Every row of every popup menu, long-press menu, submenu and toolbar overflow that does
+  something is a full-width outlined pill with its icon inside; a › when it opens something; the
+  warning colour when it deletes; dimmed when disabled. A toggle row stays plain with an outlined
+  switch, never a checkbox. Group dividers are a clear line as wide as the pills. 44 items that had
+  no icon got one; lists of pure choices stay iconless. A tall menu opened low on the screen is
+  shifted up so it does not scroll while there is room.
+- **Switches.** Every switch on a black-yellow screen is an outline with one solid dot — bright when
+  on, an opaque darker yellow when off. The filled yellow track is gone.
+- **Panels.** The monitor's panels are drawn — a large figure, a meter, tiles, a coloured state
+  line, a chart — and its generated reports get headings, dim-gold labels and bold values.
+- **The monitor's header** is pills throughout, and its own menu a pill menu with icons; the sort
+  popup's Reverse row carries the switch.
+
+### Icons
+
+- **The 応 mark** — outlined, yellow on black — as launcher icon, legacy icons and notification
+  silhouette, and a TV banner carrying the mark with 白い熊 応用管理.
+- Row icons in the process monitor follow an app update instead of showing the cached old one.
+
+### Notes for the next session
+
+- The per-area notes moved out of `CLAUDE.md` into `.claude/reference/`, one file per area, with an
+  index and the rules that hold everywhere left in `CLAUDE.md`.
+
+### Packaging
+
+- Signed `arm64-v8a` release APK: `shiroikuma-oyokanri_4.1.1+2026-11-03.19-47.gdc4154f4+107_arm64-v8a.apk`.
+
 ## 4.1.1+2026-11-03.19-47.gdc4154f4+093 — 2026-11-14
 
 Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.
