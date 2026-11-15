@@ -61,6 +61,17 @@ public class ProcessMonitorActivity extends BaseActivity {
     private View mEmpty;
     private android.widget.LinearLayout mHealth;
     private com.google.android.material.card.MaterialCardView mHealthCard;
+    // Fork (白い熊, 2026-11-15): the process-start watch — its latest reading, the health reading
+    // it is drawn into, and whether a probe / fix step this screen asked for is still out.
+    @Nullable
+    private ForkStartWatch.Snapshot mFork;
+    @Nullable
+    private SystemHealth mHealthShown;
+    private boolean mProbePending;
+    private boolean mComparePending;
+    private boolean mReportPending;
+    private boolean mPoolPending;
+    private boolean mFixPending;
 
     private final Handler mHandler = new Handler(Looper.getMainLooper());
     private long mIntervalMs = 2000;
@@ -155,6 +166,35 @@ public class ProcessMonitorActivity extends BaseActivity {
             if (ab != null) ab.setSubtitle(getString(R.string.monitor_summary, pids, killable, leaks));
         });
         mViewModel.getHealth().observe(this, this::bindHealth);
+        mViewModel.getForkStart().observe(this, f -> {
+            mFork = f;
+            if (mHealthShown != null) bindHealth(mHealthShown);
+        });
+        mViewModel.getProbeResult().observe(this, p -> {
+            if (p == null || !mProbePending) return;  // a re-delivered old result after a re-create
+            mProbePending = false;
+            showForkPanel(p);
+        });
+        mViewModel.getFixResult().observe(this, this::onFixResult);
+        mViewModel.getPoolResult().observe(this, summary -> {
+            if (summary == null || !mPoolPending) return;  // a re-delivered old result after a re-create
+            mPoolPending = false;
+            showPoolPanel(summary);
+        });
+        mViewModel.getReportResult().observe(this, text -> {
+            if (text == null || !mReportPending) return;  // a re-delivered old result after a re-create
+            mReportPending = false;
+            io.github.muntashirakon.AppManager.utils.ForkDialog.present(
+                    io.github.muntashirakon.AppManager.utils.ForkDialog.builder(this)
+                            .setTitle(R.string.monitor_report_title)
+                            .setMessage(PanelViews.pretty(this, text))
+                            .setPositiveButton(android.R.string.ok, null));
+        });
+        mViewModel.getCompareResult().observe(this, text -> {
+            if (text == null || !mComparePending) return;  // a re-delivered old result after a re-create
+            mComparePending = false;
+            showCompare(text.isEmpty() ? null : text);
+        });
         mViewModel.getLoading().observe(this, loading -> {
             if (Boolean.TRUE.equals(loading)) mProgress.show();
             else mProgress.hide();
@@ -244,6 +284,7 @@ public class ProcessMonitorActivity extends BaseActivity {
      */
     private void bindHealth(@Nullable SystemHealth h) {
         if (h == null || mHealth == null) return;
+        mHealthShown = h;
         mHealth.removeAllViews();
         if (mHealthCard != null) mHealthCard.setVisibility(View.VISIBLE);
         mHealth.setVisibility(View.VISIBLE);
@@ -283,6 +324,11 @@ public class ProcessMonitorActivity extends BaseActivity {
         addHealthPill(paging, getString(R.string.monitor_health_pill_graphics, alloc),
                 yellow, R.string.monitor_health_title_graphics, R.string.monitor_health_explain_graphics);
 
+        addForkLine(warn, yellow);
+        // Fork (+105): the kernel's room for filter programs — what runs out when starts fail.
+        addHealthPill(addHealthRow(), FilterPool.pillText(this), FilterPool.pillWarn(this) ? warn : yellow, false,
+                v -> openPool(0));
+
         if (!h.objectsSampled) {
             addHealthLine(getString(R.string.monitor_health_checking), dim, null);
             return;
@@ -296,8 +342,8 @@ public class ProcessMonitorActivity extends BaseActivity {
         for (SystemHealth.Suspect s : h.suspects) if (s.isLeak()) leaking++;
         int heavy = h.suspects.size() - leaking;
         if (leaking == 0 && heavy == 0) {
-            addHealthLine(getString(R.string.monitor_health_clean), dim,
-                    v -> showHealthExplain(R.string.monitor_health_title_leak, R.string.monitor_health_explain_leak));
+            addHealthPill(addHealthRow(), getString(R.string.monitor_health_clean), yellow,
+                    R.string.monitor_health_title_leak, R.string.monitor_health_explain_leak);
         } else {
             if (leaking > 0) {
                 android.widget.LinearLayout leak = addHealthRow();
@@ -306,10 +352,9 @@ public class ProcessMonitorActivity extends BaseActivity {
                         R.string.monitor_health_title_leak, R.string.monitor_health_explain_leak);
             }
             if (heavy > 0) {
-                addHealthLine(getResources().getQuantityString(R.plurals.monitor_health_heavy_summary,
-                                heavy, heavy), dim,
-                        v -> showHealthExplain(R.string.monitor_health_title_heavy,
-                                R.string.monitor_health_explain_heavy));
+                addHealthPill(addHealthRow(), getResources().getQuantityString(
+                                R.plurals.monitor_health_heavy_summary, heavy, heavy), yellow,
+                        R.string.monitor_health_title_heavy, R.string.monitor_health_explain_heavy);
             }
         }
     }
@@ -339,6 +384,18 @@ public class ProcessMonitorActivity extends BaseActivity {
      */
     private void addHealthPill(@NonNull android.widget.LinearLayout row, @NonNull CharSequence text,
                                int color, int titleRes, int explainRes) {
+        addHealthPill(row, text, color, false, v -> showHealthExplain(titleRes, explainRes));
+    }
+
+    /**
+     * Fork (白い熊, +096): the pill itself. Everything tappable in the header is one — never a
+     * bare line of text that gives no clue it can be pressed. {@code main} is the black-yellow
+     * theme's main action: a 3 dp frame and bold text, never a fill.
+     */
+    @NonNull
+    private androidx.appcompat.widget.AppCompatTextView addHealthPill(
+            @NonNull android.widget.LinearLayout row, @NonNull CharSequence text, int color, boolean main,
+            @NonNull View.OnClickListener click) {
         float density = getResources().getDisplayMetrics().density;
         androidx.appcompat.widget.AppCompatTextView tv = new androidx.appcompat.widget.AppCompatTextView(this);
         tv.setText(text);
@@ -351,19 +408,21 @@ public class ProcessMonitorActivity extends BaseActivity {
         android.graphics.drawable.GradientDrawable pill = new android.graphics.drawable.GradientDrawable();
         pill.setColor(android.graphics.Color.TRANSPARENT);
         pill.setCornerRadius(density * 1000f);  // clamped to half-height → a stadium
-        pill.setStroke(Math.max(1, Math.round(density * 1.2f)), color);
+        pill.setStroke(Math.max(1, Math.round(density * (main ? 3f : 1.25f))), color);
         tv.setBackground(pill);
+        if (main) tv.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         // Ripple of the same hue on tap, as the row pills elsewhere in the fork.
         android.util.TypedValue fg = new android.util.TypedValue();
         if (getTheme().resolveAttribute(android.R.attr.selectableItemBackground, fg, true)) {
             tv.setForeground(androidx.core.content.ContextCompat.getDrawable(this, fg.resourceId));
         }
-        tv.setOnClickListener(v -> showHealthExplain(titleRes, explainRes));
+        tv.setOnClickListener(click);
 
         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
                 android.view.ViewGroup.LayoutParams.WRAP_CONTENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
         if (row.getChildCount() > 0) lp.leftMargin = Math.round(density * 6);
         row.addView(tv, lp);
+        return tv;
     }
 
     /** Fork (白い熊, +065): a bordered yellow-on-black dialog explaining one health figure, dismissed with OK. */
@@ -371,11 +430,275 @@ public class ProcessMonitorActivity extends BaseActivity {
         io.github.muntashirakon.AppManager.utils.ForkDialog.present(
                 io.github.muntashirakon.AppManager.utils.ForkDialog.builder(this)
                         .setTitle(titleRes)
-                        .setMessage(explainRes)
+                        .setMessage(PanelViews.pretty(this, getString(explainRes)))
                         .setPositiveButton(android.R.string.ok, null));
     }
 
-    private void addHealthLine(@NonNull CharSequence text, int color, @Nullable View.OnClickListener click) {
+    // ---- Fork (白い熊, 2026-11-15): "new processes cannot start" -----------------------
+
+    @NonNull
+    private static String hms(long wallMs) {
+        return new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(new java.util.Date(wallMs));
+    }
+
+    @NonNull
+    private String size(long bytes) {
+        return android.text.format.Formatter.formatShortFileSize(this, bytes);
+    }
+
+    /**
+     * The process-start pill in the health header: the main pill (thick frame, bold, warning
+     * colour) while starts fail, a warning-coloured pill after, an ordinary one otherwise.
+     */
+    private void addForkLine(int warn, int yellow) {
+        ForkStartWatch.Snapshot f = mFork;
+        if (f == null) return;
+        View.OnClickListener open = v -> showForkPanel(null);
+        android.widget.LinearLayout row = addHealthRow();
+        if (f.status == ForkStartWatch.STATUS_FAILING) {
+            String text = f.failures5Min > 0 || f.lastProbe == null
+                    ? getString(R.string.monitor_fork_failing, f.failures5Min, hms(f.lastFailureMs))
+                    : getString(R.string.monitor_fork_failing_probe, hms(f.lastProbe.wallMs));
+            addHealthPill(row, text, warn, true, open);
+        } else if (f.status == ForkStartWatch.STATUS_RECENT) {
+            addHealthPill(row, getString(R.string.monitor_fork_recent, f.failures1Hour, hms(f.lastFailureMs)),
+                    warn, false, open);
+        } else {
+            addHealthPill(row, getString(R.string.monitor_fork_ok, size(f.slabUnreclaimBytes)), yellow, false, open);
+        }
+    }
+
+    /**
+     * The panel behind the header line: the state as a coloured line, the two test processes as
+     * tiles, the failure counts, the figures, the apps that crashed, and the Probe and Fix actions.
+     * Fork (+106): drawn with {@link PanelViews} — it was one block of text.
+     */
+    private void showForkPanel(@Nullable ForkStartWatch.Probe fresh) {
+        ForkStartWatch.Snapshot f = mFork;
+        if (f == null) return;
+        ForkStartWatch.Probe probe = fresh != null ? fresh : f.lastProbe;
+        boolean failing = fresh != null ? !fresh.ok : f.status == ForkStartWatch.STATUS_FAILING;
+        final int ink = PanelViews.ink(), warn = PanelViews.warn(this), ok = PanelViews.ok(this), bad = PanelViews.bad(this);
+        android.widget.LinearLayout col = PanelViews.column(this);
+        boolean recent = !failing && f.status == ForkStartWatch.STATUS_RECENT;
+        col.addView(PanelViews.status(this, getString(failing ? R.string.fork_panel_state_failing
+                : recent ? R.string.fork_panel_state_recent : R.string.fork_panel_state_ok),
+                failing ? bad : recent ? warn : ok));
+        col.addView(PanelViews.line(this, getString(failing ? R.string.monitor_fork_state_failing
+                : recent ? R.string.monitor_fork_state_recent : R.string.monitor_fork_state_ok), PanelViews.dim(this)));
+
+        col.addView(PanelViews.heading(this, getString(R.string.fork_panel_probe)));
+        if (probe == null) {
+            col.addView(PanelViews.line(this, getString(R.string.monitor_fork_panel_probe_none), PanelViews.dim(this)));
+        } else {
+            java.util.List<PanelViews.Tile> t = new java.util.ArrayList<>();
+            t.add(new PanelViews.Tile(getString(R.string.fork_panel_isolated), (probe.isoOk ? "✓ " : "✕ ")
+                    + getString(probe.isoOk ? R.string.monitor_fork_probe_started : R.string.monitor_fork_probe_not_started),
+                    probe.isoOk ? ok : bad));
+            t.add(new PanelViews.Tile(getString(R.string.fork_panel_ordinary), (probe.plainOk ? "✓ " : "✕ ")
+                    + getString(probe.plainOk ? R.string.monitor_fork_probe_started : R.string.monitor_fork_probe_not_started),
+                    probe.plainOk ? ok : bad));
+            col.addView(PanelViews.tiles(this, 2, t));
+            PanelViews.gap(col, 4);
+            col.addView(PanelViews.line(this, getString(R.string.fork_panel_probe_at, hms(probe.wallMs), probe.tookMs),
+                    PanelViews.dim(this)));
+        }
+
+        col.addView(PanelViews.heading(this, getString(R.string.fork_panel_failures)));
+        if (!f.logScanned) {
+            col.addView(PanelViews.line(this, getString(R.string.monitor_fork_panel_nolog), PanelViews.dim(this)));
+        } else {
+            java.util.List<PanelViews.Tile> t = new java.util.ArrayList<>();
+            t.add(new PanelViews.Tile(getString(R.string.fork_panel_5min), String.valueOf(f.failures5Min),
+                    f.failures5Min > 0 ? bad : ink));
+            t.add(new PanelViews.Tile(getString(R.string.fork_panel_1h), String.valueOf(f.failures1Hour),
+                    f.failures1Hour > 0 ? warn : ink));
+            t.add(new PanelViews.Tile(getString(R.string.fork_panel_total), String.valueOf(f.failuresTotal), ink));
+            col.addView(PanelViews.tiles(this, 3, t));
+            if (f.failuresTotal > 0) {
+                PanelViews.gap(col, 4);
+                col.addView(PanelViews.line(this, getString(R.string.monitor_fork_panel_span, hms(f.firstFailureMs),
+                        hms(f.lastFailureMs)), PanelViews.dim(this)));
+            }
+        }
+        if (!f.crashedApps.isEmpty()) {
+            col.addView(PanelViews.heading(this, getString(R.string.fork_panel_crashed)));
+            StringBuilder apps = new StringBuilder();
+            for (String a : f.crashedApps) apps.append(apps.length() > 0 ? "\n" : "").append(a);
+            col.addView(PanelViews.mono(this, apps));
+        }
+
+        col.addView(PanelViews.heading(this, getString(R.string.fork_panel_figures)));
+        java.util.List<PanelViews.Tile> figures = new java.util.ArrayList<>();
+        figures.add(new PanelViews.Tile(getString(R.string.fork_panel_room), FilterPool.pillValue(this),
+                FilterPool.pillWarn(this) ? warn : ink));
+        if (f.procs > 0) {
+            figures.add(new PanelViews.Tile(getString(R.string.fork_panel_procs), String.valueOf(f.procs), ink));
+            figures.add(new PanelViews.Tile(getString(R.string.fork_panel_threads), String.valueOf(f.threads), ink));
+            figures.add(new PanelViews.Tile(getString(R.string.fork_panel_cached), String.valueOf(f.cached), ink));
+        }
+        figures.add(new PanelViews.Tile(getString(R.string.fork_panel_free), size(f.memFreeBytes), ink));
+        figures.add(new PanelViews.Tile(getString(R.string.fork_panel_avail), size(f.memAvailableBytes), ink));
+        figures.add(new PanelViews.Tile(getString(R.string.fork_panel_slab), size(f.slabUnreclaimBytes), ink));
+        if (f.kmalloc64Bytes >= 0) {
+            figures.add(new PanelViews.Tile(getString(R.string.fork_panel_kmalloc), size(f.kmalloc64Bytes), ink));
+        }
+        col.addView(PanelViews.tiles(this, 2, figures));
+        col.addView(PanelViews.note(this, getString(R.string.fork_panel_explain)));
+        MaterialAlertDialogBuilder b = io.github.muntashirakon.AppManager.utils.ForkDialog.builder(this)
+                .setTitle(R.string.monitor_fork_title)
+                .setView(PanelViews.dialogBody(col))
+                .setNegativeButton(R.string.close, null);
+        android.content.DialogInterface.OnClickListener choose = (d, w) -> {
+            mFixPending = true;
+            UIUtils.displayShortToast(getString(R.string.monitor_fork_probing));
+            mViewModel.fixProbe();
+        };
+        if (failing) {
+            // Fork (+101): while starts fail the main pill is the one-tap fix of the notification;
+            // the step-by-step fix with its checklist sits beside it. The watch probes by itself.
+            b.setPositiveButton(R.string.monitor_watch_fix, (d, w) -> {
+                mFixPending = true;
+                UIUtils.displayShortToast(getString(R.string.monitor_fork_working));
+                mViewModel.fixFreeMemory();
+            }).setNeutralButton(R.string.monitor_fork_choose, choose);
+        } else {
+            b.setPositiveButton(R.string.monitor_fork_fix, choose)
+                    .setNeutralButton(R.string.monitor_fork_probe, (d, w) -> {
+                        mProbePending = true;
+                        UIUtils.displayShortToast(getString(R.string.monitor_fork_probing));
+                        mViewModel.runProbe();
+                    });
+        }
+        io.github.muntashirakon.AppManager.utils.ForkDialog.present(b);
+    }
+
+    /**
+     * Fork (白い熊, +097): the kernel-memory comparison. Without a first snapshot it offers to take
+     * one; with one it offers to compare; {@code result} is a finished comparison to show.
+     */
+    private void showCompare(@Nullable String result) {
+        long base = mViewModel.compareBaseMs();
+        MaterialAlertDialogBuilder b = io.github.muntashirakon.AppManager.utils.ForkDialog.builder(this)
+                .setTitle(R.string.monitor_compare_title);
+        if (base == 0) {
+            b.setMessage(R.string.monitor_compare_intro)
+                    .setPositiveButton(R.string.monitor_compare_take, (d, w) -> {
+                        mComparePending = true;
+                        UIUtils.displayShortToast(getString(R.string.monitor_fork_working));
+                        mViewModel.compareStart();
+                    })
+                    .setNegativeButton(R.string.close, null);
+        } else {
+            b.setMessage(PanelViews.pretty(this, result != null ? result : getString(R.string.monitor_compare_have, hms(base))))
+                    .setPositiveButton(result != null ? R.string.monitor_compare_again : R.string.monitor_compare_now,
+                            (d, w) -> {
+                                mComparePending = true;
+                                UIUtils.displayShortToast(getString(R.string.monitor_fork_working));
+                                mViewModel.compareNow();
+                            })
+                    .setNeutralButton(R.string.monitor_compare_restart, (d, w) -> {
+                        mViewModel.compareClear();
+                        showCompare(null);
+                    })
+                    .setNegativeButton(R.string.close, null);
+        }
+        io.github.muntashirakon.AppManager.utils.ForkDialog.present(b);
+    }
+
+    /** Each fix step ends in a probe; what happens next depends on whether a process could start. */
+    private void onFixResult(@Nullable ProcessMonitorViewModel.FixResult r) {
+        if (r == null || !mFixPending) return;  // a re-delivered old result after a re-create
+        mFixPending = false;
+        MaterialAlertDialogBuilder b = io.github.muntashirakon.AppManager.utils.ForkDialog.builder(this)
+                .setTitle(R.string.monitor_fork_title);
+        if (r.stage == ProcessMonitorViewModel.FIX_STAGE_PROBE) {
+            if (!r.probe.ok) {
+                showStopChecklist(false, false);
+                return;
+            }
+            b.setMessage(getString(R.string.monitor_fork_fix_not_needed, r.probe.tookMs))
+                    .setPositiveButton(android.R.string.ok, null)
+                    .setNeutralButton(R.string.monitor_fork_stop_anyway, (d, w) -> showStopChecklist(false, true));
+        } else if (r.probe.ok) {
+            b.setMessage(getString(R.string.monitor_fork_result_ok, r.probe.tookMs, r.stopped,
+                            size(r.memFreeBefore), size(r.memFreeAfter), size(r.memAvailBefore), size(r.memAvailAfter)))
+                    .setPositiveButton(android.R.string.ok, null);
+        } else if (r.stage == ProcessMonitorViewModel.FIX_STAGE_KILL) {
+            b.setMessage(getString(R.string.monitor_fork_result_still, r.stopped,
+                            size(r.memFreeBefore), size(r.memFreeAfter), size(r.memAvailBefore), size(r.memAvailAfter)))
+                    .setPositiveButton(R.string.monitor_fork_force_go, (d, w) -> showStopChecklist(true, false))
+                    .setNegativeButton(R.string.close, null);
+        } else {
+            b.setMessage(getString(R.string.monitor_fork_result_failed, r.stopped,
+                            size(r.memFreeBefore), size(r.memFreeAfter), size(r.memAvailBefore), size(r.memAvailAfter)))
+                    .setPositiveButton(android.R.string.ok, null);
+        }
+        io.github.muntashirakon.AppManager.utils.ForkDialog.present(b);
+    }
+
+    /**
+     * Says exactly what a fix step will stop, and lets each app be unticked. Step 1
+     * lists every stoppable background app, all ticked; step 2 the ten heaviest,
+     * of which the top three and anything burning half a core are ticked.
+     */
+    private void showStopChecklist(boolean forceStop, boolean optional) {
+        java.util.List<ProcessMonitorViewModel.FixCandidate> all = mViewModel.fixCandidates();
+        final java.util.List<ProcessMonitorViewModel.FixCandidate> items =
+                forceStop && all.size() > 10 ? all.subList(0, 10) : all;
+        if (items.isEmpty()) {
+            UIUtils.displayLongToast(getString(R.string.monitor_fork_none_to_stop));
+            return;
+        }
+        MaterialAlertDialogBuilder b = io.github.muntashirakon.AppManager.utils.ForkDialog.builder(this);
+        android.content.Context dc = b.getContext();
+        float density = getResources().getDisplayMetrics().density;
+        int yellow = ContextCompat.getColor(this, R.color.theme_bright_yellow);
+        int dim = io.github.muntashirakon.AppManager.fonts.ColorPrefs.getColor(this,
+                io.github.muntashirakon.AppManager.fonts.ColorPrefs.SETTINGS_DESCRIPTION);
+        android.widget.LinearLayout box = new android.widget.LinearLayout(dc);
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad = Math.round(density * 20);
+        box.setPadding(pad, Math.round(density * 8), pad, 0);
+        androidx.appcompat.widget.AppCompatTextView note = new androidx.appcompat.widget.AppCompatTextView(dc);
+        note.setText(forceStop ? R.string.monitor_fork_force_note
+                : optional ? R.string.monitor_fork_kill_note_optional : R.string.monitor_fork_kill_note);
+        note.setTextColor(dim);
+        note.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13);
+        box.addView(note);
+        final java.util.List<android.widget.CheckBox> boxes = new java.util.ArrayList<>(items.size());
+        for (int i = 0; i < items.size(); i++) {
+            ProcessMonitorViewModel.FixCandidate c = items.get(i);
+            com.google.android.material.checkbox.MaterialCheckBox cb =
+                    new com.google.android.material.checkbox.MaterialCheckBox(dc);
+            cb.setText(getString(R.string.monitor_fork_candidate, c.label, size(c.memBytes)));
+            cb.setTextColor(yellow);
+            cb.setButtonTintList(android.content.res.ColorStateList.valueOf(yellow));
+            cb.setMinHeight(0);
+            cb.setMinimumHeight(0);
+            cb.setChecked(!forceStop || i < 3 || c.cpuPercent >= 50);
+            boxes.add(cb);
+            box.addView(cb);
+        }
+        android.widget.ScrollView scroll = new android.widget.ScrollView(dc);
+        scroll.addView(box);
+        b.setTitle(forceStop ? R.string.monitor_fork_force_title : R.string.monitor_fork_kill_title)
+                .setView(scroll)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(forceStop ? R.string.monitor_fork_force_do : R.string.monitor_fork_kill_go, (d, w) -> {
+                    java.util.List<ProcessMonitorViewModel.FixCandidate> chosen = new java.util.ArrayList<>();
+                    for (int i = 0; i < boxes.size(); i++) if (boxes.get(i).isChecked()) chosen.add(items.get(i));
+                    if (chosen.isEmpty()) return;
+                    mFixPending = true;
+                    UIUtils.displayShortToast(getString(R.string.monitor_fork_working));
+                    mViewModel.fixStop(chosen, forceStop);
+                });
+        io.github.muntashirakon.AppManager.utils.ForkDialog.present(b);
+    }
+
+    @NonNull
+    private androidx.appcompat.widget.AppCompatTextView addHealthLine(@NonNull CharSequence text, int color,
+                                                                      @Nullable View.OnClickListener click) {
         androidx.appcompat.widget.AppCompatTextView tv = new androidx.appcompat.widget.AppCompatTextView(this);
         tv.setText(text);
         tv.setTextColor(color);
@@ -390,6 +713,7 @@ public class ProcessMonitorActivity extends BaseActivity {
             }
         }
         mHealth.addView(tv);
+        return tv;
     }
 
     @NonNull
@@ -597,7 +921,131 @@ public class ProcessMonitorActivity extends BaseActivity {
         return super.onCreateOptionsMenu(menu);
     }
 
+    /**
+     * Fork (白い熊, +099): the monitor's overflow, as a popup of outlined pills — every tappable
+     * action is a pill, never a bare line of text. Both entries open a dialog, hence the ›.
+     */
+    private void showMoreMenu() {
+        float d = getResources().getDisplayMetrics().density;
+        int ink = io.github.muntashirakon.AppManager.utils.ForkThemeUtils.getTextColor();
+        androidx.appcompat.widget.LinearLayoutCompat body = new androidx.appcompat.widget.LinearLayoutCompat(this);
+        body.setOrientation(androidx.appcompat.widget.LinearLayoutCompat.VERTICAL);
+        body.setBackgroundResource(R.drawable.alert_dialog_bg_yellow_on_black);
+        int pad = Math.round(8 * d);
+        body.setPadding(pad, pad, pad, pad);
+        // Fork (+104): full-width pills with their icons — the theme's menu rule.
+        final android.widget.PopupWindow popup = new android.widget.PopupWindow(body,
+                Math.round(280 * d), android.view.ViewGroup.LayoutParams.WRAP_CONTENT, true);
+        popup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        popup.setElevation(8 * d);
+        int[] titles = {R.string.monitor_interval, R.string.monitor_compare, R.string.monitor_report};
+        int[] icons = {R.drawable.ic_autorenew, R.drawable.ic_content_duplicate, R.drawable.ic_list_status};
+        Runnable[] actions = {this::showIntervalPicker, () -> showCompare(null), () -> {
+            mReportPending = true;
+            UIUtils.displayShortToast(getString(R.string.monitor_fork_working));
+            mViewModel.kernelReport();
+        }};
+        for (int i = 0; i < titles.length; i++) {
+            final Runnable action = actions[i];
+            body.addView(io.github.muntashirakon.AppManager.utils.MenuPills.pillRow(this, icons[i],
+                    getString(titles[i]), true, ink, v -> {
+                        popup.dismiss();
+                        action.run();
+                    }));
+        }
+        View anchor = findViewById(R.id.action_monitor_more);
+        if (anchor != null) popup.showAsDropDown(anchor);
+        else popup.showAtLocation(getWindow().getDecorView(),
+                android.view.Gravity.TOP | android.view.Gravity.END, pad, Math.round(96 * d));
+    }
+
+    private void openPool(int what) {
+        mPoolPending = true;
+        UIUtils.displayShortToast(getString(R.string.monitor_fork_working));
+        mViewModel.pool(what);
+    }
+
+    /**
+     * Fork (白い熊, +105, drawn in +106): the filter-program room panel — the room as one large
+     * figure with its meter, the stats as tiles, a small chart since the restart. The page
+     * behind "Browse" has the rest.
+     */
+    private void showPoolPanel(@NonNull FilterPool.Summary s) {
+        final int ink = PanelViews.ink(), warn = PanelViews.warn(this);
+        java.text.SimpleDateFormat dhm = new java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.US);
+        android.widget.LinearLayout col = PanelViews.column(this);
+        if (s.headline != null) col.addView(PanelViews.note(this, s.headline));
+        boolean low = s.free >= 0 && s.exact && s.free < 64;
+        col.addView(PanelViews.hero(this,
+                s.free < 0 ? "—" : String.format(java.util.Locale.US, "%,d", s.free) + (s.exact ? "" : "+"),
+                getString(R.string.pool_page_unit),
+                s.free < 0 ? getString(R.string.monitor_pool_none)
+                        : getString(s.exact ? R.string.pool_page_hero_exact : R.string.pool_page_hero_atleast,
+                        dhm.format(new java.util.Date(s.wallMs))),
+                low ? warn : ink));
+        if (s.fullest > 0 && s.free >= 0) {
+            PanelViews.gap(col, 8);
+            col.addView(PanelViews.meter(this, (float) s.free / (float) s.fullest, low ? warn : ink, "0",
+                    getString(R.string.pool_page_meter_right,
+                            String.format(java.util.Locale.US, "%,d", s.fullest),
+                            dhm.format(new java.util.Date(s.fullestWallMs)))));
+        }
+        java.util.List<FilterPool.Reading> boot = new java.util.ArrayList<>();
+        for (FilterPool.Reading r : s.all) if (FilterPool.sameBootAs(s, r)) boot.add(r);
+        double[] trend = FilterPool.trend(boot);
+        FilterPool.Reading latest = s.all.isEmpty() ? null : s.all.get(s.all.size() - 1);
+        java.util.List<PanelViews.Tile> tiles = new java.util.ArrayList<>();
+        tiles.add(new PanelViews.Tile(getString(R.string.pool_page_tile_size), s.fullest < 0
+                ? getString(R.string.pool_page_not_measured)
+                : String.format(java.util.Locale.US, "%,d", s.fullest), ink));
+        tiles.add(new PanelViews.Tile(getString(R.string.pool_page_tile_apps),
+                latest == null || latest.apps < 0 ? "—" : String.valueOf(latest.apps), ink));
+        tiles.add(new PanelViews.Tile(getString(R.string.pool_page_tile_trend),
+                Double.isNaN(trend[0]) ? "—" : String.format(java.util.Locale.US, "%+,.1f", trend[0]),
+                !Double.isNaN(trend[0]) && trend[0] < -0.5 ? warn : ink));
+        boolean ending = !Double.isNaN(trend[0]) && trend[0] < -0.5 && s.exact && s.free > 0;
+        tiles.add(new PanelViews.Tile(getString(R.string.pool_page_tile_left),
+                ending ? getString(R.string.monitor_pool_days, s.free / -trend[0]) : "—", ink));
+        col.addView(PanelViews.tiles(this, 2, tiles));
+        if (boot.size() >= 2) {
+            java.util.List<PanelViews.Point> points = new java.util.ArrayList<>();
+            for (FilterPool.Reading r : boot) {
+                PanelViews.Point p = new PanelViews.Point();
+                p.timeMs = r.wallMs;
+                p.value = r.free;
+                p.exact = r.exact;
+                p.flagged = r.failing;
+                points.add(p);
+            }
+            java.util.List<long[]> bands = new java.util.ArrayList<>();
+            for (FilterPool.Burst b : s.bursts) bands.add(new long[]{b.startMs, b.endMs});
+            PanelViews.Chart chart = new PanelViews.Chart(this);
+            chart.setCompact(true);
+            chart.setData(points, bands, false, "");
+            android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT, PanelViews.dp(this, 120));
+            lp.topMargin = PanelViews.dp(this, 12);
+            col.addView(chart, lp);
+        }
+        col.addView(PanelViews.note(this, getString(s.recording ? R.string.pool_panel_note : R.string.monitor_pool_off)));
+        io.github.muntashirakon.AppManager.utils.ForkDialog.present(
+                io.github.muntashirakon.AppManager.utils.ForkDialog.builder(this)
+                        .setTitle(R.string.monitor_pool_title)
+                        .setView(PanelViews.dialogBody(col))
+                        .setPositiveButton(R.string.monitor_pool_measure, (d, w) -> openPool(1))
+                        .setNeutralButton(R.string.pool_panel_browse, (d, w) ->
+                                startActivity(FilterPoolActivity.intent(this)))
+                        .setNegativeButton(R.string.close, null));
+    }
+
     private void attachOverflowLongPress(@NonNull MaterialToolbar toolbar) {
+        View more = toolbar.findViewById(R.id.action_monitor_more);
+        if (more != null) {
+            more.setOnLongClickListener(v -> {
+                startActivity(SettingsActivity.getSettingsIntent(this, "fonts_prefs"));
+                return true;
+            });
+        }
         for (int i = 0; i < toolbar.getChildCount(); ++i) {
             View child = toolbar.getChildAt(i);
             if (!(child instanceof androidx.appcompat.widget.ActionMenuView)) continue;
@@ -625,7 +1073,7 @@ public class ProcessMonitorActivity extends BaseActivity {
         toggle(menu, R.id.action_monitor_sort, !sel);
         toggle(menu, R.id.action_monitor_columns, !sel);
         toggle(menu, R.id.action_monitor_refresh, !sel);
-        toggle(menu, R.id.action_monitor_interval, !sel);
+        toggle(menu, R.id.action_monitor_more, !sel);
         return super.onPrepareOptionsMenu(menu);
     }
 
@@ -668,8 +1116,8 @@ public class ProcessMonitorActivity extends BaseActivity {
         } else if (id == R.id.action_monitor_columns) {
             showLayoutPicker();
             return true;
-        } else if (id == R.id.action_monitor_interval) {
-            showIntervalPicker();
+        } else if (id == R.id.action_monitor_more) {
+            showMoreMenu();
             return true;
         }
         return super.onOptionsItemSelected(item);

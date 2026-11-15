@@ -235,9 +235,32 @@ public class FontsPreferences extends Fragment {
     private LinearLayoutCompat mFontsContainer;
     private int mDescColorApplied = 0;
 
+    // Fork (白い熊, 2026-11-15): Diagnostics section — the export directory picker and the
+    // "Stored" line it and the purge refresh.
+    private ActivityResultLauncher<Uri> mDiagExport;
+    @Nullable
+    private AppCompatTextView mDiagStored;
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        // Keep-N-days is applied on leaving the page (and at app start).
+        final Context app = requireContext().getApplicationContext();
+        ThreadUtils.postOnBackgroundThread(() -> io.github.muntashirakon.AppManager.diag.ForkDiag.cleanUp(app));
+    }
+
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        mDiagExport = registerForActivityResult(new ActivityResultContracts.OpenDocumentTree(), uri -> {
+            if (uri == null) return;
+            final Context app = requireContext().getApplicationContext();
+            ThreadUtils.postOnBackgroundThread(() -> {
+                String name = io.github.muntashirakon.AppManager.diag.ForkDiag.exportTo(app, uri);
+                ThreadUtils.postOnMainThread(() -> UIUtils.displayLongToast(name != null
+                        ? app.getString(R.string.diag_export_done, name) : app.getString(R.string.diag_export_failed)));
+            });
+        });
         mOpenFont = registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
             if (uri == null || mPendingImportCat == null) return;
             String path = resolveFontPath(uri);
@@ -417,6 +440,9 @@ public class FontsPreferences extends Fragment {
         vtContent.addView(buildVtWifiOnlyRow());
         vtContent.addView(buildVtRescanAgeRow());
         container.addView(vtGroup);
+        // Fork (白い熊, 2026-11-15): Diagnostics — every recording behind its own switch, off by
+        // default, then the recorded data (stored, keep-N-days, export, share, purge).
+        container.addView(buildDiagGroup(inflater, container));
         // kxkb rhythm: every section except the first is preceded by a
         // full-width 1px hairline (part of view_font_group; hidden on the
         // first section so the page starts flush).
@@ -484,6 +510,148 @@ public class FontsPreferences extends Fragment {
                 v -> SettingsExportImportPanel.show(requireActivity(),
                         () -> refreshEimSummary(summary),
                         () -> requireActivity().getOnBackPressedDispatcher().onBackPressed()));
+    }
+
+    @NonNull
+    private View buildDiagGroup(@NonNull LayoutInflater inflater, @NonNull ViewGroup container) {
+        final float density = getResources().getDisplayMetrics().density;
+        final Context app = requireContext().getApplicationContext();
+        View group = inflater.inflate(R.layout.view_font_group, container, false);
+        ((AppCompatTextView) group.findViewById(R.id.group_header)).setText(R.string.diag_group);
+        LinearLayoutCompat content = group.findViewById(R.id.group_content);
+
+        addLegendHeader(content, R.string.diag_sub_monitor, density);
+        content.addView(buildVtSwitchRow(R.string.diag_watch_title, R.string.diag_watch_desc,
+                io.github.muntashirakon.AppManager.diag.ForkDiag.isWatchOn(app),
+                on -> ThreadUtils.postOnBackgroundThread(() -> {
+                    io.github.muntashirakon.AppManager.diag.ForkDiag.setWatchOn(app, on);
+                    io.github.muntashirakon.AppManager.processreaper.ForkWatchService.sync(app);
+                })));
+        content.addView(buildVtSwitchRow(R.string.diag_forkstart_title, R.string.diag_forkstart_desc,
+                io.github.muntashirakon.AppManager.diag.ForkDiag.isOn(app,
+                        io.github.muntashirakon.AppManager.diag.ForkDiag.KIND_FORKSTART),
+                on -> ThreadUtils.postOnBackgroundThread(() -> {
+                    io.github.muntashirakon.AppManager.diag.ForkDiag.setOn(app,
+                            io.github.muntashirakon.AppManager.diag.ForkDiag.KIND_FORKSTART, on);
+                    refreshDiagStored();
+                })));
+        content.addView(buildVtSwitchRow(R.string.diag_kernelmem_title, R.string.diag_kernelmem_desc,
+                io.github.muntashirakon.AppManager.diag.ForkDiag.isOn(app,
+                        io.github.muntashirakon.AppManager.diag.ForkDiag.KIND_KERNELMEM),
+                on -> ThreadUtils.postOnBackgroundThread(() -> {
+                    io.github.muntashirakon.AppManager.diag.ForkDiag.setOn(app,
+                            io.github.muntashirakon.AppManager.diag.ForkDiag.KIND_KERNELMEM, on);
+                    refreshDiagStored();
+                })));
+        content.addView(buildVtSwitchRow(R.string.diag_filterpool_title, R.string.diag_filterpool_desc,
+                io.github.muntashirakon.AppManager.diag.ForkDiag.isOn(app,
+                        io.github.muntashirakon.AppManager.diag.ForkDiag.KIND_FILTERPOOL),
+                on -> ThreadUtils.postOnBackgroundThread(() -> {
+                    io.github.muntashirakon.AppManager.diag.ForkDiag.setOn(app,
+                            io.github.muntashirakon.AppManager.diag.ForkDiag.KIND_FILTERPOOL, on);
+                    refreshDiagStored();
+                })));
+
+        addLegendHeader(content, R.string.diag_sub_data, density);
+        LinearLayoutCompat texts = new LinearLayoutCompat(requireContext());
+        texts.addView(rowTitle(R.string.diag_stored_title));
+        mDiagStored = pillSummary("…");
+        texts.addView(mDiagStored);
+        LinearLayoutCompat stored = automationRow(texts);
+        stored.setClickable(false);
+        stored.setFocusable(false);
+        content.addView(stored);
+        refreshDiagStored();
+
+        View keep = inflater.inflate(R.layout.view_separator_element, content, false);
+        ((AppCompatTextView) keep.findViewById(R.id.element_label)).setText(R.string.diag_keep_title);
+        ((AppCompatTextView) keep.findViewById(R.id.sep_sublabel)).setText(R.string.diag_keep_hint);
+        final AppCompatTextView keepValue = keep.findViewById(R.id.sep_width_value);
+        final AppCompatSeekBar keepSeek = keep.findViewById(R.id.sep_width_seek);
+        keepSeek.setMax(io.github.muntashirakon.AppManager.diag.ForkDiag.MAX_KEEP_DAYS);
+        final Runnable render = () -> {
+            int d = io.github.muntashirakon.AppManager.diag.ForkDiag.getKeepDays(app);
+            keepValue.setText(d <= 0 ? getString(R.string.diag_keep_all) : getString(R.string.diag_keep_days, d));
+            keepSeek.setProgress(d);
+        };
+        render.run();
+        keepSeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar sb, int progress, boolean fromUser) {
+                if (!fromUser) return;
+                io.github.muntashirakon.AppManager.diag.ForkDiag.setKeepDays(app, progress);
+                render.run();
+            }
+            @Override public void onStartTrackingTouch(SeekBar sb) {}
+            @Override public void onStopTrackingTouch(SeekBar sb) {}
+        });
+        content.addView(keep);
+
+        content.addView(actionRow(R.string.diag_export, pillSummary(getString(R.string.diag_export_desc)), true, true,
+                v -> {
+                    try {
+                        mDiagExport.launch(io.github.muntashirakon.AppManager.diag.ForkDiag.exportStartUri());
+                    } catch (Throwable t) {
+                        UIUtils.displayLongToast(getString(R.string.diag_export_failed));
+                    }
+                }));
+        content.addView(actionRow(R.string.diag_share, pillSummary(getString(R.string.diag_share_desc)), false, true,
+                v -> ThreadUtils.postOnBackgroundThread(() -> {
+                    android.content.Intent share = io.github.muntashirakon.AppManager.diag.ForkDiag.shareIntent(app);
+                    ThreadUtils.postOnMainThread(() -> {
+                        if (!isAdded()) return;
+                        if (share == null) UIUtils.displayShortToast(getString(R.string.diag_stored_none));
+                        else startActivity(share);
+                    });
+                })));
+        content.addView(actionRow(R.string.diag_purge, pillSummary(getString(R.string.diag_purge_desc)), false, false,
+                v -> ThreadUtils.postOnBackgroundThread(() -> {
+                    io.github.muntashirakon.AppManager.diag.ForkDiag.Inventory inv =
+                            io.github.muntashirakon.AppManager.diag.ForkDiag.inventory(app);
+                    ThreadUtils.postOnMainThread(() -> {
+                        if (!isAdded()) return;
+                        if (inv.files == 0) {
+                            UIUtils.displayShortToast(getString(R.string.diag_stored_none));
+                            return;
+                        }
+                        // The warning says what goes: how many, how big, which kinds and days.
+                        StringBuilder what = new StringBuilder();
+                        for (java.util.Map.Entry<String, List<String>> e : inv.perKind.entrySet()) {
+                            if (what.length() > 0) what.append("\n\n");
+                            what.append(e.getKey()).append(":\n").append(TextUtils.join("\n", e.getValue()));
+                        }
+                        ForkDialog.present(ForkDialog.builder(requireContext())
+                                .setTitle(R.string.diag_purge)
+                                .setMessage(getString(R.string.diag_purge_warning, inv.files,
+                                        android.text.format.Formatter.formatShortFileSize(app, inv.bytes), what))
+                                .setNegativeButton(R.string.cancel, null)
+                                .setPositiveButton(R.string.diag_purge_confirm, (d, w) ->
+                                        ThreadUtils.postOnBackgroundThread(() -> {
+                                            int n = io.github.muntashirakon.AppManager.diag.ForkDiag.purge(app);
+                                            ThreadUtils.postOnMainThread(() -> UIUtils.displayShortToast(
+                                                    app.getString(R.string.diag_purged, n)));
+                                            refreshDiagStored();
+                                        })));
+                    });
+                })));
+        return group;
+    }
+
+    /** Count the stored recordings off the main thread and show files, size and day span. */
+    private void refreshDiagStored() {
+        Context c = getContext();  // also called from a worker, possibly after the page is gone
+        if (c == null) return;
+        final Context app = c.getApplicationContext();
+        ThreadUtils.postOnBackgroundThread(() -> {
+            io.github.muntashirakon.AppManager.diag.ForkDiag.Inventory inv =
+                    io.github.muntashirakon.AppManager.diag.ForkDiag.inventory(app);
+            String text = inv.files == 0 ? app.getString(R.string.diag_stored_none)
+                    : app.getString(R.string.diag_stored_value, inv.files,
+                    android.text.format.Formatter.formatShortFileSize(app, inv.bytes), inv.firstDay, inv.lastDay);
+            ThreadUtils.postOnMainThread(() -> {
+                if (mDiagStored != null) mDiagStored.setText(text);
+            });
+        });
     }
 
     /**
@@ -647,10 +815,7 @@ public class FontsPreferences extends Fragment {
         MaterialSwitch sw = (MaterialSwitch) View.inflate(requireContext(), R.layout.item_switch, null);
         sw.setLayoutParams(new LinearLayoutCompat.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        int[][] states = {{android.R.attr.state_checked}, {}};
-        sw.setThumbTintList(new ColorStateList(states, new int[]{0xFF000000, 0xFF808000}));
-        sw.setTrackTintList(new ColorStateList(states,
-                new int[]{yellow, ColorUtils.setAlphaComponent(yellow, 0x33)}));
+        io.github.muntashirakon.AppManager.utils.ForkSwitch.outline(sw);
         sw.setChecked(initial);
         sw.setOnCheckedChangeListener((v, checked) -> onChange.accept(checked));
         row.addView(sw);
@@ -713,10 +878,7 @@ public class FontsPreferences extends Fragment {
         MaterialSwitch sw = (MaterialSwitch) View.inflate(requireContext(), R.layout.item_switch, null);
         sw.setLayoutParams(new LinearLayoutCompat.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        int[][] states = {{android.R.attr.state_checked}, {}};
-        sw.setThumbTintList(new ColorStateList(states, new int[]{0xFF000000, 0xFF808000}));
-        sw.setTrackTintList(new ColorStateList(states,
-                new int[]{yellow, ColorUtils.setAlphaComponent(yellow, 0x33)}));
+        io.github.muntashirakon.AppManager.utils.ForkSwitch.outline(sw);
         sw.setChecked(LastScreenPrefs.isEnabled(appContext));
         sw.setOnCheckedChangeListener((v, checked) -> LastScreenPrefs.setEnabled(appContext, checked));
         row.addView(sw);
@@ -768,10 +930,7 @@ public class FontsPreferences extends Fragment {
         MaterialSwitch sw = (MaterialSwitch) View.inflate(requireContext(), R.layout.item_switch, null);
         sw.setLayoutParams(new LinearLayoutCompat.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        int[][] states = {{android.R.attr.state_checked}, {}};
-        sw.setThumbTintList(new ColorStateList(states, new int[]{0xFF000000, 0xFF808000}));
-        sw.setTrackTintList(new ColorStateList(states,
-                new int[]{yellow, ColorUtils.setAlphaComponent(yellow, 0x33)}));
+        io.github.muntashirakon.AppManager.utils.ForkSwitch.outline(sw);
         boolean required = AutomationAuth.isTokenRequired(appContext);
         sw.setChecked(required);
         tokenRow.setVisibility(required ? View.VISIBLE : View.GONE);
@@ -796,10 +955,7 @@ public class FontsPreferences extends Fragment {
         MaterialSwitch sw = (MaterialSwitch) View.inflate(requireContext(), R.layout.item_switch, null);
         sw.setLayoutParams(new LinearLayoutCompat.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        int[][] states = {{android.R.attr.state_checked}, {}};
-        sw.setThumbTintList(new ColorStateList(states, new int[]{0xFF000000, 0xFF808000}));
-        sw.setTrackTintList(new ColorStateList(states,
-                new int[]{yellow, ColorUtils.setAlphaComponent(yellow, 0x33)}));
+        io.github.muntashirakon.AppManager.utils.ForkSwitch.outline(sw);
         sw.setChecked(AutomationAuth.isEnabled(appContext));
         sw.setOnCheckedChangeListener((v, checked) -> AutomationAuth.setEnabled(appContext, checked));
         row.addView(sw);
@@ -1271,8 +1427,7 @@ public class FontsPreferences extends Fragment {
         MaterialSwitch sw = (MaterialSwitch) View.inflate(requireContext(), R.layout.item_switch, null);
         sw.setLayoutParams(new LinearLayoutCompat.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        int[][] states = {{android.R.attr.state_checked}, {}};
-        sw.setThumbTintList(new ColorStateList(states, new int[]{0xFF000000, 0xFF808000}));
+        io.github.muntashirakon.AppManager.utils.ForkSwitch.outline(sw);
         sw.setChecked(OpLogPrefs.showTimestamps(requireContext()));
         sw.setOnCheckedChangeListener((v, checked) -> OpLogPrefs.setShowTimestamps(requireContext(), checked));
         rows.addView(sw);

@@ -761,7 +761,7 @@ public class VtHistoryActivity extends BaseActivity {
                     return true;
                 });
             }
-            popupMenu.show();
+            io.github.muntashirakon.AppManager.utils.MenuPills.show(popupMenu, anchor);
         }
 
         static class ViewHolder extends RecyclerView.ViewHolder {

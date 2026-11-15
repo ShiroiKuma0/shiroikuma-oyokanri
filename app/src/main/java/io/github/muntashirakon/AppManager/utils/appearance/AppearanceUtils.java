@@ -137,6 +137,21 @@ public final class AppearanceUtils {
         }
     }
 
+    /**
+     * Fork (白い熊, +104): whether a view's context belongs to a black-yellow activity — for code
+     * that draws inside a popup or a dialog and only has a wrapped context to go by.
+     */
+    public static boolean isYellowOnBlack(@Nullable Context context) {
+        for (int i = 0; i < 12 && context != null; i++) {
+            if (context instanceof Activity) {
+                return ActivityAppearanceCallback.isYellowOnBlackActivity((Activity) context);
+            }
+            if (!(context instanceof android.content.ContextWrapper)) return false;
+            context = ((android.content.ContextWrapper) context).getBaseContext();
+        }
+        return false;
+    }
+
     private static class ActivityAppearanceCallback implements Application.ActivityLifecycleCallbacks {
         @Override
         public void onActivityPreCreated(@NonNull Activity activity, @Nullable Bundle savedInstanceState) {
@@ -200,6 +215,7 @@ public final class AppearanceUtils {
                     || activity instanceof AppDetailsActivity
                     || activity instanceof ProcessMonitorActivity
                     || activity instanceof ProcessDetailActivity
+                    || activity instanceof io.github.muntashirakon.AppManager.processreaper.FilterPoolActivity
                     || activity instanceof BatteryUsageActivity
                     || activity instanceof BatteryAppDetailActivity
                     || activity instanceof AppUsageActivity

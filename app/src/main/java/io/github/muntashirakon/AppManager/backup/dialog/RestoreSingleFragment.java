@@ -106,7 +106,7 @@ public class RestoreSingleFragment extends Fragment {
                 adapter.notifyItemRangeChanged(0, adapter.getItemCount(), AdapterUtils.STUB);
                 return true;
             });
-            popupMenu.show();
+            io.github.muntashirakon.AppManager.utils.MenuPills.show(popupMenu, v);
         });
     }
 

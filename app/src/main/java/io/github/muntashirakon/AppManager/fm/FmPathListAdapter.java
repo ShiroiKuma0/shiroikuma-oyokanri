@@ -180,7 +180,7 @@ class FmPathListAdapter extends ListAdapter<FmPathListAdapter.PathPartItem, FmPa
                         mViewModel.getDisplayPropertiesLiveData().setValue(calculateUri(position));
                         return true;
                     });
-            popupMenu.show();
+            io.github.muntashirakon.AppManager.utils.MenuPills.show(popupMenu, v);
             return true;
         });
         holder.textView.setTextColor(pathPartItem.isCurrent

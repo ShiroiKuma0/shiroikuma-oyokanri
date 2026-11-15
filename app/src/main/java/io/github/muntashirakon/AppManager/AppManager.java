@@ -46,7 +46,7 @@ public class AppManager extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
-        if (isIsolatedProcess()) return;
+        if (isIsolatedProcess() || isProbeProcess()) return;
         PermissionOverrideManager.reconcileAll();
         Thread.setDefaultUncaughtExceptionHandler(new AMExceptionHandler(this));
         AppearanceUtils.init(this);
@@ -63,6 +63,17 @@ public class AppManager extends Application {
         // ours exists, so the listeners that notice a lost/returned server have to be registered for
         // the life of the process rather than by a screen.
         PrivilegeWatchdog.install(this);
+        // Fork (白い熊, 2026-11-15): diagnostics — apply keep-N-days and restore the recording
+        // notification. Disk work, so off the main thread.
+        new Thread(() -> {
+            try {
+                io.github.muntashirakon.AppManager.diag.ForkDiag.cleanUp(this);
+                io.github.muntashirakon.AppManager.diag.ForkDiag.updateNotification(this);
+            } catch (Throwable ignore) {
+            }
+            // Fork: the background process-start watch, when its switch is on.
+            io.github.muntashirakon.AppManager.processreaper.ForkWatchService.sync(this);
+        }, "diag-start").start();
         // Fork (白い熊, +146): remember which screen is on top, so the launcher can return to it
         // even after EMUI has dropped the task. One recorder for every screen at once.
         LastScreenPrefs.install(this);
@@ -88,6 +99,14 @@ public class AppManager extends Application {
         if (!isIsolatedProcess() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && !Utils.isRoboUnitTest()) {
             HiddenApiBypass.addHiddenApiExemptions("L");
         }
+    }
+
+    /** Fork: the start probe's ordinary test process must stay empty — no app start-up work in it. */
+    private static boolean isProbeProcess() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return false;
+        String name = getProcessName();
+        return name != null && name.endsWith(
+                io.github.muntashirakon.AppManager.processreaper.ForkProbeService.Plain.PROCESS_SUFFIX);
     }
 
     private static boolean isIsolatedProcess() {

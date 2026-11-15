@@ -30,6 +30,8 @@ public class BootReceiver extends BroadcastReceiver {
             // restore it by itself — re-scheduling here is the second path, for
             // the case where the job was dropped (app data cleared, OEM job GC).
             BatterySamplerJob.schedule(context.getApplicationContext());
+            // Fork: the background process-start watch, when its switch is on.
+            io.github.muntashirakon.AppManager.processreaper.ForkWatchService.sync(context.getApplicationContext());
         }
     }
 }

@@ -181,6 +181,14 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
     private volatile long mAllocatorPss = -1;
     private long mAllocatorBaseline = -1;
 
+    // Fork (白い熊, 2026-11-15): the "new processes cannot start" watch — see ForkStartWatch.
+    private final ForkStartWatch mForkWatch = ForkStartWatch.get();
+    private final MutableLiveData<ForkStartWatch.Snapshot> mForkStart = new MutableLiveData<>();
+    private final MutableLiveData<ForkStartWatch.Probe> mProbeResult = new MutableLiveData<>();
+    private final MutableLiveData<FixResult> mFixResult = new MutableLiveData<>();
+    // usap64/usap32 pool processes counted in the last /proc stat batch (load thread only).
+    private int mUsapCount;
+
     public ProcessMonitorViewModel(@NonNull Application application) {
         super(application);
     }
@@ -191,6 +199,18 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
 
     public MutableLiveData<SystemHealth> getHealth() {
         return mHealth;
+    }
+
+    public MutableLiveData<ForkStartWatch.Snapshot> getForkStart() {
+        return mForkStart;
+    }
+
+    public MutableLiveData<ForkStartWatch.Probe> getProbeResult() {
+        return mProbeResult;
+    }
+
+    public MutableLiveData<FixResult> getFixResult() {
+        return mFixResult;
     }
 
     /** The loaded row that kills {@code pid}, if any (the health header's suspects link to it). */
@@ -440,6 +460,8 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
                 mAllRows = rows;
                 mRows.postValue(filterRows(rows));
                 publishHealth(ctx);
+                // Only a successful stat batch says anything about the pool.
+                if (!ticks.isEmpty()) mForkStart.postValue(mForkWatch.tick(ctx, mUsapCount));
                 maybeSampleObjects(ctx);
             } finally {
                 mLoading.postValue(false);
@@ -689,6 +711,195 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
         return false;
     }
 
+    // ---- Fork (白い熊, 2026-11-15): process-start probe and staged fix -------------
+
+    /** A background app the fix may stop. */
+    public static final class FixCandidate {
+        @NonNull
+        public final String pkg;
+        public final int userId;
+        @NonNull
+        public final String label;
+        public final long memBytes;
+        public final double cpuPercent;
+        /** Age of the app's process in seconds, 0 when unknown. */
+        public final long ageSec;
+
+        FixCandidate(@NonNull String pkg, int userId, @NonNull String label, long memBytes, double cpuPercent,
+                     long ageSec) {
+            this.ageSec = ageSec;
+            this.pkg = pkg;
+            this.userId = userId;
+            this.label = label;
+            this.memBytes = memBytes;
+            this.cpuPercent = cpuPercent;
+        }
+    }
+
+    public static final int FIX_STAGE_PROBE = 0;
+    public static final int FIX_STAGE_KILL = 1;
+    public static final int FIX_STAGE_FORCE_STOP = 2;
+
+    public static final class FixResult {
+        public final int stage;
+        public final int stopped;
+        public final long memFreeBefore, memFreeAfter, memAvailBefore, memAvailAfter;
+        @NonNull
+        public final ForkStartWatch.Probe probe;
+
+        FixResult(int stage, int stopped, long memFreeBefore, long memFreeAfter, long memAvailBefore,
+                  long memAvailAfter, @NonNull ForkStartWatch.Probe probe) {
+            this.stage = stage;
+            this.stopped = stopped;
+            this.memFreeBefore = memFreeBefore;
+            this.memFreeAfter = memFreeAfter;
+            this.memAvailBefore = memAvailBefore;
+            this.memAvailAfter = memAvailAfter;
+            this.probe = probe;
+        }
+    }
+
+    /**
+     * The apps a fix may stop, heaviest first: exactly the rows the reaper already
+     * calls killable by force-stop. That leaves out everything in use (on screen,
+     * playing, in a call — a foreground service), the user's protected set, the
+     * built-in denylist (launcher, Tasker, keyboard…) and the privilege chain;
+     * 雫 and 自由作業盤 are excluded by name as well, whatever the classifier says.
+     */
+    @NonNull
+    public List<FixCandidate> fixCandidates() {
+        List<FixCandidate> out = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (Row r : mAllRows) {
+            if (!r.cls.killable || r.cls.method != ProcessClassifier.METHOD_FORCE_STOP) continue;
+            if (!(r.item instanceof AppProcessItem) || r.item.uid < Process.FIRST_APPLICATION_UID) continue;
+            String pkg = ((AppProcessItem) r.item).packageInfo.packageName;
+            if (pkg == null || neverStop(pkg) || !seen.add(pkg)) continue;
+            out.add(new FixCandidate(pkg, UserHandleHidden.getUserId(r.item.uid), r.title != null ? r.title : pkg,
+                    r.memBytes, Double.isNaN(r.cpuPercent) ? 0 : r.cpuPercent, (long) ageSec(r.item.pid)));
+        }
+        Collections.sort(out, (a, b) -> Long.compare(b.memBytes, a.memBytes));
+        return out;
+    }
+
+    private static boolean neverStop(@NonNull String pkg) {
+        return ForkFix.neverStop(pkg);
+    }
+
+    // ---- Fork (白い熊, +097): kernel-memory comparison — see KernelMemWatch ----------
+
+    /** Empty = the first snapshot was just taken; otherwise the comparison text. */
+    private final MutableLiveData<String> mCompareResult = new MutableLiveData<>();
+
+    public MutableLiveData<String> getCompareResult() {
+        return mCompareResult;
+    }
+
+    /** Wall time of the comparison's first snapshot, or 0. */
+    public long compareBaseMs() {
+        return KernelMemWatch.get().compareBaseMs();
+    }
+
+    public void compareStart() {
+        ThreadUtils.postOnBackgroundThread(() -> {
+            KernelMemWatch.get().compareStart();
+            mCompareResult.postValue("");
+        });
+    }
+
+    public void compareNow() {
+        ThreadUtils.postOnBackgroundThread(() -> {
+            String text = KernelMemWatch.get().compare(getApplication());
+            mCompareResult.postValue(text == null ? "" : text);
+        });
+    }
+
+    public void compareClear() {
+        KernelMemWatch.get().compareClear();
+    }
+
+    /** The kernel-memory growth report: what the growth follows. */
+    private final MutableLiveData<String> mReportResult = new MutableLiveData<>();
+
+    public MutableLiveData<String> getReportResult() {
+        return mReportResult;
+    }
+
+    // Fork (+105): the filter-program room — FilterPool.
+    private final MutableLiveData<FilterPool.Summary> mPoolResult = new MutableLiveData<>();
+
+    public MutableLiveData<FilterPool.Summary> getPoolResult() {
+        return mPoolResult;
+    }
+
+    /** 0 = just read, 1 = measure now. */
+    public void pool(int what) {
+        ThreadUtils.postOnBackgroundThread(() -> {
+            FilterPool.Summary s;
+            try {
+                s = FilterPool.run(getApplication(), what);
+            } catch (Throwable t) {
+                s = new FilterPool.Summary();
+                s.headline = String.valueOf(t);
+            }
+            mPoolResult.postValue(s);
+        });
+    }
+
+    public void kernelReport() {
+        ThreadUtils.postOnBackgroundThread(() ->
+                mReportResult.postValue(KernelMemWatch.get().report(getApplication())));
+    }
+
+    /** Run the fork probe now; the result arrives on {@link #getProbeResult()}. */
+    public void runProbe() {
+        ThreadUtils.postOnBackgroundThread(() ->
+                mProbeResult.postValue(mForkWatch.probe(getApplication(), "manual")));
+    }
+
+    /** Fix step 0: probe only, nothing stopped. The result arrives on {@link #getFixResult()}. */
+    public void fixProbe() {
+        ThreadUtils.postOnBackgroundThread(() -> {
+            long[] mem = ForkStartWatch.readMeminfo();
+            ForkStartWatch.Probe p = mForkWatch.probe(getApplication(), "fix-step-0");
+            mFixResult.postValue(new FixResult(FIX_STAGE_PROBE, 0, mem[0], mem[0], mem[1], mem[1], p));
+        });
+    }
+
+    /**
+     * Fix step 1 ({@code forceStop} false): ask the system to kill the chosen
+     * apps' background processes — which the system itself refuses for anything
+     * not in the background. Step 2 ({@code forceStop} true): force-stop them.
+     * Either way the apps go in two random halves with a probe after each, and
+     * the second half is left alone when the first already cured it — see
+     * {@link ForkFix#run}.
+     */
+    /**
+     * Fork (+101): the panel's one-tap fix — exactly what the notification's button does: end the
+     * apps the system itself lists as cached, in two halves with a probe after each.
+     */
+    public void fixFreeMemory() {
+        ThreadUtils.postOnBackgroundThread(() -> {
+            ForkFix.Outcome o = ForkFix.run(getApplication(), ForkFix.cachedTargets(), false, "panel");
+            mObjectsMs = 0;
+            mFixResult.postValue(new FixResult(FIX_STAGE_KILL, o.stopped,
+                    o.before[0], o.after[0], o.before[1], o.after[1], o.probe));
+        });
+    }
+
+    public void fixStop(@NonNull List<FixCandidate> chosen, boolean forceStop) {
+        ThreadUtils.postOnBackgroundThread(() -> {
+            List<ForkFix.Target> targets = new ArrayList<>();
+            for (FixCandidate c : chosen) {
+                targets.add(new ForkFix.Target(c.pkg, c.userId, c.memBytes, c.ageSec, c.cpuPercent));
+            }
+            ForkFix.Outcome o = ForkFix.run(getApplication(), targets, forceStop, "monitor");
+            mObjectsMs = 0;
+            mFixResult.postValue(new FixResult(forceStop ? FIX_STAGE_FORCE_STOP : FIX_STAGE_KILL, o.stopped,
+                    o.before[0], o.after[0], o.before[1], o.after[1], o.probe));
+        });
+    }
+
     private double cpuPercentFor(@NonNull ProcessItem p, @Nullable Map<Integer, Long> prev,
                                  @NonNull Map<Integer, Long> ticks, double dtSec) {
         if (prev == null || dtSec <= 0.05) return Double.NaN;
@@ -717,6 +928,7 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
         Map<Integer, Long> map = new HashMap<>(400);
         Map<Integer, Integer> ppid = new HashMap<>(400);
         Map<Integer, Long> start = new HashMap<>(400);
+        int usap = 0;
         try {
             Runner.Result r = Runner.runCommand("cat /proc/[0-9]*/stat 2>/dev/null");
             if (r == null || !r.isSuccessful()) {
@@ -736,6 +948,8 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
                 }
                 // Fields after "pid (comm)": [0]=state, [1]=ppid, … [11]=utime,
                 // [12]=stime, … [19]=starttime (proc stat field 22).
+                String comm = line.substring(open + 1, close);
+                if ("usap64".equals(comm) || "usap32".equals(comm)) usap++;
                 String[] f = line.substring(close + 1).trim().split("\\s+");
                 if (f.length < 13) continue;
                 try {
@@ -749,6 +963,7 @@ public class ProcessMonitorViewModel extends AndroidViewModel {
         }
         mPpid = ppid;
         mStart = start;
+        mUsapCount = usap;
         return map;
     }
 

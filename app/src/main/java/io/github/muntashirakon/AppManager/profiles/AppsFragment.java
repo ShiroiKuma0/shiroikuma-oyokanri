@@ -176,7 +176,7 @@ public class AppsFragment extends Fragment implements SwipeRefreshLayout.OnRefre
                                 mModel.deletePackage(fragmentItem.packageName);
                                 return true;
                             });
-                    popupMenu.show();
+                    io.github.muntashirakon.AppManager.utils.MenuPills.show(popupMenu, holder.itemView);
                     return true;
                 });
             } else {

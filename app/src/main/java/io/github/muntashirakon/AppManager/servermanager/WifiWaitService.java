@@ -114,7 +114,7 @@ public class WifiWaitService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle(getString(R.string.waiting_for_wifi))
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setSmallIcon(io.github.muntashirakon.AppManager.R.drawable.ic_default_notification)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOngoing(true)
                 .build();

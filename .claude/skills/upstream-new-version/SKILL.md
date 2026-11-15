@@ -13,7 +13,7 @@ pipeline, the server-JAR hard gate, the per-commit conflict watch-points, the CL
 chokepoint table, the version scheme — lives in the **`appmanager-fork`** skill (auto-loads on
 any task in this repo) and the **`build`** skill. **Read `appmanager-fork` before running this**,
 especially its *"Why master, not a tag"*, *"Upstream sync — rebase custom onto fresh master"*,
-and *Versioning* sections, plus CLAUDE.md's *Key files & chokepoints* table. This skill sequences
+and *Versioning* sections, plus the per-area notes under `.claude/reference/` (indexed in CLAUDE.md). This skill sequences
 those pieces and adds the two decision gates 白い熊 requires: the **pre-rebase summary** and the
 **no-silent-loss rebase rule**.
 
@@ -326,7 +326,7 @@ new base. (Push them with the next push, or amend if still local.)
   Unfrozen filter) — the `BuildConfig.DEBUG`-gated sites we flipped on. Some DEBUG-gated sites are
   intentionally left alone (see `appmanager-fork` → "Several other BuildConfig.DEBUG-gated sites") —
   don't reflexively flip them on rebase.
-- **The 93-commit feature stack** — CLAUDE.md's *Key files & chokepoints* table is the map for
+- **The 93-commit feature stack** — the per-area notes under `.claude/reference/` (indexed in CLAUDE.md) is the map for
   re-anchoring each feature if upstream moves the file it hooks: `FreezeUtils` / `PackageInstallerCompat`
   (protected `必要` profile), `MainToolbarPrefs` / `MainRecyclerAdapter` / `MainViewModel` (main list,
   notes, pills, batch snap), `BatchOpsManager` / `BatchOpsProgressMonitor` (batch progress dialog),

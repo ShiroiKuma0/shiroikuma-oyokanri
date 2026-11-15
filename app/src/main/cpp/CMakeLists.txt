@@ -32,7 +32,8 @@ add_library(am SHARED
         AhoCorasick.cpp
         io_github_muntashirakon_algo_AhoCorasick.cpp
         io_github_muntashirakon_AppManager_utils_CpuUtils.cpp
-        io_github_muntashirakon_compat_system_OsCompat.cpp)
+        io_github_muntashirakon_compat_system_OsCompat.cpp
+        shiroikuma_kernel_probe.c)
 
 target_link_libraries(am ${log-lib})
 

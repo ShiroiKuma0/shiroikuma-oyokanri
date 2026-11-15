@@ -355,7 +355,7 @@ public class ProfilesActivity extends BaseActivity implements NewProfileDialogFr
                     } else return false;
                     return true;
                 });
-                popupMenu.show();
+                io.github.muntashirakon.AppManager.utils.MenuPills.show(popupMenu, v);
                 return true;
             });
         }

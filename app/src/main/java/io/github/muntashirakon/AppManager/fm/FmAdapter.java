@@ -143,7 +143,7 @@ class FmAdapter extends MultiSelectionView.Adapter<FmItem, FmAdapter.ViewHolder>
         });
         // Set actions
         PopupMenu popupMenu = getPopupMenu(holder.action, item, holder);
-        holder.action.setOnClickListener(v -> popupMenu.show());
+        holder.action.setOnClickListener(v -> io.github.muntashirakon.AppManager.utils.MenuPills.show(popupMenu, v));
         holder.itemView.setOnLongClickListener(v -> {
             int currentPos = holder.getBindingAdapterPosition();
             if (currentPos == RecyclerView.NO_POSITION) return false;

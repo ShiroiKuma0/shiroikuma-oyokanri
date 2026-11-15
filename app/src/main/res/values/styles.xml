@@ -108,6 +108,8 @@
     </style>
 
     <style name="AppTheme.YellowOnBlack" parent="AppTheme">
+        <!-- Fork (+104): every MaterialSwitch inflated here is the theme's outlined switch. -->
+        <item name="viewInflaterClass">io.github.muntashirakon.AppManager.utils.ForkViewInflater</item>
         <!-- Fork: the bottom-sheet frame. It belongs on the ACTIVITY theme, not on
              the dialog overlay where forkDialogBorderDrawable lives: a bottom sheet
              resolves its attributes from the hosting activity's theme, so putting

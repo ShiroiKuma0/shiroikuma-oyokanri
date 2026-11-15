@@ -529,7 +529,7 @@ public class FmActivity extends BaseActivity {
                         return true;
                     });
                 }
-                popupMenu.show();
+                io.github.muntashirakon.AppManager.utils.MenuPills.show(popupMenu, v);
                 return true;
             });
         }

@@ -182,6 +182,9 @@ public final class SettingsBackupManager {
      */
     private static final Set<String> EXCLUDED_PREFS = new HashSet<>(
             Arrays.asList(AutomationAuth.PREF_FILE, SnoopingImmovable.PREF_FILE, NetBlockState.PREF_FILE,
+                    // Fork (2026-11-15): which diagnostics record on THIS phone; a restored
+                    // install records nothing until it is switched on here.
+                    io.github.muntashirakon.AppManager.diag.ForkDiag.PREF_FILE,
                     BatteryPrefs.STATE_PREF_FILE, PolicyLockState.PREF_FILE,
                     // Fork (+146): where this phone was last, and a cache of deep tracker scans
                     // keyed by installed version. Both are derived state about THIS device; a

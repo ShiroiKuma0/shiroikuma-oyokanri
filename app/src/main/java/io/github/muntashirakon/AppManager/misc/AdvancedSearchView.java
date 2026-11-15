@@ -137,7 +137,7 @@ public class AdvancedSearchView extends SearchView {
         if ((mEnabledTypes & SEARCH_TYPE_REGEX) == 0) {
             menu.findItem(R.id.action_search_type_regex).setVisible(false);
         }
-        popupMenu.show();
+        io.github.muntashirakon.AppManager.utils.MenuPills.show(popupMenu, v);
     };
 
     public AdvancedSearchView(@NonNull Context context) {

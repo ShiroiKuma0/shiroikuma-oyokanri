@@ -114,7 +114,7 @@ public final class BatteryAlerts {
                 CHANNEL_ID, context.getString(R.string.battery_alert_channel),
                 NotificationManagerCompat.IMPORTANCE_DEFAULT);
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_battery_history)
+                .setSmallIcon(R.drawable.ic_default_notification)
                 .setContentTitle(context.getString(R.string.battery_alert_title, label))
                 .setContentText(reason)
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(reason))

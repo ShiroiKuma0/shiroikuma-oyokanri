@@ -48,8 +48,11 @@
         android:icon="@drawable/ic_refresh"
         android:title="@string/refresh"
         app:showAsAction="always" />
+    <!-- Fork (白い熊, +099): the overflow is our own popup of pills (showMoreMenu), not the
+         platform's bare-text list. Long-press still opens the UI page. -->
     <item
-        android:id="@+id/action_monitor_interval"
-        android:title="@string/monitor_interval"
-        app:showAsAction="never" />
+        android:id="@+id/action_monitor_more"
+        android:icon="@drawable/ic_more_vert"
+        android:title="@string/monitor_more"
+        app:showAsAction="always" />
 </menu>

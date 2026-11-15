@@ -524,7 +524,7 @@ public class LogViewerRecyclerAdapter extends MultiSelectionView.Adapter<LogLine
                         AccessibilityUtils.requestAccessibilityFocus(holder.itemView);
                         return true;
                     });
-            popupMenu.show();
+            io.github.muntashirakon.AppManager.utils.MenuPills.show(popupMenu, v);
             return true;
         });
         super.onBindViewHolder(holder, position);

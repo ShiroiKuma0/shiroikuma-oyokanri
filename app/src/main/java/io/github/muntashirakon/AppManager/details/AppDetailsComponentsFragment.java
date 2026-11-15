@@ -571,7 +571,7 @@ public class AppDetailsComponentsFragment extends AppDetailsFragment {
                     applyRules(item, ruleType, componentStatus);
                     return true;
                 });
-                popupMenu.show();
+                io.github.muntashirakon.AppManager.utils.MenuPills.show(popupMenu, holder.toggleSwitch);
                 return true;
             });
         }

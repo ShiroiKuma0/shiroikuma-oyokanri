@@ -195,7 +195,9 @@ public class ProcessMonitorAdapter extends RecyclerView.Adapter<ProcessMonitorAd
         if (realApp) {
             PackageInfo pi = ((AppProcessItem) row.item).packageInfo;
             h.icon.setTag(pi.packageName);
-            ImageLoader.getInstance().displayImage(pi.packageName, pi.applicationInfo, h.icon);
+            // Fork (+099): versioned by lastUpdateTime, or an update keeps its old icon for up to 7 days.
+            ImageLoader.getInstance().displayImage(ImageLoader.versionedTag(pi.packageName, pi.lastUpdateTime),
+                    pi.applicationInfo, h.icon);
         } else {
             h.icon.setTag(null);
             h.icon.setImageResource(R.drawable.ic_android);

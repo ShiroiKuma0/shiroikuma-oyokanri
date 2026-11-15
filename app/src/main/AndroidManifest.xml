@@ -56,6 +56,8 @@
         android:name="android.permission.FORCE_STOP_PACKAGES"
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Fork: lets the process-start fix end cached processes without the privileged server. -->
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
@@ -224,6 +226,13 @@
             android:exported="false"
             android:label="@string/monitor_title"
             android:theme="@style/AppTheme.YellowOnBlack" />
+        <!-- Fork (+106): the filter-program room, browsable -->
+        <activity
+            android:name=".processreaper.FilterPoolActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:exported="false"
+            android:label="@string/monitor_pool_title"
+            android:theme="@style/AppTheme.YellowOnBlack" />
         <!-- Fork: process detail / inspector screen -->
         <activity
             android:name=".processreaper.ProcessDetailActivity"
@@ -231,6 +240,34 @@
             android:exported="false"
             android:label="@string/monitor_detail_title"
             android:theme="@style/AppTheme.YellowOnBlack" />
+        <!-- Fork (白い熊, 2026-11-15): the process-start probe. Binding to it forks a fresh
+             isolated process from zygote; see ForkProbeService. -->
+        <service
+            android:name=".processreaper.ForkProbeService"
+            android:exported="false"
+            android:isolatedProcess="true"
+            android:process=":forkprobe" />
+        <!-- Fork: the same probe in an ordinary process, to tell "only sandboxed processes
+             fail" from "every start fails". -->
+        <service
+            android:name=".processreaper.ForkProbeService$Plain"
+            android:exported="false"
+            android:process=":forkprobeplain" />
+        <!-- Fork (白い熊, 2026-11-15): the background process-start watch. It keeps this app's
+             process alive, because during a burst the app could not be started to fix it. -->
+        <service
+            android:name=".processreaper.ForkWatchService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            tools:targetApi="30">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Watch for failing process starts and offer to end background processes" />
+        </service>
+        <!-- Fork: the diagnostics recording notification's buttons (Mark, Turn all off). -->
+        <receiver
+            android:name=".diag.ForkDiagReceiver"
+            android:exported="false" />
         <!-- Fork: battery history screen (black/yellow theme) -->
         <activity
             android:name=".battery.BatteryUsageActivity"

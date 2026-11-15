@@ -181,7 +181,7 @@ public final class SortMenuPopup {
         row.setPadding(padH, padV, padH, padV);
         row.setClickable(true);
         row.setOnClickListener(onClick);
-        if (checked) {
+        if (checked && !square) {
             row.setBackgroundColor(withAlpha(ink, SELECTED_WASH_ALPHA));
         }
 
@@ -195,6 +195,19 @@ public final class SortMenuPopup {
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         row.addView(label, labelLp);
 
+        if (square) {
+            // Fork (+104): Reverse is a toggle, so it carries the theme's outlined switch.
+            View sw = new View(context);
+            sw.setBackground(new io.github.muntashirakon.AppManager.utils.ForkSwitchDrawable(ink,
+                    io.github.muntashirakon.AppManager.utils.ForkSwitch.offColor(ink, ForkThemeUtils.getBackgroundColor()),
+                    Math.round(dp(context, 44f)), Math.round(dp(context, 24f)),
+                    Math.round(dp(context, 2f))).checked(checked));
+            LinearLayoutCompat.LayoutParams swLp = new LinearLayoutCompat.LayoutParams(
+                    Math.round(dp(context, 44f)), Math.round(dp(context, 24f)));
+            swLp.leftMargin = Math.round(dp(context, 10f));
+            row.addView(sw, swLp);
+            return row;
+        }
         View marker = new View(context);
         GradientDrawable shape = new GradientDrawable();
         shape.setShape(square ? GradientDrawable.RECTANGLE : GradientDrawable.OVAL);

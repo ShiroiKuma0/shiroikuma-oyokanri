@@ -383,7 +383,7 @@ public class CodeEditorFragment extends AndroidFragment implements MenuProvider 
                         search(mSearchView.getText());
                         return true;
                     });
-            popupMenu.show();
+            io.github.muntashirakon.AppManager.utils.MenuPills.show(popupMenu, v);
         });
         mSearchResultCount = view.findViewById(R.id.search_result_count);
         view.findViewById(R.id.previous_button).setOnClickListener(v -> {
@@ -463,7 +463,7 @@ public class CodeEditorFragment extends AndroidFragment implements MenuProvider 
                     return true;
                 });
             }
-            popupMenu.show();
+            io.github.muntashirakon.AppManager.utils.MenuPills.show(popupMenu, v);
         });
         mPositionButton = view.findViewById(R.id.position);
         mPositionButton.setOnClickListener(v -> {
