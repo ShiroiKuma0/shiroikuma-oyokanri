@@ -10,6 +10,34 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-11-03.19-47.gdc4154f4+116 — 2026-11-17
+
+Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.
+Two fixes around the VirusTotal dialog: scan notifications no longer pile up, and the dialog no
+longer depends on which app opened the APK.
+
+### Notifications
+
+- **No leftover scan entries.** Each scan has a progress entry in the notification shade, and it was
+  withdrawn only when the scan ended with a result. A scan that stopped to wait — for the upload
+  answer, for quota, for Wi-Fi — left its entry there for good, also after the app had long been
+  installed. The entry is now withdrawn whenever the scan stops.
+- **The upload question is asked in the dialog, not in the shade.** While the report dialog or the
+  history is open, a scan waiting for consent posts nothing; otherwise one notice that opens the
+  dialog and goes away when tapped.
+- **Installing from the upload question answers it with "no".** The scan is marked cancelled instead
+  of waiting for consent for ever; **Retry** stays available.
+
+### Opening an APK
+
+- **Every APK opened from another app is vetted first.** A plain "open" or "install" request — from
+  a file manager that does not know the scan request, a browser, a download notification — now
+  opens the VirusTotal dialog, whose install button installs as before. Until now such a request went
+  straight to the installer.
+- The installer is still shown directly when no real path can be found for the file (the dialog
+  installs from a path), for installs started inside the app, and for a file added to a running
+  install queue.
+
 ## 4.1.1+2026-11-03.19-47.gdc4154f4+114 — 2026-11-17
 
 Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.
