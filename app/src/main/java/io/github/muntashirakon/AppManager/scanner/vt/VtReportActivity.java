@@ -289,7 +289,13 @@ public class VtReportActivity extends BaseActivity {
                 mViewModel.rejectUpload(active.id);
                 finish();
             }, action(getString(R.string.vt_confirm_upload_and_scan),
-                    v -> mViewModel.approveUpload(active.id)), install);
+                    v -> mViewModel.approveUpload(active.id)),
+                    // Fork (白い熊, +115): installing without uploading answers the question with
+                    // "no" — else the attempt waited for consent for ever, with its notification.
+                    state.realPathString == null ? null : action(installLabel(state), v -> {
+                        mViewModel.rejectUpload(active.id);
+                        installHandoff(state);
+                    }));
             addFileHeader(state);
             return;
         }

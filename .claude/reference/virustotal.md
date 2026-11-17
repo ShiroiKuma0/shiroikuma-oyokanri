@@ -125,3 +125,21 @@ be renamed on one side** — they live in `scanner/vt/VtContract.java`.
   upload-question and not-scanned/failed/cancelled states it was first and the scan action was the main one;
   under a report it was already last. `setActions` makes the last action the thick one, so install is now the
   main action in every state that has it.
+- **+115 — “Waiting for upload consent” notifications stayed after the install (白い熊, 2026-11-17).**
+  `ScanProgress` is a **sub**-handler of `NotificationProgressHandler`; its `onDetach(null)` removes
+  nothing — only `onResult(…)` cancels the progress entry. A scan that ended without a result
+  (`parked(…)`: consent, quota, Wi-Fi) therefore left its ongoing entry behind for good. `detach()`
+  now calls `onResult(null)` first. A consent park goes through `needsConsent()`: nothing while the
+  report dialog or the history is visible, else one auto-cancel notice that opens the dialog. And the
+  install button in the consent state calls `rejectUpload` first — installing without uploading is
+  the answer “no”; before, the attempt stayed `pending_consent` for ever.
+- **+116 — a plain APK open goes through the report dialog too (白い熊, 2026-11-17).** The dialog
+  depended on the sender knowing `ACTION_VT_SCAN`: an old 書類管理 (1.7.4+24, on a second phone) sent
+  `ACTION_VIEW` straight to `PackageInstallerActivity` and got the bare installer.
+  `PackageInstallerActivity.handOverToVetting` now forwards an external `VIEW`/`INSTALL_PACKAGE` to
+  `VtReportActivity` as a scan request and finishes. **Only with a real readable path** (the
+  `REAL_PATH` extra, a `file://` URI, or `readlink /proc/self/fd/N` of the opened content URI) —
+  without one the dialog has no install button, so the installer is shown as before. **Never
+  redirected:** the confirmed mark (`sConfirmedUri`) and every in-app launch (those carry no action),
+  which is what keeps the dialog's own install from looping. A later intent to the already running
+  singleInstance installer (`onNewIntent`, the queue) is not redirected either.

@@ -49,6 +49,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import io.github.muntashirakon.AppManager.scanner.vt.VtContract;
+import io.github.muntashirakon.AppManager.scanner.vt.VtReportActivity;
 import io.github.muntashirakon.AppManager.BaseActivity;
 import io.github.muntashirakon.AppManager.BuildConfig;
 import io.github.muntashirakon.AppManager.R;
@@ -261,6 +263,11 @@ public class PackageInstallerActivity extends BaseActivity implements InstallerD
             sConfirmedUri = null;
             mConfirmedAlready = true;
         }
+        // Fork (白い熊, +116): a plain "open this APK" from another app is vetted first.
+        if (savedInstanceState == null && !mConfirmedAlready && handOverToVetting(intent)) {
+            finish();
+            return;
+        }
         mModel = new ViewModelProvider(this).get(PackageInstallerViewModel.class);
         if (ACTION_PACKAGE_INSTALLED.equals(intent.getAction())) {
             onNewIntent(intent);
@@ -329,6 +336,47 @@ public class PackageInstallerActivity extends BaseActivity implements InstallerD
                         null, false);
             }
         });
+    }
+
+    /**
+     * Fork (白い熊, +116): an APK opened from outside with a plain VIEW or INSTALL_PACKAGE — a file
+     * manager that does not know the vetting chain, a browser, a download notification — goes
+     * through the VirusTotal dialog like a scan request does, so the dialog no longer depends on how
+     * recent the sender is. An old 書類管理 (1.7.4+24) on a second phone showed the bare installer.
+     *
+     * <p>Only with a real, readable path: the report dialog installs from the path and hides its
+     * install button without one, which would leave no way to install at all. Launches from inside
+     * this app carry no action and are never redirected, so the dialog's own install cannot loop.
+     */
+    private boolean handOverToVetting(@NonNull Intent intent) {
+        String action = intent.getAction();
+        if (!Intent.ACTION_VIEW.equals(action) && !Intent.ACTION_INSTALL_PACKAGE.equals(action)) {
+            return false;
+        }
+        Uri uri = intent.getData();
+        if (uri == null) return false;
+        try {
+            String path = intent.getStringExtra(VtContract.EXTRA_REAL_PATH);
+            if (path == null && "file".equals(uri.getScheme())) {
+                path = uri.getPath();
+            } else if (path == null && "content".equals(uri.getScheme())) {
+                try (android.os.ParcelFileDescriptor fd = getContentResolver().openFileDescriptor(uri, "r")) {
+                    if (fd != null) path = android.system.Os.readlink("/proc/self/fd/" + fd.getFd());
+                }
+            }
+            if (path == null) return false;
+            java.io.File file = new java.io.File(path);
+            if (!file.isAbsolute() || !file.isFile() || !file.canRead()) return false;
+            startActivity(new Intent(this, VtReportActivity.class)
+                    .setAction(VtContract.ACTION_VT_SCAN)
+                    .setDataAndType(uri, intent.getType())
+                    .putExtra(VtContract.EXTRA_REAL_PATH, file.getAbsolutePath())
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION));
+            return true;
+        } catch (Throwable th) {
+            Log.w(TAG, "Could not hand the file to the vetting dialog; installing directly.", th);
+            return false;
+        }
     }
 
     @Override

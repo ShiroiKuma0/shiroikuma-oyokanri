@@ -284,7 +284,7 @@ public class VtScanService extends Service {
                     // to be asked before anything is uploaded. Park for consent; approval turns the
                     // attempt into an upload and re-queues it.
                     repository.parkAttempt(attempt.id, VtScanAttempt.STATUS_PENDING_CONSENT, 0);
-                    progress.parked(getString(R.string.vt_pending_consent));
+                    progress.needsConsent();
                     return;
                 } else if (VtScanAttempt.TYPE_LOOKUP.equals(attempt.type)
                         && response.error != null && "NotFoundError".equals(response.error.code)) {
@@ -599,8 +599,24 @@ public class VtScanService extends Service {
                     ? keyNeededInfo(getString(R.string.vt_needs_key)) : null);
         }
 
+        // Fork (白い熊, +115): the scan waits for an answer only the report dialog can take. With
+        // the dialog open there is nothing to announce; otherwise one dismissible notice that
+        // opens it — never the ongoing progress entry, which stayed after the app was installed.
+        void needsConsent() {
+            mText.set(getString(R.string.vt_pending_consent));
+            postResult(isNotificationAllowed()
+                    ? createInfo(getString(R.string.vt_pending_consent)).setAutoCancel(true) : null);
+        }
+
         void detach() {
-            ThreadUtils.postOnMainThread(() -> mHandler.onDetach(null));
+            // Fork (白い熊, +115): a sub-handler's onDetach(null) removes nothing, so a scan that
+            // ended without a result (parked for quota or Wi-Fi) left its progress entry behind
+            // for good. onResult(null) only withdraws the progress entry; posted after a real
+            // result it is a no-op.
+            ThreadUtils.postOnMainThread(() -> {
+                mHandler.onResult(null);
+                mHandler.onDetach(null);
+            });
         }
 
         private void postResult(@Nullable NotificationProgressHandler.NotificationInfo info) {
