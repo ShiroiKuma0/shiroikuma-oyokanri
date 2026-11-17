@@ -38,8 +38,9 @@ import io.github.muntashirakon.AppManager.utils.UIUtils;
  */
 public class FilterPoolActivity extends BaseActivity {
     private static final int TABLE_SHORT = 40;
-    private static final String[] ALT_KEYS = {"", "apps", "procs", "forks", "mounts", "kernel"};
-    private static final int[] ALT_LABELS = {R.string.pool_page_alt_none, R.string.pool_page_alt_apps,
+    private static final String[] ALT_KEYS = {"", "sum", "held", "apps", "procs", "forks", "mounts", "kernel"};
+    private static final int[] ALT_LABELS = {R.string.pool_page_alt_none, R.string.pool_page_alt_sum,
+            R.string.pool_page_alt_held, R.string.pool_page_alt_apps,
             R.string.pool_page_alt_procs, R.string.pool_page_alt_forks, R.string.pool_page_alt_mounts,
             R.string.pool_page_alt_kernel};
     private static final int[] RANGE_LABELS = {R.string.pool_page_range_boot, R.string.pool_page_range_day,
@@ -147,6 +148,8 @@ public class FilterPoolActivity extends BaseActivity {
         long v;
         switch (key) {
             case "apps": v = r.apps; break;
+            case "sum": v = r.held < 0 || r.free < 0 ? -1 : r.free + r.held; break;
+            case "held": v = r.held; break;
             case "procs": v = r.procs; break;
             case "forks": v = r.forks; break;
             case "mounts": v = r.mounts; break;
@@ -197,8 +200,9 @@ public class FilterPoolActivity extends BaseActivity {
         tiles.add(new PanelViews.Tile(getString(R.string.pool_page_tile_size),
                 s.fullest < 0 ? getString(R.string.pool_page_not_measured) : n(s.fullest), ink));
         tiles.add(new PanelViews.Tile(getString(R.string.pool_page_tile_uptime), span(s.uptimeS), ink));
-        tiles.add(new PanelViews.Tile(getString(R.string.pool_page_tile_apps),
-                latest == null ? "—" : n(latest.apps), ink));
+        boolean hasHeld = latest != null && latest.held >= 0;
+        tiles.add(new PanelViews.Tile(getString(hasHeld ? R.string.pool_page_tile_held : R.string.pool_page_tile_apps),
+                latest == null ? "—" : n(hasHeld ? latest.held : latest.apps), ink));
         tiles.add(new PanelViews.Tile(getString(R.string.pool_page_tile_trend),
                 Double.isNaN(trend[0]) ? "—" : String.format(Locale.US, "%+,.1f", trend[0]),
                 !Double.isNaN(trend[0]) && trend[0] < -0.5 ? warn : ink));
@@ -225,6 +229,7 @@ public class FilterPoolActivity extends BaseActivity {
         final String altKey = ALT_KEYS[mAlt];
         List<PanelViews.Point> points = new ArrayList<>();
         for (FilterPool.Reading r : range) {
+            if (!r.exact) continue; // listed below, never drawn
             PanelViews.Point p = new PanelViews.Point();
             p.timeMs = r.wallMs;
             p.value = r.free;
@@ -370,8 +375,6 @@ public class FilterPoolActivity extends BaseActivity {
         int ink = PanelViews.ink(), warn = PanelViews.warn(this), dim = PanelViews.dim(this);
         add(sb, "● ", ink);
         add(sb, getString(R.string.pool_page_legend_exact) + "   ", dim);
-        add(sb, "○ ", ink);
-        add(sb, getString(R.string.pool_page_legend_atleast) + "   ", dim);
         add(sb, "● ", warn);
         add(sb, getString(R.string.pool_page_legend_failing) + "   ", dim);
         add(sb, "▮ ", warn);

@@ -124,3 +124,29 @@ Fork replacement for the legacy "Running apps" screen, now **deleted** (`Running
   measurement took it; the "Fullest since the restart" tile and the meter use it (the tile used to say
   "Not measured" unless the Pool size test had run). `store()` no longer lets the half-hourly "at least 6"
   replace a fresher exact reading as the shown figure (`EXACT_KEEP_MS`, 26 h).
+- **+108 — the chart drew "at least 6" as 6, and the full count now runs hourly (白い熊, 2026-11-16).** After the
+  first night the chart showed a flat line at zero between two exact readings: the half-hourly quick readings
+  (cap 6, "at least 6") were plotted at their value and joined into the curve. `PanelViews.Chart` now draws the
+  curve through **exact points only**, on a scale **fitted to them** (`mMin`…`mMax`, so 1,435 → 1,380 is
+  visible), and puts inexact points as small hollow marks on the top edge (still pickable). `DEEP_MS` is one
+  hour (it was 24 h — the night had no exact reading at all); each full count empties the pool for ~80 ms.
+  The trend needs `TREND_MIN_POINTS` 5 exact readings over `TREND_MIN_SPAN_MS` 6 h (three points over one hour
+  produced "−96.1 a day, 14.4 days"). First real interval: 1,435 → 1,380 in 13.6 h with apps 63 → 76.
+- **+109 — no more half-hourly quick reading (白い熊, 2026-11-16: “they are misleading”).** With ~1,400 free the
+  cap-6 gauge can only say "at least 6", and the hourly full count makes it redundant. `maybeMeasure` runs the
+  full count only; the gauge survives **only beside a failing probe** (`gaugeForProbe`, kind `probe`), where it
+  is exact and carries the reserve proof. `rows()` drops every line with `exact=0` unless `failing=1`, so old
+  `quick` lines stay in the file but appear nowhere; the charts skip inexact points altogether and the legend
+  lost its "at least" entry. An inexact reading **while failing** is kept in the list on purpose: it would
+  contradict the full-pool explanation.
+- **+110 — held programs counted directly (白い熊, 2026-11-17).** One day of hourly readings: room + app
+  processes stayed 1,452–1,463 for 24 h (−3.6 ± 1.8 a day with the app count regressed out), after a one-off drop
+  of 43 in the first 13.6 h; forks now ~305 k/day against a 63-day average of 1.84 M/day, and the old loss per
+  fork (1 per 86 k) predicts 3.5 a day — fits, unproven. The kernel (5.10) prints `Seccomp_filters:` in
+  `/proc/<pid>/status`, readable by the shell (gid readproc): 91 processes in filter mode, 96 programs in sum,
+  with 83 app processes. Each `room` line now carries **`fproc=`** (processes with `Seccomp: 2`) and **`fsum=`**
+  (sum of `Seccomp_filters`); `Reading.held`/`holders`. **free + fsum** is the figure to watch — its fall is the
+  loss, measured, not inferred. Page: second curves "Room + held" and "Held by processes", and the apps tile
+  shows the held figure once a reading has it. Caveat: a child that inherited its parent's filter is counted
+  with the same program again, so `fsum` can overcount shared programs. Toybox here has no `awk`.
+

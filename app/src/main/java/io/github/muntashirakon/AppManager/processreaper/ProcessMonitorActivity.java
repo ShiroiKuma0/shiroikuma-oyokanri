@@ -1010,6 +1010,7 @@ public class ProcessMonitorActivity extends BaseActivity {
         if (boot.size() >= 2) {
             java.util.List<PanelViews.Point> points = new java.util.ArrayList<>();
             for (FilterPool.Reading r : boot) {
+                if (!r.exact) continue;
                 PanelViews.Point p = new PanelViews.Point();
                 p.timeMs = r.wallMs;
                 p.value = r.free;

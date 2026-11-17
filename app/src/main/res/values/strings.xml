@@ -2029,6 +2029,9 @@
     <string name="pool_page_range_week">7 days</string>
     <string name="pool_page_range_all">Everything</string>
     <string name="pool_page_alt_none">Room only</string>
+    <string name="pool_page_alt_sum">Room + held</string>
+    <string name="pool_page_alt_held">Held by processes</string>
+    <string name="pool_page_tile_held">Held by processes</string>
     <string name="pool_page_alt_apps">App processes</string>
     <string name="pool_page_alt_procs">Processes</string>
     <string name="pool_page_alt_forks">Created since restart</string>
@@ -2038,7 +2041,6 @@
     <string name="pool_page_touch">Touch the chart for a reading and its figures.</string>
     <string name="pool_page_readout">%1$s · room %2$s · %3$s\nApp processes %4$s · processes %5$s · threads %6$s\nCreated %7$s thousand · mounts %8$s · kernel memory %9$s MB · up %10$s</string>
     <string name="pool_page_legend_exact">exact</string>
-    <string name="pool_page_legend_atleast">at least</string>
     <string name="pool_page_legend_failing">while failing</string>
     <string name="pool_page_legend_burst">burst</string>
     <string name="pool_page_bursts">Bursts (%1$d)</string>
@@ -2057,7 +2059,7 @@
     <string name="pool_page_col_mounts">Mounts</string>
     <string name="pool_page_show_all">Show all %1$d</string>
     <string name="pool_page_show_less">Show fewer</string>
-    <string name="pool_page_explain">Every app process holds one filter program. When no room is left, the kernel refuses every new one and no app can start. A “+” means at least that many, since a reading stops at its cap so as not to empty the pool. Orange marks a reading taken while starts were failing.</string>
+    <string name="pool_page_explain">Every app process holds one filter program. When no room is left, the kernel refuses every new one and no app can start. A “+” means at least that many: the small gauge beside a failing start stops at six. Orange marks a reading taken while starts were failing.</string>
     <string name="pool_page_size_explain">This fills the whole free pool once to count it, then releases it. For a moment no app can start, and an app that starts in that moment fails. It tells how much room a freshly restarted phone has.</string>
     <string name="pool_page_churn_explain">This measures the room, creates and releases %1$d programs one by one, and measures again. It takes about half a minute. If the room is smaller afterwards beyond the apps that started meanwhile, creating and releasing programs is what uses the pool up — and the test has then used some of it for good, until the next restart.</string>
     <string name="pool_page_run">Run</string>
@@ -2086,7 +2088,7 @@
     <string name="fork_panel_kmalloc">Of it, 64-byte objects</string>
     <string name="fork_panel_explain">When this fails, the kernel has no room left for the security filter every new process needs, so apps and WebView renderers die the moment they start. Memory is not exhausted. Ending cached apps returns their filters and cures it for a while; only a restart returns the rest.</string>
     <string name="diag_filterpool_title">Filter-program room</string>
-    <string name="diag_filterpool_desc">Measures how many filter programs the kernel still accepts — the room that runs out when new processes cannot start — and records it with the figures beside it: every 30 minutes a small reading, once a day and after each restart a deep one. Needs the background watch.</string>
+    <string name="diag_filterpool_desc">Measures how many filter programs the kernel still accepts — the room that runs out when new processes cannot start — and records it with the figures beside it: a full count every hour and after each restart, and a small gauge beside each failing start. Needs the background watch.</string>
     <string name="monitor_pool_pill">Filter room %1$s</string>
     <string name="monitor_pool_pill_none">Filter room: not measured</string>
     <string name="monitor_pool_title">Filter-program room</string>
@@ -2106,7 +2108,7 @@
     <string name="monitor_pool_trend">Trend: %1$s programs per day.</string>
     <string name="monitor_pool_left">At this rate the room is used up in about %1$.1f days.</string>
     <string name="monitor_pool_per_forks">Per million processes and threads created: %1$s.</string>
-    <string name="monitor_pool_trend_none">No trend yet: it needs three exact readings at least an hour apart.</string>
+    <string name="monitor_pool_trend_none">No trend yet: it needs five exact readings over at least six hours.</string>
     <string name="monitor_pool_table">Latest readings — time, room, kind, then apps · processes · thousand creations:</string>
     <string name="monitor_pool_row_ctx">%1$s · %2$s · %3$s</string>
     <string name="monitor_pool_table_none">None yet.</string>

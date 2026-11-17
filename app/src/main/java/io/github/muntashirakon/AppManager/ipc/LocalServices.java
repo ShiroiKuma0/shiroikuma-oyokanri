@@ -157,6 +157,9 @@ public class LocalServices {
     @WorkerThread
     private static void unbindServicesIfRunning() {
         // Basically unregister the services so that we can open another connection
+        // Fork (+112): this unbind is housekeeping before a bind, not a lost backend — it must not
+        // take the root route with it. See Ops.snapshotRootRoute.
+        boolean[] rootRoute = Ops.snapshotRootRoute();
         CountDownLatch unbindWatcher = new CountDownLatch(1);
         ThreadUtils.postOnMainThread(() -> {
             try {
@@ -169,5 +172,6 @@ public class LocalServices {
             unbindWatcher.await(30, TimeUnit.SECONDS);
         } catch (InterruptedException ignore) {
         }
+        Ops.restoreRootRoute(rootRoute);
     }
 }

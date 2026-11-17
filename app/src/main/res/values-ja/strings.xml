@@ -1538,6 +1538,9 @@
     <string name="pool_page_range_week">7 日</string>
     <string name="pool_page_range_all">すべて</string>
     <string name="pool_page_alt_none">空きのみ</string>
+    <string name="pool_page_alt_sum">空き + 保持</string>
+    <string name="pool_page_alt_held">プロセスが保持</string>
+    <string name="pool_page_tile_held">プロセスが保持</string>
     <string name="pool_page_alt_apps">応用プロセス</string>
     <string name="pool_page_alt_procs">プロセス</string>
     <string name="pool_page_alt_forks">再起動以降の作成数</string>
@@ -1547,7 +1550,6 @@
     <string name="pool_page_touch">グラフに触れると、その測定と数値を表示します。</string>
     <string name="pool_page_readout">%1$s · 空き %2$s · %3$s\n応用プロセス %4$s · プロセス %5$s · スレッド %6$s\n作成 %7$s 千 · マウント %8$s · カーネルメモリ %9$s MB · 稼働 %10$s</string>
     <string name="pool_page_legend_exact">正確</string>
-    <string name="pool_page_legend_atleast">少なくとも</string>
     <string name="pool_page_legend_failing">失敗中</string>
     <string name="pool_page_legend_burst">バースト</string>
     <string name="pool_page_bursts">バースト (%1$d)</string>
@@ -1566,7 +1568,7 @@
     <string name="pool_page_col_mounts">マウント</string>
     <string name="pool_page_show_all">%1$d 件すべて表示</string>
     <string name="pool_page_show_less">表示を減らす</string>
-    <string name="pool_page_explain">応用のプロセスは 1 つずつフィルタープログラムを持ちます。空きがなくなると、カーネルは新しいものをすべて拒否し、応用を起動できなくなります。「+」は少なくともその数という意味です。プールを空にしないよう、測定は上限で止まります。オレンジは起動が失敗している間の測定です。</string>
+    <string name="pool_page_explain">応用のプロセスは 1 つずつフィルタープログラムを持ちます。空きがなくなると、カーネルは新しいものをすべて拒否し、応用を起動できなくなります。「+」は少なくともその数という意味です。起動失敗時の小さな測定は 6 個で止まります。オレンジは起動が失敗している間の測定です。</string>
     <string name="pool_page_size_explain">空きプール全体を一度埋めて数え、すぐに解放します。その一瞬は応用を起動できず、ちょうどそのとき起動した応用は失敗します。再起動直後の端末にどれだけ空きがあるかが分かります。</string>
     <string name="pool_page_churn_explain">空きを測り、プログラムを %1$d 個ひとつずつ作成して解放し、もう一度測ります。約 30 秒かかります。その間に起動した応用の分を超えて空きが減っていれば、作成と解放そのものがプールを使い切る原因です — その場合、減った分は次の再起動まで戻りません。</string>
     <string name="pool_page_run">実行</string>
@@ -1595,7 +1597,7 @@
     <string name="fork_panel_kmalloc">うち 64 バイトのオブジェクト</string>
     <string name="fork_panel_explain">これが失敗するとき、カーネルには新しいプロセスに必要なセキュリティフィルターの空きがありません。そのため応用と WebView レンダラーは起動した瞬間に落ちます。メモリが尽きたわけではありません。キャッシュ済み応用を終了するとそのフィルターが返され、しばらく解消します。残りを返すのは再起動だけです。</string>
     <string name="diag_filterpool_title">フィルタープログラムの空き</string>
-    <string name="diag_filterpool_desc">カーネルがあと何個のフィルタープログラムを受け入れるか — 新しいプロセスを起動できなくなるときに尽きる空き — を測り、関連する数値と一緒に記録します。30 分ごとに小さな測定、1 日 1 回と再起動のたびに深い測定を行います。バックグラウンド監視が必要です。</string>
+    <string name="diag_filterpool_desc">カーネルがあと何個のフィルタープログラムを受け入れるか — 新しいプロセスを起動できなくなるときに尽きる空き — を測り、関連する数値と一緒に記録します。1 時間ごとと再起動のたびに最後まで数え、起動が失敗するたびに小さな測定を行います。バックグラウンド監視が必要です。</string>
     <string name="monitor_pool_pill">フィルター空き %1$s</string>
     <string name="monitor_pool_pill_none">フィルター空き: 未測定</string>
     <string name="monitor_pool_title">フィルタープログラムの空き</string>
@@ -1615,7 +1617,7 @@
     <string name="monitor_pool_trend">傾向: 1 日あたり %1$s 個。</string>
     <string name="monitor_pool_left">この速さだと、空きは約 %1$.1f 日で尽きます。</string>
     <string name="monitor_pool_per_forks">プロセスとスレッドの作成 100 万回あたり: %1$s。</string>
-    <string name="monitor_pool_trend_none">傾向はまだ出せません。1 時間以上離れた正確な測定が 3 回必要です。</string>
+    <string name="monitor_pool_trend_none">傾向はまだ出せません。6 時間以上にわたる正確な測定が 5 回必要です。</string>
     <string name="monitor_pool_table">最近の測定 — 時刻、空き、種類、応用 · プロセス · 作成回数 (千):</string>
     <string name="monitor_pool_row_ctx">%1$s · %2$s · %3$s</string>
     <string name="monitor_pool_table_none">まだありません。</string>

@@ -382,7 +382,7 @@ final class PanelViews {
     static final class Point {
         long timeMs;
         double value;
-        /** False: "at least this much" — drawn hollow. */
+        /** False: "at least this much" — a hollow mark on the top edge, never part of the curve. */
         boolean exact = true;
         /** Taken while starts were failing — drawn in the warning colour. */
         boolean flagged;
@@ -396,7 +396,10 @@ final class PanelViews {
     }
 
     /**
-     * A time chart: the main curve in the theme's colour (hollow marks for "at least" readings),
+     * A time chart: the main curve in the theme's colour through the exact points only, on a
+     * scale fitted to them (an inexact point would be a hollow mark on the top edge, but the pool
+     * chart no longer feeds any — Fork +108: plotted at their value, a row of "at least 6" read as
+     * a night at zero),
      * an optional second curve on a scale of its own, and shaded bands for time spans (bursts).
      * A touch picks the nearest point.
      */
@@ -415,7 +418,7 @@ final class PanelViews {
         @Nullable
         private OnPick mOnPick;
         private long mT0, mT1;
-        private double mMax, mAltMin, mAltMax;
+        private double mMin, mMax, mAltMin, mAltMax;
 
         Chart(@NonNull Context c) {
             super(c);
@@ -448,13 +451,16 @@ final class PanelViews {
             mShowAlt = showAlt;
             mEmpty = empty;
             mPicked = null;
-            mMax = 1;
+            double lo = Double.MAX_VALUE, hi = -Double.MAX_VALUE;
             mAltMin = Double.MAX_VALUE;
             mAltMax = -Double.MAX_VALUE;
             mT0 = Long.MAX_VALUE;
             mT1 = Long.MIN_VALUE;
             for (Point p : mPoints) {
-                mMax = Math.max(mMax, p.value);
+                if (p.exact) {
+                    lo = Math.min(lo, p.value);
+                    hi = Math.max(hi, p.value);
+                }
                 mT0 = Math.min(mT0, p.timeMs);
                 mT1 = Math.max(mT1, p.timeMs);
                 if (!Double.isNaN(p.alt)) {
@@ -463,7 +469,18 @@ final class PanelViews {
                 }
             }
             if (mT1 <= mT0) mT1 = mT0 + 60_000L;
-            mMax = niceMax(mMax);
+            if (hi < lo) {
+                // No exact point at all: an empty scale, the marks say the rest.
+                mMin = 0;
+                mMax = 10;
+            } else {
+                // Fitted to the exact readings, so a loss of fifty in fifteen hundred can be seen.
+                double pad = Math.max((hi - lo) * 0.15, 4);
+                double step = niceStep((hi - lo + 2 * pad) / 4);
+                mMin = Math.max(0, Math.floor((lo - pad) / step) * step);
+                mMax = Math.ceil((hi + pad) / step) * step;
+                if (mMax <= mMin) mMax = mMin + step;
+            }
             if (mAltMax <= mAltMin) mAltMax = mAltMin + 1;
             invalidate();
         }
@@ -477,13 +494,13 @@ final class PanelViews {
             mOnPick = l;
         }
 
-        private static double niceMax(double v) {
-            if (v <= 10) return 10;
+        private static double niceStep(double v) {
+            if (v <= 1) return 1;
             double mag = Math.pow(10, Math.floor(Math.log10(v)));
-            for (double step : new double[]{1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10}) {
+            for (double step : new double[]{1, 2, 2.5, 5, 10}) {
                 if (step * mag >= v) return step * mag;
             }
-            return v;
+            return 10 * mag;
         }
 
         private float left() {
@@ -507,7 +524,12 @@ final class PanelViews {
         }
 
         private float y(double v) {
-            return bottom() - (bottom() - top()) * (float) (v / mMax);
+            return bottom() - (bottom() - top()) * (float) ((v - mMin) / (mMax - mMin));
+        }
+
+        /** Where a point is drawn: on the curve when exact, on the top edge when "at least". */
+        private float y(@NonNull Point p) {
+            return p.exact ? y(p.value) : top();
         }
 
         private float yAlt(double v) {
@@ -539,7 +561,7 @@ final class PanelViews {
             }
             mText.setTextAlign(Paint.Align.RIGHT);
             for (int i = 0; i <= 2; i++) {
-                double v = mMax * i / 2.0;
+                double v = mMin + (mMax - mMin) * i / 2.0;
                 float yy = y(v);
                 canvas.drawLine(l, yy, r, yy, mGrid);
                 canvas.drawText(compact(v), l - dp(getContext(), 6), yy + mText.getTextSize() * 0.35f, mText);
@@ -571,6 +593,7 @@ final class PanelViews {
             mPath.reset();
             boolean first = true;
             for (Point p : mPoints) {
+                if (!p.exact) continue;
                 if (first) mPath.moveTo(x(p.timeMs), y(p.value));
                 else mPath.lineTo(x(p.timeMs), y(p.value));
                 first = false;
@@ -586,7 +609,7 @@ final class PanelViews {
                     mDot.setStyle(Paint.Style.STROKE);
                     mDot.setStrokeWidth(dp(getContext(), 1.25f));
                 }
-                canvas.drawCircle(x(p.timeMs), y(p.value), p.flagged ? rad * 1.3f : rad, mDot);
+                canvas.drawCircle(x(p.timeMs), y(p), p.exact ? (p.flagged ? rad * 1.3f : rad) : rad * 0.7f, mDot);
             }
             if (mPicked != null) {
                 float px = x(mPicked.timeMs);
@@ -594,7 +617,7 @@ final class PanelViews {
                 mDot.setStyle(Paint.Style.STROKE);
                 mDot.setStrokeWidth(dp(getContext(), 2));
                 mDot.setColor(mInk);
-                canvas.drawCircle(px, y(mPicked.value), dp(getContext(), 6), mDot);
+                canvas.drawCircle(px, y(mPicked), dp(getContext(), 6), mDot);
             }
         }
 

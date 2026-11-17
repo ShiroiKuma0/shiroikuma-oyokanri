@@ -271,10 +271,12 @@ public class VtReportActivity extends BaseActivity {
 
         if (active != null && VtScanAttempt.STATUS_PENDING_KEY.equals(active.status)) {
             addStateHero(warn(), "?", getString(R.string.vt_set_up), getString(R.string.vt_needs_key));
+            // Fork (白い熊, +113): no key is no reason to refuse the install — a phone where
+            // VirusTotal was never set up could not install anything from here.
             setActions(getString(R.string.cancel), v -> finish(), action(getString(R.string.vt_set_up), v -> {
                 mKeyDialogShown.remove(active.id);
                 maybeShowKeyDialog(active.id);
-            }));
+            }), install);
             maybeShowKeyDialog(active.id);
             addFileHeader(state);
             return;
@@ -286,8 +288,8 @@ public class VtReportActivity extends BaseActivity {
             setActions(getString(R.string.cancel), v -> {
                 mViewModel.rejectUpload(active.id);
                 finish();
-            }, install, action(getString(R.string.vt_confirm_upload_and_scan),
-                    v -> mViewModel.approveUpload(active.id)));
+            }, action(getString(R.string.vt_confirm_upload_and_scan),
+                    v -> mViewModel.approveUpload(active.id)), install);
             addFileHeader(state);
             return;
         }
@@ -353,9 +355,9 @@ public class VtReportActivity extends BaseActivity {
                 addStateHero(dim(), "?", getString(R.string.vt_state_not_scanned),
                         getString(R.string.vt_state_not_scanned_hint));
             }
-            setActions(getString(R.string.cancel), v -> finish(), install,
+            setActions(getString(R.string.cancel), v -> finish(),
                     action(getString(failed || cancelled ? R.string.vt_retry : R.string.vt_scan_now),
-                            v -> mViewModel.rescan()));
+                            v -> mViewModel.rescan()), install);
             addFileHeader(state);
             addLocalAnalysis(file);
         }
@@ -365,7 +367,9 @@ public class VtReportActivity extends BaseActivity {
 
     /**
      * Fork (白い熊, +082): the actions of the current state in one row of equal buttons — the LAST
-     * one is the main action (thick frame) — and a full-width way out beneath them. This replaced
+     * one is the main action (thick frame) — and a full-width way out beneath them. The install
+     * button is ALWAYS the last one, in every state (白い熊, +114): it sat on the left in the
+     * no-key, upload-question and not-scanned states and on the right under a report. This replaced
      * the ✕ in the header, the pills scattered through the content and the pop-up that asked the
      * upload question a second time on top of this dialog.
      */

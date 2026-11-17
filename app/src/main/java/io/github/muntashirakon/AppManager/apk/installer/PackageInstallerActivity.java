@@ -154,6 +154,8 @@ public class PackageInstallerActivity extends BaseActivity implements InstallerD
     @Nullable
     private PackageInstallerService mService;
     private boolean mServiceBound;
+    /** Fork (+111): an install was submitted while the service connection was still on its way. */
+    private boolean mAwaitingService;
     private InstallerDialogFragment mInstallerDialogFragment;
     private boolean initiated = false;
     private final PackageInstallerService.OnInstallFinished mInstallFinishedListener =
@@ -206,7 +208,14 @@ public class PackageInstallerActivity extends BaseActivity implements InstallerD
                     return;
                 }
                 mCurrentItem = currentItem;
-                if (mService.hasOperation(currentItem.getOperationId())) {
+                if (mAwaitingService) {
+                    // Fork (+111): the install was started before this connection arrived. Its
+                    // operation may not have reached the service's onStartCommand yet, so
+                    // hasOperation() cannot be asked — it would report a live install as aborted.
+                    // The service hands a result that is already there to a late listener.
+                    mAwaitingService = false;
+                    setInstallFinishedListener();
+                } else if (mService.hasOperation(currentItem.getOperationId())) {
                     setInstallFinishedListener();
                 } else {
                     String packageName = currentItem.getPackageName();
@@ -481,9 +490,16 @@ public class PackageInstallerActivity extends BaseActivity implements InstallerD
         if (!alwaysOnBackground && mService != null) {
             setInstallFinishedListener();
             showInstallProgress();
+        } else if (!alwaysOnBackground) {
+            // Fork (白い熊, +111): the service connection has not arrived yet. Upstream treated that
+            // as a background install and closed this window, so the result came as a notification
+            // instead of the dialog. It only ever lost the race when nothing stood between opening
+            // and installing — an install already confirmed in the VirusTotal dialog (+083) on a
+            // busy phone. Stay, show the progress, and let onServiceConnected attach the listener.
+            mAwaitingService = true;
+            showInstallProgress();
         } else {
             unsetInstallFinishedListener();
-            // For some reason, the service is empty
             // Install next app instead
             goToNext();
         }

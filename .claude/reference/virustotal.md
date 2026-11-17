@@ -109,3 +109,19 @@ be renamed on one side** — they live in `scanner/vt/VtContract.java`.
   match the `ALTER … DEFAULT` exactly or Room refuses to open the DB at start (see the battery
   `M_8_9` note). Settings (upload-automatically default **on** = prompt-before-upload default off;
   Wi-Fi-only; rescan-age days) are on the 白い熊 応用管理 UI page.
+
+- **+111 — a confirmed install sometimes ended in a notification instead of the dialog (白い熊, 2026-11-17).**
+  `PackageInstallerActivity.launchInstallerService` treated `mService == null` as “install in the background”:
+  it dropped the listener and closed the window, so `PackageInstallerService.finishInstallation` found no
+  listener and posted “… installed”. The connection from `bindService` in `onCreate` is asynchronous; with the
+  +083 confirmed path nothing stands between opening and installing, so on a busy phone the install could be
+  submitted first. Now that case sets `mAwaitingService`, shows the progress and lets `onServiceConnected`
+  attach the listener — **without asking `hasOperation()`**, because the operation may not have reached the
+  service's `onStartCommand` yet and would be reported as aborted. Diagnosed from the code, not reproduced.
+- **+113 — the “Set up VirusTotal” state has the install button too (白い熊, 2026-11-17).** With no API key the
+  dialog offered only Set up / Cancel, so a phone without a key (the rooted Samsung) could not install from the
+  vetting dialog at all. `STATUS_PENDING_KEY` now passes `install` to `setActions` like the consent state does.
+- **+114 — the install button is always the last (right, main) action (白い熊, 2026-11-17).** In the no-key,
+  upload-question and not-scanned/failed/cancelled states it was first and the scan action was the main one;
+  under a report it was already last. `setActions` makes the last action the thick one, so install is now the
+  main action in every state that has it.

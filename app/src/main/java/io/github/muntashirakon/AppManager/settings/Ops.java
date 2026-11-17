@@ -177,6 +177,29 @@ public class Ops {
         setWorkingUid(Process.myUid());
     }
 
+    /**
+     * Fork (白い熊, +112): the root route as it stands, for {@link #restoreRootRoute(boolean[])}.
+     * <p>
+     * {@code LocalServices.bindServices} unbinds before it binds, and since upstream 43e74db72 that
+     * unbind calls {@link #invalidateRuntimeBackend()}. In root mode this cleared {@code sDirectRoot}
+     * a moment before the bind needed it: {@code RootService.asRunnable} then sent the start
+     * command down the ADB route (127.0.0.1:60001, connection refused), no root service was ever
+     * started, and the app sat on "Determining working mode…" for the 45 s of the bind latch
+     * before falling back to no-root. Found on a rooted Samsung (Magisk); the Mate XT has no root,
+     * so both flags are false there and this is a no-op.
+     */
+    @AnyThread
+    @NonNull
+    public static boolean[] snapshotRootRoute() {
+        return new boolean[]{sDirectRoot, sIsRoot};
+    }
+
+    @AnyThread
+    public static void restoreRootRoute(@NonNull boolean[] route) {
+        if (route[0]) sDirectRoot = true;
+        if (route[1]) sIsRoot = true;
+    }
+
     @AnyThread
     public static int getWorkingUidOrRoot() {
         int uid = getWorkingUid();

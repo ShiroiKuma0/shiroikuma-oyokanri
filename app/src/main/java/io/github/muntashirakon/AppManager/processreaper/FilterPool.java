@@ -32,10 +32,13 @@ import io.github.muntashirakon.AppManager.utils.ThreadUtils;
  * <p>Three measurements, all through plain UDP sockets with a one-instruction filter
  * ({@link KernelProbe}):
  * <ul>
- * <li><b>quick</b> — at most 6, every 30 minutes: "at least six" on a healthy phone, exact when
- * it is nearly full;</li>
+ * <li><b>quick</b> — at most 6, only beside a failing probe (kind {@code probe}), where it is
+ * exact and proves the full pool. Until +108 it also ran every 30 minutes (kind {@code quick});
+ * on a healthy phone that could only say "at least six", so it was dropped and those old lines
+ * are no longer shown;</li>
  * <li><b>deep</b> — at most {@link #DEEP_CAP}, once per boot after 15 minutes of uptime, then
- * every 24 hours, and on demand: exact as soon as less than that is free;</li>
+ * every hour (+108; once a day gave no curve at all), and on demand: exact as soon as less
+ * than that is free;</li>
  * <li><b>size</b> — up to {@link #SIZE_CAP}, only on demand: the whole free pool.</li>
  * </ul>
  * A measurement that reads below its cap emptied the pool for a moment, in which app starts
@@ -51,8 +54,11 @@ public final class FilterPool {
     static final int DEEP_CAP = 2048;
     static final int SIZE_CAP = 16384;
     static final int CHURN_CYCLES = 2000;
-    private static final long QUICK_MS = 30 * 60_000L;
-    private static final long DEEP_MS = 24 * 3_600_000L;
+    // Fork (+108): hourly. Once a day left the night without a single exact reading.
+    private static final long DEEP_MS = 3_600_000L;
+    /** A trend needs this many exact readings over this long, or three points make a "14 days left". */
+    private static final int TREND_MIN_POINTS = 5;
+    private static final long TREND_MIN_SPAN_MS = 6 * 3_600_000L;
     private static final long BOOT_SETTLE_MS = 15 * 60_000L;
 
     private static final String K_FREE = "pool_free", K_EXACT = "pool_exact", K_WALL = "pool_wall",
@@ -61,7 +67,6 @@ public final class FilterPool {
             K_SIZE_BOOT = "pool_size_boot";
 
     private static final AtomicBoolean BUSY = new AtomicBoolean();
-    private static long sQuickEl;
 
     /** Wall-clock second the phone booted, stable to a few seconds. */
     private static long bootSec() {
@@ -81,15 +86,12 @@ public final class FilterPool {
         boolean deepDue = nowEl >= BOOT_SETTLE_MS
                 && (!sameBoot(ForkDiag.getLong(ctx, K_DEEP_BOOT, 0), bootSec())
                 || now - ForkDiag.getLong(ctx, K_DEEP_WALL, 0) >= DEEP_MS);
-        boolean quickDue = sQuickEl == 0 || nowEl - sQuickEl >= QUICK_MS;
-        if (!deepDue && !quickDue) return;
+        // No full count while starts are failing: the room is 0 and the gauge beside the probe says so.
+        if (!deepDue || ForkStartWatch.get().isActive()) return;
         if (!BUSY.compareAndSet(false, true)) return;
-        sQuickEl = nowEl;
         ThreadUtils.postOnBackgroundThread(() -> {
             try {
-                // No deep measurement while starts are failing: the room is 0 and the quick one says so.
-                if (deepDue && !ForkStartWatch.get().isActive()) measure(ctx, "deep", DEEP_CAP);
-                else quick(ctx, "quick");
+                measure(ctx, "deep", DEEP_CAP);
             } catch (Throwable ignore) {
             } finally {
                 BUSY.set(false);
@@ -101,7 +103,6 @@ public final class FilterPool {
     @NonNull
     static String gaugeForProbe(@NonNull Context ctx) {
         try {
-            sQuickEl = SystemClock.elapsedRealtime();
             return quick(ctx.getApplicationContext(), "probe");
         } catch (Throwable t) {
             return " sockfree=unavailable";
@@ -179,7 +180,13 @@ public final class FilterPool {
                     + " grep -E '^(SUnreclaim|Percpu):' /proc/meminfo 2>/dev/null;"
                     + " echo \"procs $(ps -A 2>/dev/null | wc -l)\"; echo \"threads $(ps -AT 2>/dev/null | wc -l)\";"
                     + " Z=$(pidof -s zygote64 2>/dev/null); [ -n \"$Z\" ] &&"
-                    + " echo \"apps $(ps -A -o PPID 2>/dev/null | grep -c -w \"$Z\")\"; true");
+                    + " echo \"apps $(ps -A -o PPID 2>/dev/null | grep -c -w \"$Z\")\";"
+                    // Fork (+110): what living processes hold, straight from the kernel (5.9+ prints
+                    // Seccomp_filters). free + fsum falling over time is the loss itself, with no
+                    // inference through the app count. No awk on this toybox, hence the loop.
+                    + " echo \"fproc $(grep -h '^Seccomp:' /proc/[0-9]*/status 2>/dev/null | grep -c -w 2)\";"
+                    + " F=$(grep -h '^Seccomp_filters:' /proc/[0-9]*/status 2>/dev/null | grep -o '[0-9]*$');"
+                    + " if [ -n \"$F\" ]; then S=0; for n in $F; do S=$((S+n)); done; echo \"fsum $S\"; fi; true");
             if (r != null) {
                 for (String line : r.getOutputAsList()) {
                     String[] f = line.trim().split("[\\s:]+");
@@ -190,7 +197,7 @@ public final class FilterPool {
                             sb.append(" o.").append(f[0]).append('=').append(f[1]); break;
                         case "SUnreclaim": case "Percpu":
                             sb.append(" m.").append(f[0]).append("KB=").append(f[1]); break;
-                        case "procs": case "threads": case "apps":
+                        case "procs": case "threads": case "apps": case "fproc": case "fsum":
                             sb.append(' ').append(f[0]).append('=').append(f[1]); break;
                         default: break;
                     }
@@ -271,6 +278,9 @@ public final class FilterPool {
                 if (eq > 0) row.t.put(tok.substring(0, eq), tok.substring(eq + 1));
             }
             if (thisBootOnly && !sameBoot(row.num("boot"), boot)) continue;
+            // Fork (+108): an "at least" reading on a healthy phone says nothing — not shown anywhere.
+            // One taken while starts were failing would contradict the full pool, so that one stays.
+            if (row.num("exact") != 1 && row.num("failing") != 1) continue;
             out.add(row);
         }
         return out;
@@ -336,8 +346,8 @@ public final class FilterPool {
                     dhm.format(new Date(hi.wallMs)), n(lo.num("free")), dhm.format(new Date(lo.wallMs))));
         }
         // The trend: a straight line through the exact readings, against time and against process creations.
-        if (exactRows.size() >= 3
-                && exactRows.get(exactRows.size() - 1).wallMs - exactRows.get(0).wallMs >= 3_600_000L) {
+        if (exactRows.size() >= TREND_MIN_POINTS
+                && exactRows.get(exactRows.size() - 1).wallMs - exactRows.get(0).wallMs >= TREND_MIN_SPAN_MS) {
             double[] byTime = slope(exactRows, null);
             double perDay = byTime[0] * 86_400_000.0;
             sb.append('\n').append(ctx.getString(R.string.monitor_pool_trend, String.format(Locale.US, "%+,.1f", perDay)));
@@ -437,6 +447,8 @@ public final class FilterPool {
     /** One recorded reading with the figures beside it; -1 where a figure is missing. */
     public static final class Reading {
         public long wallMs, boot, free, uptimeS, forks, apps, procs, threads, mounts, vmap, kmalloc64, sUnreclaimKB;
+        /** Filter programs held by living processes ({@code fsum}) and how many processes hold any; -1 before +110. */
+        public long held = -1, holders = -1;
         public boolean exact, failing;
         public String kind = "", reserve;
     }
@@ -473,7 +485,8 @@ public final class FilterPool {
         List<Reading> ex = new ArrayList<>();
         for (Reading r : readings) if (r.exact && !r.failing) ex.add(r);
         double[] out = {Double.NaN, Double.NaN};
-        if (ex.size() < 3 || ex.get(ex.size() - 1).wallMs - ex.get(0).wallMs < 3_600_000L) return out;
+        if (ex.size() < TREND_MIN_POINTS
+                || ex.get(ex.size() - 1).wallMs - ex.get(0).wallMs < TREND_MIN_SPAN_MS) return out;
         out[0] = fit(ex, false) * 86_400_000.0;
         out[1] = fit(ex, true) * 1_000_000.0;
         return out;
@@ -535,6 +548,8 @@ public final class FilterPool {
             r.mounts = row.num("o.mnt_cache");
             r.vmap = row.num("o.vmap_area");
             r.kmalloc64 = row.num("o.kmalloc-64");
+            r.held = row.num("fsum");
+            r.holders = row.num("fproc");
             r.sUnreclaimKB = row.num("m.SUnreclaimKB");
             String k = row.t.get("kind");
             if (k != null) r.kind = k;
