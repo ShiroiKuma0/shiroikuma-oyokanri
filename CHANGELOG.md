@@ -10,6 +10,47 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-11-03.19-47.gdc4154f4+114 — 2026-11-17
+
+Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.
+This release makes the filter-program room honest and adds a direct count of what holds it, fixes
+root mode hanging at start, and puts the install button where it belongs in the VirusTotal dialog.
+
+### Filter-program room
+
+- **Only full counts are recorded and drawn.** The half-hourly quick reading could say no more than
+  "at least 6"; plotted as a value it showed a night at zero. It is gone from the background
+  measurement, from the chart, from its legend and from the reading list. The quick gauge remains
+  only inside the process-start probe.
+- **A full count every hour** instead of once a day, skipped while a process-start episode is open.
+- **The chart fits its scale to the readings** (lowest to highest, on round steps) instead of
+  starting at zero, so a change of a few programs in 1,500 is visible.
+- **A trend needs five full counts over six hours** before it is stated, on the page and in the report.
+- **Held by processes.** Each reading now also counts the filter programs processes hold — the sum of
+  `Seccomp_filters` over `/proc`, and the number of processes in filter mode — recorded as `fsum` and
+  `fproc`. The page shows it as a tile and offers two new curves to hold against the room: **held**,
+  and **room plus held**, the figure that falls only when the pool itself loses programs.
+
+### Installer
+
+- **The result dialog instead of a notification.** When an install was confirmed before the installer
+  service had connected, the window closed and only the "installed" notification remained. The window
+  now stays, shows the progress and takes the result when the service connects.
+
+### Root mode
+
+- **No more 45 seconds on "Determining working mode…".** On a rooted phone the clean-up before
+  binding the root service cleared the direct-root route it was about to use, so the start command
+  went to the ADB route and failed against port 60001. The route is kept across the clean-up; the
+  root service starts and binds in under a second.
+
+### VirusTotal dialog
+
+- **An install button also when no API key is set**, beside **Set up VirusTotal**.
+- **Install is always the right-hand, main action** — in the no-key, upload-question, not-scanned,
+  failed and cancelled states as under a report; the scan action (**Retry**, **Scan now**,
+  **Yes, upload and scan**) sits to its left.
+
 ## 4.1.1+2026-11-03.19-47.gdc4154f4+107 — 2026-11-15
 
 Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.
