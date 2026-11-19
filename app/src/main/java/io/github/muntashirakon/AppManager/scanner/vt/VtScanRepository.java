@@ -533,6 +533,8 @@ public class VtScanRepository implements Closeable {
             VtScanAttempt attempt = mAttemptDao.get(attemptId);
             VtFile file = attempt == null ? null : mFileDao.get(attempt.fileId);
             if (attempt == null || file == null) return;
+            // Fork (白い熊, +117): a cancelled scan stays cancelled, whatever arrives afterwards.
+            if (VtScanAttempt.STATUS_CANCELLED.equals(attempt.status)) return;
             long now = System.currentTimeMillis();
             attempt.status = VtScanAttempt.STATUS_COMPLETED;
             attempt.analysisId = analysisId;
@@ -561,6 +563,7 @@ public class VtScanRepository implements Closeable {
         mDatabase.runInTransaction(() -> {
             VtScanAttempt attempt = mAttemptDao.get(attemptId);
             if (attempt == null) return;
+            if (VtScanAttempt.STATUS_CANCELLED.equals(attempt.status)) return;
             long now = System.currentTimeMillis();
             attempt.status = VtScanAttempt.STATUS_FAILED;
             attempt.errorCode = errorCode;

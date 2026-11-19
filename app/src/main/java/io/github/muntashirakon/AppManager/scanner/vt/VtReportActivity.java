@@ -355,8 +355,10 @@ public class VtReportActivity extends BaseActivity {
                 }
                 addStateHero(danger(), "!", getString(R.string.vt_state_failed), reason);
             } else if (cancelled) {
-                addStateHero(dim(), "×", getString(R.string.vt_state_cancelled),
-                        getString(R.string.vt_state_cancelled_hint));
+                // Fork (白い熊, +119): a cancel is no fault — a blue ring around the app's own icon,
+                // not a cross. The cross stays only for a file whose icon cannot be read.
+                addStateHero(dim(), CANCELLED_RING, state.app == null ? null : state.app.icon, "×",
+                        getString(R.string.vt_state_cancelled), getString(R.string.vt_state_cancelled_hint));
             } else {
                 addStateHero(dim(), "?", getString(R.string.vt_state_not_scanned),
                         getString(R.string.vt_state_not_scanned_hint));
@@ -650,16 +652,39 @@ public class VtReportActivity extends BaseActivity {
     // ── Heroes ───────────────────────────────────────────────────────────────────────────────────
 
     /** Failed · cancelled · not scanned · needs a key: one ring, a headline and the reason. */
+    // Fork (白い熊, +119): the ring of a cancelled scan. Brighter than the update pill's ink
+    // (#0D47A1), which is made for a yellow ground and all but disappears on black.
+    private static final int CANCELLED_RING = 0xFF2979FF;
+
     private void addStateHero(@ColorInt int color, @NonNull String glyph, @NonNull CharSequence headline,
                               @NonNull CharSequence message) {
+        addStateHero(color, color, null, glyph, headline, message);
+    }
+
+    /** @param icon drawn inside the ring in place of {@code glyph} when not null */
+    private void addStateHero(@ColorInt int color, @ColorInt int ringColor,
+                              @Nullable android.graphics.drawable.Drawable icon, @NonNull String glyph,
+                              @NonNull CharSequence headline, @NonNull CharSequence message) {
         LinearLayout box = framedBox(color, 3f);
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         VtGaugeView gauge = new VtGaugeView(this);
         gauge.setInk(accent(), dim());
-        gauge.showState(color, glyph, "");
-        row.addView(gauge, new LinearLayout.LayoutParams(dp(88), dp(88)));
+        gauge.showState(ringColor, icon == null ? glyph : "", "");
+        if (icon == null) {
+            row.addView(gauge, new LinearLayout.LayoutParams(dp(88), dp(88)));
+        } else {
+            android.widget.FrameLayout holder = new android.widget.FrameLayout(this);
+            holder.addView(gauge, new android.widget.FrameLayout.LayoutParams(dp(88), dp(88)));
+            androidx.appcompat.widget.AppCompatImageView image = new androidx.appcompat.widget.AppCompatImageView(this);
+            // A fresh drawable: the app card above shows the same icon, and one Drawable
+            // cannot be laid out in two views.
+            android.graphics.drawable.Drawable.ConstantState cs = icon.getConstantState();
+            image.setImageDrawable(cs == null ? icon : cs.newDrawable(getResources()).mutate());
+            holder.addView(image, new android.widget.FrameLayout.LayoutParams(dp(48), dp(48), Gravity.CENTER));
+            row.addView(holder, new LinearLayout.LayoutParams(dp(88), dp(88)));
+        }
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);

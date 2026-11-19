@@ -82,7 +82,13 @@ public class VtScanService extends Service {
     private final ExecutorService mScanExecutor = Executors.newFixedThreadPool(MAX_CONCURRENT_SCANS);
     private final ScheduledExecutorService mScheduler = Executors.newSingleThreadScheduledExecutor();
     private final Map<Long, Future<?>> mRunningScans = new ConcurrentHashMap<>();
+    // Fork (白い熊, +117): the progress of each running scan, so a cancel can withdraw its entry at once.
+    private final Map<Long, ScanProgress> mProgressByAttempt = new ConcurrentHashMap<>();
     private volatile boolean mStopping;
+    // Fork (白い熊, +118): scans cancelled but whose thread has not returned yet, and whether the
+    // "VirusTotal — running" entry is up. See cancelAttempt.
+    private final java.util.Set<Long> mCancelledIds = ConcurrentHashMap.newKeySet();
+    private volatile boolean mForeground;
     @Nullable
     private VtScanRepository mRepository;
     @Nullable
@@ -117,6 +123,10 @@ public class VtScanService extends Service {
     public int onStartCommand(@Nullable Intent intent, int flags, int startId) {
         if (intent != null && ACTION_CANCEL.equals(intent.getAction())) {
             cancelAttempt(intent.getLongExtra(EXTRA_ATTEMPT_ID, 0));
+        } else if (!mForeground) {
+            // Fork (白い熊, +118): the entry was taken down by a cancel; a new scan puts it back
+            // (and a startForegroundService must be answered with startForeground in any case).
+            startForeground();
         }
         scheduleDispatch();
         return START_STICKY;
@@ -175,9 +185,12 @@ public class VtScanService extends Service {
             }
             FutureTask<Void> future = new FutureTask<>(() -> {
                 ScanProgress progress = new ScanProgress(attempt);
+                mProgressByAttempt.put(attempt.id, progress);
                 try {
                     execute(attempt, progress);
                 } finally {
+                    mProgressByAttempt.remove(attempt.id);
+                    mCancelledIds.remove(attempt.id);
                     progress.detach();
                     mRunningScans.remove(attempt.id);
                     sUploadPercent.remove(attempt.id);
@@ -186,6 +199,7 @@ public class VtScanService extends Service {
                 return null;
             });
             if (mRunningScans.putIfAbsent(attempt.id, future) == null) {
+                if (!mForeground) ThreadUtils.postOnMainThread(this::startForeground);
                 mScanExecutor.execute(future);
             }
         }
@@ -224,9 +238,25 @@ public class VtScanService extends Service {
             } catch (Throwable th) {
                 th.printStackTrace();
             }
+            // Fork (白い熊, +117): the entry goes NOW. The scan thread may sit in a network call
+            // that an interrupt does not end, and until it returned the entry kept saying the
+            // scan was running.
+            ScanProgress progress = mProgressByAttempt.get(attemptId);
+            if (progress != null) progress.cancelled();
             Future<?> future = mRunningScans.get(attemptId);
             if (future != null) {
+                mCancelledIds.add(attemptId);
                 future.cancel(true);
+            }
+            // Fork (白い熊, +118): "VirusTotal — running" goes with the cancel too, unless another
+            // scan is really running. The cancelled thread may still sit in a network request; the
+            // service waits for it without an entry and stops when it returns.
+            if (mCancelledIds.containsAll(mRunningScans.keySet())) {
+                ThreadUtils.postOnMainThread(() -> {
+                    if (mStopping || !mCancelledIds.containsAll(mRunningScans.keySet())) return;
+                    mForeground = false;
+                    ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE);
+                });
             }
         });
     }
@@ -295,6 +325,12 @@ public class VtScanService extends Service {
                 } else {
                     throw error(response);
                 }
+            }
+            VtScanAttempt latest = repository.getAttempt(attempt.id);
+            if (latest != null && VtScanAttempt.STATUS_CANCELLED.equals(latest.status)) {
+                // Fork (白い熊, +117): cancelled while the last request was under way.
+                progress.cancelled();
+                return;
             }
             repository.completeAttempt(attempt.id, report, analysisId);
             if (uploaded) {
@@ -488,6 +524,7 @@ public class VtScanService extends Service {
     }
 
     private void startForeground() {
+        mForeground = true;
         ForegroundService.start(this, NOTIFICATION_ID, new NotificationCompat.Builder(this, CHANNEL_ID)
                         .setSmallIcon(R.drawable.ic_default_notification)
                         .setContentTitle("VirusTotal")
@@ -538,6 +575,7 @@ public class VtScanService extends Service {
         private final ProgressHandler mHandler;
         private final AtomicReference<CharSequence> mText = new AtomicReference<>(getString(R.string.vt_queued));
         private String mTitle;
+        private volatile boolean mCancelled;
 
         ScanProgress(@NonNull VtScanAttempt attempt) {
             mAttempt = attempt;
@@ -565,6 +603,7 @@ public class VtScanService extends Service {
         }
 
         void update(@NonNull CharSequence text, int current, int max) {
+            if (mCancelled) return;
             mText.set(text);
             if (max < 0) {
                 mHandler.postUpdate(-1, 0);
@@ -572,18 +611,23 @@ public class VtScanService extends Service {
         }
 
         void complete(@NonNull String body, @NonNull String resultText) {
+            if (mCancelled) return;
             mText.set(body);
             postResult(isNotificationAllowed() ? createInfo(body).setBody(resultText) : null);
         }
 
         void failed(@NonNull String body) {
+            if (mCancelled) return;
             mText.set(getString(R.string.vt_failed));
             postResult(isNotificationAllowed() ? createInfo(getString(R.string.vt_failed)).setBody(body) : null);
         }
 
+        // Fork (白い熊, +117): a cancel is 白い熊's own act — nothing to announce. It used to post a
+        // result entry titled with the file and reading "Cancel scan", with a Cancel scan button,
+        // which stayed in the shade and looked like a scan still running.
         void cancelled() {
-            mText.set(getString(R.string.vt_cancel_scan));
-            postResult(isNotificationAllowed() ? createInfo(getString(R.string.vt_cancel_scan)) : null);
+            mCancelled = true;
+            postResult(null);
         }
 
         // Item 2: a transient parked state — keep the ongoing progress text, no result notification.

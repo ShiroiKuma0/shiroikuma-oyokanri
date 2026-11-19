@@ -143,3 +143,19 @@ be renamed on one side** — they live in `scanner/vt/VtContract.java`.
   redirected:** the confirmed mark (`sConfirmedUri`) and every in-app launch (those carry no action),
   which is what keeps the dialog's own install from looping. A later intent to the already running
   singleInstance installer (`onNewIntent`, the queue) is not redirected either.
+- **+117 — a cancelled scan kept a notification and looked alive (白い熊, 2026-11-18).** Three causes.
+  (1) `ScanProgress.cancelled()` posted a **result** entry — file name, “Cancel scan”, with a Cancel
+  scan button, not auto-cancel — whenever no VirusTotal screen was visible, which is exactly the case
+  after cancel → install; it now posts nothing. (2) The progress entry was withdrawn only when the
+  scan thread returned, and a thread inside an `HttpURLConnection` call does not notice an interrupt:
+  `VtScanService.cancelAttempt` now withdraws it at once through `mProgressByAttempt`, and
+  `update/complete/failed` are no-ops after that. (3) A report arriving after the cancel overwrote
+  `STATUS_CANCELLED` with completed and announced a result: `completeAttempt`/`failAttempt` leave a
+  cancelled attempt alone and `execute` re-reads the status before completing. **+118:** the service's own
+  foreground entry (“VirusTotal — running”) goes with the cancel as well — `stopForeground(REMOVE)` when
+  every running scan is in `mCancelledIds`; the service lives on without an entry until the thread
+  returns, and `mForeground` makes the next `ACTION_RUN` or dispatched scan call `startForeground` again.
+- **+119 — the cancelled state (白い熊, 2026-11-19).** No cross: `addStateHero` has an overload with a
+  ring colour and an icon; “Scan cancelled” draws a blue ring (`CANCELLED_RING`, `#2979FF` — the update
+  pill's `#0D47A1` ink is too dark on black) around the app's icon from `state.app.icon`, and falls
+  back to the cross only when the file has no readable icon. Frame and headline keep the dim colour.
