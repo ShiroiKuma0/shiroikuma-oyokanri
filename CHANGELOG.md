@@ -10,6 +10,43 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-11-03.19-47.gdc4154f4+121 — 2026-11-19
+
+Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.
+This release guards a freeze or thaw of a system app against a crash of the system itself, and
+stops the unrolled row from offering actions that cannot act.
+
+### A thaw that survives a system restart
+
+- **The problem.** On the Huawei Mate XT, enabling `com.huawei.lbs` again after it was disabled can
+  make EMUI's own location code throw inside the system process. The phone soft-reboots, the change
+  is lost with it, and the next attempt does the same — the app could not be thawed from the phone.
+- **Every enabled-state change of a system app is now made under a guard.** Before the change, a
+  small detached script is started on the privileged (shell) side, where it survives a system
+  restart that kills every app. If the system survives, the script exits and nothing is different.
+  If the system dies, the script repeats the change the instant the restarted system accepts it —
+  early enough that it sticks.
+- **A report on the next start.** When the app list next opens, a dialog names the app that caused
+  the restart and says whether the change was carried through, could not be repeated, or was not
+  reported at all.
+- **A question before the risky step.** Taking a system app to freeze level 3 or 4 from the row's
+  rung pills or the snowflake asks first. For an app already seen to restart the system
+  (`com.huawei.lbs` is known from the start), the thaw asks too.
+- **Known limits.** Batch operations, the freeze in app details and the gate switches on the 盗み見
+  page are guarded but do not ask. The guard needs Shizuku, ADB or root, as the change itself does.
+  It has been verified to arm and to stand down on a healthy system; it has not yet had to carry a
+  change through a real restart.
+
+### The unrolled row
+
+- **Restore, Share backup and Delete backup appear only on a row that has a backup**, and **Back
+  up** only on an installed app. On an uninstalled system app with no backup they were all drawn and
+  did nothing at all when tapped.
+- **No silent refusal.** The check that swallowed those taps now says the app is not installed.
+- **New pill: Reinstall.** Shown on a system app that was removed for this user, it opens the same
+  installer screen a tap on such a row already reached. Without Shizuku, ADB or root it says so
+  instead. On a pane whose pills were already rearranged it is placed once, just ahead of Back up.
+
 ## 4.1.1+2026-11-03.19-47.gdc4154f4+119 — 2026-11-19
 
 Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.
