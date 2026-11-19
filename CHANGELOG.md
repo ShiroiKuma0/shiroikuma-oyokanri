@@ -10,6 +10,29 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-11-03.19-47.gdc4154f4+119 — 2026-11-19
+
+Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.
+This release makes cancelling a VirusTotal scan final and quiet.
+
+### Cancelling a scan
+
+- **A cancel announces nothing.** A cancelled scan used to post an entry with the file name, the
+  text "Cancel scan" and a **Cancel scan** button whenever no VirusTotal screen was showing — which
+  is exactly the case after cancelling and installing. It stayed in the shade and looked like a scan
+  still running.
+- **The scan's progress entry goes with the tap.** It used to wait until the scan thread came back
+  from its network request.
+- **"VirusTotal — running" goes with the tap as well**, unless another scan is really running. The
+  next scan raises it again.
+- **Cancelled stays cancelled.** A report or an error that arrives just after the cancel is dropped
+  instead of turning the scan into a completed or failed one.
+
+### The cancelled state in the dialog
+
+- The round indicator shows **the app's icon in a blue ring** instead of a cross. The cross remains
+  only for a file whose icon cannot be read.
+
 ## 4.1.1+2026-11-03.19-47.gdc4154f4+116 — 2026-11-17
 
 Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.
