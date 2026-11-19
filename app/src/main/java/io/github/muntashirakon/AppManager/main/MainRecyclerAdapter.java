@@ -1539,6 +1539,9 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                 ShareBackupHandler.share(mActivity, Collections.singletonList(
                         new UserPackagePair(item.packageName, UserHandleHidden.myUserId())));
                 break;
+            case "reinstall":
+                reinstallExisting(item);
+                break;
             case "note":
                 AppNotesManager.showNoteDialog(mActivity, item.packageName, item.label,
                         () -> notifyItemChanged(indexOf(item)));
@@ -1562,8 +1565,50 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         }
     }
 
+    /**
+     * Fork (白い熊, +120): bring back a system app removed for this user, through the installer
+     * screen a tap on such a row already reaches — the pane adds the way in, not a second flow.
+     *
+     * <p>The privilege question is asked on a worker: {@code SelfPermissions} blocks while the
+     * privileged server is being bound, and this runs from a click.
+     */
+    private void reinstallExisting(@NonNull ApplicationItem item) {
+        final Context ctx = mActivity.getApplicationContext();
+        ThreadUtils.postOnBackgroundThread(() -> {
+            ApplicationInfo info;
+            try {
+                info = PackageManagerCompat.getApplicationInfo(item.packageName, MATCH_UNINSTALLED_PACKAGES
+                                | PackageManagerCompat.MATCH_DISABLED_COMPONENTS
+                                | PackageManagerCompat.MATCH_STATIC_SHARED_AND_SDK_LIBRARIES,
+                        UserHandleHidden.myUserId());
+            } catch (Throwable th) {
+                // Not on the phone at all (a row that exists only because of a backup).
+                ThreadUtils.postOnMainThread(() -> displayShortToast(R.string.app_not_installed));
+                return;
+            }
+            if (ApplicationInfoCompat.isInstalled(info)) {
+                // The row was stale: the app is already here. Let the list re-read it.
+                BroadcastUtils.sendPackageAltered(ctx, new String[]{item.packageName});
+                return;
+            }
+            if (!SelfPermissions.canInstallExistingPackages()) {
+                ThreadUtils.postOnMainThread(() -> displayLongToast(R.string.only_works_in_root_or_adb_mode));
+                return;
+            }
+            ThreadUtils.postOnMainThread(() -> {
+                if (mActivity.isFinishing() || mActivity.isDestroyed()) {
+                    return;
+                }
+                mActivity.startActivity(PackageInstallerActivity.getLaunchableInstance(mActivity, item.packageName));
+            });
+        });
+    }
+
     private void showBackupDialog(@NonNull ApplicationItem item) {
         if (!item.isInstalled && item.backup == null) {
+            // Fork (白い熊, +120): say so. This returned without a word, which is what a pill
+            // that "does nothing" looked like.
+            displayShortToast(R.string.app_not_installed);
             return;
         }
         AppBackupDialogFragment fragment = AppBackupDialogFragment.getInstance(item.packageName,
@@ -1735,6 +1780,48 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         }
         final Context ctx = mActivity.getApplicationContext();
         final int target = item.freezeLevel == level ? 0 : level;
+        // Fork (白い熊, +121): the disable gate is crossed when either end of the move is at
+        // rung 3 or above and the other is not.
+        boolean crossesDisable = (item.freezeLevel >= 3) != (target >= 3);
+        confirmSystemRestartRisk(item, crossesDisable, () -> applyFreezeLevelNow(item, userId, target, ctx));
+    }
+
+    /**
+     * Fork (白い熊, +121): ask before an enabled-state change that can restart the system.
+     * <p>
+     * A package already seen to do it is always asked about, thaw included — the restart is
+     * certain. Any other system app is asked about only on the way <i>in</i>: that is the
+     * moment there is still a choice, and a thaw nobody can decline is not worth a question.
+     */
+    private void confirmSystemRestartRisk(@NonNull ApplicationItem item, boolean changesEnabledState,
+                                          @NonNull Runnable action) {
+        if (!changesEnabledState || item.isUser) {
+            action.run();
+            return;
+        }
+        boolean freezing = !item.isFrozen || item.freezeLevel < 3;
+        ThreadUtils.postOnBackgroundThread(() -> {
+            boolean known = io.github.muntashirakon.AppManager.utils.EnabledStateGuard
+                    .isKnownToRestartSystem(item.packageName);
+            ThreadUtils.postOnMainThread(() -> {
+                if (mActivity.isFinishing() || mActivity.isDestroyed()) {
+                    return;
+                }
+                if (!known && !freezing) {
+                    action.run();
+                    return;
+                }
+                ForkDialog.present(ForkDialog.builder(mActivity)
+                        .setTitle(R.string.state_guard_warn_title)
+                        .setMessage(mActivity.getString(known ? R.string.state_guard_warn_known
+                                : R.string.state_guard_warn_system, item.label))
+                        .setNegativeButton(R.string.cancel, null)
+                        .setPositiveButton(R.string.action_continue, (dialog, which) -> action.run()));
+            });
+        });
+    }
+
+    private void applyFreezeLevelNow(@NonNull ApplicationItem item, int userId, int target, @NonNull Context ctx) {
         ThreadUtils.postOnBackgroundThread(() -> {
             try {
                 FreezeUtils.setLevel(item.packageName, userId, target);
@@ -1757,6 +1844,15 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
                 ? item.userIds[0]
                 : UserHandleHidden.myUserId();
         final boolean wasFrozen = item.isFrozen;
+        // Fork (白い熊, +121): a thaw crosses the disable gate when the app stands at rung 3 or
+        // above. A freeze is taken to cross it: the method is a database read (worker only),
+        // the default one disables, and every other one falls back to disabling when it cannot
+        // be applied.
+        boolean crossesDisable = !wasFrozen || item.freezeLevel >= 3;
+        confirmSystemRestartRisk(item, crossesDisable, () -> toggleFreezeNow(item, userId, wasFrozen, ctx));
+    }
+
+    private void toggleFreezeNow(@NonNull ApplicationItem item, int userId, boolean wasFrozen, @NonNull Context ctx) {
         ThreadUtils.postOnBackgroundThread(() -> {
             try {
                 if (wasFrozen) {

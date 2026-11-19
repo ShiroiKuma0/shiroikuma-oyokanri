@@ -44,6 +44,7 @@ public final class AppPanePrefs {
     private static final String PREF_MIGRATED_CLEAR_DATA = "migrated_clear_data";
     private static final String PREF_MIGRATED_FREEZE_LEVELS = "migrated_freeze_levels";
     private static final String PREF_MIGRATED_APP_LAUNCH = "migrated_app_launch";
+    private static final String PREF_MIGRATED_REINSTALL = "migrated_reinstall";
     private static final String DELIM = ",";
 
     /** Every action the pane can offer. Stable wire keys — never rename one. */
@@ -75,12 +76,15 @@ public final class AppPanePrefs {
             "app_settings",
             // Fork (白い熊): 起動マネージャー — opens EMUI's App-launch screen at this app, via
             // 白い熊 自由作業盤. A regular, drag-reorderable pane pill; last in the default order.
-            "app_launch"));
+            "app_launch",
+            // Fork (白い熊, +120): bring back a system app that was removed for this user
+            // (install-existing). Only drawn on a row that is in exactly that state.
+            "reinstall"));
 
     /** What a fresh install shows, in this order. */
     private static final List<String> DEFAULT_VISIBLE = Collections.unmodifiableList(Arrays.asList(
             "open", "app_info", "snooping", "freeze_level_1", "freeze_level_2", "freeze_level_3",
-            "freeze_level_4", "force_stop", "backup", "restore", "share_backup", "note",
+            "freeze_level_4", "force_stop", "reinstall", "backup", "restore", "share_backup", "note",
             "uninstall", "clear_data", "app_launch"));
 
     /**
@@ -193,6 +197,39 @@ public final class AppPanePrefs {
         save(ctx, visible, hidden);
     }
 
+    /**
+     * Fork (白い熊, +120): one-shot placement of {@code reinstall} in the visible set, just ahead
+     * of the backup pills — the same trap and the same answer as {@link #migrateClearDataVisible}.
+     * A new key is in neither stored list, and left to the reconciliation it would be appended to
+     * the end of the visible order <em>and</em> listed as hidden at once. Fires once; hiding the
+     * pill afterwards stands.
+     */
+    public static void migrateReinstallVisible(@NonNull Context ctx) {
+        SharedPreferences sp = sp(ctx);
+        if (sp.getBoolean(PREF_MIGRATED_REINSTALL, false)) {
+            return;
+        }
+        sp.edit().putBoolean(PREF_MIGRATED_REINSTALL, true).apply();
+        String visibleRaw = sp.getString(PREF_VISIBLE_ORDER, null);
+        String hiddenRaw = sp.getString(PREF_HIDDEN_ORDER, null);
+        if (visibleRaw == null && hiddenRaw == null) {
+            // Never edited: DEFAULT_VISIBLE already carries it.
+            return;
+        }
+        List<String> visible = new ArrayList<>(parseKeys(visibleRaw));
+        List<String> hidden = new ArrayList<>(parseKeys(hiddenRaw));
+        if (visible.contains("reinstall") || hidden.contains("reinstall")) {
+            return;
+        }
+        int at = visible.indexOf("backup");
+        if (at < 0) {
+            visible.add("reinstall");
+        } else {
+            visible.add(at, "reinstall");
+        }
+        save(ctx, visible, hidden);
+    }
+
     @StringRes
     public static int titleForKey(@NonNull String key) {
         switch (key) {
@@ -223,6 +260,7 @@ public final class AppPanePrefs {
             case "scanner":         return R.string.scanner;
             case "app_settings":    return R.string.view_in_settings;
             case "app_launch":      return R.string.app_launch_open;
+            case "reinstall":       return R.string.reinstall;
             default: return 0;
         }
     }
@@ -254,6 +292,7 @@ public final class AppPanePrefs {
             case "scanner":         return R.drawable.ic_security;
             case "app_settings":    return R.drawable.ic_settings;
             case "app_launch":      return R.drawable.ic_open_in_new;
+            case "reinstall":       return R.drawable.ic_get_app;
             default: return 0;
         }
     }

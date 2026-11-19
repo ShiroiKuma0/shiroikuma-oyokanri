@@ -157,6 +157,19 @@ public final class AppPaneBinder {
             case "save_apk":
             case "app_settings":
                 return item.isInstalled ? context.getString(AppPanePrefs.titleForKey(key)) : null;
+            case "backup":
+                // Fork (白い熊, +120): there is nothing to back up of an app that is not here…
+                return item.isInstalled ? context.getString(R.string.back_up) : null;
+            case "restore":
+            case "delete_backup":
+            case "share_backup":
+                // …and nothing to restore, delete or share without a backup. These three were
+                // drawn on every row and did nothing at all on one that had neither.
+                return item.backup != null ? context.getString(AppPanePrefs.titleForKey(key)) : null;
+            case "reinstall":
+                // Only for a system app removed for this user: its code is still on the system
+                // image, so it can be brought back. A removed user app has nothing to install from.
+                return !item.isInstalled && !item.isUser ? context.getString(R.string.reinstall) : null;
             case "app_launch":
                 // EMUI's 起動マネージャー lists nothing for an app that is not installed.
                 return item.isInstalled ? context.getString(R.string.app_launch_open) : null;

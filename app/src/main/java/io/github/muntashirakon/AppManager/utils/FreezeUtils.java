@@ -106,6 +106,28 @@ public final class FreezeUtils {
         return stored != null ? stored : Prefs.Blocking.getDefaultFreezingMethod();
     }
 
+    /**
+     * Fork (白い熊, +121): the ONE place this class changes an app's enabled state.
+     * <p>
+     * For a system app the change is made under {@link EnabledStateGuard}: on this phone a
+     * {@code PACKAGE_CHANGED} for {@code com.huawei.lbs} kills the system process, the write is
+     * lost with it, and only the same change repeated in the first instant of the restarted
+     * system sticks. The guard is what repeats it. Every enabled-state write in here must come
+     * through this method, or that package (and whichever others behave like it) is back to a
+     * soft reboot per tap with no way out.
+     */
+    @WorkerThread
+    private static void setEnabledStateGuarded(@NonNull String packageName, int newState, @UserIdInt int userId) {
+        java.io.File token = EnabledStateGuard.arm(packageName, userId, newState);
+        try {
+            PackageManagerCompat.setApplicationEnabledSetting(packageName, newState, 0, userId);
+        } finally {
+            // Reached only while the system is alive; if it died, so did we, and the marker
+            // stays behind to say so.
+            EnabledStateGuard.disarm(token);
+        }
+    }
+
     @Deprecated
     @WorkerThread
     public static void freeze(@NonNull String packageName, @UserIdInt int userId) throws RemoteException {
@@ -150,7 +172,7 @@ public final class FreezeUtils {
             }
             // No permission, fall-through
         }
-        PackageManagerCompat.setApplicationEnabledSetting(packageName, PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER, 0, userId);
+        setEnabledStateGuarded(packageName, PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER, userId);
     }
 
     /**
@@ -194,8 +216,8 @@ public final class FreezeUtils {
             }
         }
         try {
-            PackageManagerCompat.setApplicationEnabledSetting(packageName,
-                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER, 0, userId);
+            setEnabledStateGuarded(packageName,
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER, userId);
             any = true;
         } catch (Throwable ignore) {
         }
@@ -347,7 +369,7 @@ public final class FreezeUtils {
             // No delegation, or no owner. Nothing to lift that we could have lifted.
         }
         if (PackageManagerCompat.getApplicationEnabledSetting(packageName, userId) != PackageManager.COMPONENT_ENABLED_STATE_ENABLED) {
-            PackageManagerCompat.setApplicationEnabledSetting(packageName, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, 0, userId);
+            setEnabledStateGuarded(packageName, PackageManager.COMPONENT_ENABLED_STATE_ENABLED, userId);
         }
     }
 
@@ -527,9 +549,9 @@ public final class FreezeUtils {
                 }
                 break;
             case GATE_DISABLE:
-                PackageManagerCompat.setApplicationEnabledSetting(packageName, apply
+                setEnabledStateGuarded(packageName, apply
                         ? PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER
-                        : PackageManager.COMPONENT_ENABLED_STATE_ENABLED, 0, userId);
+                        : PackageManager.COMPONENT_ENABLED_STATE_ENABLED, userId);
                 break;
             case GATE_HIDE:
                 if (apply) {

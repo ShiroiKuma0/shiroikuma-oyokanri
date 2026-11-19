@@ -1711,10 +1711,48 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
 
     private boolean mImsVisibleBeforeLeave = false;
 
+    /**
+     * Fork (白い熊, +121): say what {@code EnabledStateGuard} did while we were dead. A system
+     * restart kills this app with everything else, so the first thing it can know about one is
+     * what the guard left behind. Read on a worker — it is file I/O — and asked on every resume,
+     * because the report is only written once storage is back, which can be after we are.
+     */
+    private void showStateGuardReports() {
+        ThreadUtils.postOnBackgroundThread(() -> {
+            java.util.List<io.github.muntashirakon.AppManager.utils.EnabledStateGuard.Report> reports =
+                    io.github.muntashirakon.AppManager.utils.EnabledStateGuard.collectReports();
+            if (reports.isEmpty()) {
+                return;
+            }
+            StringBuilder message = new StringBuilder();
+            for (io.github.muntashirakon.AppManager.utils.EnabledStateGuard.Report report : reports) {
+                CharSequence label = io.github.muntashirakon.AppManager.utils.PackageUtils
+                        .getPackageLabel(getPackageManager(), report.packageName);
+                int res = !report.guarded ? R.string.state_guard_unguarded
+                        : !report.accepted ? R.string.state_guard_not_accepted
+                        : report.enable ? R.string.state_guard_thawed : R.string.state_guard_disabled;
+                if (message.length() > 0) {
+                    message.append("\n\n");
+                }
+                message.append(getString(res, label));
+            }
+            ThreadUtils.postOnMainThread(() -> {
+                if (isFinishing() || isDestroyed()) {
+                    return;
+                }
+                ForkDialog.present(ForkDialog.builder(this)
+                        .setTitle(R.string.state_guard_title)
+                        .setMessage(message)
+                        .setPositiveButton(R.string.ok, null));
+            });
+        });
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
         if (viewModel != null) viewModel.onResume();
+        showStateGuardReports();
         // Profile membership may have changed elsewhere (e.g. the profiles
         // editor); rebuild the cached per-row pill data.
         if (mAdapter != null) mAdapter.reloadProfileMembership();

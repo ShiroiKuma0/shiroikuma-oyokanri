@@ -173,6 +173,7 @@ or answering a question about it**, and read `privileges-and-startup.md` before 
 13. **Room:** never renumber a live migration (the database is at version **13**; upstream tables are appended at the fork's next free version), and every `@ColumnInfo(defaultValue)` must match its `ALTER … DEFAULT` exactly, or the app dies at start (`battery.md`, `virustotal.md`).
 14. **A registry key is never simply renamed** — `MainToolbarPrefs.alias`; adding to `DEFAULT_VISIBLE` is inert on an edited install and needs a one-shot migration (`main-list.md`).
 15. **Confirm `BUILD SUCCESSFUL` before signing** — a build that died mid-way leaves the previous unsigned APK behind and the pipeline will happily sign it under the new name (`battery.md`).
+16. **An app's enabled state is changed only through `FreezeUtils.setEnabledStateGuarded`** — a bare `setApplicationEnabledSetting` on some system apps (`com.huawei.lbs`) kills `system_server` and loses the write (`freeze.md`).
 
 ## Conventions
 

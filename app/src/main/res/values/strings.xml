@@ -1364,6 +1364,15 @@
     <string name="pref_sign_apk_error_signing_key_not_added">A valid signing key is required for signing an APK file.</string>
     <string name="pref_sign_apk_no_signing_key">No signing key</string>
     <string name="failed_to_freeze">Could not freeze <xliff:g id="app_name" example="App Manager">%1$s</xliff:g>.</string>
+    <!-- Fork (白い熊, +121): the enabled-state guard -->
+    <string name="state_guard_title">The system restarted</string>
+    <string name="state_guard_thawed">Changing <xliff:g id="app_name">%1$s</xliff:g> made the system restart. 白い熊 応用管理 repeated the change as the system came back up, and it has been accepted: the app is enabled.\n\nIf it still shows as frozen, tap Unfreeze once more to lift what is left. That tap will not restart the system.</string>
+    <string name="state_guard_disabled">Changing <xliff:g id="app_name">%1$s</xliff:g> made the system restart. 白い熊 応用管理 repeated the change as the system came back up, and it has been accepted: the app is disabled.\n\nThawing it again will restart the system once more.</string>
+    <string name="state_guard_not_accepted">Changing <xliff:g id="app_name">%1$s</xliff:g> made the system restart, and the change could not be repeated as the system came back up. The app is as it was before.</string>
+    <string name="state_guard_unguarded">The system restarted while <xliff:g id="app_name">%1$s</xliff:g> was being changed, and nothing reported back. The app is probably as it was before. Changing it again is likely to restart the system again.</string>
+    <string name="state_guard_warn_title">This may restart the system</string>
+    <string name="state_guard_warn_known"><xliff:g id="app_name">%1$s</xliff:g> is known to restart the system (a soft reboot of a few seconds) whenever it is disabled or enabled. 白い熊 応用管理 carries the change through the restart, but the restart itself cannot be avoided.</string>
+    <string name="state_guard_warn_system"><xliff:g id="app_name">%1$s</xliff:g> is a system app. Disabling some system apps, or enabling them again, restarts the system (a soft reboot of a few seconds). 白い熊 応用管理 carries the change through such a restart, but cannot tell in advance which apps cause one.</string>
     <string name="failed_to_unfreeze">Could not unfreeze <xliff:g id="app_name" example="App Manager">%1$s</xliff:g>.</string>
     <string name="freeze_unfreeze">Freeze/unfreeze</string>
     <string name="profile_freeze_msg">Freezes or unfreezes apps based on state</string>
