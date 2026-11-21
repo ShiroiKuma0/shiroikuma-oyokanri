@@ -10,6 +10,66 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-11-03.19-47.gdc4154f4+124 — 2026-11-21
+
+Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.
+This release finishes what `+123` left open in the black-yellow look and repairs the switch.
+**It has not been checked on a device yet** — see *Known limits* at the end.
+
+### The switch
+
+- **Drawn whole, at one size.** Switches came out tiny, with the dot sticking out of the track when
+  off. Upstream's "medium" switch style gave a much smaller track than the look calls for, and the
+  dot sat in a padded drawable, which the switch widget reads as room to overhang. The switch is
+  now drawn as one piece — 52 × 28 dp, a 2 dp outline, a solid dot that travels inside it — on
+  every screen.
+- The meaning-coloured switches of the 盗み見 tab use the same drawing with their own colour.
+
+### Hand-built pills follow the Buttons roles
+
+- The pills of the unrolled row and of the batch pane, the shelf, the process monitor's pills and
+  the actions of the VirusTotal report now take the *Buttons* frame and label colours instead of
+  the two base colours.
+- A pill whose colour carries a meaning (a destructive action, a level, a state) keeps that colour.
+  Row note and tag pills keep their own two roles.
+
+### Floating buttons built in code
+
+- The file manager's speed dial is no longer a filled disc: ground inside, an accent ring around
+  it, and a glyph that turns red while the dial is open.
+
+### Lists and pickers
+
+- **Plain list dialogs** show each row as a full-width outlined pill with an icon coloured by what
+  the row does.
+- **Searchable list dialogs** carry the role-coloured icon on each row, without a frame.
+- The rows of the font picker have an icon, and the remove glyph of the selection sheet is red.
+- Single- and multiple-choice lists keep their marks.
+
+### Upstream screens: no stray colours
+
+- **Every Material colour names a role.** The theme left many Material colours at their defaults,
+  which is where purple, lilac and grey surfaces on upstream screens came from. Each now points at
+  one of the settable roles.
+- **The dark base is forced on every screen**, whatever the old light / dark setting says.
+- **Two new settable colours** under *Base colours*: *Selection* — the fill of a selected row and
+  of a search match, which used to be pale yellow under yellow text — and *Track*, the groove
+  behind a progress bar or slider.
+- Literal colours were removed from the main list row, the main screen, the legend row, the
+  activity-tracker window and the selection panel.
+- **Code editor.** Plain text, line numbers, the current line, the selection and the cursor follow
+  the roles. Syntax colours and the terminal's ANSI colours stay, since they carry meaning.
+
+### Known limits
+
+- **Not checked on a device.** The build compiles and each surface was read in the code that draws
+  it; nothing was looked at on a phone.
+- Whether EMUI accepts the run-time colour replacement is still untested — where it is refused, a
+  changed colour does not reach the surfaces drawn by the theme, and they stay yellow on black.
+- **The splash window stays black.** The system draws it before any app code runs.
+- Icons in list dialogs are chosen from the row's label, so a list of names or paths shows the
+  same accent icon on every row.
+
 ## 4.1.1+2026-11-03.19-47.gdc4154f4+123 — 2026-11-21
 
 Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.
