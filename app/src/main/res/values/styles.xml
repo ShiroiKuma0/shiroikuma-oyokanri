@@ -137,6 +137,49 @@
         <item name="colorOnSurfaceVariant">@color/theme_bright_yellow</item>
         <item name="colorControlNormal">@color/theme_bright_yellow</item>
         <item name="colorOutline">@color/theme_bright_yellow</item>
+        <!-- Fork (白い熊, +124): the rest of Material 3's colour attributes. Left at their
+             defaults they were where the upstream screens found purple, grey and lilac: a
+             tertiary badge, a surface-variant search field, an inverse snackbar, an outline-variant
+             divider. Every one of them names a role now, so a widget that asks the theme for ANY
+             colour gets one of the palette's. -->
+        <item name="colorSecondary">@color/theme_bright_yellow</item>
+        <item name="colorOnSecondary">@color/fork_ground</item>
+        <item name="colorTertiary">@color/theme_bright_yellow</item>
+        <item name="colorOnTertiary">@color/fork_ground</item>
+        <item name="colorTertiaryContainer">@color/fork_ground</item>
+        <item name="colorOnTertiaryContainer">@color/theme_bright_yellow</item>
+        <item name="colorPrimaryInverse">@color/fork_ground</item>
+        <item name="colorPrimaryFixed">@color/theme_bright_yellow</item>
+        <item name="colorPrimaryFixedDim">@color/theme_bright_yellow</item>
+        <item name="colorOnPrimaryFixed">@color/fork_ground</item>
+        <item name="colorOnPrimaryFixedVariant">@color/fork_ground</item>
+        <item name="colorSecondaryFixed">@color/theme_bright_yellow</item>
+        <item name="colorSecondaryFixedDim">@color/theme_bright_yellow</item>
+        <item name="colorOnSecondaryFixed">@color/fork_ground</item>
+        <item name="colorOnSecondaryFixedVariant">@color/fork_ground</item>
+        <item name="colorTertiaryFixed">@color/theme_bright_yellow</item>
+        <item name="colorTertiaryFixedDim">@color/theme_bright_yellow</item>
+        <item name="colorOnTertiaryFixed">@color/fork_ground</item>
+        <item name="colorOnTertiaryFixedVariant">@color/fork_ground</item>
+        <item name="colorSurfaceVariant">@color/fork_ground</item>
+        <item name="colorSurfaceBright">@color/fork_ground</item>
+        <item name="colorSurfaceDim">@color/fork_ground</item>
+        <item name="colorSurfaceInverse">@color/theme_bright_yellow</item>
+        <item name="colorOnSurfaceInverse">@color/fork_ground</item>
+        <item name="colorOutlineVariant">@color/fork_divider</item>
+        <item name="colorOnBackground">@color/theme_bright_yellow</item>
+        <item name="colorError">@color/fork_delete</item>
+        <item name="colorOnError">@color/fork_ground</item>
+        <item name="colorErrorContainer">@color/fork_ground</item>
+        <item name="colorOnErrorContainer">@color/fork_delete</item>
+        <item name="colorControlActivated">@color/theme_bright_yellow</item>
+        <item name="colorAccent">@color/theme_bright_yellow</item>
+        <item name="android:textColorTertiary">@color/settings_description</item>
+        <item name="android:textColorHint">@color/settings_description</item>
+        <item name="android:textColorLink">@color/fork_icon_message</item>
+        <item name="android:textColorHighlight">@color/highlight</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:textColorPrimary">@color/theme_bright_yellow</item>
         <item name="android:textColorSecondary">@color/theme_bright_yellow</item>
         <item name="android:colorBackground">@color/fork_ground</item>
@@ -252,6 +295,8 @@
 
     <style name="MaterialAlertDialog.AppTheme.YellowOnBlack" parent="MaterialAlertDialog.Material3">
         <item name="background">@drawable/alert_dialog_bg_yellow_on_black</item>
+        <!-- Fork (+124): a setItems list is an action list - full-width icon pills. -->
+        <item name="listItemLayout">@layout/fork_alert_list_item</item>
     </style>
 
     <!-- Fork: dialog action buttons rendered with a yellow hairline border on

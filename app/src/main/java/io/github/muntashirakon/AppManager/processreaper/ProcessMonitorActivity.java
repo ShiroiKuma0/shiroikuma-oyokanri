@@ -399,7 +399,9 @@ public class ProcessMonitorActivity extends BaseActivity {
         float density = getResources().getDisplayMetrics().density;
         androidx.appcompat.widget.AppCompatTextView tv = new androidx.appcompat.widget.AppCompatTextView(this);
         tv.setText(text);
-        tv.setTextColor(color);
+        // Fork (+124): the plain accent means "a button" — the Buttons roles (Pills.frameFor).
+        tv.setTextColor(io.github.muntashirakon.AppManager.utils.Pills.textFor(this, color));
+        color = io.github.muntashirakon.AppManager.utils.Pills.frameFor(this, color);
         tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
         tv.setSingleLine(true);
         int hp = Math.round(density * 10), vp = Math.round(density * 4);

@@ -11,4 +11,6 @@
 
     <color name="widget_screen_time_app3_bg">#1b1b1b</color>
     <color name="widget_screen_time_app3_fg">#ffffff</color>
+    <!-- Fork (+124): see values/colors.xml — the alias has to win over libcore's -night value. -->
+    <color name="highlight">@color/fork_selection</color>
 </resources>

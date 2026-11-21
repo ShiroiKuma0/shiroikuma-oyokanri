@@ -17,7 +17,7 @@
         style="@style/Widget.AppTheme.CardView.Outlined"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardBackgroundColor="@color/sixty_percent_white"
+        app:cardBackgroundColor="@color/fork_ground"
         android:minWidth="200dp">
 
         <androidx.appcompat.widget.LinearLayoutCompat

@@ -229,6 +229,9 @@ public final class RowPills {
         Context context = pill.getContext();
         int padH = Math.round(ForkThemeUtils.dpToPx(context, compact ? 12f : ACTION_PAD_H_DP));
         int padV = Math.round(ForkThemeUtils.dpToPx(context, compact ? 2f : ACTION_PAD_V_DP));
+        // Fork (+124): the plain accent means "a button" — the Buttons roles (Pills.frameFor).
+        final int label = io.github.muntashirakon.AppManager.utils.Pills.textFor(context, ink);
+        ink = io.github.muntashirakon.AppManager.utils.Pills.frameFor(context, ink);
         if (filled) {
             GradientDrawable shape = new GradientDrawable();
             shape.setShape(GradientDrawable.RECTANGLE);
@@ -239,7 +242,7 @@ public final class RowPills {
             pill.setTextColor(io.github.muntashirakon.AppManager.utils.ForkPalette.get(io.github.muntashirakon.AppManager.utils.ForkPalette.GROUND));
         } else {
             pill.setBackground(outline(context, ink));
-            pill.setTextColor(ink);
+            pill.setTextColor(label);
         }
         pill.setPadding(padH, padV, padH, padV);
         pill.setGravity(Gravity.CENTER);

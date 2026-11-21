@@ -8,6 +8,7 @@ import android.graphics.Color;
 import android.util.AttributeSet;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.cardview.widget.CardView;
 import androidx.core.widget.TextViewCompat;
@@ -41,10 +42,32 @@ public class FloatingActionButtonGroup extends SpeedDialView {
         layoutParams.setMargins(margin, margin, margin, margin);
         fab.setLayoutParams(layoutParams);
         fab.setUseCompatPadding(false);
-        setMainFabOpenedBackgroundColor(MaterialColors.getColor(this, androidx.appcompat.R.attr.colorError));
-        setMainFabOpenedIconColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnError));
-        setMainFabClosedBackgroundColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorSecondaryContainer));
-        setMainFabClosedIconColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSecondaryContainer));
+        // Fork (白い熊, +124): never a filled slab. The speed dial builds its buttons in code, so the
+        // theme's view inflater cannot restyle them: ground inside, a ring in the accent, the glyph
+        // in the accent — red while it is open and its tap means "close". libcore cannot see the
+        // app's colour roles, so it asks the theme attributes those roles feed.
+        int ground = MaterialColors.getColor(this, com.google.android.material.R.attr.colorSurface);
+        setMainFabOpenedBackgroundColor(ground);
+        setMainFabOpenedIconColor(MaterialColors.getColor(this, androidx.appcompat.R.attr.colorError));
+        setMainFabClosedBackgroundColor(ground);
+        setMainFabClosedIconColor(MaterialColors.getColor(this, androidx.appcompat.R.attr.colorPrimary));
+        ring(fab, 3f);
+    }
+
+    /** Fork (+124): an accent ring as the button's foreground; the button itself stays the ground. */
+    private void ring(@NonNull FloatingActionButton fab, float widthDp) {
+        try {
+            fab.setCompatElevation(0);
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                android.graphics.drawable.GradientDrawable ring = new android.graphics.drawable.GradientDrawable();
+                ring.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+                ring.setColor(Color.TRANSPARENT);
+                ring.setStroke(Math.max(1, UiUtils.dpToPx(getContext(), widthDp)),
+                        MaterialColors.getColor(this, androidx.appcompat.R.attr.colorPrimary));
+                fab.setForeground(ring);
+            }
+        } catch (Throwable ignore) {
+        }
     }
 
     @SuppressLint("RestrictedApi")
@@ -61,9 +84,10 @@ public class FloatingActionButtonGroup extends SpeedDialView {
     @Nullable
     @Override
     public FabWithLabelView addActionItem(SpeedDialActionItem actionItem, int position, boolean animate) {
-        int fabImageTintColor = MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnPrimaryContainer);
-        int fabBackgroundColor = MaterialColors.getColor(this, com.google.android.material.R.attr.colorPrimaryContainer);
-        int labelColor = MaterialColors.getColor(this, android.R.attr.textColorSecondary);
+        // Fork (+124): outlined like the main button, and the label in the theme's text colour.
+        int fabImageTintColor = MaterialColors.getColor(this, androidx.appcompat.R.attr.colorPrimary);
+        int fabBackgroundColor = MaterialColors.getColor(this, com.google.android.material.R.attr.colorSurface);
+        int labelColor = MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurface);
         int labelBackgroundColor = Color.TRANSPARENT;
         Context context = getContext();
         SpeedDialActionItem item = new SpeedDialActionItem.Builder(actionItem.getId(), actionItem.getFabImageDrawable(context))
@@ -85,6 +109,7 @@ public class FloatingActionButtonGroup extends SpeedDialView {
         layoutParams.setMargins(margin, 0, margin, 0);
         fab.setLayoutParams(layoutParams);
         fab.setUseCompatPadding(false);
+        ring(fab, 1.25f);
         CardView labelBackground = fabWrapper.getLabelBackground();
         labelBackground.setUseCompatPadding(false);
         labelBackground.setContentPadding(0, 0, 0, 0);

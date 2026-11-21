@@ -99,6 +99,14 @@
     <color name="fork_heading">#FFFF00</color>
     <color name="fork_divider">#B3B300</color>
     <color name="fork_delete">#FF0000</color>
+    <color name="fork_track">#333300</color>
+    <color name="fork_selection">#404000</color>
+    <!-- Fork (+124): overrides libcore's pale-yellow "highlight" (#FFFF9F), which upstream lays
+         under a selected row and a search match — yellow text on it could not be read. It is an
+         alias of the palette's selection role. The role itself must NOT be this resource: libcore
+         also has a -night "highlight", and a night-qualified value beats the run-time loader's
+         default-config one — so values-night/colors.xml repeats this alias. -->
+    <color name="highlight">@color/fork_selection</color>
     <color name="fork_icon_connect">#00FF00</color>
     <color name="fork_icon_message">#4D94FF</color>
     <color name="fork_icon_contact">#00FFFF</color>

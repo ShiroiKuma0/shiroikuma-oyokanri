@@ -260,7 +260,10 @@ public final class Prefs {
         }
 
         public static int getNightMode() {
-            return AppPref.getInt(AppPref.PrefKey.PREF_APP_THEME_INT);
+            // Fork (白い熊, +124): every screen is black-yellow, so the base is always Material's
+            // dark one. With "light" or "follow system" the attributes the theme does not name
+            // (and libcore's own -night colours) came up as dark ink on our black ground.
+            return androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES;
         }
 
         public static void setNightMode(int nightMode) {

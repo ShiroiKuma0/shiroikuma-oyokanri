@@ -69,6 +69,26 @@ public final class EditorThemes {
         scheme.setColor(EditorColorScheme.LINE_NUMBER_BACKGROUND, SurfaceColors.SURFACE_2.getColor(context));
         scheme.setColor(EditorColorScheme.COMPLETION_WND_BACKGROUND, SurfaceColors.SURFACE_1.getColor(context));
         scheme.setColor(EditorColorScheme.HIGHLIGHTED_DELIMITERS_FOREGROUND, Color.RED);
+        // Fork (白い熊, +124): the editor's chrome in the palette's roles. The syntax colours of the
+        // TextMate theme stay — they carry meaning — but plain text, line numbers, the current
+        // line, the selection and the cursor were the theme's own greys and whites.
+        int ink = io.github.muntashirakon.AppManager.utils.ForkPalette.get(context,
+                io.github.muntashirakon.AppManager.utils.ForkPalette.TEXT);
+        int ground = io.github.muntashirakon.AppManager.utils.ForkPalette.get(context,
+                io.github.muntashirakon.AppManager.utils.ForkPalette.GROUND);
+        scheme.setColor(EditorColorScheme.TEXT_NORMAL, ink);
+        scheme.setColor(EditorColorScheme.LINE_NUMBER, io.github.muntashirakon.AppManager.fonts.ColorPrefs.getColor(
+                context, io.github.muntashirakon.AppManager.fonts.ColorPrefs.SETTINGS_DESCRIPTION));
+        scheme.setColor(EditorColorScheme.LINE_NUMBER_CURRENT, ink);
+        scheme.setColor(EditorColorScheme.LINE_DIVIDER, io.github.muntashirakon.AppManager.utils.ForkPalette.get(
+                context, io.github.muntashirakon.AppManager.utils.ForkPalette.DIVIDER));
+        scheme.setColor(EditorColorScheme.CURRENT_LINE, ColorUtils.blendARGB(ground, ink, 0.12f));
+        scheme.setColor(EditorColorScheme.SELECTED_TEXT_BACKGROUND, io.github.muntashirakon.AppManager.utils
+                .ForkPalette.get(context, io.github.muntashirakon.AppManager.utils.ForkPalette.SELECTION));
+        scheme.setColor(EditorColorScheme.SELECTION_INSERT, ink);
+        scheme.setColor(EditorColorScheme.SELECTION_HANDLE, ink);
+        scheme.setColor(EditorColorScheme.COMPLETION_WND_TEXT_PRIMARY, ink);
+        scheme.setColor(EditorColorScheme.COMPLETION_WND_CORNER, ink);
         int thumbColor = MaterialColors.getColor(context, androidx.appcompat.R.attr.colorControlActivated, EditorColor.class.getSimpleName());
         scheme.setColor(EditorColorScheme.SCROLL_BAR_THUMB, thumbColor);
         scheme.setColor(EditorColorScheme.SCROLL_BAR_THUMB_PRESSED, thumbColor);

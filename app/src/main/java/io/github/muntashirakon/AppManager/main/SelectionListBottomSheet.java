@@ -192,7 +192,10 @@ public class SelectionListBottomSheet {
             } else {
                 holder.hidden.setVisibility(View.GONE);
             }
-            holder.remove.setImageTintList(ColorStateList.valueOf(textColor));
+            // Fork (+124): the row's one action removes — the delete role's red.
+            holder.remove.setImageTintList(ColorStateList.valueOf(
+                    io.github.muntashirakon.AppManager.utils.ForkPalette.get(holder.remove.getContext(),
+                            io.github.muntashirakon.AppManager.utils.ForkPalette.DELETE)));
             holder.remove.setOnClickListener(v -> removeAt(holder.getBindingAdapterPosition()));
         }
 

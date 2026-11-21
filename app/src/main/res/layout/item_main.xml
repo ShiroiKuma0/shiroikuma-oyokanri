@@ -423,7 +423,7 @@
                 android:layout_height="4dp"
                 android:layout_marginTop="2dp"
                 android:layout_marginBottom="2dp"
-                android:background="#2A2A2A"
+                android:background="@color/fork_track"
                 android:visibility="gone">
 
                 <View

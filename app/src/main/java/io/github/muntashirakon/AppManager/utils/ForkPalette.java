@@ -72,6 +72,9 @@ public final class ForkPalette {
     public static final String HEADING = "ui_heading";
     public static final String DIVIDER = "ui_divider";
     public static final String DELETE = "role_delete";
+    /** Fork (+124): the track behind a bar, and the fill under a selected row or a search match. */
+    public static final String TRACK = "bar_track";
+    public static final String SELECTION = "selection_fill";
     public static final String ICON_CONNECT = "icon_connect";
     public static final String ICON_MESSAGE = "icon_message";
     public static final String ICON_CONTACT = "icon_contact";
@@ -105,6 +108,8 @@ public final class ForkPalette {
     public static final Role[] ROLES = {
             new Role(TEXT, R.color.theme_bright_yellow, R.string.palette_text, FIXED, 0xFFFFFF00),
             new Role(GROUND, R.color.fork_ground, R.string.palette_ground, FIXED, 0xFF000000),
+            new Role(SELECTION, R.color.fork_selection, R.string.palette_selection, BLEND, 25),
+            new Role(TRACK, R.color.fork_track, R.string.palette_track, BLEND, 20),
             new Role(TOPBAR_BG, R.color.fork_topbar_bg, R.string.palette_topbar_bg, FROM_GROUND, 0),
             new Role(TOPBAR_TEXT, R.color.fork_topbar_text, R.string.palette_topbar_text, FROM_TEXT, 0),
             new Role(BUTTON_FRAME, R.color.fork_button_frame, R.string.palette_button_frame, FROM_TEXT, 0),

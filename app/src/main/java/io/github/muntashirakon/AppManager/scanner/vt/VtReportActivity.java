@@ -424,19 +424,21 @@ public class VtReportActivity extends BaseActivity {
         tv.setGravity(Gravity.CENTER);
         tv.setSingleLine(true);
         tv.setEllipsize(TextUtils.TruncateAt.END);
-        tv.setTextColor(accent());
+        // Fork (+124): the dialog's actions wear the Buttons roles.
+        final int frameInk = io.github.muntashirakon.AppManager.utils.Pills.frameFor(this, accent());
+        tv.setTextColor(io.github.muntashirakon.AppManager.utils.Pills.textFor(this, accent()));
         tv.setTextSize(15);
         tv.setTypeface(main ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
         tv.setPadding(dp(10), 0, dp(10), 0);
         GradientDrawable shape = new GradientDrawable();
         shape.setColor(Color.TRANSPARENT);
         shape.setCornerRadius(dp(100));
-        shape.setStroke(Math.max(1, dp(main ? 3f : 1.25f)), accent());
+        shape.setStroke(Math.max(1, dp(main ? 3f : 1.25f)), frameInk);
         GradientDrawable mask = new GradientDrawable();
         mask.setColor(Color.WHITE);
         mask.setCornerRadius(dp(100));
         tv.setBackground(new android.graphics.drawable.RippleDrawable(
-                android.content.res.ColorStateList.valueOf(RowPills.withAlpha(accent(), 0.25f)), shape, mask));
+                android.content.res.ColorStateList.valueOf(RowPills.withAlpha(frameInk, 0.25f)), shape, mask));
     }
 
     @NonNull

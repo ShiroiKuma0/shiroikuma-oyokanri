@@ -5,7 +5,7 @@
     android:id="@+id/coordinator_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/theme_screen_bg"
+    android:background="@color/fork_ground"
     tools:context="io.github.muntashirakon.AppManager.main.MainActivity">
 
     <io.github.muntashirakon.widget.AppBarLayout

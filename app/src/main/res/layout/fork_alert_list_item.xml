@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Fork (白い熊, +124): a row of every AlertDialog.setItems list, named by listItemLayout in
+     MaterialAlertDialog.AppTheme.YellowOnBlack: a full-width outlined pill with its icon,
+     coloured by what the row does. The frame is a padding container because the list sets and
+     clears state on the row itself. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp"
+    android:paddingTop="3dp"
+    android:paddingBottom="3dp">
+
+    <io.github.muntashirakon.AppManager.utils.ForkListPillText
+        android:id="@android:id/text1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:textSize="16sp"
+        android:ellipsize="end"
+        android:maxLines="2" />
+
+</FrameLayout>

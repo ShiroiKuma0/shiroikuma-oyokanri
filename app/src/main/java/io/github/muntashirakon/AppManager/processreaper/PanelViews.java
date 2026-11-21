@@ -310,7 +310,9 @@ final class PanelViews {
     @NonNull
     static TextView pill(@NonNull Context c, @NonNull CharSequence t, @ColorInt int color, boolean main,
                          @NonNull View.OnClickListener click) {
-        TextView v = text(c, t, 14, color, main);
+        // Fork (+124): the plain accent means "a button" — the Buttons roles (Pills.frameFor).
+        TextView v = text(c, t, 14, io.github.muntashirakon.AppManager.utils.Pills.textFor(c, color), main);
+        color = io.github.muntashirakon.AppManager.utils.Pills.frameFor(c, color);
         GradientDrawable frame = new GradientDrawable();
         frame.setCornerRadius(dp(c, 100));
         frame.setColor(Color.TRANSPARENT);

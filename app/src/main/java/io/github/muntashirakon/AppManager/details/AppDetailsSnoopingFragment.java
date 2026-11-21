@@ -1868,9 +1868,7 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
              */
             private void tintSwitch(@NonNull MaterialSwitch toggle, @ColorInt int accent) {
                 ColorStateList tint = ColorStateList.valueOf(accent);
-                toggle.setThumbTintList(tint);
-                toggle.setTrackDecorationTintList(tint);
-                toggle.setTrackTintList(ColorStateList.valueOf(Color.TRANSPARENT));
+                io.github.muntashirakon.AppManager.utils.ForkSwitch.tint(toggle, tint);
             }
 
             /**
@@ -2011,9 +2009,7 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 toggle.setVisibility(View.VISIBLE);
                 toggle.setChecked(!locked);
                 ColorStateList tint = ColorStateList.valueOf(accent);
-                toggle.setThumbTintList(tint);
-                toggle.setTrackDecorationTintList(tint);
-                toggle.setTrackTintList(ColorStateList.valueOf(Color.TRANSPARENT));
+                io.github.muntashirakon.AppManager.utils.ForkSwitch.tint(toggle, tint);
                 // The frame marks OUR doing, exactly as it does on a capability
                 // row — and here that is the LOCKED state, since an unlocked power
                 // is what every fresh install gives you. Both branches set both
@@ -2158,9 +2154,7 @@ public class AppDetailsSnoopingFragment extends AppDetailsFragment {
                 // The switch says the same thing: its dot and its outline take the
                 // accent, and the track stays hollow so the dot is what you read.
                 ColorStateList accentTint = ColorStateList.valueOf(accent);
-                toggle.setThumbTintList(accentTint);
-                toggle.setTrackDecorationTintList(accentTint);
-                toggle.setTrackTintList(ColorStateList.valueOf(Color.TRANSPARENT));
+                io.github.muntashirakon.AppManager.utils.ForkSwitch.tint(toggle, accentTint);
                 // A box around the switch means the decision is REMEMBERED — it is
                 // replayed when the app is reinstalled or updated and travels in a
                 // settings export. No box means the live state stands on its own.

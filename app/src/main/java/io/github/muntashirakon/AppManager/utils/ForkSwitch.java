@@ -34,6 +34,16 @@ public final class ForkSwitch {
         return ColorUtils.blendARGB(ground, on, 0.55f);
     }
 
+    /**
+     * Fork (+124): recolour an outlined switch that carries a meaning (the 盗み見 tab). Since +124
+     * the outline IS the track drawable — so a caller must never set a transparent track tint
+     * again; it goes through here.
+     */
+    public static void tint(@NonNull MaterialSwitch sw, @NonNull ColorStateList tint) {
+        sw.setThumbTintList(tint);
+        sw.setTrackTintList(tint);
+    }
+
     /** Fork (+123): both colours are settable roles of their own — never constants. */
     public static void outline(@NonNull MaterialSwitch sw) {
         outlineWith(sw, ForkPalette.get(sw.getContext(), ForkPalette.SWITCH_ON),
@@ -53,24 +63,39 @@ public final class ForkSwitch {
                     new int[]{ForkPalette.disabled(on), ForkPalette.disabled(off), on, off});
             sw.setMinHeight(0);
             sw.setMinimumHeight(0);
-            // One dot for both states, 46 % of the track's height, inside the stock thumb's box so
-            // the switch keeps its size and travel.
-            Drawable stock = sw.getThumbDrawable();
-            int box = stock != null ? stock.getIntrinsicHeight() : 0;
-            if (box > 0) {
-                int dot = Math.round(box * 0.46f);
-                GradientDrawable oval = new GradientDrawable();
-                oval.setShape(GradientDrawable.OVAL);
-                oval.setColor(Color.WHITE);
-                oval.setSize(dot, dot);
-                int inset = (box - dot) / 2;
-                sw.setThumbDrawable(new InsetDrawable(oval, inset, inset, box - dot - inset, box - dot - inset));
-            }
+            // Fork (白い熊, +124): the whole switch is drawn here, at the skill's size (52 x 28 dp,
+            // 2 dp outline, a dot of 46 % of the height) — whatever style the layout names.
+            // Until +123 the stock thumb's box was reused and the dot was an InsetDrawable. Both
+            // were wrong: upstream's "medium" switch style has a far smaller track, and
+            // SwitchCompat reads a drawable's PADDING as "this much of the thumb may overhang
+            // the track" — an InsetDrawable reports its insets as padding, so the dot hung out
+            // over the left end when off (白い熊's screenshot of 2026-11-21: "mangled, tiny").
+            // A LayerDrawable's layer insets are not padding, so the dot's box now travels
+            // inside the track and the gap to the outline is the same all round.
+            float d = sw.getResources().getDisplayMetrics().density;
+            int w = Math.round(52 * d), h = Math.round(28 * d);
+            int dot = Math.round(h * 0.46f);
+            int inset = (h - dot) / 2;
+            GradientDrawable oval = new GradientDrawable();
+            oval.setShape(GradientDrawable.OVAL);
+            oval.setColor(Color.WHITE);
+            oval.setSize(dot, dot);
+            android.graphics.drawable.LayerDrawable thumb =
+                    new android.graphics.drawable.LayerDrawable(new Drawable[]{oval});
+            thumb.setLayerInset(0, inset, inset, h - dot - inset, h - dot - inset);
+            GradientDrawable track = new GradientDrawable();
+            track.setShape(GradientDrawable.RECTANGLE);
+            track.setCornerRadius(h / 2f);
+            track.setColor(Color.TRANSPARENT);
+            track.setStroke(Math.max(1, Math.round(2 * d)), Color.WHITE);
+            track.setSize(w, h);
+            sw.setThumbDrawable(thumb);
             sw.setThumbIconDrawable(null);
             sw.setThumbTintList(tint);
-            // The track decoration is the outline; the track itself stays hollow.
-            sw.setTrackDecorationTintList(tint);
-            sw.setTrackTintList(ColorStateList.valueOf(Color.TRANSPARENT));
+            sw.setTrackDrawable(track);
+            sw.setTrackTintList(tint);
+            sw.setTrackDecorationDrawable(null);
+            sw.setSwitchMinWidth(w);
         } catch (Throwable ignore) {
         }
     }

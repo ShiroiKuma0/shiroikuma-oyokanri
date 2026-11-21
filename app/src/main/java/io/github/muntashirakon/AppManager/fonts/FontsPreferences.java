@@ -480,7 +480,7 @@ public class FontsPreferences extends Fragment {
         // default place right under Screens (index 2 on), ahead of the per-screen sections.
         int at = 2;
         container.addView(buildPaletteGroup(inflater, container, R.string.palette_group_base,
-                ForkPalette.TEXT, ForkPalette.GROUND), at++);
+                ForkPalette.TEXT, ForkPalette.GROUND, ForkPalette.SELECTION, ForkPalette.TRACK), at++);
         container.addView(buildPaletteGroup(inflater, container, R.string.palette_group_topbar,
                 ForkPalette.TOPBAR_BG, ForkPalette.TOPBAR_TEXT), at++);
         container.addView(buildPaletteGroup(inflater, container, R.string.palette_group_buttons,
@@ -2120,6 +2120,8 @@ public class FontsPreferences extends Fragment {
                         : inf.inflate(R.layout.item_font_picker, parent, false);
                 FontUtil.Option o = opts.get(position);
                 TextView caption = v.findViewById(R.id.fp_caption);
+                // Fork (+124): a picker row has its icon too.
+                UiRowIcons.set(caption, R.drawable.ic_font_download, ForkPalette.ICON_MESSAGE);
                 TextView previewLine = v.findViewById(R.id.fp_preview);
                 if (ADD_MARKER.equals(o.value)) {
                     caption.setVisibility(View.GONE);

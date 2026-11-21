@@ -3358,6 +3358,8 @@
     <string name="palette_group_icons">Icon colours</string>
     <string name="palette_text">Text and accent — everything without a colour of its own</string>
     <string name="palette_ground">Background</string>
+    <string name="palette_selection">Selected row and search match</string>
+    <string name="palette_track">Track behind a bar</string>
     <string name="palette_topbar_bg">Top bar background</string>
     <string name="palette_topbar_text">Top bar title and glyphs</string>
     <string name="palette_button_frame">Button frame</string>

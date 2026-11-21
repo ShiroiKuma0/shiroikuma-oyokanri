@@ -72,6 +72,26 @@ public final class Pills {
         return false;
     }
 
+    /**
+     * Fork (白い熊, +124): the frame colour of a hand-built action pill. The fork's own pill
+     * builders (row and pane pills, the shelf, the monitor's panels, the report dialog's actions)
+     * are handed an ink by their callers — the plain accent for an ordinary action, or a colour
+     * that carries a meaning (a warning, a freeze level, a verdict). The plain accent means "the
+     * button colour": it becomes the Buttons roles here, in the one place every builder passes
+     * through, so those pills follow the same two swatches as every inflated button. A
+     * meaning-carrying colour is returned untouched.
+     */
+    @ColorInt
+    public static int frameFor(@NonNull Context context, @ColorInt int ink) {
+        return ink == ForkThemeUtils.getTextColor() ? ForkPalette.get(context, ForkPalette.BUTTON_FRAME) : ink;
+    }
+
+    /** The label colour to go with {@link #frameFor}. */
+    @ColorInt
+    public static int textFor(@NonNull Context context, @ColorInt int ink) {
+        return ink == ForkThemeUtils.getTextColor() ? ForkPalette.get(context, ForkPalette.BUTTON_TEXT) : ink;
+    }
+
     /** An outlined pill as a background for any view (a row, a hand-built button). */
     @NonNull
     public static Drawable frame(@NonNull Context context, boolean main, @ColorInt int color) {

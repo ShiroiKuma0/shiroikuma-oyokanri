@@ -98,3 +98,33 @@ buttons stay glyphs; multi-select checkboxes stay selection marks.
 - **Not checked on the device.** Everything above was verified in the code only (白い熊, 2026-11-21: no
   screenshots). The thirty-five upstream screens were never drawn black-yellow before — expect stray surfaces
   that hard-code a Material colour in their own layouts or code.
+
+## +124 — the four items left open by +123, and the switch (2026-11-21)
+
+- **The switch is drawn whole by `ForkSwitch`** (52 × 28 dp, 2 dp outline as the *track* drawable, a dot of 46 %
+  in a `LayerDrawable` thumb). **LANDMINE:** `SwitchCompat` reads a thumb drawable's *padding* as "this much may
+  overhang the track"; an `InsetDrawable` reports its insets as padding, so until +123 the dot hung out over the
+  left end, and upstream's "medium" style made the whole thing tiny. Never wrap the thumb in an `InsetDrawable`,
+  and never set a transparent track tint — recolour through `ForkSwitch.tint(sw, tint)` (the 盗み見 tab does).
+- **Hand-built pills follow the Buttons roles** through `Pills.frameFor` / `textFor`: a builder handed the plain
+  accent gets `BUTTON_FRAME` / `BUTTON_TEXT`; a meaning-carrying ink is left alone. Wired into
+  `RowPills.styleActionPill` (pane, batch pane, shelf), the monitor's two pill builders and the report dialog's
+  `styleAction`. Row note/tag pills keep their own `CHIP` / `ADDPILL` roles.
+- **The speed dial** (`libcore … FloatingActionButtonGroup`) builds its buttons in code: ground, an accent ring
+  as foreground, red glyph while open. libcore cannot see the app's roles, so it asks the theme attributes they
+  feed (`colorSurface`, `colorPrimary`, `colorError`).
+- **List dialogs.** `AlertDialog.setItems` rows are full-width icon pills (`listItemLayout` →
+  `fork_alert_list_item` → `utils/ForkListPillText`); `SearchableItemsDialogBuilder` rows carry an icon without a
+  frame (the app's own copy of libcore's `m3_alert_select_dialog_item` → `utils/ForkListItemText` — **diff the two
+  when libcore's copy changes**). The role is read from the label with the menus' word table. Single- and
+  multi-choice lists keep their marks.
+- **Every Material colour attribute names a role** in `AppTheme.YellowOnBlack` (secondary, tertiary, the fixed
+  and inverse families, surface variant, outline variant, error, hint, link…) — the defaults were where upstream
+  screens found purple and grey. **Night resources are forced** (`Prefs.Appearance.getNightMode()` returns
+  `MODE_NIGHT_YES`): the ground is ours on every screen, so the base must be Material's dark one.
+- **A role resource must not have a `-night` twin** — a night-qualified value beats the run-time loader's
+  default-config entry. libcore's `highlight` has one, so the selection role is `fork_selection` and `highlight`
+  is an alias to it in both `values` and `values-night`.
+- New roles: `SELECTION` (selected row, search match — was libcore's unreadable pale yellow) and `TRACK`
+  (the track behind a bar). The code editor's chrome (plain text, line numbers, current line, selection, cursor)
+  takes the roles in `EditorThemes.fixColor`; syntax colours and the terminal's ANSI colours stay.

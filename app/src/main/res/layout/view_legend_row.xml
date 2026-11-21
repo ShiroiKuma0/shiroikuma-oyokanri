@@ -25,7 +25,7 @@
         android:singleLine="true"
         android:paddingHorizontal="8dp"
         android:paddingVertical="5dp"
-        android:textColor="#E8E8E8"
+        android:textColor="@color/theme_bright_yellow"
         android:textSize="14sp"
         tools:text="App name" />
 
@@ -35,7 +35,7 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:layout_marginStart="14dp"
-        android:textColor="#C8C8C8"
+        android:textColor="@color/settings_description"
         android:textSize="15sp"
         tools:text="User app" />
 
