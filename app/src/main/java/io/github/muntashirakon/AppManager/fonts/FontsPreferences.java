@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Locale;
 
 import io.github.muntashirakon.AppManager.R;
+import io.github.muntashirakon.AppManager.utils.ForkPalette;
 import io.github.muntashirakon.AppManager.utils.LayoutGeometry;
 import io.github.muntashirakon.AppManager.main.MainLayoutPrefs;
 import io.github.muntashirakon.AppManager.appdata.self.MigrationKit;
@@ -288,7 +289,7 @@ public class FontsPreferences extends Fragment {
         LayoutInflater inflater = LayoutInflater.from(requireContext());
         for (Group g : GROUPS) {
             View groupView = inflater.inflate(R.layout.view_font_group, container, false);
-            ((AppCompatTextView) groupView.findViewById(R.id.group_header)).setText(g.titleRes);
+            header(groupView, g.titleRes);
             LinearLayoutCompat groupContent = groupView.findViewById(R.id.group_content);
             for (Cat c : g.cats) {
                 View element = inflater.inflate(R.layout.view_font_element, groupContent, false);
@@ -307,20 +308,20 @@ public class FontsPreferences extends Fragment {
         // Fork: main-list separators (width slider + colour each) — built
         // manually because the data-driven Cat structure is font/colour-only.
         View sepGroup = inflater.inflate(R.layout.view_font_group, container, false);
-        ((AppCompatTextView) sepGroup.findViewById(R.id.group_header)).setText(R.string.pref_sep_group);
+        header(sepGroup, R.string.pref_sep_group);
         LinearLayoutCompat sepContent = sepGroup.findViewById(R.id.group_content);
         sepContent.addView(buildSeparatorElement(inflater, sepContent, true));
         sepContent.addView(buildSeparatorElement(inflater, sepContent, false));
         container.addView(sepGroup);
         // Fork: the running/active app box (border width + user/system colours).
         View boxGroup = inflater.inflate(R.layout.view_font_group, container, false);
-        ((AppCompatTextView) boxGroup.findViewById(R.id.group_header)).setText(R.string.pref_runbox_group);
+        header(boxGroup, R.string.pref_runbox_group);
         LinearLayoutCompat boxContent = boxGroup.findViewById(R.id.group_content);
         boxContent.addView(buildRunningBoxElement(inflater, boxContent));
         container.addView(boxGroup);
         // Fork: process monitor — app-icon size + the four row-state colours.
         View monGroup = inflater.inflate(R.layout.view_font_group, container, false);
-        ((AppCompatTextView) monGroup.findViewById(R.id.group_header)).setText(R.string.pref_monitor_group);
+        header(monGroup, R.string.pref_monitor_group);
         LinearLayoutCompat monContent = monGroup.findViewById(R.id.group_content);
         monContent.addView(buildMonitorIconElement(inflater, monContent));
         monContent.addView(buildMonitorPaddingElement(inflater, monContent));
@@ -342,7 +343,7 @@ public class FontsPreferences extends Fragment {
         // colour per kind of line. The colours are the orientation: what a page of ten thousand
         // lines is scanned for is where each app starts and which of them went red.
         View logGroup = inflater.inflate(R.layout.view_font_group, container, false);
-        ((AppCompatTextView) logGroup.findViewById(R.id.group_header)).setText(R.string.pref_oplog_group);
+        header(logGroup, R.string.pref_oplog_group);
         LinearLayoutCompat logContent = logGroup.findViewById(R.id.group_content);
         logContent.addView(buildOpLogTextSizeElement(inflater, logContent));
         logContent.addView(buildOpLogTimestampElement(inflater, logContent));
@@ -368,7 +369,7 @@ public class FontsPreferences extends Fragment {
         // Fork: process detail page — icon size, line padding, and the five text
         // surfaces (each: font family/weight/size + colour, via bindElement).
         View detGroup = inflater.inflate(R.layout.view_font_group, container, false);
-        ((AppCompatTextView) detGroup.findViewById(R.id.group_header)).setText(R.string.pref_detail_group);
+        header(detGroup, R.string.pref_detail_group);
         LinearLayoutCompat detContent = detGroup.findViewById(R.id.group_content);
         detContent.addView(buildDetailIconElement(inflater, detContent));
         detContent.addView(buildDetailPaddingElement(inflater, detContent));
@@ -380,7 +381,7 @@ public class FontsPreferences extends Fragment {
         container.addView(detGroup);
         // Fork: the selected card's frame (colour + border width + roundness).
         View frameGroup = inflater.inflate(R.layout.view_font_group, container, false);
-        ((AppCompatTextView) frameGroup.findViewById(R.id.group_header)).setText(R.string.pref_selframe_group);
+        header(frameGroup, R.string.pref_selframe_group);
         LinearLayoutCompat frameContent = frameGroup.findViewById(R.id.group_content);
         frameContent.addView(buildSelectionFrameElement(inflater, frameContent));
         container.addView(frameGroup);
@@ -389,16 +390,18 @@ public class FontsPreferences extends Fragment {
         // process-monitor screens. The skill asks for a settable role rather than a hard-coded
         // constant; this is it. Changing it recolours the open page live.
         View pageGroup = inflater.inflate(R.layout.view_font_group, container, false);
-        ((AppCompatTextView) pageGroup.findViewById(R.id.group_header)).setText(R.string.pref_settings_page_group);
+        header(pageGroup, R.string.pref_settings_page_group);
         LinearLayoutCompat pageContent = pageGroup.findViewById(R.id.group_content);
         addColorRow(pageContent,
                 new ColorSpec(ColorPrefs.SETTINGS_DESCRIPTION, R.string.pref_color_settings_description),
                 () -> { if (mFontsContainer != null) applyDescriptionColor(mFontsContainer); });
+        addColorRow(pageContent, new ColorSpec(ForkPalette.HEADING, R.string.palette_heading), () -> {});
+        addColorRow(pageContent, new ColorSpec(ForkPalette.DIVIDER, R.string.palette_divider), () -> {});
         container.addView(pageGroup);
         // Fork: a reference legend at the TOP of the page — sample chips styled
         // in code to mirror the live list, with what each colour/style means.
         View legendGroup = inflater.inflate(R.layout.view_font_group, container, false);
-        ((AppCompatTextView) legendGroup.findViewById(R.id.group_header)).setText(R.string.pref_legend_group);
+        header(legendGroup, R.string.pref_legend_group);
         LinearLayoutCompat legendContent = legendGroup.findViewById(R.id.group_content);
         buildLegend(inflater, legendContent);
         container.addView(legendGroup, 0);
@@ -406,7 +409,7 @@ public class FontsPreferences extends Fragment {
         // (Kōjiki flow): heading + one tappable row that opens the category
         // panel; the row summary shows the directory and the latest export.
         View eimGroup = inflater.inflate(R.layout.view_font_group, container, false);
-        ((AppCompatTextView) eimGroup.findViewById(R.id.group_header)).setText(R.string.settings_eim_title);
+        header(eimGroup, R.string.settings_eim_title);
         LinearLayoutCompat eimContent = eimGroup.findViewById(R.id.group_content);
         eimContent.addView(buildEimRow());
         // Fork: the 保存復元 automation contract's two rows live INSIDE this
@@ -428,32 +431,138 @@ public class FontsPreferences extends Fragment {
         // Export/Import rather than in a section of its own — it is a page-level habit, not a
         // colour, and the page has no other home for one.
         View screensGroup = inflater.inflate(R.layout.view_font_group, container, false);
-        ((AppCompatTextView) screensGroup.findViewById(R.id.group_header)).setText(R.string.pref_screens_group);
+        header(screensGroup, R.string.pref_screens_group);
         LinearLayoutCompat screensContent = screensGroup.findViewById(R.id.group_content);
         screensContent.addView(buildReopenSwitchRow());
         container.addView(screensGroup, 1);
         // Fork (白い熊, APK-vetting chain, item 8): VirusTotal scan settings.
         View vtGroup = inflater.inflate(R.layout.view_font_group, container, false);
-        ((AppCompatTextView) vtGroup.findViewById(R.id.group_header)).setText(R.string.virus_total);
+        header(vtGroup, R.string.virus_total);
         LinearLayoutCompat vtContent = vtGroup.findViewById(R.id.group_content);
-        vtContent.addView(buildVtAutoUploadRow());
-        vtContent.addView(buildVtWifiOnlyRow());
+        // Fork (白い熊, +123): look up / look up while roaming / upload / upload while roaming.
+        // A row that has nothing to govern while its master is off is dimmed and cannot be tapped.
+        final View lookupRoaming = buildVtSwitchRow(R.string.vt_lookup_roaming_title, R.string.vt_lookup_roaming_desc,
+                io.github.muntashirakon.AppManager.settings.Prefs.VirusTotal.lookupWhileRoaming(),
+                io.github.muntashirakon.AppManager.settings.Prefs.VirusTotal::setLookupWhileRoaming);
+        final View uploadRoaming = buildVtSwitchRow(R.string.vt_upload_roaming_title, R.string.vt_upload_roaming_desc,
+                io.github.muntashirakon.AppManager.settings.Prefs.VirusTotal.uploadWhileRoaming(),
+                io.github.muntashirakon.AppManager.settings.Prefs.VirusTotal::setUploadWhileRoaming);
+        final View autoUpload = buildVtAutoUploadRow();
+        final View wifiOnly = buildVtWifiOnlyRow();
+        vtContent.addView(buildVtSwitchRow(R.string.vt_lookup_title, R.string.vt_lookup_desc,
+                io.github.muntashirakon.AppManager.settings.Prefs.VirusTotal.lookupEnabled(), on -> {
+                    io.github.muntashirakon.AppManager.settings.Prefs.VirusTotal.setLookupEnabled(on);
+                    setRowEnabled(lookupRoaming, on);
+                }));
+        vtContent.addView(lookupRoaming);
+        vtContent.addView(buildVtSwitchRow(R.string.vt_upload_title, R.string.vt_upload_desc,
+                io.github.muntashirakon.AppManager.settings.Prefs.VirusTotal.uploadEnabled(), on -> {
+                    io.github.muntashirakon.AppManager.settings.Prefs.VirusTotal.setUploadEnabled(on);
+                    setRowEnabled(uploadRoaming, on);
+                    setRowEnabled(autoUpload, on);
+                    setRowEnabled(wifiOnly, on);
+                }));
+        vtContent.addView(uploadRoaming);
+        vtContent.addView(autoUpload);
+        vtContent.addView(wifiOnly);
+        setRowEnabled(lookupRoaming, io.github.muntashirakon.AppManager.settings.Prefs.VirusTotal.lookupEnabled());
+        boolean uploads = io.github.muntashirakon.AppManager.settings.Prefs.VirusTotal.uploadEnabled();
+        setRowEnabled(uploadRoaming, uploads);
+        setRowEnabled(autoUpload, uploads);
+        setRowEnabled(wifiOnly, uploads);
         vtContent.addView(buildVtRescanAgeRow());
         container.addView(vtGroup);
         // Fork (白い熊, 2026-11-15): Diagnostics — every recording behind its own switch, off by
         // default, then the recorded data (stored, keep-N-days, export, share, purge).
         container.addView(buildDiagGroup(inflater, container));
-        // kxkb rhythm: every section except the first is preceded by a
-        // full-width 1px hairline (part of view_font_group; hidden on the
-        // first section so the page starts flush).
-        for (int i = 0; i < container.getChildCount(); i++) {
-            View hairline = container.getChildAt(i).findViewById(R.id.group_hairline);
-            if (hairline != null) hairline.setVisibility(i == 0 ? View.GONE : View.VISIBLE);
-        }
+        // Fork (白い熊, +123): the theme's own colour roles, each in the section of the thing it
+        // colours, then Maintenance. They are built after the sections above but take their
+        // default place right under Screens (index 2 on), ahead of the per-screen sections.
+        int at = 2;
+        container.addView(buildPaletteGroup(inflater, container, R.string.palette_group_base,
+                ForkPalette.TEXT, ForkPalette.GROUND), at++);
+        container.addView(buildPaletteGroup(inflater, container, R.string.palette_group_topbar,
+                ForkPalette.TOPBAR_BG, ForkPalette.TOPBAR_TEXT), at++);
+        container.addView(buildPaletteGroup(inflater, container, R.string.palette_group_buttons,
+                ForkPalette.BUTTON_FRAME, ForkPalette.BUTTON_TEXT, ForkPalette.DELETE), at++);
+        container.addView(buildPaletteGroup(inflater, container, R.string.palette_group_dialogs,
+                ForkPalette.DIALOG_BG, ForkPalette.DIALOG_FRAME, ForkPalette.DIALOG_TEXT), at++);
+        container.addView(buildPaletteGroup(inflater, container, R.string.palette_group_menus,
+                ForkPalette.MENU_BG, ForkPalette.MENU_FRAME, ForkPalette.MENU_TEXT, ForkPalette.MENU_DIVIDER,
+                ForkPalette.SHEET_BG, ForkPalette.SHEET_FRAME), at++);
+        container.addView(buildPaletteGroup(inflater, container, R.string.palette_group_switches,
+                ForkPalette.SWITCH_ON, ForkPalette.SWITCH_OFF), at++);
+        container.addView(buildPaletteGroup(inflater, container, R.string.palette_group_icons,
+                ForkPalette.ICON_CONNECT, ForkPalette.ICON_MESSAGE, ForkPalette.ICON_CONTACT,
+                ForkPalette.ICON_SHARE, ForkPalette.ICON_VIEW, ForkPalette.ICON_BLOCK), at);
+        container.addView(buildMaintenanceGroup(inflater, container));
+        // Every row from the shared element layouts gets its icon, then the page is laid out:
+        // the settings pill, the chip index, the sections folded and in the stored order.
+        UiRowIcons.sweep(container);
+        UiPageSections.arrange(container, view.findViewById(R.id.fonts_scroll), buildAppSettingsPill());
         // Fork (白い熊, +076): apply the settable description colour over the whole page in one pass.
         // When the role sits at its default this is a no-op, so an untouched install looks exactly
         // as it did before the role existed.
         applyDescriptionColor(container);
+    }
+
+    /**
+     * Fork (白い熊, +123): a section heading. The tag is the section's stable id for the stored
+     * order and fold state ({@link UiPageSections}) — the entry name of the title string, so
+     * <b>never rename a section's title string</b>; change its text instead.
+     */
+    private void header(@NonNull View group, @StringRes int titleRes) {
+        ((AppCompatTextView) group.findViewById(R.id.group_header)).setText(titleRes);
+        group.setTag(R.id.fork_section_id, getResources().getResourceEntryName(titleRes));
+    }
+
+    /** Fork (+123): one section of the theme's colour roles — a swatch row per role. */
+    @NonNull
+    private View buildPaletteGroup(@NonNull LayoutInflater inflater, @NonNull ViewGroup container,
+                                   @StringRes int titleRes, @NonNull String... roles) {
+        View group = inflater.inflate(R.layout.view_font_group, container, false);
+        header(group, titleRes);
+        LinearLayoutCompat content = group.findViewById(R.id.group_content);
+        final float density = getResources().getDisplayMetrics().density;
+        LinearLayoutCompat rows = new LinearLayoutCompat(requireContext());
+        rows.setOrientation(LinearLayoutCompat.VERTICAL);
+        rows.setPaddingRelative(Math.round(72 * density), Math.round(4 * density),
+                Math.round(16 * density), Math.round(4 * density));
+        for (String key : roles) {
+            ForkPalette.Role role = ForkPalette.role(key);
+            if (role != null) addColorRow(rows, new ColorSpec(key, role.labelRes), () -> {});
+        }
+        content.addView(rows);
+        return group;
+    }
+
+    /** Fork (+123): Maintenance — the page's own housekeeping. */
+    @NonNull
+    private View buildMaintenanceGroup(@NonNull LayoutInflater inflater, @NonNull ViewGroup container) {
+        View group = inflater.inflate(R.layout.view_font_group, container, false);
+        header(group, R.string.ui_maintenance_group);
+        LinearLayoutCompat content = group.findViewById(R.id.group_content);
+        content.addView(actionRow(R.string.ui_reset_section_order,
+                pillSummary(getString(R.string.ui_reset_section_order_desc)), false, false, v -> {
+                    UiPageSections.resetOrder(requireContext());
+                    requireActivity().recreate();
+                }));
+        return group;
+    }
+
+    /**
+     * Fork (+123): the first element of the page — the thick pill that leads to the app's own
+     * settings. Not a section: it is pinned above the chip index and never reorders.
+     */
+    @NonNull
+    private View buildAppSettingsPill() {
+        View row = actionRow(R.string.ui_app_settings, pillSummary(getString(R.string.ui_app_settings_desc)),
+                true, true, v -> startActivity(new android.content.Intent(requireContext(),
+                        io.github.muntashirakon.AppManager.settings.SettingsActivity.class)));
+        final float density = getResources().getDisplayMetrics().density;
+        row.setPaddingRelative(Math.round(16 * density), Math.round(6 * density),
+                Math.round(16 * density), Math.round(2 * density));
+        return row;
     }
 
     /**
@@ -517,7 +626,7 @@ public class FontsPreferences extends Fragment {
         final float density = getResources().getDisplayMetrics().density;
         final Context app = requireContext().getApplicationContext();
         View group = inflater.inflate(R.layout.view_font_group, container, false);
-        ((AppCompatTextView) group.findViewById(R.id.group_header)).setText(R.string.diag_group);
+        header(group, R.string.diag_group);
         LinearLayoutCompat content = group.findViewById(R.id.group_content);
 
         addLegendHeader(content, R.string.diag_sub_monitor, density);
@@ -665,7 +774,13 @@ public class FontsPreferences extends Fragment {
     private View actionRow(@StringRes int titleRes, @Nullable AppCompatTextView summary,
                            boolean main, boolean opens, @NonNull View.OnClickListener onClick) {
         final float density = getResources().getDisplayMetrics().density;
-        final int ink = ContextCompat.getColor(requireContext(), R.color.theme_bright_yellow);
+        // Fork (+123): the role of the row decides the icon's colour, and a deleting row is red
+        // all over; frame and label are otherwise the button roles.
+        String name = getResources().getResourceEntryName(titleRes);
+        String role = UiRowIcons.roleOf(name);
+        boolean destructive = ForkPalette.DELETE.equals(role);
+        final int frameInk = ForkPalette.get(requireContext(), destructive ? ForkPalette.DELETE : ForkPalette.BUTTON_FRAME);
+        final int ink = destructive ? frameInk : ForkPalette.get(requireContext(), ForkPalette.BUTTON_TEXT);
         // The pill and its explanation stack vertically; the whole item is then wrapped with the
         // skill's dim-gold left rule, which spans pill + explanation (白い熊). Minimal padding.
         LinearLayoutCompat row = new LinearLayoutCompat(requireContext());
@@ -674,14 +789,9 @@ public class FontsPreferences extends Fragment {
         LinearLayoutCompat pill = new LinearLayoutCompat(requireContext());
         pill.setOrientation(LinearLayoutCompat.HORIZONTAL);
         pill.setGravity(Gravity.CENTER_VERTICAL);
-        pill.setPaddingRelative(Math.round(18 * density), Math.round(9 * density),
+        pill.setPaddingRelative(Math.round(16 * density), Math.round(9 * density),
                 Math.round(16 * density), Math.round(9 * density));
-        GradientDrawable frame = new GradientDrawable();
-        frame.setColor(Color.TRANSPARENT);
-        frame.setStroke(Math.max(1, Math.round((main ? 3f : 1.25f) * density)), ink);
-        frame.setCornerRadius(50 * density);
-        pill.setBackground(new RippleDrawable(
-                ColorStateList.valueOf((ink & 0x00FFFFFF) | 0x33000000), frame, null));
+        pill.setBackground(io.github.muntashirakon.AppManager.utils.Pills.frame(requireContext(), main, frameInk));
         pill.setClickable(true);
         pill.setFocusable(true);
         pill.setOnClickListener(onClick);
@@ -691,8 +801,9 @@ public class FontsPreferences extends Fragment {
         title.setTextColor(ink);
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         title.setTypeface(null, main ? Typeface.BOLD : Typeface.NORMAL);
-        pill.addView(title, new LinearLayoutCompat.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        UiRowIcons.set(title, UiRowIcons.glyphFor(name), role);
+        pill.addView(title, new LinearLayoutCompat.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         if (opens) {
             AppCompatTextView chevron = new AppCompatTextView(requireContext());
             chevron.setText("›");
@@ -705,10 +816,12 @@ public class FontsPreferences extends Fragment {
             clp.setMarginStart(Math.round(10 * density));
             pill.addView(chevron, clp);
         }
+        // The pill hugs its label (白い熊, 2026-11-09): a short action stretched across the line
+        // reads as a banner, not a button.
         row.addView(pill, new LinearLayoutCompat.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         if (summary != null) {
-            summary.setPaddingRelative(Math.round(18 * density), Math.round(3 * density), 0, 0);
+            summary.setPaddingRelative(Math.round(16 * density), Math.round(3 * density), 0, 0);
             row.addView(summary);
         }
         // Wrap pill + explanation with the left rule, at minimal vertical padding; the pill's own
@@ -727,7 +840,7 @@ public class FontsPreferences extends Fragment {
     @NonNull
     private AppCompatTextView pillSummary(@Nullable CharSequence text) {
         AppCompatTextView sum = new AppCompatTextView(requireContext());
-        sum.setTextColor(0xFFC8C800);
+        sum.setTextColor(ColorPrefs.getColor(requireContext(), ColorPrefs.SETTINGS_DESCRIPTION));
         sum.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         if (!TextUtils.isEmpty(text)) {
             sum.setText(text);
@@ -783,6 +896,8 @@ public class FontsPreferences extends Fragment {
         tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         // Fork (白い熊): the skill's row label is bold, so a bold tag below can never outweigh it.
         tv.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        // Fork (+123): every row has an icon, coloured by what the row does.
+        UiRowIcons.auto(tv, textRes);
         return tv;
     }
 
@@ -790,7 +905,7 @@ public class FontsPreferences extends Fragment {
     private AppCompatTextView rowSummary(@StringRes int textRes) {
         AppCompatTextView tv = new AppCompatTextView(requireContext());
         tv.setText(textRes);
-        tv.setTextColor(0xFFC8C800);
+        tv.setTextColor(ColorPrefs.getColor(requireContext(), ColorPrefs.SETTINGS_DESCRIPTION));
         tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         return tv;
     }
@@ -821,6 +936,20 @@ public class FontsPreferences extends Fragment {
         row.addView(sw);
         row.setOnClickListener(v -> sw.toggle());
         return row;
+    }
+
+    /** Fork (+123): a row whose master switch is off — dimmed to 38 %, and deaf to taps. */
+    private static void setRowEnabled(@NonNull View row, boolean enabled) {
+        row.setAlpha(enabled ? 1f : 0.38f);
+        setEnabledDeep(row, enabled);
+    }
+
+    private static void setEnabledDeep(@NonNull View v, boolean enabled) {
+        v.setEnabled(enabled);
+        if (v instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) setEnabledDeep(g.getChildAt(i), enabled);
+        }
     }
 
     @NonNull
@@ -1811,6 +1940,11 @@ public class FontsPreferences extends Fragment {
         row.setOnClickListener(v -> openColorPicker(spec, () -> {
             refresh.run();
             previewRefresh.run();
+            // Fork (+123): a theme role is laid over the resources — this screen is rebuilt with
+            // it now, every other one when it next comes forward (ForkPalette.isStale).
+            if (ForkPalette.isRole(spec.key) || ColorPrefs.SETTINGS_DESCRIPTION.equals(spec.key)) {
+                requireActivity().recreate();
+            }
         }));
         container.addView(row);
     }

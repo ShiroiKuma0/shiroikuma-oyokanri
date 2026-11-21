@@ -682,7 +682,7 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
                 View button = menuView.getChildAt(j);
                 if (button instanceof ImageView) {
                     button.setOnLongClickListener(v -> {
-                        startActivity(SettingsActivity.getSettingsIntent(this, "fonts_prefs"));
+                        startActivity(io.github.muntashirakon.AppManager.fonts.UiSettingsActivity.getIntent(this));
                         return true;
                     });
                 }
@@ -2306,7 +2306,7 @@ public class MainActivity extends BaseActivity implements SwipeRefreshLayout.OnR
         int ink = ForkThemeUtils.getTextColor();
         GradientDrawable background = new GradientDrawable();
         background.setShape(GradientDrawable.RECTANGLE);
-        background.setColor(Color.BLACK);
+        background.setColor(io.github.muntashirakon.AppManager.utils.ForkPalette.get(io.github.muntashirakon.AppManager.utils.ForkPalette.GROUND));
         background.setStroke(Math.round(ForkThemeUtils.dpToPx(this, 1f)),
                 ColorUtils.setAlphaComponent(ink, 0x88));
         mOperationBar.setBackground(background);

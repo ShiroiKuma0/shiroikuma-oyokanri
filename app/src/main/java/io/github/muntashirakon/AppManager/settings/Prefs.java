@@ -288,6 +288,8 @@ public final class Prefs {
 
         public static void setThemeTextColor(int color) {
             AppPref.set(AppPref.PrefKey.PREF_THEME_TEXT_COLOR_INT, color);
+            // Fork (+123): a palette base — every screen is rebuilt in the new colour.
+            io.github.muntashirakon.AppManager.utils.ForkPalette.invalidate();
         }
 
         public static int getThemeBackgroundColor() {
@@ -296,6 +298,8 @@ public final class Prefs {
 
         public static void setThemeBackgroundColor(int color) {
             AppPref.set(AppPref.PrefKey.PREF_THEME_BACKGROUND_COLOR_INT, color);
+            // Fork (+123): a palette base — every screen is rebuilt in the new colour.
+            io.github.muntashirakon.AppManager.utils.ForkPalette.invalidate();
         }
 
         public static int getThemeBorderColor() {
@@ -1066,6 +1070,41 @@ public final class Prefs {
 
         public static void setUploadOnWifiOnly(boolean wifiOnly) {
             AppPref.set(AppPref.PrefKey.PREF_VIRUS_TOTAL_WIFI_ONLY_BOOL, wifiOnly);
+        }
+
+        // Fork (白い熊, +123): the four network switches of the installer's vetting.
+        // "Upload" off: no file ever leaves the phone; a hash look-up still runs.
+        // "Look up" off: not even the hash is asked about. Each has a roaming twin, off by default.
+        public static boolean lookupEnabled() {
+            return AppPref.getBoolean(AppPref.PrefKey.PREF_VIRUS_TOTAL_LOOKUP_BOOL);
+        }
+
+        public static void setLookupEnabled(boolean enabled) {
+            AppPref.set(AppPref.PrefKey.PREF_VIRUS_TOTAL_LOOKUP_BOOL, enabled);
+        }
+
+        public static boolean lookupWhileRoaming() {
+            return AppPref.getBoolean(AppPref.PrefKey.PREF_VIRUS_TOTAL_LOOKUP_ROAMING_BOOL);
+        }
+
+        public static void setLookupWhileRoaming(boolean enabled) {
+            AppPref.set(AppPref.PrefKey.PREF_VIRUS_TOTAL_LOOKUP_ROAMING_BOOL, enabled);
+        }
+
+        public static boolean uploadEnabled() {
+            return AppPref.getBoolean(AppPref.PrefKey.PREF_VIRUS_TOTAL_UPLOAD_BOOL);
+        }
+
+        public static void setUploadEnabled(boolean enabled) {
+            AppPref.set(AppPref.PrefKey.PREF_VIRUS_TOTAL_UPLOAD_BOOL, enabled);
+        }
+
+        public static boolean uploadWhileRoaming() {
+            return AppPref.getBoolean(AppPref.PrefKey.PREF_VIRUS_TOTAL_UPLOAD_ROAMING_BOOL);
+        }
+
+        public static void setUploadWhileRoaming(boolean enabled) {
+            AppPref.set(AppPref.PrefKey.PREF_VIRUS_TOTAL_UPLOAD_ROAMING_BOOL, enabled);
         }
 
         public static int getRescanAgeDays() {

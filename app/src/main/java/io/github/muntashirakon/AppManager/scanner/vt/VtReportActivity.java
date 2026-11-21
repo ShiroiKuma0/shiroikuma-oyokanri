@@ -347,7 +347,12 @@ public class VtReportActivity extends BaseActivity {
             VtScanAttempt last = state.last;
             boolean failed = last != null && VtScanAttempt.STATUS_FAILED.equals(last.status);
             boolean cancelled = last != null && VtScanAttempt.STATUS_CANCELLED.equals(last.status);
-            if (failed) {
+            if (failed && VtScanService.CODE_SWITCHED_OFF.equals(last.errorCode)) {
+                // Fork (白い熊, +123): a switch on the UI screen kept this file off VirusTotal. That
+                // is the setting doing its work — a quiet state with its reason, never the red "!".
+                addStateHero(dim(), "?", getString(R.string.vt_state_not_checked),
+                        last.errorMessage != null ? last.errorMessage : getString(R.string.vt_switched_off));
+            } else if (failed) {
                 String reason = last.errorMessage != null && !last.errorMessage.trim().isEmpty()
                         ? last.errorMessage : getString(R.string.vt_state_failed_no_reason);
                 if (last.errorCode != null && !reason.contains(last.errorCode)) {
@@ -907,7 +912,7 @@ public class VtReportActivity extends BaseActivity {
     @NonNull
     private TextView filterChip(@NonNull CharSequence label, @ColorInt int color, int filter) {
         boolean selected = mPage == filter;
-        TextView chip = text(label, selected ? Color.BLACK : color, 13, selected);
+        TextView chip = text(label, selected ? io.github.muntashirakon.AppManager.utils.ForkPalette.get(io.github.muntashirakon.AppManager.utils.ForkPalette.GROUND) : color, 13, selected);
         chip.setPadding(dp(12), dp(6), dp(12), dp(6));
         GradientDrawable bg = new GradientDrawable();
         bg.setCornerRadius(dp(100));

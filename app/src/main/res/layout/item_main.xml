@@ -8,7 +8,7 @@
     android:clickable="true"
     android:focusable="true"
     android:checkable="true"
-    app:cardBackgroundColor="@android:color/black">
+    app:cardBackgroundColor="@color/fork_ground">
 
     <!-- Fork (白い熊, +118): the card is now a COLUMN — the row itself, and under it the pane
          that a tap unrolls. The pane is part of the row rather than an extra item inserted into

@@ -12,7 +12,7 @@
         android:id="@+id/appbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@android:color/black"
+        android:background="@color/fork_ground"
         android:fitsSystemWindows="true"
         app:liftOnScroll="true"
         app:liftOnScrollTargetViewId="@+id/item_list">
@@ -172,7 +172,7 @@
             android:id="@+id/item_list"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="@android:color/black"
+            android:background="@color/fork_ground"
             android:scrollbars="none"
             android:focusable="false"
             android:clipToPadding="false"
@@ -188,7 +188,7 @@
         android:layout_height="wrap_content"
         android:fitsSystemWindows="true"
         android:focusable="false"
-        app:cardBackgroundColor="@android:color/black"
+        app:cardBackgroundColor="@color/fork_ground"
         app:cardElevation="0dp"
         app:menu="@menu/activity_main_selection_actions" />
 
@@ -201,7 +201,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:background="@android:color/black"
+        android:background="@color/fork_ground"
         android:elevation="12dp"
         android:orientation="vertical"
         android:visibility="gone"

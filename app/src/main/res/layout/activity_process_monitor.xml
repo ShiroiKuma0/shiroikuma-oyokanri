@@ -57,7 +57,7 @@
             android:id="@+id/monitor_list"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="@android:color/black"
+            android:background="@color/fork_ground"
             android:clipToPadding="false"
             android:fitsSystemWindows="true"
             tools:listitem="@layout/item_monitor_process" />

@@ -192,6 +192,11 @@ public class SettingsActivity extends BaseActivity implements PreferenceFragment
 
     @Override
     public boolean onPreferenceStartFragment(@NonNull PreferenceFragmentCompat caller, @NonNull Preference pref) {
+        if ("fonts_prefs".equals(pref.getKey())) {
+            // Fork (白い熊, +123): the UI page is a screen of its own, not a page under "Settings".
+            startActivity(io.github.muntashirakon.AppManager.fonts.UiSettingsActivity.getIntent(this));
+            return true;
+        }
         if (pref.getFragment() == null) {
             return false;
         }

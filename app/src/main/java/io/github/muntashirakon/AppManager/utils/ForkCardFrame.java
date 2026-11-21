@@ -39,7 +39,7 @@ public final class ForkCardFrame {
     public static void apply(@NonNull Context context, @NonNull MaterialCardView card, boolean system) {
         float density = context.getResources().getDisplayMetrics().density;
         float boxDp = RunningBoxPrefs.getWidthDp(context);
-        card.setCardBackgroundColor(Color.BLACK);
+        card.setCardBackgroundColor(io.github.muntashirakon.AppManager.utils.ForkPalette.get(io.github.muntashirakon.AppManager.utils.ForkPalette.GROUND));
         card.setRadius(RunningBoxPrefs.getRadiusDp(context) * density);
         card.setStrokeWidth(boxDp <= 0f ? 0 : Math.max(1, Math.round(boxDp * density)));
         card.setStrokeColor(system

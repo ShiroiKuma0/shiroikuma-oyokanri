@@ -13,13 +13,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Fork (白い熊, +121/+122): drag one pill onto another to reorder them, in place.
+ * Fork (白い熊, +121/+123): drag one pill onto another to reorder them, in place.
  *
  * <p>The actions were configurable from a settings page three screens away. Rearranging things
  * you are looking at should not require going somewhere else to do it, so the pills are their own
  * editor: long-press one and drop it where it belongs.
  *
- * <p><b>The pill moves as you drag it</b>, which is the whole point (白い熊, +122). The first
+ * <p><b>The pill moves as you drag it</b>, which is the whole point (白い熊, +123). The first
  * version only shaded the slot you were over and did the move on release — so nothing appeared to
  * happen until it suddenly had. Now crossing a neighbour reorders the row immediately: the pill
  * is taken out and put back at the new index, every other pill reflows around it, and a

@@ -236,7 +236,7 @@ public final class RowPills {
             shape.setCornerRadius(ForkThemeUtils.dpToPx(context, 100f));
             pill.setBackground(new RippleDrawable(
                     ColorStateList.valueOf(ColorUtils.setAlphaComponent(Color.BLACK, 0x33)), shape, null));
-            pill.setTextColor(Color.BLACK);
+            pill.setTextColor(io.github.muntashirakon.AppManager.utils.ForkPalette.get(io.github.muntashirakon.AppManager.utils.ForkPalette.GROUND));
         } else {
             pill.setBackground(outline(context, ink));
             pill.setTextColor(ink);
@@ -268,7 +268,7 @@ public final class RowPills {
         styleActionPill(pill, ink, filled);
         pill.setText(text);
         if (iconRes != 0) {
-            setActionGlyph(pill, iconRes, filled ? Color.BLACK : ink);
+            setActionGlyph(pill, iconRes, filled ? io.github.muntashirakon.AppManager.utils.ForkPalette.get(io.github.muntashirakon.AppManager.utils.ForkPalette.GROUND) : ink);
         }
         LinearLayoutCompat.LayoutParams lp = new LinearLayoutCompat.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);

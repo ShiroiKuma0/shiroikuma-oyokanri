@@ -11,7 +11,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:layout_marginTop="16dp">
+    android:layout_marginTop="10dp">
 
     <!-- Sub-heading with a text-width underline (wrap_content wrapper, so
          the match_parent rule below spans only the text). kxkb ladder:
@@ -44,7 +44,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="3dp"
         android:paddingStart="72dp"
         android:paddingEnd="16dp">
 
@@ -55,6 +55,7 @@
             android:orientation="vertical">
 
         <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/cap_family"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/pref_font_family"
@@ -92,9 +93,10 @@
         </androidx.appcompat.widget.LinearLayoutCompat>
 
         <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/cap_weight"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="2dp"
             android:text="@string/pref_font_weight"
             android:textColor="@color/settings_description"
             android:textSize="14sp" />
@@ -130,9 +132,10 @@
         </androidx.appcompat.widget.LinearLayoutCompat>
 
         <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/cap_size"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="2dp"
             android:text="@string/pref_font_size"
             android:textColor="@color/settings_description"
             android:textSize="14sp" />
@@ -170,7 +173,7 @@
             android:id="@+id/color_rows"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="2dp"
             android:orientation="vertical" />
 
     </androidx.appcompat.widget.LinearLayoutCompat>

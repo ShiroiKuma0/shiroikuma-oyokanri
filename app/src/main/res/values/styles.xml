@@ -35,14 +35,14 @@
          COLOUR attributes (colorSurface and friends) and does not touch this drawable attribute.
          Scoped to the splash trampoline on purpose — AppTheme itself is app-wide and must not be
          forced black here. -->
-    <style name="AppTheme.SplashContent" parent="AppTheme">
+    <style name="AppTheme.SplashContent" parent="AppTheme.YellowOnBlack">
         <item name="android:windowBackground">@android:color/black</item>
     </style>
 
     <!-- The pure-black-preference twin. NOTE the explicit parent: dot-notation would imply
          AppTheme.SplashContent, and the explicit parent attribute deliberately overrides that so
          this keeps inheriting AppTheme.Black, exactly as the old postSplashScreenTheme did. -->
-    <style name="AppTheme.SplashContentBlack" parent="AppTheme.Black">
+    <style name="AppTheme.SplashContentBlack" parent="AppTheme.YellowOnBlack">
         <item name="android:windowBackground">@android:color/black</item>
     </style>
 
@@ -99,12 +99,12 @@
 
     <style name="ThemeOverlay.AppManager.PopupMenu" parent="ThemeOverlay.Material3">
         <item name="popupMenuBackground">@drawable/popup_menu_background_black</item>
-        <item name="colorOnSurface">@color/theme_bright_yellow</item>
-        <item name="colorOnSurfaceVariant">@color/theme_bright_yellow</item>
-        <item name="colorControlNormal">@color/theme_bright_yellow</item>
-        <item name="android:textColorPrimary">@color/theme_bright_yellow</item>
-        <item name="android:textColorSecondary">@color/theme_bright_yellow</item>
-        <item name="actionMenuTextColor">@color/theme_bright_yellow</item>
+        <item name="colorOnSurface">@color/fork_menu_text</item>
+        <item name="colorOnSurfaceVariant">@color/fork_menu_text</item>
+        <item name="colorControlNormal">@color/fork_menu_text</item>
+        <item name="android:textColorPrimary">@color/fork_menu_text</item>
+        <item name="android:textColorSecondary">@color/fork_menu_text</item>
+        <item name="actionMenuTextColor">@color/fork_menu_text</item>
     </style>
 
     <style name="AppTheme.YellowOnBlack" parent="AppTheme">
@@ -117,9 +117,9 @@
              stay borderless. -->
         <item name="forkBottomSheetBorderDrawable">@drawable/bottom_sheet_bg_yellow_on_black</item>
         <item name="colorPrimary">@color/theme_bright_yellow</item>
-        <item name="colorOnPrimary">@android:color/black</item>
+        <item name="colorOnPrimary">@color/fork_ground</item>
         <item name="colorPrimaryContainer">@color/theme_bright_yellow</item>
-        <item name="colorOnPrimaryContainer">@android:color/black</item>
+        <item name="colorOnPrimaryContainer">@color/fork_ground</item>
         <!-- Material 3 Chip's checked-state background and text read from
              colorSecondaryContainer / colorOnSecondaryContainer (see the
              m3_chip_background_color and m3_chip_text_color selectors in
@@ -132,20 +132,21 @@
              these attrs also gain the yellow look, which is consistent
              with the fork. -->
         <item name="colorSecondaryContainer">@color/theme_bright_yellow</item>
-        <item name="colorOnSecondaryContainer">@android:color/black</item>
+        <item name="colorOnSecondaryContainer">@color/fork_ground</item>
         <item name="colorOnSurface">@color/theme_bright_yellow</item>
         <item name="colorOnSurfaceVariant">@color/theme_bright_yellow</item>
         <item name="colorControlNormal">@color/theme_bright_yellow</item>
         <item name="colorOutline">@color/theme_bright_yellow</item>
         <item name="android:textColorPrimary">@color/theme_bright_yellow</item>
         <item name="android:textColorSecondary">@color/theme_bright_yellow</item>
-        <item name="android:colorBackground">@android:color/black</item>
-        <item name="colorSurface">@android:color/black</item>
-        <item name="colorSurfaceContainer">@android:color/black</item>
-        <item name="colorSurfaceContainerLow">@android:color/black</item>
-        <item name="colorSurfaceContainerLowest">@android:color/black</item>
-        <item name="colorSurfaceContainerHigh">@android:color/black</item>
-        <item name="colorSurfaceContainerHighest">@android:color/black</item>
+        <item name="android:colorBackground">@color/fork_ground</item>
+        <item name="android:windowBackground">@color/fork_ground</item>
+        <item name="colorSurface">@color/fork_ground</item>
+        <item name="colorSurfaceContainer">@color/fork_ground</item>
+        <item name="colorSurfaceContainerLow">@color/fork_ground</item>
+        <item name="colorSurfaceContainerLowest">@color/fork_ground</item>
+        <item name="colorSurfaceContainerHigh">@color/fork_ground</item>
+        <item name="colorSurfaceContainerHighest">@color/fork_ground</item>
         <item name="popupMenuBackground">@drawable/popup_menu_background_black</item>
         <item name="materialAlertDialogTheme">@style/ThemeOverlay.AppTheme.MaterialAlertDialog.YellowOnBlack</item>
         <!--
@@ -172,7 +173,7 @@
         without prefix is what caused the build failures in v3/v4.
         -->
         <item name="elevationOverlayEnabled">false</item>
-        <item name="elevationOverlayColor">@android:color/black</item>
+        <item name="elevationOverlayColor">@color/fork_ground</item>
     </style>
 
     <!-- Fork (白い熊, +081): the VirusTotal report is a framed, almost page-big DIALOG over whatever
@@ -222,14 +223,14 @@
         <!-- Fork: the SELECTED control state (radio dot/ring, checkbox, switch)
              defaults to the M3 accent and reads grey on this palette. Pin the
              activated colour to yellow so single-choice dialog radios match. -->
-        <item name="colorControlActivated">@color/theme_bright_yellow</item>
-        <item name="android:colorControlActivated">@color/theme_bright_yellow</item>
-        <item name="colorAccent">@color/theme_bright_yellow</item>
+        <item name="colorControlActivated">@color/fork_dialog_text</item>
+        <item name="android:colorControlActivated">@color/fork_dialog_text</item>
+        <item name="colorAccent">@color/fork_dialog_text</item>
         <!-- Fork: give every dialog action button (OK / Cancel / Neutral) a
              yellow hairline border to match the dialog frame. The button bar
              reads these three theme attrs, so this themes the buttons of every
              dialog that uses this overlay - no per-dialog code needed. -->
-        <item name="buttonBarPositiveButtonStyle">@style/Widget.AppTheme.Button.Dialog.YellowOutlined</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.AppTheme.Button.Dialog.YellowOutlined.Main</item>
         <item name="buttonBarNegativeButtonStyle">@style/Widget.AppTheme.Button.Dialog.YellowOutlined</item>
         <item name="buttonBarNeutralButtonStyle">@style/Widget.AppTheme.Button.Dialog.YellowOutlined</item>
         <!-- Fork: the bordered window-background drawable, exposed as the libcore
@@ -239,6 +240,14 @@
              border can only be applied programmatically). Unset on every non-fork
              theme, so those dialogs are left untouched. -->
         <item name="forkDialogBorderDrawable">@drawable/alert_dialog_bg_yellow_on_black</item>
+        <!-- Fork (+123): all dialog text in the dialog's own text role, never M3's grey or blue. -->
+        <item name="colorOnSurface">@color/fork_dialog_text</item>
+        <item name="colorOnSurfaceVariant">@color/fork_dialog_text</item>
+        <item name="colorPrimary">@color/fork_dialog_text</item>
+        <item name="android:textColorPrimary">@color/fork_dialog_text</item>
+        <item name="android:textColorSecondary">@color/fork_dialog_text</item>
+        <item name="android:textColorHint">@color/settings_description</item>
+        <item name="colorSurface">@color/fork_dialog_bg</item>
     </style>
 
     <style name="MaterialAlertDialog.AppTheme.YellowOnBlack" parent="MaterialAlertDialog.Material3">
@@ -250,9 +259,20 @@
          button so the button-bar sizing/insets are preserved; only the stroke
          and text colour are layered on top. -->
     <style name="Widget.AppTheme.Button.Dialog.YellowOutlined" parent="Widget.Material3.Button.TextButton.Dialog">
-        <item name="strokeColor">@color/theme_bright_yellow</item>
-        <item name="strokeWidth">1.5dp</item>
-        <item name="android:textColor">@color/theme_bright_yellow</item>
+        <!-- Fork (+123): a regular pill by the black-yellow rule - 1.25dp frame, normal weight,
+             fully round, never filled. utils/Pills restyles it again in code (the same numbers),
+             which is where a deleting dialog's main pill turns red. -->
+        <item name="strokeColor">@color/fork_button_frame</item>
+        <item name="strokeWidth">1.25dp</item>
+        <item name="cornerRadius">100dp</item>
+        <item name="android:textColor">@color/fork_button_text</item>
+        <item name="android:layout_marginStart">8dp</item>
+    </style>
+
+    <!-- Fork (+123): the dialog's main action - 3dp frame, bold. -->
+    <style name="Widget.AppTheme.Button.Dialog.YellowOutlined.Main">
+        <item name="strokeWidth">3dp</item>
+        <item name="android:textStyle">bold</item>
     </style>
 
     <!-- Shadows libcore's Widget.AppTheme.MultiSelectionActionsView. The

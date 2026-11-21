@@ -266,7 +266,7 @@ public final class MainCardBinder {
         int freezeLevel = item != null ? item.freezeLevel
                 : (applicationInfo != null ? FreezeUtils.levelOf(applicationInfo)
                 : (frozen ? FreezeUtils.GATE_DISABLE : 0));
-        int freezeFilm = FreezeLevelBadge.film(context, freezeLevel, Color.BLACK);
+        int freezeFilm = FreezeLevelBadge.film(context, freezeLevel, io.github.muntashirakon.AppManager.utils.ForkPalette.get(io.github.muntashirakon.AppManager.utils.ForkPalette.GROUND));
         cardView.setCardBackgroundColor(freezeFilm);
         if (!frozen) {
             float boxDp = RunningBoxPrefs.getWidthDp(context);

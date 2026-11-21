@@ -465,6 +465,15 @@ public class FmActivity extends BaseActivity {
                     holder.iconView.setImageDrawable(item.icon);
                 } else {
                     holder.iconView.setImageResource(item.iconRes);
+                    // Fork (+123): a drawer row's glyph is coloured by what the row is — a
+                    // favourite, a place, a tag — like every action list in the theme.
+                    String role = item.type == FmDrawerItem.ITEM_TYPE_FAVORITE
+                            ? io.github.muntashirakon.AppManager.utils.ForkPalette.ICON_MESSAGE
+                            : item.type == FmDrawerItem.ITEM_TYPE_TAG
+                            ? io.github.muntashirakon.AppManager.utils.ForkPalette.ICON_CONTACT
+                            : io.github.muntashirakon.AppManager.utils.ForkPalette.ICON_VIEW;
+                    holder.iconView.setImageTintList(android.content.res.ColorStateList.valueOf(
+                            io.github.muntashirakon.AppManager.utils.ForkPalette.get(holder.iconView.getContext(), role)));
                 }
             }
             holder.itemView.setOnClickListener(v -> {

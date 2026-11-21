@@ -34,15 +34,25 @@ public final class ForkSwitch {
         return ColorUtils.blendARGB(ground, on, 0.55f);
     }
 
+    /** Fork (+123): both colours are settable roles of their own — never constants. */
     public static void outline(@NonNull MaterialSwitch sw) {
-        outline(sw, ForkThemeUtils.getTextColor(), ForkThemeUtils.getBackgroundColor());
+        outlineWith(sw, ForkPalette.get(sw.getContext(), ForkPalette.SWITCH_ON),
+                ForkPalette.get(sw.getContext(), ForkPalette.SWITCH_OFF));
     }
 
+    /** A switch that carries a meaning in its colour: off is that colour's own darker shade. */
     public static void outline(@NonNull MaterialSwitch sw, @ColorInt int on, @ColorInt int ground) {
+        outlineWith(sw, on, offColor(on, ground));
+    }
+
+    private static void outlineWith(@NonNull MaterialSwitch sw, @ColorInt int on, @ColorInt int off) {
         try {
             ColorStateList tint = new ColorStateList(
-                    new int[][]{{android.R.attr.state_checked}, {}},
-                    new int[]{on, offColor(on, ground)});
+                    new int[][]{{-android.R.attr.state_enabled, android.R.attr.state_checked},
+                            {-android.R.attr.state_enabled}, {android.R.attr.state_checked}, {}},
+                    new int[]{ForkPalette.disabled(on), ForkPalette.disabled(off), on, off});
+            sw.setMinHeight(0);
+            sw.setMinimumHeight(0);
             // One dot for both states, 46 % of the track's height, inside the stock thumb's box so
             // the switch keeps its size and travel.
             Drawable stock = sw.getThumbDrawable();

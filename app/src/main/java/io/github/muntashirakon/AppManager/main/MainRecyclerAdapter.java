@@ -789,7 +789,7 @@ public class MainRecyclerAdapter extends MultiSelectionView.Adapter<ApplicationI
         if (!item.isInstalled) {
             filmColor = mcFilmUninstalled;
         } else {
-            filmColor = FreezeLevelBadge.film(context, item.freezeLevel, Color.BLACK);
+            filmColor = FreezeLevelBadge.film(context, item.freezeLevel, io.github.muntashirakon.AppManager.utils.ForkPalette.get(io.github.muntashirakon.AppManager.utils.ForkPalette.GROUND));
         }
         cardView.setCardBackgroundColor(filmColor);
         // Fork: square cells for the edge-to-edge separator grid; the selected

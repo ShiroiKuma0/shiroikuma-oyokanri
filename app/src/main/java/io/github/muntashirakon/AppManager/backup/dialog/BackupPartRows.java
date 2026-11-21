@@ -154,7 +154,7 @@ public final class BackupPartRows {
         final boolean[] state = {checked};
         Runnable render = () -> {
             applyPillStyle(pill, part.color, state[0]);
-            setGlyph(pill, part.iconRes, state[0] ? Color.BLACK : part.color);
+            setGlyph(pill, part.iconRes, state[0] ? io.github.muntashirakon.AppManager.utils.ForkPalette.get(io.github.muntashirakon.AppManager.utils.ForkPalette.GROUND) : part.color);
         };
         render.run();
         pill.setOnClickListener(v -> {
@@ -219,7 +219,7 @@ public final class BackupPartRows {
                 on ? color : ColorUtils.setAlphaComponent(color, 0x88));
         pill.setBackground(new RippleDrawable(
                 ColorStateList.valueOf(ColorUtils.setAlphaComponent(color, 0x33)), shape, null));
-        pill.setTextColor(on ? Color.BLACK : color);
+        pill.setTextColor(on ? io.github.muntashirakon.AppManager.utils.ForkPalette.get(io.github.muntashirakon.AppManager.utils.ForkPalette.GROUND) : color);
     }
 
     private static void setGlyph(@NonNull TextView pill, int drawableRes, int tint) {

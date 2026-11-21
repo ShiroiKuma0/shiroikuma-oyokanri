@@ -203,7 +203,7 @@ public class ProcessMonitorAdapter extends RecyclerView.Adapter<ProcessMonitorAd
             h.icon.setImageResource(R.drawable.ic_android);
         }
 
-        h.itemView.setBackgroundColor(mSelected.contains(position) ? mSelectedBg : Color.BLACK);
+        h.itemView.setBackgroundColor(mSelected.contains(position) ? mSelectedBg : io.github.muntashirakon.AppManager.utils.ForkPalette.get(io.github.muntashirakon.AppManager.utils.ForkPalette.GROUND));
         h.itemView.setOnClickListener(v -> {
             int pos = h.getBindingAdapterPosition();
             if (pos == RecyclerView.NO_POSITION) return;

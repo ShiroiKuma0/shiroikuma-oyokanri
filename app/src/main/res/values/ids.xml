@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<resources>
+    <!-- Fork (+123): marks a button utils/Pills has already styled. -->
+    <item name="fork_pill_done" type="id" />
+    <!-- Fork (+123): a UI-screen section's stable id (the entry name of its title string). -->
+    <item name="fork_section_id" type="id" />
+</resources>

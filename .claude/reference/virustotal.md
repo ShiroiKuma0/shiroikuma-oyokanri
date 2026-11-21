@@ -159,3 +159,14 @@ be renamed on one side** — they live in `scanner/vt/VtContract.java`.
   ring colour and an icon; “Scan cancelled” draws a blue ring (`CANCELLED_RING`, `#2979FF` — the update
   pill's `#0D47A1` ink is too dark on black) around the app's icon from `state.app.icon`, and falls
   back to the cross only when the file has no readable icon. Frame and headline keep the dim colour.
+- **+123 — four network switches (白い熊, 2026-11-21), on the UI screen's VirusTotal section.** *Look up on
+  VirusTotal* (on), *Look up while roaming* (off), *Upload to VirusTotal* (on), *Upload while roaming* (off);
+  `Prefs.VirusTotal.lookupEnabled/lookupWhileRoaming/uploadEnabled/uploadWhileRoaming`. In `VtScanService`:
+  `requireLookupAllowed()` guards the hash look-up and a rescan request; `uploadAndPoll` guards every upload, an
+  approved one too. **Off** ends the attempt as failed with `CODE_SWITCHED_OFF` — which `VtReportActivity` shows
+  as the quiet *Not checked* state with its reason, never the red "!" — and Install stays offered. **Roaming**
+  parks through `VtDeferException` (which now carries its own words, Wi-Fi or roaming) and retries like the Wi-Fi
+  wait. Look-up off + upload on: an unknown-status file goes straight to the upload path (asking first when
+  uploads are not automatic). Polling for the result of an upload already made is not gated. `isRoaming()` asks
+  the active network for `NOT_ROAMING`; behind a VPN it asks the mobile networks directly (roaming when one is
+  and no Wi-Fi is up); unknown reads as not roaming.

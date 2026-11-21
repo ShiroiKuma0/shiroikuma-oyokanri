@@ -142,8 +142,18 @@ public class PillMenuItemView extends ListMenuItemView {
         boolean pill = MenuPills.isPill(item);
         boolean destructive = pill && MenuPills.isDestructive(context, item);
 
-        int color = destructive ? MenuPills.warning(context) : accent();
-        if (!item.isEnabled()) color = ColorUtils.setAlphaComponent(color, MenuPills.DISABLED_ALPHA);
+        // Fork (+123): frame, label and icon are three roles. The frame and the label are the
+        // menu's own; the icon wears the colour of what the row does. A deleting row lends its
+        // red to all three.
+        int fallback = mTitleColors != null ? mTitleColors.getDefaultColor() : Color.WHITE;
+        int color = destructive ? MenuPills.warning(context) : MenuPills.frame(context, fallback);
+        int textColor = destructive ? color : MenuPills.text(context, fallback);
+        int iconColor = destructive ? color : MenuPills.iconColor(context, item, fallback);
+        if (!item.isEnabled()) {
+            color = ColorUtils.setAlphaComponent(color, MenuPills.DISABLED_ALPHA);
+            textColor = ColorUtils.setAlphaComponent(textColor, MenuPills.DISABLED_ALPHA);
+            iconColor = ColorUtils.setAlphaComponent(iconColor, MenuPills.DISABLED_ALPHA);
+        }
 
         ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) mContent.getLayoutParams();
         int h = dp(MenuPills.SIDE_MARGIN_DP);
@@ -160,11 +170,8 @@ public class PillMenuItemView extends ListMenuItemView {
         // The switch of a toggle row ends where the pills end.
         mContent.setPaddingRelative(mPadStart, mPadTop, toggle ? 0 : mPadEnd, mPadBottom);
 
-        if (destructive) mTitle.setTextColor(color);
-        else if (MenuPills.themed(context)) {
-            mTitle.setTextColor(item.isEnabled() ? accent()
-                    : ColorUtils.setAlphaComponent(accent(), MenuPills.DISABLED_ALPHA));
-        } else mTitle.setTextColor(mTitleColors);
+        if (destructive || MenuPills.themed(context)) mTitle.setTextColor(textColor);
+        else mTitle.setTextColor(mTitleColors);
 
         if (mArrow != null) {
             boolean opens = pill && MenuPills.opens(context, item);
@@ -172,7 +179,7 @@ public class PillMenuItemView extends ListMenuItemView {
                 Drawable chevron = AppCompatResources.getDrawable(context, R.drawable.fork_menu_chevron);
                 if (chevron != null) {
                     chevron = chevron.mutate();
-                    chevron.setTint(color);
+                    chevron.setTint(textColor);
                     mArrow.setImageDrawable(chevron);
                 }
             }
@@ -184,7 +191,8 @@ public class PillMenuItemView extends ListMenuItemView {
             if (child instanceof CheckBox) {
                 if (child.getTag() == null) {
                     CheckBox cb = (CheckBox) child;
-                    int on = accent();
+                    int on = MenuPills.themed(context)
+                            ? ForkPalette.get(context, ForkPalette.SWITCH_ON) : accent();
                     cb.setButtonDrawable(new ForkSwitchDrawable(on, MenuPills.switchOff(context, on),
                             dp(44), dp(24), dp(2)));
                     cb.setButtonTintList(null);
@@ -205,9 +213,9 @@ public class PillMenuItemView extends ListMenuItemView {
                     ilp.bottomMargin = dp(2);
                     child.setLayoutParams(ilp);
                 }
-                // An icon takes the colour of its row.
+                // The icon is coloured by what the row does.
                 if (child instanceof ImageView) {
-                    ((ImageView) child).setImageTintList(ColorStateList.valueOf(color));
+                    ((ImageView) child).setImageTintList(ColorStateList.valueOf(iconColor));
                 }
             }
         }

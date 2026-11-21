@@ -14,37 +14,67 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:paddingTop="10dp"
+    android:paddingTop="4dp"
     android:paddingBottom="2dp">
 
     <View
         android:id="@+id/group_hairline"
         android:layout_width="match_parent"
         android:layout_height="1px"
-        android:background="@color/theme_bright_yellow" />
+        android:background="@color/fork_divider" />
 
+    <!-- Fork (+123): the heading is the fold handle — a tap folds or unfolds the section's rows;
+         the chevron at the right says which (› folded, ⌄ open). fonts/UiPageSections wires it. -->
     <androidx.appcompat.widget.LinearLayoutCompat
-        android:layout_width="wrap_content"
+        android:id="@+id/group_header_row"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?attr/selectableItemBackground"
         android:paddingStart="36dp"
-        android:paddingEnd="0dp"
-        android:paddingTop="8dp">
+        android:paddingEnd="20dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="4dp">
 
-        <androidx.appcompat.widget.AppCompatTextView
-            android:id="@+id/group_header"
+        <androidx.appcompat.widget.LinearLayoutCompat
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="@color/theme_bright_yellow"
-            android:textStyle="bold"
-            android:textSize="20sp"
-            tools:text="Reading view" />
+            android:orientation="vertical">
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/group_header"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/fork_heading"
+                android:textStyle="bold"
+                android:textSize="20sp"
+                tools:text="Reading view" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="2.5dp"
+                android:layout_marginTop="2dp"
+                android:background="@color/fork_heading" />
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
 
         <View
-            android:layout_width="match_parent"
-            android:layout_height="2.5dp"
-            android:layout_marginTop="2dp"
-            android:background="@color/theme_bright_yellow" />
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/group_chevron"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:includeFontPadding="false"
+            android:text="›"
+            android:textColor="@color/fork_heading"
+            android:textStyle="bold"
+            android:textSize="24sp" />
 
     </androidx.appcompat.widget.LinearLayoutCompat>
 

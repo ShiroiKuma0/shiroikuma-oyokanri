@@ -118,6 +118,8 @@ class FlagsAdapter extends RecyclerView.Adapter<FlagsAdapter.ViewHolder> {
         lp.gravity = android.view.Gravity.END;
         lp.setMarginEnd((int) (16 * context.getResources().getDisplayMetrics().density));
         button.setLayoutParams(lp);
+        // Fork (+123): built in code, so the inflater never sees it.
+        io.github.muntashirakon.AppManager.utils.Pills.button(button, false);
         return new ViewHolder(container, view.findViewById(android.R.id.text1), button, container);
     }
 

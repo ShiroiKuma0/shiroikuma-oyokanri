@@ -73,4 +73,36 @@
          place the black-yellow skill allows a non-accent colour, and NEVER grey. Centralised
          here so the descriptions, color-role labels and left rules share it. -->
     <color name="settings_description">#FFC8C800</color>
+    <!-- Fork (白い熊, +123): the theme's colour ROLES. Every one of these is a settable role on the
+         白い熊 応用管理 UI screen; the value here is only the default (and what an Android below 11
+         shows, where a colour resource cannot be replaced at run time). utils/ForkPalette replaces
+         each of them, and theme_bright_yellow (the text/accent base), with the stored colour through
+         a ResourcesLoader, so a theme attribute, a drawable or a layout that names one follows the
+         setting without any code. NEVER write a literal colour or @android:color/black in a theme,
+         drawable or layout again: name a role. -->
+    <color name="fork_ground">#000000</color>
+    <color name="fork_topbar_bg">#000000</color>
+    <color name="fork_topbar_text">#FFFF00</color>
+    <color name="fork_dialog_bg">#000000</color>
+    <color name="fork_dialog_frame">#FFFF00</color>
+    <color name="fork_dialog_text">#FFFF00</color>
+    <color name="fork_menu_bg">#000000</color>
+    <color name="fork_menu_frame">#FFFF00</color>
+    <color name="fork_menu_text">#FFFF00</color>
+    <color name="fork_menu_divider">#B3B300</color>
+    <color name="fork_sheet_bg">#000000</color>
+    <color name="fork_sheet_frame">#FFFF00</color>
+    <color name="fork_button_frame">#FFFF00</color>
+    <color name="fork_button_text">#FFFF00</color>
+    <color name="fork_switch_on">#FFFF00</color>
+    <color name="fork_switch_off">#8C8C00</color>
+    <color name="fork_heading">#FFFF00</color>
+    <color name="fork_divider">#B3B300</color>
+    <color name="fork_delete">#FF0000</color>
+    <color name="fork_icon_connect">#00FF00</color>
+    <color name="fork_icon_message">#4D94FF</color>
+    <color name="fork_icon_contact">#00FFFF</color>
+    <color name="fork_icon_share">#FF8000</color>
+    <color name="fork_icon_view">#FFFF00</color>
+    <color name="fork_icon_block">#FF00FF</color>
 </resources>

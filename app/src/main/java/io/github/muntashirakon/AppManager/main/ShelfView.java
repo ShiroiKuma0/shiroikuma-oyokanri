@@ -185,7 +185,7 @@ public class ShelfView extends LinearLayoutCompat {
             if (pill.isScreen()) {
                 int icon = ShelfPrefs.screenIcon(pill.payload);
                 if (icon != 0) {
-                    RowPills.setActionGlyph(view, icon, active ? android.graphics.Color.BLACK : ink);
+                    RowPills.setActionGlyph(view, icon, active ? io.github.muntashirakon.AppManager.utils.ForkPalette.get(io.github.muntashirakon.AppManager.utils.ForkPalette.GROUND) : ink);
                 }
             } else {
                 view.setCompoundDrawablesRelative(null, null, null, null);

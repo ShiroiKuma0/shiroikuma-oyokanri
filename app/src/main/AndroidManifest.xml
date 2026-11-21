@@ -226,6 +226,13 @@
             android:exported="false"
             android:label="@string/monitor_title"
             android:theme="@style/AppTheme.YellowOnBlack" />
+        <!-- Fork (+123): the 白い熊 応用管理 UI screen, a screen of its own -->
+        <activity
+            android:name=".fonts.UiSettingsActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:exported="false"
+            android:label="@string/pref_fonts"
+            android:theme="@style/AppTheme.YellowOnBlack" />
         <!-- Fork (+106): the filter-program room, browsable -->
         <activity
             android:name=".processreaper.FilterPoolActivity"

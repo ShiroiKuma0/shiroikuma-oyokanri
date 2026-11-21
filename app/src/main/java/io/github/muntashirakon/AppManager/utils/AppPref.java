@@ -164,6 +164,12 @@ public class AppPref {
         // Fork (白い熊, APK-vetting chain): upload only on Wi-Fi, and the rescan-age threshold (days).
         PREF_VIRUS_TOTAL_WIFI_ONLY_BOOL,
         PREF_VIRUS_TOTAL_RESCAN_AGE_DAYS_INT,
+        // Fork (白い熊, +123): the installer's four network switches — look up at all / while
+        // roaming, upload at all / while roaming.
+        PREF_VIRUS_TOTAL_LOOKUP_BOOL,
+        PREF_VIRUS_TOTAL_LOOKUP_ROAMING_BOOL,
+        PREF_VIRUS_TOTAL_UPLOAD_BOOL,
+        PREF_VIRUS_TOTAL_UPLOAD_ROAMING_BOOL,
 
         PREF_USE_SYSTEM_FONT_BOOL,
         PREF_ZIP_ALIGN_BOOL,
@@ -448,7 +454,14 @@ public class AppPref {
             // prompt-before-upload flag defaults OFF; Wi-Fi-only is off by default too.
             case PREF_VIRUS_TOTAL_PROMPT_BEFORE_UPLOADING_BOOL:
             case PREF_VIRUS_TOTAL_WIFI_ONLY_BOOL:
+            // Fork (+123): nothing goes over a roaming connection unless asked for.
+            case PREF_VIRUS_TOTAL_LOOKUP_ROAMING_BOOL:
+            case PREF_VIRUS_TOTAL_UPLOAD_ROAMING_BOOL:
                 return false;
+            // Fork (+123): looking up and uploading are both on by default.
+            case PREF_VIRUS_TOTAL_LOOKUP_BOOL:
+            case PREF_VIRUS_TOTAL_UPLOAD_BOOL:
+                return true;
             case PREF_APP_OP_SHOW_DEFAULT_BOOL:
             case PREF_SHOW_DISCLAIMER_BOOL:
             case PREF_LOG_VIEWER_SHOW_PID_TID_TIMESTAMP_BOOL:

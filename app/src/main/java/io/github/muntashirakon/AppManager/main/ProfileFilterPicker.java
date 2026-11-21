@@ -154,7 +154,7 @@ public final class ProfileFilterPicker {
     private static void applyRowState(@NonNull Context ctx, @NonNull View row,
                                       @NonNull TextView name, @NonNull TextView plus,
                                       @NonNull TextView minus, int state, int yellow) {
-        final int black = Color.BLACK;
+        final int black = io.github.muntashirakon.AppManager.utils.ForkPalette.get(io.github.muntashirakon.AppManager.utils.ForkPalette.GROUND);
         final float d = ctx.getResources().getDisplayMetrics().density;
         final int rowRadius = (int) (12 * d);
         final int pillRadius = (int) (100 * d);

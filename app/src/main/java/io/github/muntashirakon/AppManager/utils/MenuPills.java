@@ -164,22 +164,112 @@ public final class MenuPills {
         return themed(context) ? ForkThemeUtils.getTextColor() : fallback;
     }
 
+    /** Fork (+123): delete has a red role of its own — the monitor's leak orange would collide with share. */
     @ColorInt
     static int warning(@NonNull Context context) {
-        return ColorPrefs.getColor(context, ColorPrefs.MONITOR_LEAK);
+        return ForkPalette.get(context, ForkPalette.DELETE);
+    }
+
+    @ColorInt
+    static int frame(@NonNull Context context, @ColorInt int fallback) {
+        return themed(context) ? ForkPalette.get(context, ForkPalette.MENU_FRAME) : fallback;
+    }
+
+    @ColorInt
+    static int text(@NonNull Context context, @ColorInt int fallback) {
+        return themed(context) ? ForkPalette.get(context, ForkPalette.MENU_TEXT) : fallback;
+    }
+
+    /**
+     * Fork (白い熊, +123): what a row does, as one of the palette's icon roles — a menu is read by
+     * colour before it is read by word. Told from the item's id name (or, for a menu built in
+     * code, from the name of the string it shows), first match wins; anything else is "view".
+     * {word fragment, role} — delete first, so "clear_data" is never taken for something milder.
+     */
+    private static final String[][] ROLE_WORDS = {
+            {"delete", ForkPalette.DELETE}, {"uninstall", ForkPalette.DELETE}, {"clear", ForkPalette.DELETE},
+            {"remove", ForkPalette.DELETE}, {"discard", ForkPalette.DELETE}, {"forget", ForkPalette.DELETE},
+            {"clean", ForkPalette.DELETE}, {"purge", ForkPalette.DELETE}, {"wipe", ForkPalette.DELETE},
+            {"unfreeze", ForkPalette.ICON_CONNECT},
+            {"freeze", ForkPalette.ICON_BLOCK}, {"block", ForkPalette.ICON_BLOCK}, {"stop", ForkPalette.ICON_BLOCK},
+            {"kill", ForkPalette.ICON_BLOCK}, {"disable", ForkPalette.ICON_BLOCK}, {"deny", ForkPalette.ICON_BLOCK},
+            {"cancel", ForkPalette.ICON_BLOCK}, {"net_policy", ForkPalette.ICON_BLOCK},
+            {"magisk", ForkPalette.ICON_BLOCK}, {"close", ForkPalette.ICON_BLOCK},
+            {"share", ForkPalette.ICON_SHARE}, {"export", ForkPalette.ICON_SHARE}, {"copy", ForkPalette.ICON_SHARE},
+            {"save", ForkPalette.ICON_SHARE}, {"print", ForkPalette.ICON_SHARE}, {"extract", ForkPalette.ICON_SHARE},
+            {"shortcut", ForkPalette.ICON_SHARE}, {"upload", ForkPalette.ICON_SHARE},
+            {"backup", ForkPalette.ICON_CONNECT}, {"restore", ForkPalette.ICON_CONNECT},
+            {"install", ForkPalette.ICON_CONNECT}, {"import", ForkPalette.ICON_CONNECT},
+            {"run", ForkPalette.ICON_CONNECT}, {"launch", ForkPalette.ICON_CONNECT},
+            {"refresh", ForkPalette.ICON_CONNECT}, {"reload", ForkPalette.ICON_CONNECT},
+            {"rescan", ForkPalette.ICON_CONNECT}, {"retry", ForkPalette.ICON_CONNECT},
+            {"update", ForkPalette.ICON_CONNECT}, {"sync", ForkPalette.ICON_CONNECT},
+            {"record", ForkPalette.ICON_CONNECT}, {"termux", ForkPalette.ICON_CONNECT},
+            {"one_click", ForkPalette.ICON_CONNECT}, {"routine", ForkPalette.ICON_CONNECT},
+            {"edit", ForkPalette.ICON_MESSAGE}, {"rename", ForkPalette.ICON_MESSAGE}, {"note", ForkPalette.ICON_MESSAGE},
+            {"mark", ForkPalette.ICON_MESSAGE}, {"replace", ForkPalette.ICON_MESSAGE},
+            {"undo", ForkPalette.ICON_MESSAGE}, {"redo", ForkPalette.ICON_MESSAGE}, {"favorite", ForkPalette.ICON_MESSAGE},
+            {"select", ForkPalette.ICON_MESSAGE}, {"wrap", ForkPalette.ICON_MESSAGE}, {"log_level", ForkPalette.ICON_MESSAGE},
+            {"profile", ForkPalette.ICON_CONTACT}, {"app_info", ForkPalette.ICON_CONTACT},
+            {"user", ForkPalette.ICON_CONTACT}, {"app_op", ForkPalette.ICON_CONTACT},
+            {"sensor", ForkPalette.ICON_CONTACT}, {"battery_opt", ForkPalette.ICON_CONTACT},
+    };
+
+    /** The palette role of a name such as {@code action_share_apk} or {@code vt_cancel_scan}. */
+    @NonNull
+    public static String roleForName(@Nullable String name) {
+        if (name != null) {
+            String n = name.toLowerCase(java.util.Locale.ROOT);
+            for (String[] pair : ROLE_WORDS) {
+                if (n.contains(pair[0])) return pair[1];
+            }
+        }
+        return ForkPalette.ICON_VIEW;
+    }
+
+    @NonNull
+    static String roleOf(@NonNull Context context, @NonNull MenuItem item) {
+        try {
+            if (isDestructive(context, item)) return ForkPalette.DELETE;
+            int id = item.getItemId();
+            if (id != 0 && id != View.NO_ID) {
+                return roleForName(context.getResources().getResourceEntryName(id));
+            }
+            CharSequence title = item.getTitle();
+            for (int[] pair : TITLE_ICONS) {
+                if (titleIs(context, title, pair[0])) {
+                    return roleForName(context.getResources().getResourceEntryName(pair[0]));
+                }
+            }
+            return roleForName(title != null ? title.toString().replace(' ', '_') : null);
+        } catch (Throwable t) {
+            return ForkPalette.ICON_VIEW;
+        }
+    }
+
+    /** The colour of a row's icon: its role, whatever the frame and the label wear. */
+    @ColorInt
+    static int iconColor(@NonNull Context context, @NonNull MenuItem item, @ColorInt int fallback) {
+        return themed(context) ? ForkPalette.get(context, roleOf(context, item)) : fallback;
+    }
+
+    /** The icon colour of a hand-built row, from a role name such as {@link ForkPalette#ICON_SHARE}. */
+    @ColorInt
+    public static int roleColor(@NonNull Context context, @NonNull String role) {
+        return ForkPalette.get(context, role);
     }
 
     /** A switch that is off: an opaque darker accent on a themed screen, never a faded one. */
     @ColorInt
     static int switchOff(@NonNull Context context, @ColorInt int accent) {
-        return themed(context) ? ForkSwitch.offColor(accent, ForkThemeUtils.getBackgroundColor())
+        return themed(context) ? ForkPalette.get(context, ForkPalette.SWITCH_OFF)
                 : ColorUtils.setAlphaComponent(accent, 140);
     }
 
     /** The line between two groups: clearly there, quieter than a pill frame. */
     @ColorInt
     static int divider(@NonNull Context context, @ColorInt int accent) {
-        return themed(context) ? ColorUtils.blendARGB(ForkThemeUtils.getBackgroundColor(), accent, 0.7f)
+        return themed(context) ? ForkPalette.get(context, ForkPalette.MENU_DIVIDER)
                 : ColorUtils.setAlphaComponent(accent, 178);
     }
 
@@ -269,6 +359,14 @@ public final class MenuPills {
     @NonNull
     public static View pillRow(@NonNull Context context, int iconRes, @NonNull CharSequence label, boolean opens,
                                @ColorInt int color, @NonNull View.OnClickListener onClick) {
+        return pillRow(context, iconRes, label, opens, color, color, onClick);
+    }
+
+    /** As above, with the icon in the colour of what the row does ({@link #roleColor}). */
+    @NonNull
+    public static View pillRow(@NonNull Context context, int iconRes, @NonNull CharSequence label, boolean opens,
+                               @ColorInt int color, @ColorInt int iconColor,
+                               @NonNull View.OnClickListener onClick) {
         float d = context.getResources().getDisplayMetrics().density;
         android.widget.LinearLayout row = new android.widget.LinearLayout(context);
         row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
@@ -286,7 +384,7 @@ public final class MenuPills {
                 ColorUtils.setAlphaComponent(color, 77)), frame, mask));
         android.widget.ImageView icon = new android.widget.ImageView(context);
         if (iconRes != 0) icon.setImageResource(iconRes);
-        icon.setImageTintList(android.content.res.ColorStateList.valueOf(color));
+        icon.setImageTintList(android.content.res.ColorStateList.valueOf(iconColor));
         android.widget.LinearLayout.LayoutParams ilp = new android.widget.LinearLayout.LayoutParams(
                 Math.round(24 * d), Math.round(24 * d));
         ilp.setMarginEnd(Math.round(12 * d));

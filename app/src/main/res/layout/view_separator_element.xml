@@ -11,7 +11,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:layout_marginTop="16dp">
+    android:layout_marginTop="10dp">
 
     <!-- kxkb ladder: sub-heading 54dp; controls below at 72dp. -->
     <androidx.appcompat.widget.LinearLayoutCompat
@@ -41,7 +41,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="3dp"
         android:paddingStart="72dp"
         android:paddingEnd="16dp">
 
@@ -72,7 +72,7 @@
             android:id="@+id/color_rows"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="2dp"
             android:orientation="vertical" />
 
     </androidx.appcompat.widget.LinearLayoutCompat>

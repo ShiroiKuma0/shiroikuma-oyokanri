@@ -1043,7 +1043,7 @@ public class ProcessMonitorActivity extends BaseActivity {
         View more = toolbar.findViewById(R.id.action_monitor_more);
         if (more != null) {
             more.setOnLongClickListener(v -> {
-                startActivity(SettingsActivity.getSettingsIntent(this, "fonts_prefs"));
+                startActivity(io.github.muntashirakon.AppManager.fonts.UiSettingsActivity.getIntent(this));
                 return true;
             });
         }
@@ -1055,7 +1055,7 @@ public class ProcessMonitorActivity extends BaseActivity {
                 View button = menuView.getChildAt(j);
                 if (button instanceof ImageView) {
                     button.setOnLongClickListener(v -> {
-                        startActivity(SettingsActivity.getSettingsIntent(this, "fonts_prefs"));
+                        startActivity(io.github.muntashirakon.AppManager.fonts.UiSettingsActivity.getIntent(this));
                         return true;
                     });
                 }

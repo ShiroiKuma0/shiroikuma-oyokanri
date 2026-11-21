@@ -26,7 +26,7 @@ public class KeyStoreActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
-        setTheme(Prefs.Appearance.getTransparentAppTheme());
+        setTheme(io.github.muntashirakon.AppManager.R.style.AppTheme_YellowOnBlack_Transparent);
         EdgeToEdge.enable(this);
         super.onCreate(savedInstanceState);
         if (Boolean.TRUE.equals(BuildExpiryChecker.buildExpired())) {

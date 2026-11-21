@@ -25,7 +25,6 @@ import androidx.core.content.ContextCompat;
 import androidx.core.splashscreen.SplashScreen;
 import androidx.lifecycle.ViewModelProvider;
 
-import com.google.android.material.color.DynamicColors;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -101,7 +100,6 @@ public class SplashActivity extends AppCompatActivity {
         SplashScreen.installSplashScreen(this);
         EdgeToEdge.enable(this);
         super.onCreate(savedInstanceState);
-        DynamicColors.applyToActivityIfAvailable(this);
         setContentView(R.layout.activity_authentication);
         ((TextView) findViewById(R.id.version)).setText(String.format(Locale.ROOT, "%s (%d)",
                 BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE));

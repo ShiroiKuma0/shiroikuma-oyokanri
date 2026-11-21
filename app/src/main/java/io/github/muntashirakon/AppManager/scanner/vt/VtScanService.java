@@ -7,6 +7,9 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.os.Build;
 import android.os.IBinder;
 
 import androidx.annotation.NonNull;
@@ -282,6 +285,7 @@ public class VtScanService extends Service {
             if (VtScanAttempt.STATUS_ANALYSING.equals(attempt.status) && analysisId != null) {
                 report = pollAnalysis(virusTotal, file.sha256, analysisId, attempt.id, progress);
             } else if (VtScanAttempt.TYPE_RESCAN.equals(attempt.type)) {
+                requireLookupAllowed();
                 repository.setAttemptStatus(attempt.id, VtScanAttempt.STATUS_ANALYSING);
                 progress.update(getString(R.string.vt_checking));
                 VirusTotal.ResponseV3<String> response = virusTotal.requestRescan(file.sha256);
@@ -294,7 +298,24 @@ public class VtScanService extends Service {
                 uploaded = true;
                 VtScanAttempt updated = repository.getAttempt(attempt.id);
                 analysisId = updated == null ? null : updated.analysisId;
+            } else if (VtScanAttempt.TYPE_LOOKUP.equals(attempt.type) && !Prefs.VirusTotal.lookupEnabled()) {
+                // Fork (白い熊, +123): "Look up on VirusTotal" is off — the hash is not asked about.
+                // With uploading on, the file goes the way of an unknown one (asked about first
+                // when uploads are not automatic); with both off nothing contacts VirusTotal.
+                if (!Prefs.VirusTotal.uploadEnabled()) {
+                    throw new VtSwitchedOffException(getString(R.string.vt_switched_off));
+                }
+                if (Prefs.VirusTotal.promptBeforeUpload()) {
+                    repository.parkAttempt(attempt.id, VtScanAttempt.STATUS_PENDING_CONSENT, 0);
+                    progress.needsConsent();
+                    return;
+                }
+                report = uploadAndPoll(virusTotal, file, attempt, progress);
+                uploaded = true;
+                VtScanAttempt updated = repository.getAttempt(attempt.id);
+                analysisId = updated == null ? null : updated.analysisId;
             } else {
+                requireLookupAllowed();
                 repository.setAttemptStatus(attempt.id, VtScanAttempt.STATUS_LOOKING_UP);
                 progress.update(getString(R.string.vt_checking));
                 VirusTotal.ResponseV3<VtFileReport> response = virusTotal.fetchFileReport(file.sha256);
@@ -307,6 +328,12 @@ public class VtScanService extends Service {
                     // meaningless "VirusTotal request failed."
                     repository.setAttemptStatus(attempt.id, VtScanAttempt.STATUS_ANALYSING);
                     report = pollReport(virusTotal, file.sha256, attempt.id, progress, MAX_ANALYSIS_POLLS, false);
+                } else if (VtScanAttempt.TYPE_LOOKUP.equals(attempt.type)
+                        && response.error != null && "NotFoundError".equals(response.error.code)
+                        && !Prefs.VirusTotal.uploadEnabled()) {
+                    // Fork (白い熊, +123): unknown to VirusTotal and "Upload to VirusTotal" is off —
+                    // the file stays on the phone and nobody is asked. Said plainly, not as a fault.
+                    throw new VtSwitchedOffException(getString(R.string.vt_not_known_upload_off));
                 } else if (VtScanAttempt.TYPE_LOOKUP.equals(attempt.type)
                         && response.error != null && "NotFoundError".equals(response.error.code)
                         && Prefs.VirusTotal.promptBeforeUpload()) {
@@ -350,9 +377,14 @@ public class VtScanService extends Service {
             progress.parked(getString(R.string.vt_quota_waiting));
             scheduleDispatchAfter(e.nextAttemptAt - System.currentTimeMillis());
         } catch (VtDeferException e) {
-            requireRepository().setNextAttemptAt(attempt.id, e.nextAttemptAt, getString(R.string.vt_waiting_wifi));
-            progress.parked(getString(R.string.vt_waiting_wifi));
+            // The exception carries the words for its own reason: Wi-Fi, or roaming (+123).
+            requireRepository().setNextAttemptAt(attempt.id, e.nextAttemptAt, e.getMessage());
+            progress.parked(e.getMessage());
             scheduleDispatchAfter(e.nextAttemptAt - System.currentTimeMillis());
+        } catch (VtSwitchedOffException e) {
+            // Fork (+123): a switch on the UI screen forbids this request. CODE_SWITCHED_OFF lets
+            // the report dialog show it as a setting, not as a failure.
+            fail(attempt.id, CODE_SWITCHED_OFF, e.getMessage(), progress);
         } catch (VtTooLargeException e) {
             // Item 9: too large for VirusTotal — local analysis only, no upload.
             fail(attempt.id, "TooLarge", getString(R.string.vt_too_large), progress);
@@ -384,9 +416,18 @@ public class VtScanService extends Service {
         if (length > MAX_UPLOAD_BYTES) {
             throw new VtTooLargeException("File is larger than 650 MB.");
         }
+        // Fork (白い熊, +123): "Upload to VirusTotal" off stops every upload, an approved one too.
+        if (!Prefs.VirusTotal.uploadEnabled()) {
+            throw new VtSwitchedOffException(getString(R.string.vt_not_known_upload_off));
+        }
+        if (!Prefs.VirusTotal.uploadWhileRoaming() && isRoaming()) {
+            throw new VtDeferException(getString(R.string.vt_waiting_roaming_upload),
+                    System.currentTimeMillis() + WIFI_RETRY_MS);
+        }
         // Item 8/10: honour the Wi-Fi-only upload setting — defer off an unmetered network.
         if (Prefs.VirusTotal.uploadOnWifiOnly() && isMeteredOrOffline()) {
-            throw new VtDeferException("Waiting for Wi-Fi.", System.currentTimeMillis() + WIFI_RETRY_MS);
+            throw new VtDeferException(getString(R.string.vt_waiting_wifi),
+                    System.currentTimeMillis() + WIFI_RETRY_MS);
         }
         repository.setAttemptStatus(attempt.id, VtScanAttempt.STATUS_UPLOADING);
         progress.update(getString(R.string.vt_uploading));
@@ -460,6 +501,56 @@ public class VtScanService extends Service {
             waitForNextPoll();
         }
         throw new IOException(getString(R.string.vt_error_analysis_timeout));
+    }
+
+    /** Fork (白い熊, +123): a look-up (or a rescan request) may go out now, or says why not. */
+    private void requireLookupAllowed() throws IOException {
+        if (!Prefs.VirusTotal.lookupEnabled()) {
+            throw new VtSwitchedOffException(getString(R.string.vt_switched_off));
+        }
+        if (!Prefs.VirusTotal.lookupWhileRoaming() && isRoaming()) {
+            throw new VtDeferException(getString(R.string.vt_waiting_roaming_lookup),
+                    System.currentTimeMillis() + WIFI_RETRY_MS);
+        }
+    }
+
+    /**
+     * Fork (白い熊, +123): whether what we would send goes over a roaming mobile connection.
+     * The active network says so itself (it lacks NOT_ROAMING). Behind a VPN the active network
+     * is the tunnel, whose own flags depend on the VPN app declaring its underlying networks —
+     * so there the mobile networks are asked directly: roaming when one of them is and no Wi-Fi
+     * is up to carry the traffic instead. Unknown reads as "not roaming": a parked scan that
+     * can never leave is worse than one request.
+     */
+    private boolean isRoaming() {
+        try {
+            ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm == null) return false;
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+                android.net.NetworkInfo info = cm.getActiveNetworkInfo();
+                return info != null && info.isRoaming();
+            }
+            Network active = cm.getActiveNetwork();
+            NetworkCapabilities caps = active == null ? null : cm.getNetworkCapabilities(active);
+            if (caps == null) return false;
+            if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING)) return true;
+            if (!caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) return false;
+            boolean wifi = false, mobileRoaming = false;
+            for (Network network : cm.getAllNetworks()) {
+                NetworkCapabilities c = cm.getNetworkCapabilities(network);
+                if (c == null || c.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) continue;
+                if (c.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+                        || c.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
+                    wifi = true;
+                } else if (c.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+                        && !c.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING)) {
+                    mobileRoaming = true;
+                }
+            }
+            return mobileRoaming && !wifi;
+        } catch (Throwable e) {
+            return false;
+        }
     }
 
     private boolean isMeteredOrOffline() {
@@ -552,6 +643,15 @@ public class VtScanService extends Service {
         VtQuotaException(@Nullable String message, long nextAttemptAt) {
             super(message == null ? "VirusTotal quota exceeded." : message);
             this.nextAttemptAt = nextAttemptAt;
+        }
+    }
+
+    /** Fork (+123): the attempt ended because a switch on the UI screen forbids the request. */
+    public static final String CODE_SWITCHED_OFF = "SwitchedOff";
+
+    private static class VtSwitchedOffException extends IOException {
+        VtSwitchedOffException(@NonNull String message) {
+            super(message);
         }
     }
 

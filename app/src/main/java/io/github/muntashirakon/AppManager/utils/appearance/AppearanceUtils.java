@@ -83,11 +83,13 @@ public final class AppearanceUtils {
         AppearanceOptions options = new AppearanceOptions();
         options.locale = LangUtils.getFromPreference(context);
         options.layoutDirection = Prefs.Appearance.getLayoutDirection();
-        options.theme = transparent ? Prefs.Appearance.getTransparentAppTheme() : Prefs.Appearance.getAppTheme();
+        // Fork (+123): the black-yellow theme everywhere, and never the wallpaper's colours.
+        options.theme = transparent ? R.style.AppTheme_YellowOnBlack_Transparent : R.style.AppTheme_YellowOnBlack;
         options.nightMode = Prefs.Appearance.getNightMode();
         ContextThemeWrapper newCtx = new ContextThemeWrapper(context, options.theme);
         newCtx.applyOverrideConfiguration(createOverrideConfiguration(context, options));
-        return DynamicColors.wrapContextIfAvailable(newCtx);
+        io.github.muntashirakon.AppManager.utils.ForkPalette.apply(newCtx);
+        return newCtx;
     }
 
     /**
@@ -96,6 +98,7 @@ public final class AppearanceUtils {
     @NonNull
     public static Context getThemedWidgetContext(@NonNull Context context, boolean transparent) {
         int theme = transparent ? Prefs.Appearance.getTransparentAppTheme() : Prefs.Appearance.getAppTheme();
+        // Home-screen widgets live on somebody else's surface and keep the upstream themes.
         ContextThemeWrapper newCtx = new ContextThemeWrapper(context, theme);
         return DynamicColors.wrapContextIfAvailable(newCtx);
     }
@@ -115,6 +118,9 @@ public final class AppearanceUtils {
      * Initialize appearance in the app. Must be called from {@link Application#onCreate()}.
      */
     public static void init(@NonNull Application application) {
+        // Fork (+123): the settable colour roles, laid over the application's own resources
+        // (toasts, services) here and over each activity's before it is created.
+        io.github.muntashirakon.AppManager.utils.ForkPalette.apply(application);
         application.registerActivityLifecycleCallbacks(new ActivityAppearanceCallback());
         application.registerComponentCallbacks(new ComponentAppearanceCallback(application));
         applyOnlyLocale(application);
@@ -156,6 +162,8 @@ public final class AppearanceUtils {
         @Override
         public void onActivityPreCreated(@NonNull Activity activity, @Nullable Bundle savedInstanceState) {
             boolean yellowOnBlack = isYellowOnBlackActivity(activity);
+            // Fork (+123): before setTheme and before anything is inflated.
+            io.github.muntashirakon.AppManager.utils.ForkPalette.apply(activity);
             if (activity instanceof PerProcessActivity) {
                 int theme;
                 if (yellowOnBlack) {
@@ -168,6 +176,9 @@ public final class AppearanceUtils {
                     // palette, translucent window.
                     theme = activity instanceof io.github.muntashirakon.AppManager.scanner.vt.VtReportActivity
                             ? R.style.AppTheme_YellowOnBlack_Floating
+                            // Fork (+123): every upstream screen that asks for a see-through window.
+                            : ((PerProcessActivity) activity).getTransparentBackground()
+                            ? R.style.AppTheme_YellowOnBlack_Transparent
                             // Fork (白い熊, +085): the installer's dialogs, on a see-through window.
                             : activity instanceof io.github.muntashirakon.AppManager.apk.installer.PackageInstallerActivity
                             ? R.style.AppTheme_YellowOnBlack_Transparent
@@ -207,22 +218,10 @@ public final class AppearanceUtils {
          * line per activity) as more screens are converted.
          */
         private static boolean isYellowOnBlackActivity(@NonNull Activity activity) {
-            return activity instanceof SettingsActivity
-                    || activity instanceof BatchOpsProgressActivity
-                    || activity instanceof ListScreenActivity
-                    || activity instanceof ProfilesActivity
-                    || activity instanceof AppsBaseProfileActivity
-                    || activity instanceof AppDetailsActivity
-                    || activity instanceof ProcessMonitorActivity
-                    || activity instanceof ProcessDetailActivity
-                    || activity instanceof io.github.muntashirakon.AppManager.processreaper.FilterPoolActivity
-                    || activity instanceof BatteryUsageActivity
-                    || activity instanceof BatteryAppDetailActivity
-                    || activity instanceof AppUsageActivity
-                    || activity instanceof FinderActivity
-                    || activity instanceof io.github.muntashirakon.AppManager.scanner.vt.VtReportActivity
-                    || activity instanceof io.github.muntashirakon.AppManager.apk.installer.PackageInstallerActivity
-                    || activity instanceof MainActivity;
+            // Fork (白い熊, +123): every screen. The list of sixteen that used to stand here is
+            // gone — "all screens" was the decision, and a screen that is not black-yellow no
+            // longer exists, so a new activity needs no line anywhere.
+            return true;
         }
 
         @Override
@@ -251,6 +250,10 @@ public final class AppearanceUtils {
 
         @Override
         public void onActivityResumed(@NonNull Activity activity) {
+            // Fork (+123): a colour role changed while this screen was in the back stack.
+            if (io.github.muntashirakon.AppManager.utils.ForkPalette.isStale(activity)) {
+                activity.recreate();
+            }
         }
 
         @Override

@@ -66,7 +66,10 @@ import io.github.muntashirakon.io.Paths;
  * imported files). Failures only show a toast and leave the panel open.
  */
 public final class SettingsExportImportPanel {
-    private static final int DIM = 0xFFC8C800;
+    // Fork (+123): the settable dim-gold role, not a constant.
+    private final int DIM = io.github.muntashirakon.AppManager.fonts.ColorPrefs.getColor(
+            io.github.muntashirakon.AppManager.utils.ContextUtils.getContext(),
+            io.github.muntashirakon.AppManager.fonts.ColorPrefs.SETTINGS_DESCRIPTION);
     private static final int WARN = 0xFFFF5252;
 
     private final Activity mActivity;
@@ -214,6 +217,7 @@ public final class SettingsExportImportPanel {
         importBtn.setOnClickListener(v -> onImportClicked());
         buttons.addView(importBtn);
         Button exportBtn = pill(mActivity.getString(R.string.settings_eim_export));
+        io.github.muntashirakon.AppManager.utils.Pills.plain(exportBtn, true);
         exportBtn.setOnClickListener(v -> onExportClicked());
         buttons.addView(exportBtn);
         root.addView(buttons);
@@ -392,6 +396,7 @@ public final class SettingsExportImportPanel {
         AlertDialog info = infoDialog(box, true);
         LinearLayout btns = infoButtonRow(box);
         Button ok = pill(mActivity.getString(R.string.ok));
+        io.github.muntashirakon.AppManager.utils.Pills.plain(ok, true);
         ok.setOnClickListener(v -> closeChain(info));
         btns.addView(ok);
         info.show();
@@ -422,6 +427,7 @@ public final class SettingsExportImportPanel {
         later.setOnClickListener(v -> closeChain(info));
         btns.addView(later);
         Button restart = pill(mActivity.getString(R.string.settings_eim_restart_now));
+        io.github.muntashirakon.AppManager.utils.Pills.plain(restart, true);
         restart.setOnClickListener(v -> restartProcess());
         btns.addView(restart);
         info.show();
@@ -494,7 +500,7 @@ public final class SettingsExportImportPanel {
     @NonNull
     private GradientDrawable box(int cornerDp, int strokeDp) {
         GradientDrawable g = new GradientDrawable();
-        g.setColor(0xFF000000);
+        g.setColor(io.github.muntashirakon.AppManager.utils.ForkPalette.get(io.github.muntashirakon.AppManager.utils.ForkPalette.GROUND));
         g.setCornerRadius(cornerDp * mDensity);
         g.setStroke(Math.round(strokeDp * mDensity), mYellow);
         return g;
@@ -553,6 +559,9 @@ public final class SettingsExportImportPanel {
         b.setMinHeight(0);
         b.setMinimumHeight(0);
         b.setPadding(dp(20), dp(8), dp(20), dp(8));
+        // Fork (+123): the theme's regular pill (1.25 dp, the button roles); a panel's main
+        // action is made the thick one where it is created.
+        io.github.muntashirakon.AppManager.utils.Pills.plain(b, false);
         return b;
     }
 }

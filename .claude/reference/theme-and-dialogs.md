@@ -40,3 +40,61 @@
   `ForkSwitch.outline` on every inflated `MaterialSwitch`: hollow track, one dot of 46 % for both states, accent
   when on and an opaque darker accent when off. A page that tints a switch with a meaning-carrying colour (the
   盗み見 tab) does so afterwards and keeps the outline. Never set a filled track tint again.
+
+## The whole black-yellow skill, on every screen (+123, 2026-11-21)
+
+白い熊's decisions that day: **all** screens are black-yellow; the UI page is a screen of its own; the primary
+colours are `#FFFF00` / `#000000` but **every item is settable separately, nothing pinned in XML**; glyph-only
+buttons stay glyphs; multi-select checkboxes stay selection marks.
+
+- **`utils/ForkPalette` — the colour roles, and how XML follows them.** A theme attribute, drawable or layout can
+  only name a colour *resource*. Each role is one (`@color/fork_*`; the text/accent base is the long-standing
+  `@color/theme_bright_yellow`, the ground `@color/fork_ground`), and `ForkPalette.apply(context)` lays the stored
+  colours over them with a `ResourcesLoader` (Android 11+; below that XML shows the defaults, code-drawn surfaces
+  still follow). It runs for the application in `AppearanceUtils.init` and for each activity in
+  `onActivityPreCreated`, **before** `setTheme`. A change bumps an epoch: the UI screen recreates itself, every
+  other activity recreates in `onActivityResumed` (`ForkPalette.isStale`).
+- **The loader comes from `com.google.android.material.color.ForkColorLoader`** — one class in Material's package,
+  because `ColorResourcesLoaderCreator` is package-private. Material's public `ColorResourcesOverride` is NOT used:
+  it also applies the "personalized colours" overlay, i.e. the wallpaper palette. **On a Material upgrade, check
+  that `ColorResourcesLoaderCreator.create(Context, Map)` still exists.**
+- **Storage.** Roles live in `ColorPrefs` (`shiroikuma_colors`, exported). The two bases are the old
+  `Prefs.Appearance` theme text/background — `ColorPrefs` maps `ForkPalette.TEXT` / `GROUND` onto them, so the
+  Appearance page and the UI screen share one store. A role's default cascades from a base (`ROLES` table), so a
+  base change moves everything not given a colour of its own. **LANDMINE:** a default must never be read back from
+  a resource the palette overrides (it would return the setting as its own default) — `SETTINGS_DESCRIPTION`'s
+  default is the literal for that reason.
+- **Not settable, and why:** the splash window (`AppTheme.Splash`) — the system draws it from the manifest theme
+  before any app code runs, so no loader exists yet; it stays literal black. Home-screen widgets keep the
+  upstream themes (they sit on the launcher's surface).
+- **All screens:** `isYellowOnBlackActivity` returns true; a `getTransparentBackground()` activity gets
+  `AppTheme.YellowOnBlack.Transparent`; `DynamicColors` is no longer applied to any activity (only to widget
+  contexts). `KeyStoreActivity` and the splash content themes were moved over by hand (not `PerProcessActivity`).
+- **`utils/Pills` + `ForkViewInflater` — buttons, floating buttons, top bars.** The inflater restyles every
+  inflated `Button` / `MaterialButton` / extended FAB as an outlined pill **when it is attached** (by then its
+  label and checkable state are final): main = a filled style in the layout, a bare `<Button>`, or a dialog's
+  `android.R.id.button1` (3 dp, bold); everything else 1.25 dp. A label in `Pills.DESTRUCTIVE` (Delete, Uninstall,
+  Purge, …) turns frame and label red (`ForkPalette.DELETE`) — that is also what makes a deleting dialog's main
+  pill red, with no call site. **Left alone:** a button with no label (a glyph), an `IconButton` style, and a
+  checkable button (a selector segment keeps its fill as the selection mark). An icon beside a label is tinted by
+  the role told from the button's id name. A FAB becomes ground + accent ring; `MaterialToolbar` and libcore's
+  `AppBarLayout` take the top-bar roles. A button built in code: `Pills.button(b, main)` /
+  `Pills.plain(textView, main)`.
+- **Menu icons are coloured by role** (`MenuPills.roleOf` → `roleForName`: word fragments of the item's id name,
+  delete first; for menus built in code the name of the matching `TITLE_ICONS` string). Frame and label are the
+  menu's own roles; a deleting row is red all over (`ForkPalette.DELETE`, no longer `MONITOR_LEAK`, whose orange
+  collided with share). A new verb that reads wrong gets a line in `ROLE_WORDS`.
+- **Switch colours are roles** (`SWITCH_ON`, `SWITCH_OFF`); `ForkSwitch.outline(sw, on, ground)` remains for a
+  switch that carries a meaning in its colour (盗み見).
+- **The UI screen** is `fonts/UiSettingsActivity` hosting `FontsPreferences`; Settings' `fonts_prefs` row and the
+  two toolbar shortcuts start it. `FontsPreferences` builds each section as a `view_font_group` tagged with an id
+  by `header(group, titleRes)` — **the id is the entry name of the title string: never rename a section's title
+  string**, it is what the stored order is made of. `UiPageSections.arrange` then lays out the "App settings"
+  main pill, the chip index (`UiFlowLayout`; tap = unfold + scroll, long-press = live drag-reorder, sections
+  follow on drop) and the sections, **all folded by default**; order and fold state are `ui_section_order` /
+  `ui_sections_open` in `shiroikuma_colors`. `UiRowIcons` gives every row an icon as the label's start drawable
+  (`auto` from the string's name; `sweep` for the shared element layouts). Action pills hug their label.
+  "Reset section order" is in Maintenance.
+- **Not checked on the device.** Everything above was verified in the code only (白い熊, 2026-11-21: no
+  screenshots). The thirty-five upstream screens were never drawn black-yellow before — expect stray surfaces
+  that hard-code a Material colour in their own layouts or code.

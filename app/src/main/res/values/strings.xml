@@ -3327,4 +3327,59 @@
     <string name="app_launch_exempt_pinned">The system pins this app\'s battery-optimization setting; it can\'t be changed here.</string>
     <string name="app_launch_exempt_toast_on">%s — now exempt from battery optimization</string>
     <string name="app_launch_exempt_toast_off">%s — now battery-optimized</string>
+    <!-- Fork (+123): the installer's four VirusTotal network switches -->
+    <string name="vt_lookup_title">Look up on VirusTotal</string>
+    <string name="vt_lookup_desc">Ask VirusTotal about a file by its hash. Off: nothing is asked; an unknown file is uploaded straight away if uploading is on.</string>
+    <string name="vt_lookup_roaming_title">Look up while roaming</string>
+    <string name="vt_lookup_roaming_desc">Off: while the mobile connection is roaming, a look-up waits and is tried again.</string>
+    <string name="vt_upload_title">Upload to VirusTotal</string>
+    <string name="vt_upload_desc">Send a file VirusTotal does not know for analysis. Off: no file ever leaves the phone.</string>
+    <string name="vt_upload_roaming_title">Upload while roaming</string>
+    <string name="vt_upload_roaming_desc">Off: while the mobile connection is roaming, an upload waits and is tried again.</string>
+    <string name="vt_waiting_roaming_lookup">VirusTotal: Roaming — the look-up is waiting…</string>
+    <string name="vt_waiting_roaming_upload">VirusTotal: Roaming — the upload is waiting…</string>
+    <string name="vt_switched_off">Looking up on VirusTotal is switched off (白い熊 応用管理 UI → VirusTotal).</string>
+    <string name="vt_not_known_upload_off">VirusTotal does not know this file, and uploading is switched off (白い熊 応用管理 UI → VirusTotal).</string>
+    <string name="vt_state_not_checked">Not checked</string>
+
+    <!-- Fork (+123): the UI screen — settings pill, maintenance, and the theme's colour roles.
+         NEVER rename a *_group string: its name is the section's stored id. -->
+    <string name="ui_app_settings">App settings</string>
+    <string name="ui_app_settings_desc">Everything that is not look and feel: mode of operation, backups, rules, the installer, privacy.</string>
+    <string name="ui_maintenance_group">Maintenance</string>
+    <string name="ui_reset_section_order">Reset section order</string>
+    <string name="ui_reset_section_order_desc">Put the sections of this screen back in their original order. What is folded stays folded.</string>
+    <string name="palette_group_base">Base colours</string>
+    <string name="palette_group_topbar">Top bar</string>
+    <string name="palette_group_buttons">Buttons</string>
+    <string name="palette_group_dialogs">Dialogs</string>
+    <string name="palette_group_menus">Menus and sheets</string>
+    <string name="palette_group_switches">Switches</string>
+    <string name="palette_group_icons">Icon colours</string>
+    <string name="palette_text">Text and accent — everything without a colour of its own</string>
+    <string name="palette_ground">Background</string>
+    <string name="palette_topbar_bg">Top bar background</string>
+    <string name="palette_topbar_text">Top bar title and glyphs</string>
+    <string name="palette_button_frame">Button frame</string>
+    <string name="palette_button_text">Button label</string>
+    <string name="palette_dialog_bg">Dialog background</string>
+    <string name="palette_dialog_frame">Dialog frame</string>
+    <string name="palette_dialog_text">Dialog text</string>
+    <string name="palette_menu_bg">Menu background</string>
+    <string name="palette_menu_frame">Menu frame and pills</string>
+    <string name="palette_menu_text">Menu labels</string>
+    <string name="palette_menu_divider">Menu group divider</string>
+    <string name="palette_sheet_bg">Bottom sheet background</string>
+    <string name="palette_sheet_frame">Bottom sheet frame</string>
+    <string name="palette_switch_on">Switch, on</string>
+    <string name="palette_switch_off">Switch, off</string>
+    <string name="palette_heading">Section headings</string>
+    <string name="palette_divider">Line between sections</string>
+    <string name="palette_icon_connect">Icon — runs, installs, restores, connects</string>
+    <string name="palette_icon_message">Icon — edits, marks, writes</string>
+    <string name="palette_icon_contact">Icon — about an app, a profile, a measure</string>
+    <string name="palette_icon_share">Icon — copies, shares, exports</string>
+    <string name="palette_icon_view">Icon — views, opens, settings</string>
+    <string name="palette_icon_block">Icon — freezes, blocks, stops</string>
+    <string name="palette_delete">Delete — destructive buttons, rows and icons</string>
 </resources>

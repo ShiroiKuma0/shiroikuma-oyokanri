@@ -173,12 +173,46 @@ public final class ColorPrefs {
         return ctx.getApplicationContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
     }
 
+    // Fork (白い熊, +123): the palette's two bases are the long-standing theme text and background
+    // of Prefs.Appearance — one store, so the Appearance page and the UI screen cannot disagree.
+    private static boolean isBase(@NonNull String key) {
+        return io.github.muntashirakon.AppManager.utils.ForkPalette.TEXT.equals(key)
+                || io.github.muntashirakon.AppManager.utils.ForkPalette.GROUND.equals(key);
+    }
+
+    private static int baseDefault(@NonNull String key) {
+        return io.github.muntashirakon.AppManager.utils.ForkPalette.TEXT.equals(key) ? 0xFFFFFF00 : 0xFF000000;
+    }
+
+    private static int baseGet(@NonNull String key) {
+        return io.github.muntashirakon.AppManager.utils.ForkPalette.TEXT.equals(key)
+                ? io.github.muntashirakon.AppManager.settings.Prefs.Appearance.getThemeTextColor()
+                : io.github.muntashirakon.AppManager.settings.Prefs.Appearance.getThemeBackgroundColor();
+    }
+
+    private static void baseSet(@NonNull String key, int color) {
+        if (io.github.muntashirakon.AppManager.utils.ForkPalette.TEXT.equals(key)) {
+            io.github.muntashirakon.AppManager.settings.Prefs.Appearance.setThemeTextColor(color);
+        } else {
+            io.github.muntashirakon.AppManager.settings.Prefs.Appearance.setThemeBackgroundColor(color);
+        }
+    }
+
+    private static void changed(@NonNull String key) {
+        sChanged = true;
+        if (io.github.muntashirakon.AppManager.utils.ForkPalette.isRole(key) || SETTINGS_DESCRIPTION.equals(key)) {
+            io.github.muntashirakon.AppManager.utils.ForkPalette.invalidate();
+        }
+    }
+
     public static boolean isSet(@NonNull Context ctx, @NonNull String key) {
+        if (isBase(key)) return baseGet(key) != baseDefault(key);
         return sp(ctx).contains("color_" + key);
     }
 
     /** Stored colour for {@code key}, or {@code def} if unset. */
     public static int getColor(@NonNull Context ctx, @NonNull String key, int def) {
+        if (isBase(key)) return baseGet(key);
         SharedPreferences s = sp(ctx);
         String k = "color_" + key;
         return s.contains(k) ? s.getInt(k, def) : def;
@@ -190,13 +224,15 @@ public final class ColorPrefs {
     }
 
     public static void setColor(@NonNull Context ctx, @NonNull String key, int color) {
-        sp(ctx).edit().putInt("color_" + key, color).apply();
-        sChanged = true;
+        if (isBase(key)) baseSet(key, color);
+        else sp(ctx).edit().putInt("color_" + key, color).apply();
+        changed(key);
     }
 
     public static void reset(@NonNull Context ctx, @NonNull String key) {
-        sp(ctx).edit().remove("color_" + key).apply();
-        sChanged = true;
+        if (isBase(key)) baseSet(key, baseDefault(key));
+        else sp(ctx).edit().remove("color_" + key).apply();
+        changed(key);
     }
 
     /**
@@ -206,9 +242,14 @@ public final class ColorPrefs {
      * swatch) never disagree.
      */
     public static int defaultColor(@NonNull Context ctx, @NonNull String key) {
+        if (isBase(key)) return baseDefault(key);
+        Integer palette = io.github.muntashirakon.AppManager.utils.ForkPalette.defaultOf(key);
+        if (palette != null) return palette;
         switch (key) {
             case SETTINGS_DESCRIPTION:
-                return ContextCompat.getColor(ctx, R.color.settings_description);
+                // A literal, not the resource: ForkPalette lays the stored colour over the
+                // resource, so reading it back here would return the setting as its own default.
+                return 0xFFC8C800;
             case LABEL_FROZEN:
                 return ContextCompat.getColor(ctx, R.color.theme_ice_blue);
             case LABEL_SYSTEM:
