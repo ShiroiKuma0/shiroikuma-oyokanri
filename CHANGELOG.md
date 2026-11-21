@@ -10,6 +10,118 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-11-03.19-47.gdc4154f4+123 — 2026-11-21
+
+Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.
+This release makes every screen black-yellow, makes every colour of that look a setting, turns the
+UI page into a screen of its own, and adds four network switches to the installer's VirusTotal
+vetting. **It has not been checked on a device yet** — see *Known limits* at the end.
+(`+122` was built and never released; `+123` adds two fixes to it.)
+
+### Every screen is black-yellow
+
+- **All screens, not sixteen.** Until now only the fork's own screens wore the black-yellow theme;
+  the scanner, the VirusTotal history, the file manager, the log viewer, the debloater, one-click
+  operations, the terminal, the editors, the viewers, help and the rest followed upstream's theme
+  picker. Every activity now gets the black-yellow theme, see-through windows included.
+- **The wallpaper no longer colours anything.** Dynamic colour is not applied to any activity; it
+  remains only for home-screen widgets, which sit on the launcher's surface.
+
+### Every colour is a setting
+
+- **Colour roles.** Text and accent, background, top bar (background, title and glyphs), buttons
+  (frame, label), dialogs (background, frame, text), menus (background, frame and pills, labels,
+  group divider), bottom sheets (background, frame), switches (on, off), section headings, the line
+  between sections, six icon colours and the delete red are each a role with its own swatch on the
+  UI screen, in the section of the thing it colours.
+- **Defaults cascade.** The primary colours stay `#FFFF00` on `#000000`. A role that has not been
+  given a colour of its own follows the base it derives from, so changing *Text and accent* or
+  *Background* moves everything that was left alone.
+- **Nothing is pinned in XML any more.** Themes, drawables and layouts name a role instead of a
+  literal colour, and from Android 11 the stored colours are laid over those roles at run time —
+  so the parts of the interface the theme itself draws follow the settings, not only what the app
+  paints in code.
+- **A change shows at once.** The UI screen rebuilds itself when a role changes; every other open
+  screen rebuilds when it next comes forward.
+- The base colours are the same store as *Settings → Appearance*, so the two cannot disagree, and
+  all roles travel in the settings export with the other colours.
+
+### Buttons, dialogs, menus and switches
+
+- **Every button is an outlined pill, never filled.** The main action of a block has a 3 dp frame
+  and a bold label; every other action a 1.25 dp frame and a normal label. This is applied where
+  buttons are created, so screens are covered without each layout asking for it.
+- **A deleting action is red** — frame and label — still unfilled: Delete, Uninstall, Delete
+  backup, Clear data, Purge, Discard.
+- **Left as they were, on purpose:** a button that is only a glyph, and a segment of a selector,
+  whose fill marks the chosen one.
+- **Dialogs.** The positive button is the main pill, the others regular pills; a dialog that
+  deletes gets a red main pill. All dialog text is in the dialog's own text colour.
+- **Floating buttons** are a ring on the background with the glyph in the accent; an extended one
+  is a pill.
+- **Top bars** take their own background and title colours.
+- **Menu icons are coloured by what the row does** — run / install / restore green, edit and mark
+  blue, about an app or profile cyan, copy / share / export orange, freeze / block / stop magenta,
+  delete red, plain view and open in the accent — while frame and label stay in the menu's colours.
+  Delete has a red of its own; it used to borrow the process monitor's orange, which is the colour
+  of sharing.
+- **Switches** take their on and off colours from two roles.
+- The file manager's drawer colours its glyphs by what a row is: a favourite, a place, a tag.
+- The Export / Import panel's buttons are pills of the same weights: Export, OK and Restart now are
+  the main ones.
+
+### 白い熊 応用管理 UI is a screen of its own
+
+- **Its own title, no longer a page titled "Settings".** It opens from Settings and from the two
+  toolbar shortcuts as before.
+- **App settings pill.** The first element is a thick pill that leads to the app's settings.
+- **Chip index.** Under it, one small chip per section. A tap unfolds the section and scrolls to
+  it. A long-press lifts the chip; the chips reorder live under the finger, and the sections take
+  the new order when it is dropped.
+- **Folding sections.** A tap on a heading folds or unfolds its rows (› folded, ⌄ open). Every
+  section starts folded. Order and fold state are remembered and travel in the settings export.
+- **Maintenance → Reset section order** puts the sections back in their original order.
+- **An icon on every row**, coloured by what the row does.
+- **Action pills hug their label** instead of spanning the line, and carry their icon inside.
+- Rows sit closer together; the line between sections is the darker accent.
+- New sections: Base colours, Top bar, Buttons, Dialogs, Menus and sheets, Switches, Icon colours,
+  Maintenance. The page's own section gains *Section headings* and *Line between sections*.
+
+### VirusTotal: four network switches
+
+In the VirusTotal section of the UI screen:
+
+- **Look up on VirusTotal** — on by default. Off: the file's hash is not asked about. With
+  uploading on, the file then goes the way of an unknown one; with both off, nothing contacts
+  VirusTotal.
+- **Look up while roaming** — off by default. While the mobile connection is roaming, a look-up
+  waits and is tried again.
+- **Upload to VirusTotal** — on by default. Off: no file ever leaves the phone, and no upload
+  question is asked.
+- **Upload while roaming** — off by default. While roaming, an upload waits and is tried again.
+- **A switched-off request is not a failure.** The report dialog shows a quiet *Not checked* state
+  with the reason and where the switch is, and Install stays offered.
+- **A roaming wait says so** — in the notification and in the dialog — and retries the way the
+  Wi-Fi wait does.
+- **Behind a VPN** the mobile networks are asked directly whether they are roaming, since the
+  tunnel's own answer depends on the VPN app.
+- A row that has nothing to govern while its master switch is off is dimmed and cannot be tapped.
+- Fetching the result of an upload that was already made is never held back.
+
+### Known limits
+
+- **Not checked on a device.** The build compiles and each surface was read in the code that draws
+  it; nothing was looked at on a phone.
+- **Below Android 11** the parts drawn by the theme show the default colours; what the app paints
+  in code follows the settings on every version. Whether EMUI accepts the run-time colour
+  replacement is untested — where it is refused, the app stays yellow on black.
+- **The splash window stays black.** The system draws it before any app code runs.
+- The fork's older hand-built pills (list rows, the unrolled pane, the shelf, the report dialog's
+  actions) follow the two base colours, not the new *Buttons* roles.
+- Floating buttons built in code (the speed dial) are not restyled yet.
+- The upstream screens were never black-yellow before; some may still show a surface with a colour
+  of its own.
+
 ## 4.1.1+2026-11-03.19-47.gdc4154f4+121 — 2026-11-19
 
 Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.

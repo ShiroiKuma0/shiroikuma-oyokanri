@@ -25,7 +25,7 @@ actions**, readable **per-app backups**, a **remote-triggerable settings export*
 **battery-exemption toggle** and an **EMUI startup-manager hand-off** to the automation sister app,
 and the **AM Debug** toolset unlocked in a normal release build.
 
-**📥 Latest release: [`4.1.1+2026-11-03.19-47.gdc4154f4+121`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
+**📥 Latest release: [`4.1.1+2026-11-03.19-47.gdc4154f4+123`](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases/latest)** — [all releases & APK downloads »](https://github.com/ShiroiKuma0/shiroikuma-oyokanri/releases)
 
 <sub>Version reads as **upstream `4.1.1`**, rebased onto upstream commit **`dc4154f4` of 2026-11-03 19:47 UTC**, fork build **121**.</sub>
 
@@ -227,6 +227,14 @@ submenu, the toolbar overflow — that does something is a full-width outlined p
 inside and a › when it opens something; a destructive row takes the warning colour; a toggle row
 carries an outlined switch, never a checkbox. Every switch is an outline with one solid dot, bright
 when on and a darker yellow when off — nothing is ever filled.
+
+**Every screen, and every colour a setting.** The look now covers all screens of the app, upstream's
+included. Text, background, top bar, buttons, dialogs, menus, bottom sheets, switches, headings and
+the icon colours are each a role with its own swatch; a role left alone follows the two base
+colours, and from Android 11 the parts the theme itself draws follow the settings too. Buttons are
+outlined pills throughout — the main action thick and bold, a deleting one red — and menu icons are
+coloured by what a row does. The UI page is a screen of its own: an *App settings* pill, a chip
+index that jumps to a section and reorders by dragging, and sections that fold.
 
 ## 🧊 A freeze that closes every gate — and four switches to choose how many
 
@@ -556,6 +564,10 @@ version and signature date behind a filter strip, plus the threat classification
 signing certificate and permissions VirusTotal extracted. A failed scan names its reason and offers
 Retry. The install button is the decision — the app's own installer carries on without asking the
 same question twice, and still stops for a signature mismatch or a data-losing downgrade.
+
+Four switches decide what may leave the phone: look up on VirusTotal, look up while roaming, upload
+to VirusTotal, upload while roaming — the two roaming ones off by default. A request a switch
+forbids is shown as *Not checked* with its reason, and a roaming one waits and retries.
 
 ## 🏪 Per-app install source — restore a banking app that refuses to run
 
