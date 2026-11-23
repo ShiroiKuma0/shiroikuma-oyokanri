@@ -170,3 +170,8 @@ be renamed on one side** — they live in `scanner/vt/VtContract.java`.
   uploads are not automatic). Polling for the result of an upload already made is not gated. `isRoaming()` asks
   the active network for `NOT_ROAMING`; behind a VPN it asks the mobile networks directly (roaming when one is
   and no Wi-Fi is up); unknown reads as not roaming.
+- **+125 — every upload over 32 MB failed with a bare HTTP 405 (白い熊, 2026-11-23).** `VirusTotal.uploadLargeFile`
+  asked for the one-time upload URL with **POST**; `/files/upload_url` is a **GET** endpoint and answers a POST
+  with 405 and no JSON body — hence the report's “null: VtError{httpErrorCode=405, code='null', message='null'}”.
+  Files up to 32 MB go straight to `POST /files` and never met it. The POST of the file itself to the returned
+  URL was always right.

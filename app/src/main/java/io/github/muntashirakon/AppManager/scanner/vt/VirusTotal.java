@@ -206,7 +206,9 @@ public class VirusTotal {
         try {
             applyTimeouts(connection);
             connection.setUseCaches(false);
-            connection.setRequestMethod("POST");
+            // Fork: GET, not POST — /files/upload_url answers a POST with a bare 405, which failed
+            // every upload over 32 MB (the small-file path never comes here).
+            connection.setRequestMethod("GET");
             connection.setDoInput(true);
             connection.setRequestProperty("accept", "application/json");
             connection.setRequestProperty("x-apikey", mApiKey);
