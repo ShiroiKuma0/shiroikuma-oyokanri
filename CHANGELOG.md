@@ -10,6 +10,26 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-11-03.19-47.gdc4154f4+125 — 2026-11-23
+
+Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.
+One fix, in the VirusTotal upload.
+
+### VirusTotal
+
+- **Files over 32 MB upload again.** Such an upload ended at once in *Scan failed* with
+  “null: VtError{httpErrorCode=405, code='null', message='null'}”. A file of that size is not sent
+  straight to VirusTotal: the app first asks for a one-time upload address. It asked with the wrong
+  HTTP method (POST where the service accepts only GET), and VirusTotal refused the request before
+  any file data was sent.
+- Files up to 32 MB never took that step and were not affected. The transfer of the file itself is
+  unchanged.
+
+### Known limits
+
+- The fix was made from the error shown on the device and VirusTotal's interface description. A
+  large upload with this build **has not been confirmed on a device yet**.
+
 ## 4.1.1+2026-11-03.19-47.gdc4154f4+124 — 2026-11-21
 
 Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.
