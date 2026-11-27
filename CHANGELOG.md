@@ -70,7 +70,9 @@ checked on a device.
 
 ### Known limits
 
-- Confirmed on the device: the 起動マネージャー pill through the provider call (`+127`).
+- Confirmed on the device (`+127`): the long-press hints, the UI page with its App language
+  section, section icons and row icons, the Japanese, and the 起動マネージャー pill through the
+  provider call.
 - **Not checked on a device yet:** the backup of a frozen app, the data-only restore into one, the
   item colour rows, and the pill after the removal of the broadcast path.
 - Not measured: what installing an APK over a hidden app does to its hidden state during a full
