@@ -47,6 +47,7 @@ import io.github.muntashirakon.AppManager.apk.ApkFile;
 import io.github.muntashirakon.AppManager.apk.installer.InstallerOptions;
 import io.github.muntashirakon.AppManager.apk.installer.PackageInstallerCompat;
 import io.github.muntashirakon.AppManager.backup.struct.BackupMetadataV5;
+import io.github.muntashirakon.AppManager.compat.ApplicationInfoCompat;
 import io.github.muntashirakon.AppManager.compat.AppOpsManagerCompat;
 import io.github.muntashirakon.AppManager.compat.BackupCompat;
 import io.github.muntashirakon.AppManager.compat.DeviceIdleManagerCompat;
@@ -181,9 +182,19 @@ class RestoreOp implements Closeable {
         // Get package info
         mPackageInfo = null;
         try {
-            mPackageInfo = PackageManagerCompat.getPackageInfo(packageName, GET_SIGNING_CERTIFICATES
-                    | PackageManagerCompat.MATCH_STATIC_SHARED_AND_SDK_LIBRARIES, userId);
-            mUid = Objects.requireNonNull(mPackageInfo.applicationInfo).uid;
+            // Fork (白い熊, +129): a frozen app is an installed app. A hidden package (freeze gate 4)
+            // is reported as not installed to a lookup that does not ask for it, so a data-only
+            // restore was refused and one with the APK treated it as a fresh install. The flags
+            // also match a package uninstalled with its data kept, which is NOT installed —
+            // hence the FLAG_INSTALLED test, the predicate the app list itself uses.
+            PackageInfo info = PackageManagerCompat.getPackageInfo(packageName, GET_SIGNING_CERTIFICATES
+                    | PackageManagerCompat.MATCH_STATIC_SHARED_AND_SDK_LIBRARIES
+                    | PackageManagerCompat.MATCH_UNINSTALLED_PACKAGES
+                    | PackageManagerCompat.MATCH_DISABLED_COMPONENTS, userId);
+            if (info.applicationInfo != null && ApplicationInfoCompat.isInstalled(info.applicationInfo)) {
+                mPackageInfo = info;
+                mUid = info.applicationInfo.uid;
+            }
         } catch (Exception ignore) {
         }
         mIsInstalled = mPackageInfo != null;
@@ -588,8 +599,12 @@ class RestoreOp implements Closeable {
             }
             // Get package info, again
             try {
+                // Fork (+129): with the hidden-package flags — an app that was hidden before the
+                // install may still be hidden after it, and is installed all the same.
                 mPackageInfo = PackageManagerCompat.getPackageInfo(mPackageName, GET_SIGNING_CERTIFICATES
-                        | PackageManagerCompat.MATCH_STATIC_SHARED_AND_SDK_LIBRARIES, mUserId);
+                        | PackageManagerCompat.MATCH_STATIC_SHARED_AND_SDK_LIBRARIES
+                        | PackageManagerCompat.MATCH_UNINSTALLED_PACKAGES
+                        | PackageManagerCompat.MATCH_DISABLED_COMPONENTS, mUserId);
                 mUid = Objects.requireNonNull(mPackageInfo.applicationInfo).uid;
                 mIsInstalled = true;
             } catch (Exception e) {

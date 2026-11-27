@@ -148,9 +148,15 @@ class BackupOp implements Closeable {
         mBackupFlags = backupFlags;
         mPm = ContextUtils.getContext().getPackageManager();
         try {
+            // Fork (白い熊, +128): a frozen app must be backed up like any other. A hidden package
+            // (freeze gate 4) is reported as not installed to a lookup that does not ask for it,
+            // so without MATCH_UNINSTALLED_PACKAGES this threw NameNotFoundException and the
+            // backup died as "Failed to setup metadata" before reading a single file.
             mPackageInfo = PackageManagerCompat.getPackageInfo(mPackageName,
                     PackageManager.GET_META_DATA | GET_SIGNING_CERTIFICATES | PackageManager.GET_PERMISSIONS
-                            | PackageManagerCompat.MATCH_STATIC_SHARED_AND_SDK_LIBRARIES, userId);
+                            | PackageManagerCompat.MATCH_STATIC_SHARED_AND_SDK_LIBRARIES
+                            | PackageManagerCompat.MATCH_UNINSTALLED_PACKAGES
+                            | PackageManagerCompat.MATCH_DISABLED_COMPONENTS, userId);
             Objects.requireNonNull(mPackageInfo);
             mApplicationInfo = Objects.requireNonNull(mPackageInfo.applicationInfo);
             // Override existing metadata

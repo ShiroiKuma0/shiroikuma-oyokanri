@@ -42,6 +42,15 @@ public final class LangUtils {
             conf.setLocale(Locale.forLanguageTag(locale));
             sLocaleMap.put(locale, ConfigurationCompat.getLocales(conf).get(0));
         }
+        // Fork (白い熊, 2026-11-27): the declaration is the short list now. A language chosen
+        // earlier that is no longer listed stays in force until another is picked, and is shown.
+        try {
+            String chosen = Prefs.Appearance.getLanguage(context);
+            if (chosen != null && !chosen.isEmpty() && !sLocaleMap.containsKey(chosen)) {
+                sLocaleMap.put(chosen, Locale.forLanguageTag(chosen));
+            }
+        } catch (Throwable ignore) {
+        }
     }
 
     @NonNull

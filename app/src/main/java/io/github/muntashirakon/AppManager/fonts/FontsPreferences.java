@@ -46,6 +46,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -81,9 +82,18 @@ public class FontsPreferences extends Fragment {
     private static final class ColorSpec {
         final String key;
         final int labelRes;
+        /** Fork (+129): the label of an item role, which is put together and has no string of its own. */
+        @Nullable
+        final CharSequence label;
         ColorSpec(String key, int labelRes) {
             this.key = key;
             this.labelRes = labelRes;
+            this.label = null;
+        }
+        ColorSpec(String key, @NonNull CharSequence label) {
+            this.key = key;
+            this.labelRes = 0;
+            this.label = label;
         }
     }
 
@@ -397,6 +407,14 @@ public class FontsPreferences extends Fragment {
                 () -> { if (mFontsContainer != null) applyDescriptionColor(mFontsContainer); });
         addColorRow(pageContent, new ColorSpec(ForkPalette.HEADING, R.string.palette_heading), () -> {});
         addColorRow(pageContent, new ColorSpec(ForkPalette.DIVIDER, R.string.palette_divider), () -> {});
+        // Fork (白い熊, 2026-11-27): the seven section-icon colours of this page — what kind of
+        // thing a section is. Heading and chip of a section share one.
+        for (String sectionRole : new String[]{ForkPalette.SECTION_BASE, ForkPalette.SECTION_CONTROLS,
+                ForkPalette.SECTION_WORDS, ForkPalette.SECTION_FRAME, ForkPalette.SECTION_REACH,
+                ForkPalette.SECTION_WARNING, ForkPalette.SECTION_FLASH}) {
+            ForkPalette.Role r = ForkPalette.role(sectionRole);
+            if (r != null) addColorRow(pageContent, new ColorSpec(sectionRole, r.labelRes), () -> {});
+        }
         container.addView(pageGroup);
         // Fork: a reference legend at the TOP of the page — sample chips styled
         // in code to mirror the live list, with what each colour/style means.
@@ -482,7 +500,8 @@ public class FontsPreferences extends Fragment {
         container.addView(buildPaletteGroup(inflater, container, R.string.palette_group_base,
                 ForkPalette.TEXT, ForkPalette.GROUND, ForkPalette.SELECTION, ForkPalette.TRACK), at++);
         container.addView(buildPaletteGroup(inflater, container, R.string.palette_group_topbar,
-                ForkPalette.TOPBAR_BG, ForkPalette.TOPBAR_TEXT), at++);
+                ForkPalette.TOPBAR_BG, ForkPalette.TOPBAR_TEXT,
+                ForkPalette.TOOLTIP_BG, ForkPalette.TOOLTIP_FRAME, ForkPalette.TOOLTIP_TEXT), at++);
         container.addView(buildPaletteGroup(inflater, container, R.string.palette_group_buttons,
                 ForkPalette.BUTTON_FRAME, ForkPalette.BUTTON_TEXT, ForkPalette.DELETE), at++);
         container.addView(buildPaletteGroup(inflater, container, R.string.palette_group_dialogs,
@@ -495,7 +514,11 @@ public class FontsPreferences extends Fragment {
         container.addView(buildPaletteGroup(inflater, container, R.string.palette_group_icons,
                 ForkPalette.ICON_CONNECT, ForkPalette.ICON_MESSAGE, ForkPalette.ICON_CONTACT,
                 ForkPalette.ICON_SHARE, ForkPalette.ICON_VIEW, ForkPalette.ICON_BLOCK), at);
+        addItemRoles(inflater, container);
         container.addView(buildMaintenanceGroup(inflater, container));
+        // Fork (白い熊, 2026-11-27): "App language" — the first section and the first chip. Its
+        // place comes from the registry in UiPageSections, not from where it is built.
+        container.addView(buildLanguageGroup(inflater, container));
         // Every row from the shared element layouts gets its icon, then the page is laid out:
         // the settings pill, the chip index, the sections folded and in the stored order.
         UiRowIcons.sweep(container);
@@ -536,6 +559,122 @@ public class FontsPreferences extends Fragment {
         return group;
     }
 
+    /**
+     * Fork (白い熊, +129): where each area of item roles is listed — the id of the section that
+     * already covers those screens, or the title of a section of its own. The areas are the ones
+     * {@code tools/fork_colour_roles.py} sorts the layouts into.
+     */
+    private static final Object[][] ITEM_AREAS = {
+            {"main", R.string.pref_font_group_main_list},
+            {"details", R.string.pref_font_group_app_details},
+            {"monitor", R.string.pref_monitor_group},
+            {"oplog", R.string.pref_oplog_group},
+            {"dialogs", R.string.palette_group_dialogs},
+            {"menus", R.string.palette_group_menus},
+            {"uipage", R.string.pref_settings_page_group},
+            {"vt", R.string.virus_total},
+            {"settings", R.string.palette_group_settings_screens},
+            {"fm", R.string.palette_group_fm},
+            {"logs", R.string.palette_group_logs},
+            {"other", R.string.palette_group_other_screens},
+            {"shapes", R.string.palette_group_shapes},
+            {"theme", R.string.palette_group_theme},
+    };
+
+    /**
+     * Fork (白い熊, +129): every item of the XML has a colour role of its own
+     * ({@link ForkPalette#ITEMS}, made at build time). Each is listed in the section its screens
+     * belong to, under one caption; an area with no section yet gets one.
+     */
+    private void addItemRoles(@NonNull LayoutInflater inflater, @NonNull LinearLayoutCompat container) {
+        final float density = getResources().getDisplayMetrics().density;
+        for (Object[] area : ITEM_AREAS) {
+            List<ForkPalette.Item> items = new ArrayList<>();
+            for (ForkPalette.Item item : ForkPalette.ITEMS) {
+                if (item.area.equals(area[0])) items.add(item);
+            }
+            if (items.isEmpty()) continue;
+            int titleRes = (Integer) area[1];
+            String id = getResources().getResourceEntryName(titleRes);
+            View group = null;
+            for (int i = 0; i < container.getChildCount(); i++) {
+                if (id.equals(container.getChildAt(i).getTag(R.id.fork_section_id))) {
+                    group = container.getChildAt(i);
+                    break;
+                }
+            }
+            if (group == null) {
+                group = inflater.inflate(R.layout.view_font_group, container, false);
+                header(group, titleRes);
+                container.addView(group);
+            }
+            LinearLayoutCompat content = group.findViewById(R.id.group_content);
+            LinearLayoutCompat rows = new LinearLayoutCompat(requireContext());
+            rows.setOrientation(LinearLayoutCompat.VERTICAL);
+            rows.setPaddingRelative(Math.round(72 * density), Math.round(8 * density),
+                    Math.round(16 * density), Math.round(4 * density));
+            AppCompatTextView caption = new AppCompatTextView(requireContext());
+            caption.setText(R.string.palette_items_caption);
+            caption.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+            caption.setTextColor(ColorPrefs.getColor(requireContext(), ColorPrefs.SETTINGS_DESCRIPTION));
+            caption.setPadding(0, 0, 0, Math.round(4 * density));
+            rows.addView(caption);
+            for (ForkPalette.Item item : items) {
+                addColorRow(rows, new ColorSpec(item.key, itemLabel(item)), () -> {});
+            }
+            content.addView(rows);
+        }
+    }
+
+    @NonNull
+    private CharSequence itemLabel(@NonNull ForkPalette.Item item) {
+        String base;
+        ForkPalette.Role role = ForkPalette.role(item.base);
+        ForkPalette.Item parent = ForkPalette.item(item.base);
+        if (role != null) base = getString(role.labelRes);
+        else if (parent != null) base = parent.attribute != null ? parent.attribute : parent.key;
+        else base = getString(R.string.pref_color_settings_description);
+        String middle;
+        if (item.attribute != null) {
+            middle = item.attribute;
+        } else {
+            int kind;
+            switch (item.kind) {
+                case 't': kind = R.string.palette_item_kind_text; break;
+                case 'i': kind = R.string.palette_item_kind_icons; break;
+                case 'g': kind = R.string.palette_item_kind_ground; break;
+                case 'f': kind = R.string.palette_item_kind_frame; break;
+                default: kind = R.string.palette_item_kind_other; break;
+            }
+            middle = getString(kind);
+        }
+        if (item.what == null) return getString(R.string.palette_item_label_2, middle, base);
+        return getString(R.string.palette_item_label_3, item.what.replace('_', ' '), middle, base);
+    }
+
+    /**
+     * Fork (白い熊, 2026-11-27): "App language" — one row, "Language: ‹current›", a main pill
+     * with a › that opens the picker ({@link UiLanguage}).
+     */
+    @NonNull
+    private View buildLanguageGroup(@NonNull LayoutInflater inflater, @NonNull ViewGroup container) {
+        View group = inflater.inflate(R.layout.view_font_group, container, false);
+        header(group, R.string.ui_language_group);
+        LinearLayoutCompat content = group.findViewById(R.id.group_content);
+        View row = actionRow(R.string.ui_language_row, pillSummary(getString(R.string.ui_language_row_desc)),
+                true, true, v -> UiLanguage.showPicker(requireActivity()));
+        View title = row.findViewWithTag(ACTION_TITLE_TAG);
+        if (title instanceof AppCompatTextView) {
+            ((AppCompatTextView) title).setText(getString(R.string.ui_language_row,
+                    UiLanguage.currentName(requireContext())));
+            UiRowIcons.set((AppCompatTextView) title, R.drawable.ic_translate, ForkPalette.ICON_VIEW);
+        }
+        content.addView(row);
+        return group;
+    }
+
+    private static final String ACTION_TITLE_TAG = "fork_action_title";
+
     /** Fork (+123): Maintenance — the page's own housekeeping. */
     @NonNull
     private View buildMaintenanceGroup(@NonNull LayoutInflater inflater, @NonNull ViewGroup container) {
@@ -547,6 +686,19 @@ public class FontsPreferences extends Fragment {
                     UiPageSections.resetOrder(requireContext());
                     requireActivity().recreate();
                 }));
+        // Fork (白い熊, 2026-11-27): every colour of this page back to its default, after a
+        // confirmation. A single colour is reset from its own picker ("Reset to default").
+        content.addView(actionRow(R.string.ui_reset_all_colours,
+                pillSummary(getString(R.string.ui_reset_all_colours_desc)), false, false, v ->
+                        io.github.muntashirakon.AppManager.utils.ForkDialog.present(
+                                io.github.muntashirakon.AppManager.utils.ForkDialog.builder(requireContext())
+                                        .setTitle(R.string.ui_reset_all_colours)
+                                        .setMessage(R.string.ui_reset_all_colours_confirm)
+                                        .setPositiveButton(R.string.ui_reset_all_colours, (d, w) -> {
+                                            ColorPrefs.resetAll(requireContext());
+                                            requireActivity().recreate();
+                                        })
+                                        .setNegativeButton(R.string.cancel, null))));
         return group;
     }
 
@@ -798,6 +950,7 @@ public class FontsPreferences extends Fragment {
 
         AppCompatTextView title = new AppCompatTextView(requireContext());
         title.setText(titleRes);
+        title.setTag(ACTION_TITLE_TAG);
         title.setTextColor(ink);
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         title.setTypeface(null, main ? Typeface.BOLD : Typeface.NORMAL);
@@ -1929,7 +2082,8 @@ public class FontsPreferences extends Fragment {
         AppCompatTextView label = row.findViewById(R.id.cr_label);
         AppCompatTextView value = row.findViewById(R.id.cr_value);
         View swatch = row.findViewById(R.id.cr_swatch);
-        label.setText(spec.labelRes);
+        if (spec.label != null) label.setText(spec.label);
+        else label.setText(spec.labelRes);
         final Runnable refresh = () -> {
             int color = ColorPrefs.getColor(requireContext(), spec.key);
             swatch.setBackground(swatchDrawable(color));
@@ -2054,7 +2208,7 @@ public class FontsPreferences extends Fragment {
             presets.addView(sw);
         }
         ForkDialog.present(ForkDialog.builder(requireContext())
-                .setTitle(spec.labelRes)
+                .setTitle(spec.label != null ? spec.label : getString(spec.labelRes))
                 .setView(body)
                 .setPositiveButton(R.string.ok, (d, w) -> {
                     Integer col = parseColor(hexInput.getText().toString());

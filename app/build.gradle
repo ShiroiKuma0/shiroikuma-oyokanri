@@ -14,6 +14,19 @@ def customBaseVersionCode = (project.findProperty('customBaseVersionCode') ?: '0
 // produced an APK carrying the wrong version before.
 def upstreamPin = upstreamBasePin()
 
+// Fork (白い熊, +129): one colour role per item of the XML. The task copies src/main/res, rewrites
+// the copy and writes the role table (ForkItemRoles.java) beside it; a failure stops the build.
+def forkItemRolesDir = layout.buildDirectory.dir("generated/fork-item-roles").get().asFile
+tasks.register("forkItemRoles", Exec) {
+    def script = rootProject.file("tools/fork_colour_roles.py")
+    inputs.file(script)
+    inputs.dir("src/main/res")
+    inputs.file("src/main/java/io/github/muntashirakon/AppManager/utils/ForkPalette.java")
+    outputs.dir(forkItemRolesDir)
+    commandLine "python3", script.absolutePath, "--out", forkItemRolesDir.absolutePath
+}
+tasks.matching { it.name == "preBuild" }.configureEach { dependsOn "forkItemRoles" }
+
 android {
     namespace 'io.github.muntashirakon.AppManager'
     compileSdk compile_sdk
@@ -108,6 +121,11 @@ android {
     }
     sourceSets {
         androidTest.assets.srcDirs += files("$projectDir/schemas".toString())
+        // Fork (白い熊, +129): the build takes its resources from the copy the forkItemRoles task
+        // rewrites (every colour reference given a role of its own), never from src/main/res
+        // directly; the sources keep their names. See tools/fork_colour_roles.py.
+        main.res.srcDirs = [new File(forkItemRolesDir, "res")]
+        main.java.srcDir new File(forkItemRolesDir, "java")
     }
     dependenciesInfo {
         includeInApk false

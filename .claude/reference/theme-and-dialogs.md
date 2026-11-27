@@ -128,3 +128,71 @@ buttons stay glyphs; multi-select checkboxes stay selection marks.
 - New roles: `SELECTION` (selected row, search match — was libcore's unreadable pale yellow) and `TRACK`
   (the track behind a bar). The code editor's chrome (plain text, line numbers, current line, selection, cursor)
   takes the roles in `EditorThemes.fixColor`; syntax colours and the terminal's ANSI colours stay.
+
+## +127 — the skill applied again: tooltip, section icons, App language, Japanese (2026-11-27)
+
+- **The long-press hint is ours** (`utils/ForkTooltips`). The platform tooltip is drawn from non-public theme
+  attributes — it showed yellow or black text on a light grey box. `AppearanceUtils.onActivityPostCreated` calls
+  `ForkTooltips.watch(activity)`: after every layout pass each view with a `tooltipText` hands it over (the
+  platform's is switched off by nulling the text) and gets a long-press that shows a popup in the roles
+  `TOOLTIP_BG` / `_FRAME` / `_TEXT` (Top bar section). **A view with a long-press of its own keeps it and has no
+  hint** (the main ⋮ overflow, the selection bar's actions). Dialog windows are not watched.
+- **Section registry: `REGISTRY` in `fonts/UiPageSections`** — id, icon, one of the seven `ForkPalette.SECTION_*`
+  roles. **Its order is the page's default order**; keep "App language" first and no two neighbours of one
+  colour. Heading and chip both draw from it through `UiRowIcons.labelIcon`. A new section gets a line there, or
+  it lands at the end in the base colour with a generic icon.
+- **`UiRowIcons.labelIcon`** sizes every icon by its label (1.25 × text size, floor 18 dp for rows, none for
+  chips), re-read at every layout. Not done: centring on the first line of a wrapped label.
+- **App language** is `fonts/UiLanguage` + `buildLanguageGroup`. No second stored value — it sets upstream's
+  `Prefs.Appearance.setLanguage`, like Settings › Language. **`res/xml/locales_config.xml` is the fork's short
+  list** (ja, en, then languages at four fifths or more of upstream's strings); on a rebase a conflict there is
+  never "take upstream". `LangUtils.loadAppLanguages` keeps a language chosen earlier that is no longer listed.
+- **Japanese: `values-ja/strings_fork.xml`** holds every string that had no Japanese (the fork's and
+  upstream's), apart from upstream's `strings.xml`. **`tools/check-ja.py` must report 0 missing before a build is
+  called done**; a new string gets its Japanese there in the same change. When upstream translates one of those
+  keys the build stops on a duplicate resource — delete the entry in `strings_fork.xml`.
+- The menu icon defaults moved to the 2026-11-23 values (connect `#00A550`, message `#0066FF`, contact
+  `#00B0FF`, block `#FF3D7F`); stored colours are untouched. "Reset all colours" is in Maintenance
+  (`ColorPrefs.resetAll`).
+- Not checked on the device.
+
+## +129 — every item of the XML has a colour role of its own (2026-11-27)
+
+白い熊: split the roles "as 臨電話 has them". Same method as its `tools/sk_colour_roles.py`.
+
+- **`tools/fork_colour_roles.py`, run by the Gradle task `forkItemRoles` before every build.** It copies
+  `src/main/res` to `app/build/generated/fork-item-roles/res`, rewrites the copy, and **the build takes its
+  resources from the copy** (`sourceSets.main.res.srcDirs` in `app/build.gradle`). The sources are never
+  rewritten: a layout keeps naming `@color/fork_ground` or `?attr/colorPrimary`, so a rebase conflicts no more
+  than before and a new upstream layout gets its roles by itself. **Never point a tool at the copy to edit it,
+  and never add a second res source directory without adding it to the script.**
+- **What becomes a role.** A layout reference → `fork_l__<area>__<base>__<kind>` (area = the group of screens,
+  the `AREAS` table in the script; kind t/i/g/f/x from the attribute's name). A non-vector drawable →
+  `fork_d__<file>__<base>__<kind>`. Every colour item of every `<style>` in `values/styles.xml` →
+  `fork_s__<Style>__<attribute>`, so each Material attribute of `AppTheme.YellowOnBlack` and of the dialog and
+  popup overlays is settable alone. 127 roles at +129 (77 of them theme attributes).
+- **`?attr` in a layout** follows the style role of that attribute. An attribute an overlay redefines (dialog,
+  popup menu: `colorPrimary`, `textColorSecondary`, `colorOnSurface`, …) is split only where the window is
+  known — `dialog_*` layouts resolve through the dialog overlay, `activity_*` / `appbar*` / `pager_*` through
+  the main theme; in an `item_*` or `view_*` layout it stays the shared attribute, because the same row is
+  inflated in both kinds of window.
+- **`SCREEN_ONLY` (+131):** a table in the script names the rows and fragments that are only ever inflated
+  on a screen (`fragment_scanner`, `item_shared_lib`, `item_right_summary`, `item_right_standalone_action`);
+  they are split like an `activity_*` layout, and the table may move a layout to the area it is shown in.
+  Before adding a row, grep every `R.layout.<name>` and `@layout/<name>`: one use inside a dialog keeps it
+  out (`item_title_action` — the saved-filters dialog; `item_icon_title_subtitle`; `item_changelog_*`).
+  130 roles at +131.
+- **Not split:** vector icons (masks, tinted where used), widget layouts and drawables (the launcher draws
+  them), the splash logo, libcore's resources, and everything a widget takes from the theme without naming it
+  in XML — that still moves with the theme attribute's role, which is now one role per attribute.
+- **Run time:** `ForkPalette.Item` / `ForkPalette.ITEMS` (generated `ForkItemRoles`). An item falls back to its
+  base (a `ROLES` role, the dim gold, or another item), is stored like every colour (`color_<key>` in
+  `shiroikuma_colors`, exported, cleared by "Reset all colours") and is laid over its resource by the same
+  loader. Generated colours exist in default `values/` only (the night-twin rule).
+- **UI page:** `FontsPreferences.addItemRoles` lists each area's roles under one caption in the section that
+  covers those screens (`ITEM_AREAS`), or in a section of its own: Settings screens, File manager, Log viewer,
+  Other screens, Shapes, Theme attributes (registered in `UiPageSections.REGISTRY`). Labels are composed:
+  kind or attribute, then the base in brackets.
+- Role keys are resource names: **renaming a layout area, a drawable file or a style renames its roles and
+  drops the colours stored for them.**
+- Not checked on the device.

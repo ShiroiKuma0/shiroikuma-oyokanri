@@ -5,4 +5,7 @@
     <item name="fork_pill_done" type="id" />
     <!-- Fork (+123): a UI-screen section's stable id (the entry name of its title string). -->
     <item name="fork_section_id" type="id" />
+    <!-- Fork: the hint a view handed over to ForkTooltips, and the text size a label icon was drawn for. -->
+    <item name="fork_tooltip_text" type="id" />
+    <item name="fork_label_icon" type="id" />
 </resources>

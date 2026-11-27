@@ -107,10 +107,23 @@
          also has a -night "highlight", and a night-qualified value beats the run-time loader's
          default-config one — so values-night/colors.xml repeats this alias. -->
     <color name="highlight">@color/fork_selection</color>
-    <color name="fork_icon_connect">#00FF00</color>
-    <color name="fork_icon_message">#4D94FF</color>
-    <color name="fork_icon_contact">#00FFFF</color>
+    <!-- Fork (2026-11-27): the menu icon defaults of 2026-11-23 — heavy green, heavy blue, light
+         blue, rose — off the colours 白い熊 cannot tell apart. -->
+    <color name="fork_icon_connect">#00A550</color>
+    <color name="fork_icon_message">#0066FF</color>
+    <color name="fork_icon_contact">#00B0FF</color>
     <color name="fork_icon_share">#FF8000</color>
     <color name="fork_icon_view">#FFFF00</color>
-    <color name="fork_icon_block">#FF00FF</color>
+    <color name="fork_icon_block">#FF3D7F</color>
+    <!-- Fork (2026-11-27): the seven section-icon colours of the UI page, and the tooltip. -->
+    <color name="fork_section_base">#FFFF00</color>
+    <color name="fork_section_controls">#00A550</color>
+    <color name="fork_section_words">#00B0FF</color>
+    <color name="fork_section_frame">#0066FF</color>
+    <color name="fork_section_reach">#FF8000</color>
+    <color name="fork_section_warning">#FF0000</color>
+    <color name="fork_section_flash">#FF3D7F</color>
+    <color name="fork_tooltip_bg">#000000</color>
+    <color name="fork_tooltip_frame">#FFFF00</color>
+    <color name="fork_tooltip_text">#FFFF00</color>
 </resources>

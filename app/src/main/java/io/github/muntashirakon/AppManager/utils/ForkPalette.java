@@ -81,6 +81,22 @@ public final class ForkPalette {
     public static final String ICON_SHARE = "icon_share";
     public static final String ICON_VIEW = "icon_view";
     public static final String ICON_BLOCK = "icon_block";
+    /**
+     * Fork (白い熊, 2026-11-27): the seven section-icon colours of the UI page — what KIND of thing
+     * a section is. Roles of their own, not the menu icon roles: green, light blue and rose mean
+     * other things in a menu, even where the default value is the same.
+     */
+    public static final String SECTION_BASE = "section_base";
+    public static final String SECTION_CONTROLS = "section_controls";
+    public static final String SECTION_WORDS = "section_words";
+    public static final String SECTION_FRAME = "section_frame";
+    public static final String SECTION_REACH = "section_reach";
+    public static final String SECTION_WARNING = "section_warning";
+    public static final String SECTION_FLASH = "section_flash";
+    /** Fork (2026-11-27): the long-press hint of an icon — see {@link ForkTooltips}. */
+    public static final String TOOLTIP_BG = "tooltip_bg";
+    public static final String TOOLTIP_FRAME = "tooltip_frame";
+    public static final String TOOLTIP_TEXT = "tooltip_text";
 
     /** How a role's default is found. */
     private static final int FROM_TEXT = 0, FROM_GROUND = 1, FIXED = 2, BLEND = 3;
@@ -127,19 +143,77 @@ public final class ForkPalette {
             new Role(SWITCH_OFF, R.color.fork_switch_off, R.string.palette_switch_off, BLEND, 55),
             new Role(HEADING, R.color.fork_heading, R.string.palette_heading, FROM_TEXT, 0),
             new Role(DIVIDER, R.color.fork_divider, R.string.palette_divider, BLEND, 70),
-            new Role(ICON_CONNECT, R.color.fork_icon_connect, R.string.palette_icon_connect, FIXED, 0xFF00FF00),
-            new Role(ICON_MESSAGE, R.color.fork_icon_message, R.string.palette_icon_message, FIXED, 0xFF4D94FF),
-            new Role(ICON_CONTACT, R.color.fork_icon_contact, R.string.palette_icon_contact, FIXED, 0xFF00FFFF),
+            new Role(ICON_CONNECT, R.color.fork_icon_connect, R.string.palette_icon_connect, FIXED, 0xFF00A550),
+            new Role(ICON_MESSAGE, R.color.fork_icon_message, R.string.palette_icon_message, FIXED, 0xFF0066FF),
+            new Role(ICON_CONTACT, R.color.fork_icon_contact, R.string.palette_icon_contact, FIXED, 0xFF00B0FF),
             new Role(ICON_SHARE, R.color.fork_icon_share, R.string.palette_icon_share, FIXED, 0xFFFF8000),
             new Role(ICON_VIEW, R.color.fork_icon_view, R.string.palette_icon_view, FROM_TEXT, 0),
-            new Role(ICON_BLOCK, R.color.fork_icon_block, R.string.palette_icon_block, FIXED, 0xFFFF00FF),
+            new Role(ICON_BLOCK, R.color.fork_icon_block, R.string.palette_icon_block, FIXED, 0xFFFF3D7F),
             new Role(DELETE, R.color.fork_delete, R.string.palette_delete, FIXED, 0xFFFF0000),
+            new Role(SECTION_BASE, R.color.fork_section_base, R.string.palette_section_base, FROM_TEXT, 0),
+            new Role(SECTION_CONTROLS, R.color.fork_section_controls, R.string.palette_section_controls, FIXED, 0xFF00A550),
+            new Role(SECTION_WORDS, R.color.fork_section_words, R.string.palette_section_words, FIXED, 0xFF00B0FF),
+            new Role(SECTION_FRAME, R.color.fork_section_frame, R.string.palette_section_frame, FIXED, 0xFF0066FF),
+            new Role(SECTION_REACH, R.color.fork_section_reach, R.string.palette_section_reach, FIXED, 0xFFFF8000),
+            new Role(SECTION_WARNING, R.color.fork_section_warning, R.string.palette_section_warning, FIXED, 0xFFFF0000),
+            new Role(SECTION_FLASH, R.color.fork_section_flash, R.string.palette_section_flash, FIXED, 0xFFFF3D7F),
+            new Role(TOOLTIP_BG, R.color.fork_tooltip_bg, R.string.palette_tooltip_bg, FROM_GROUND, 0),
+            new Role(TOOLTIP_FRAME, R.color.fork_tooltip_frame, R.string.palette_tooltip_frame, FROM_TEXT, 0),
+            new Role(TOOLTIP_TEXT, R.color.fork_tooltip_text, R.string.palette_tooltip_text, FROM_TEXT, 0),
     };
 
     private static final Map<String, Role> BY_KEY = new HashMap<>();
 
+    /**
+     * Fork (白い熊, +129): the role of one item of the XML — a layout's text, icons, grounds or
+     * frames on one group of screens, one shape, one colour attribute of one style. Made at build
+     * time by {@code tools/fork_colour_roles.py} ({@code ForkItemRoles}); never written by hand.
+     * It falls back to {@link #base}, a role of {@link #ROLES}, the dim gold of {@code ColorPrefs},
+     * or another item (a layout that names a theme attribute follows that attribute's role).
+     */
+    public static final class Item {
+        @NonNull
+        public final String key;
+        @ColorRes
+        public final int colorRes;
+        @NonNull
+        public final String base;
+        /** Where the UI page lists it: main, details, dialogs, …, shapes, theme. */
+        @NonNull
+        public final String area;
+        /** t text · i icon · g ground · f frame · x other. */
+        public final char kind;
+        /** The shape's file or the style's name; null for a layout role. */
+        @Nullable
+        public final String what;
+        /** The style's attribute; null for the others. */
+        @Nullable
+        public final String attribute;
+
+        Item(@NonNull String key, @ColorRes int colorRes, @NonNull String base, @NonNull String area, char kind,
+             @Nullable String what, @Nullable String attribute) {
+            this.key = key;
+            this.colorRes = colorRes;
+            this.base = base;
+            this.area = area;
+            this.kind = kind;
+            this.what = what;
+            this.attribute = attribute;
+        }
+    }
+
+    /** Every item role, sorted by key. */
+    public static final java.util.List<Item> ITEMS = ForkItemRoles.all();
+    private static final Map<String, Item> ITEM_BY_KEY = new HashMap<>();
+
     static {
         for (Role r : ROLES) BY_KEY.put(r.key, r);
+        for (Item i : ITEMS) ITEM_BY_KEY.put(i.key, i);
+    }
+
+    @Nullable
+    public static Item item(@NonNull String key) {
+        return ITEM_BY_KEY.get(key);
     }
 
     @Nullable
@@ -148,14 +222,20 @@ public final class ForkPalette {
     }
 
     public static boolean isRole(@NonNull String key) {
-        return BY_KEY.containsKey(key);
+        return BY_KEY.containsKey(key) || ITEM_BY_KEY.containsKey(key);
     }
 
     /** The default of a role, or null when {@code key} is not one of the palette's. */
     @Nullable
     public static Integer defaultOf(@NonNull String key) {
         Role r = BY_KEY.get(key);
-        if (r == null) return null;
+        if (r == null) {
+            // An item role shows what its base shows until it is given a colour of its own.
+            Item item = ITEM_BY_KEY.get(key);
+            if (item == null) return null;
+            Context context = ContextUtils.getContext();
+            return isRole(item.base) ? get(context, item.base) : ColorPrefs.getColor(context, item.base);
+        }
         switch (r.source) {
             case FROM_TEXT:
                 return ForkThemeUtils.getTextColor();
@@ -233,6 +313,7 @@ public final class ForkPalette {
         // The dim gold of descriptions and left rules is a role of ColorPrefs' own.
         map.put(R.color.settings_description, ColorPrefs.getColor(context, ColorPrefs.SETTINGS_DESCRIPTION,
                 0xFFC8C800));
+        for (Item i : ITEMS) map.put(i.colorRes, get(context, i.key));
         return map;
     }
 

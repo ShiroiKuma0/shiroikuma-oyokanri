@@ -1,22 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Fork (白い熊, 2026-11-27): the SHORT list of the black-yellow skill — Japanese and English,
+     then only the languages in which the app is translated to four fifths or more of upstream's
+     strings (measured against values/strings.xml of upstream master). Every translation stays in
+     the package; this list is what the two pickers and the system's per-app language screen
+     offer. Dropped: fa (79.8 %), ko, nb-NO, hi, ro. Added: nl, sv (both above four fifths). -->
 <locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="ja"/>
+    <locale android:name="en"/>
     <locale android:name="ar"/>
     <locale android:name="de"/>
-    <locale android:name="en"/>
     <locale android:name="es-ES"/>
-    <locale android:name="fa"/>
     <locale android:name="fr"/>
-    <locale android:name="hi"/>
     <locale android:name="id"/>
     <locale android:name="it"/>
-    <locale android:name="ja"/>
-    <locale android:name="ko"/>
-    <locale android:name="nb-NO"/>
+    <locale android:name="nl"/>
     <locale android:name="pl"/>
     <locale android:name="pt"/>
     <locale android:name="pt-BR"/>
-    <locale android:name="ro"/>
     <locale android:name="ru-RU"/>
+    <locale android:name="sv"/>
     <locale android:name="tr-TR"/>
     <locale android:name="uk-UA"/>
     <locale android:name="vi"/>

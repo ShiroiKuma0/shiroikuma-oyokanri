@@ -18,9 +18,8 @@ package io.github.muntashirakon.AppManager.appstartup;
  * <p>自由作業盤 already trusts 応用管理 as a sister in its {@code AutomationCallers} allowlist
  * (package name + kernel-reported uid + pinned signing certificate), so no shared token is needed.
  * Its clean {@code com.opentasker.action.RUN_TASK} trigger is signature-gated and we are signed with
- * a different key, and its existing sister-facing {@code shiroikuma.jiyusagyoban.action.RUN_TASK}
- * forwards no variable payload into the task — so this is a <b>new</b> sister-facing entry 白い熊 adds
- * on the 自由作業盤 side: run a named task <b>and</b> inject which app it is about.
+ * a different key — so this is a sister-facing entry of its own on the 自由作業盤 side: run a
+ * named task <b>and</b> inject which app it is about.
  */
 public final class AppLaunchContract {
     private AppLaunchContract() {
@@ -29,54 +28,38 @@ public final class AppLaunchContract {
     /** 白い熊 自由作業盤. */
     public static final String JIYU_PACKAGE = "shiroikuma.jiyusagyoban";
 
-    /**
-     * Run a 自由作業盤 task, carrying the app it is about. Explicit ({@code setPackage}), sent as a
-     * plain broadcast with {@code FLAG_INCLUDE_STOPPED_PACKAGES}; gated on the 自由作業盤 side by its
-     * {@code AutomationCallers} allowlist (uid + signing cert), never by a signature permission we
-     * cannot hold. (It was ordered through +071 until an EMUI ordered-queue redelivery to 自由作業盤's
-     * single receiver — ~6 s later, after its goAsync() finished — produced a phantom duplicate run;
-     * a plain broadcast does not hold the receiver open. 自由作業盤 never checks isOrderedBroadcast.)
-     */
-    public static final String ACTION_RUN_TASK_WITH_TARGET =
-            "shiroikuma.jiyusagyoban.action.RUN_TASK_WITH_TARGET";
+    // ── The provider call (白い熊, 2026-11-24, security audit V-06) — the only path. ─────────────
+    //
+    // 自由作業盤's data door (authority {@code shiroikuma.jiyusagyoban.automation}, the one
+    // AppDataClient already calls for describe/export/import) answers {@code run_task} from its
+    // build +023 on. A provider call is where the system names the caller: 自由作業盤 checks package,
+    // binder uid and pinned certificate there, so nothing we hand out can stand in for us. The
+    // broadcast it replaced (RUN_TASK_WITH_TARGET) proved identity with a PendingIntent — a bearer
+    // object that every notification listener and launcher receives from us and could present in
+    // our place. 自由作業盤 closed that door in its +024; it was removed here in +130.
+    //
+    // These names are a wire format: never renamed.
 
+    /** Run a named task about one app. Synchronous — call it off the main thread. */
+    public static final String METHOD_RUN_TASK = "run_task";
     /** The task name to run (String, required). */
-    public static final String EXTRA_TASK = "shiroikuma.jiyusagyoban.extra.TASK";
-    /** The project the task lives in, to disambiguate a shared name (String, optional). */
-    public static final String EXTRA_PROJECT = "shiroikuma.jiyusagyoban.extra.PROJECT";
-    /** The target app's package name, injected into the task as the variable {@code pkg}. */
-    public static final String EXTRA_TARGET_PACKAGE = "shiroikuma.jiyusagyoban.extra.TARGET_PACKAGE";
+    public static final String CALL_TASK = "task";
+    /** The project the task lives in, to tell same-named tasks apart (String, optional). */
+    public static final String CALL_PROJECT = "project";
+    /** The target app's package name; {@code %pkg} in the task. */
+    public static final String CALL_TARGET_PACKAGE = "target_package";
+    /** The target app's display label; {@code %label} in the task. */
+    public static final String CALL_TARGET_LABEL = "target_label";
     /**
-     * The target app's display label, injected as {@code label} — what the task types into 検索,
-     * since the startup screen filters by the app's name rather than its package.
+     * The answer: {@code OK:ran '<task>' in <n>ms}, {@code OK:running '<task>'} (still going after
+     * 6 s; the run carries on) or {@code ERROR:<why>}.
      */
-    public static final String EXTRA_TARGET_LABEL = "shiroikuma.jiyusagyoban.extra.TARGET_LABEL";
-    /** The caller's package, for the {@code AutomationCallers} gate and the run log. */
-    public static final String EXTRA_SOURCE = "shiroikuma.jiyusagyoban.extra.SOURCE";
-    /**
-     * An <b>immutable</b> {@link android.app.PendingIntent} we create, carrying forge-proof caller
-     * identity. A broadcast has no sender uid below API 34 and {@code Binder.getCallingUid()} in the
-     * receiver returns 自由作業盤's own uid, so {@link #EXTRA_SOURCE} alone could be spoofed; the
-     * system stamps a PendingIntent's {@code creatorPackage}/{@code creatorUid}, which 自由作業盤
-     * cross-checks against {@code EXTRA_SOURCE} before running its {@code AutomationCallers} gate
-     * (name + that uid + pinned cert). 自由作業盤 only reads those two fields and never sends it.
-     */
-    public static final String EXTRA_IDENTITY = "shiroikuma.jiyusagyoban.extra.IDENTITY";
-    /** Where to send the terminal reply (String, optional). */
-    public static final String EXTRA_REPLY_PACKAGE = "shiroikuma.jiyusagyoban.extra.REPLY_PACKAGE";
-    /** A per-call nonce echoed back on the reply, so a stale or spoofed reply is ignored. */
-    public static final String EXTRA_REQUEST_ID = "shiroikuma.jiyusagyoban.extra.REQUEST_ID";
+    public static final String CALL_RESULT = "result";
+    /** What a 自由作業盤 older than +023 answers: it is too old, and 白い熊 is told so. */
+    public static final String CALL_UNKNOWN_METHOD = "ERROR:unknown method";
 
     /** The task 白い熊 creates in 自由作業盤 to open 起動マネージャー and search for {@code label}. */
     public static final String TASK_OPEN_APP_LAUNCH = "起動マネージャーを開く";
     /** The project it lives in. */
     public static final String PROJECT_APP_LAUNCH = "アプリ起動";
-
-    // ── Reply (renrakusaki shape: a FRESH broadcast, never only the ordered result — EMUI severs
-    // the ordered-result channel between third-party apps). 自由作業盤 fresh-broadcasts this with
-    // setPackage(REPLY_PACKAGE) + FLAG_INCLUDE_STOPPED_PACKAGES. ─────────────────────────────────
-
-    public static final String ACTION_RESULT = "shiroikuma.oyokanri.action.APP_LAUNCH_RESULT";
-    /** {@code OK:<detail>} or {@code ERROR:<reason>}. */
-    public static final String EXTRA_RESULT = "shiroikuma.oyokanri.extra.RESULT";
 }

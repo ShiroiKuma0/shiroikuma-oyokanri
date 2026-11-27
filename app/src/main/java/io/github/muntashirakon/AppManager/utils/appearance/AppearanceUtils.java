@@ -242,6 +242,8 @@ public final class AppearanceUtils {
             AppCompatDelegate.setDefaultNightMode(Prefs.Appearance.getNightMode());
 
             sActivityReferences.put(activity.hashCode(), new WeakReference<>(activity));
+            // Fork (白い熊, 2026-11-27): the long-press hint of every icon, in our own roles.
+            io.github.muntashirakon.AppManager.utils.ForkTooltips.watch(activity);
         }
 
         @Override

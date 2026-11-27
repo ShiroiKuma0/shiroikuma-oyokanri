@@ -235,6 +235,22 @@ public final class ColorPrefs {
         changed(key);
     }
 
+    /** Fork (白い熊, 2026-11-27): every colour back to its default — "Reset all colours". */
+    public static void resetAll(@NonNull Context ctx) {
+        SharedPreferences s = sp(ctx);
+        SharedPreferences.Editor e = s.edit();
+        for (String k : s.getAll().keySet()) {
+            if (k.startsWith("color_")) e.remove(k);
+        }
+        e.apply();
+        baseSet(io.github.muntashirakon.AppManager.utils.ForkPalette.TEXT,
+                baseDefault(io.github.muntashirakon.AppManager.utils.ForkPalette.TEXT));
+        baseSet(io.github.muntashirakon.AppManager.utils.ForkPalette.GROUND,
+                baseDefault(io.github.muntashirakon.AppManager.utils.ForkPalette.GROUND));
+        sChanged = true;
+        io.github.muntashirakon.AppManager.utils.ForkPalette.invalidate();
+    }
+
     /**
      * The original hardcoded palette value for a role — the colour the list
      * showed before colours became configurable. Centralised here so the

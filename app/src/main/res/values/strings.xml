@@ -3384,4 +3384,38 @@
     <string name="palette_icon_view">Icon — views, opens, settings</string>
     <string name="palette_icon_block">Icon — freezes, blocks, stops</string>
     <string name="palette_delete">Delete — destructive buttons, rows and icons</string>
+    <!-- Fork (2026-11-27): the black-yellow skill applied fully - App language, section icons, tooltip. -->
+    <string name="ui_language_group">App language</string>
+    <string name="ui_language_row">Language: %s</string>
+    <string name="ui_language_row_desc">The language of this app only. The same setting as Settings › Language.</string>
+    <string name="ui_language_system">System default</string>
+    <string name="ui_reset_all_colours">Reset all colours</string>
+    <string name="ui_reset_all_colours_desc">Put every colour of this screen back to its default. Fonts, sizes and the section order stay.</string>
+    <string name="ui_reset_all_colours_confirm">Every colour you have set on this screen goes back to its default. This cannot be undone.</string>
+    <string name="palette_section_base">Section icon — the base: what the app is, its settings</string>
+    <string name="palette_section_controls">Section icon — controls: what you operate</string>
+    <string name="palette_section_words">Section icon — words, written and read</string>
+    <string name="palette_section_frame">Section icon — the frame and its boxes</string>
+    <string name="palette_section_reach">Section icon — the app reaches out: asks, offers, hands over</string>
+    <string name="palette_section_warning">Section icon — warning: resets, wipes, diagnostics</string>
+    <string name="palette_section_flash">Section icon — a brief flash</string>
+    <string name="palette_tooltip_bg">Long-press hint, background</string>
+    <string name="palette_tooltip_frame">Long-press hint, frame</string>
+    <string name="palette_tooltip_text">Long-press hint, text</string>
+    <!-- Fork (+129): item colour roles, made at build time by tools/fork_colour_roles.py -->
+    <string name="palette_group_settings_screens">Settings screens</string>
+    <string name="palette_group_fm">File manager</string>
+    <string name="palette_group_logs">Log viewer</string>
+    <string name="palette_group_other_screens">Other screens</string>
+    <string name="palette_group_shapes">Shapes</string>
+    <string name="palette_group_theme">Theme attributes</string>
+    <string name="palette_items_caption">Item colours. Each follows the colour in brackets until it is given one of its own.</string>
+    <string name="palette_item_kind_text">Text</string>
+    <string name="palette_item_kind_icons">Icons</string>
+    <string name="palette_item_kind_ground">Ground</string>
+    <string name="palette_item_kind_frame">Frame</string>
+    <string name="palette_item_kind_other">Other</string>
+    <string name="palette_item_label_2">%1$s (%2$s)</string>
+    <string name="palette_item_label_3">%1$s — %2$s (%3$s)</string>
+    <string name="app_launch_jiyu_too_old">白い熊 自由作業盤 is too old for this. Update it.</string>
 </resources>

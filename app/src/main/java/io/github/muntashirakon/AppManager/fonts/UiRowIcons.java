@@ -76,18 +76,45 @@ final class UiRowIcons {
 
     static void set(@NonNull TextView label, @DrawableRes int icon, @NonNull String role) {
         try {
-            Context context = label.getContext();
-            Drawable d = AppCompatResources.getDrawable(context, icon);
-            if (d == null) return;
-            d = d.mutate();
-            d.setTint(ForkPalette.get(context, role));
-            float density = context.getResources().getDisplayMetrics().density;
-            int size = Math.round(18 * density);
-            d.setBounds(0, 0, size, size);
-            label.setCompoundDrawablesRelative(d, null, null, null);
-            label.setCompoundDrawablePadding(Math.round(8 * density));
+            labelIcon(label, icon, ForkPalette.get(label.getContext(), role), 18, null);
         } catch (Throwable ignore) {
         }
+    }
+
+    /**
+     * Fork (白い熊, 2026-11-27): an icon as the label's start drawable, <b>sized by the label</b> —
+     * 1.25 × the label's text size, never under {@code floorDp} (18 for a row, 0 for a chip); the
+     * gap is half the icon. The size is read again at every layout pass, so a font pass that
+     * runs after the row was built is followed. {@code gutter}, when given, hears what the icon
+     * and its gap take at the label's start (a heading's underline starts after it).
+     */
+    static void labelIcon(@NonNull TextView label, @DrawableRes int icon, int color, int floorDp,
+                          @androidx.annotation.Nullable GutterListener gutter) {
+        Context context = label.getContext();
+        Drawable d = AppCompatResources.getDrawable(context, icon);
+        if (d == null) return;
+        final Drawable glyph = d.mutate();
+        glyph.setTint(color);
+        final float density = context.getResources().getDisplayMetrics().density;
+        final int floor = Math.round(floorDp * density);
+        Runnable size = () -> {
+            int px = Math.max(floor, Math.round(1.25f * label.getTextSize()));
+            Object drawn = label.getTag(R.id.fork_label_icon);
+            if (drawn instanceof Integer && (Integer) drawn == px) return;
+            label.setTag(R.id.fork_label_icon, px);
+            glyph.setBounds(0, 0, px, px);
+            Drawable[] old = label.getCompoundDrawablesRelative();
+            label.setCompoundDrawablesRelative(glyph, old[1], old[2], old[3]);
+            label.setCompoundDrawablePadding(px / 2);
+            if (gutter != null) gutter.onGutter(px + px / 2);
+        };
+        label.setTag(R.id.fork_label_icon, null);
+        size.run();
+        label.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> size.run());
+    }
+
+    interface GutterListener {
+        void onGutter(int px);
     }
 
     /**
