@@ -143,6 +143,16 @@ buttons stay glyphs; multi-select checkboxes stay selection marks.
   it lands at the end in the base colour with a generic icon.
 - **`UiRowIcons.labelIcon`** sizes every icon by its label (1.25 × text size, floor 18 dp for rows, none for
   chips), re-read at every layout. Not done: centring on the first line of a wrapped label.
+- **The picker (+132, skill of 2026-11-27):** 日本語 and English are two pinned pills outside the scrolling
+  part; under them one framed box (`DIALOG_FRAME`) that scrolls by itself, "System default" first, the rest by
+  their own names. Every line has a flag from `drawable-nodpi/fork_flag_*.png` (rendered from Noto Color Emoji
+  at 136 × 128, as 白い熊 GNU Jami has them); from +133 a tag without a country gets the flag of its
+  likely country (`UiLanguage.countryOf`, ICU likely subtags; bare `pt` is pinned to Portugal because ICU says
+  Brazil and `pt-BR` is declared beside it). From +134 the country line and the tag column follow the same likely country (`UiLanguage.shown`:
+  `de` reads "Deutschland" and `de-DE`); stored and applied stays the declared tag. **One row per language
+  (+134):** `pt-BR` left `locales_config.xml`, `pt` is the one Portuguese (白い熊 chose Portugal); two rows only
+  where the script differs (`zh-CN`, `zh-TW`). A stored `pt-BR` stays in force (`LangUtils`) and is shown. **A language added to `locales_config.xml` with a new country needs its flag
+  file and a case in `UiLanguage.flagOf`.**
 - **App language** is `fonts/UiLanguage` + `buildLanguageGroup`. No second stored value — it sets upstream's
   `Prefs.Appearance.setLanguage`, like Settings › Language. **`res/xml/locales_config.xml` is the fork's short
   list** (ja, en, then languages at four fifths or more of upstream's strings); on a rebase a conflict there is
