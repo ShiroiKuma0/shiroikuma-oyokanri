@@ -10,6 +10,39 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-11-03.19-47.gdc4154f4+134 — 2026-11-27
+
+Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.
+This release covers builds `+132` to `+134` and changes one thing: the “App language” dialog of
+the UI page. **It has not been checked on a device yet.**
+
+### The App language dialog
+
+- **日本語 and English are pinned on top**, as two full-width pills that never scroll. The pill
+  of the current language is thick and bold with a filled mark; the other is thin.
+- **Every other language sits in one framed box that scrolls by itself.** “System default” is
+  its first row; the rest follow by their own names, as plain rows with hairlines between them.
+  The current language sits in a thick pill there, and the dialog opens with it in view.
+- **Every line carries a flag** at the left of the name: bundled images from Google's Noto Color
+  Emoji, never emoji text. “System default” has a globe.
+- **A language declared without a country shows its likely country**: the flag, the country
+  line and the tag. German reads “Deutsch”, with “Deutschland” beneath and `de-DE` at the right.
+  What is stored and applied is still the declared language.
+- The title carries the globe; one Cancel pill sits under the box.
+
+### One row per language
+
+- Portuguese is one row now. Brazil's variant left the list and the app's language declaration;
+  Portugal's stays. Its translation stays in the package, and if it was the chosen language it
+  stays in force and is shown as the current row.
+- Simplified and traditional Chinese both stay, because the script differs.
+- The list has 18 languages: Japanese, English, and those translated to four fifths or more.
+
+### Known limits
+
+- Not checked on a device yet.
+- The likely country of a language needs Android 7 or newer; an older system shows the globe.
+
 ## 4.1.1+2026-11-03.19-47.gdc4154f4+131 — 2026-11-27
 
 Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.
