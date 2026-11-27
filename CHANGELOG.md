@@ -10,6 +10,73 @@ the pin · our build counter) and the pin carries the commit's **time** as well 
 syncs landing on one day still sort. Earlier versions used `customBaseVersionName+customBuildNumber`.
 Nothing already published is ever retagged.
 
+## 4.1.1+2026-11-03.19-47.gdc4154f4+131 — 2026-11-27
+
+Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.
+This release covers builds `+126` to `+131`: the app's own UI page gains a language section,
+section icons and a colour role for every item; the whole fork is translated into Japanese; and a
+frozen app can be backed up and restored. See *Known limits* at the end for what has not been
+checked on a device.
+
+### The UI page
+
+- **App language** is the first section and the first chip of the index. It sets the language of
+  this app only, the same setting as Settings › Language.
+- **Every section has an icon**, on its heading and on its chip, in one of seven section-icon
+  colours chosen by what the section is. Each of the seven is a settable colour.
+- **Reset all colours** in Maintenance puts every colour of the page back to its default; fonts,
+  sizes and the section order stay.
+
+### A colour role for every item
+
+- Until now two items that named the same colour in the layouts could not be coloured apart. Each
+  group of screens, each shape and each colour attribute of the theme now has a role of its own:
+  130 of them, 77 being theme attributes.
+- They are listed on the UI page as “Item colours”, in the section of the screens they belong to,
+  with new sections for Settings screens, File manager, Log viewer, Other screens, Shapes and
+  Theme attributes.
+- Each role follows the colour it replaced until it is given one of its own, so nothing looks
+  different after the update.
+- The roles are made at build time (`tools/fork_colour_roles.py`, Gradle task `forkItemRoles`) on
+  a copy of the resources; the layouts in the repository are unchanged.
+- Not split: vector icons (tinted where they are used), the home-screen widgets and the splash
+  logo (drawn outside the app), and three row layouts that a dialog and a screen share.
+
+### Long-press hints
+
+- The hint shown by a long-press on an icon of a bar came out as a light grey box with yellow or
+  black text, because the platform's tooltip cannot be themed. It is now a small popup of the
+  app's own, with three settable colours: background, frame and text.
+
+### Japanese
+
+- **Every string the fork adds has its Japanese translation** (`values-ja/strings_fork.xml`).
+  `tools/check-ja.py` compares the key sets and reports no gap.
+
+### Backup and restore
+
+- **A frozen app can be backed up.** The backup of an app that was frozen and hidden failed,
+  because a hidden package is reported as not installed unless it is asked for explicitly.
+- **A restore sees a hidden app as installed**, so a data-only restore goes into it instead of
+  asking for the APK. An app that was uninstalled with its data kept is still treated as not
+  installed.
+
+### 起動マネージャー
+
+- The pill now asks 白い熊 自由作業盤 through a call to its provider instead of a broadcast, and
+  the old broadcast path is removed on both sides.
+- A 自由作業盤 too old to know the call gets the message “白い熊 自由作業盤 is too old for this.
+  Update it.”
+
+### Known limits
+
+- Confirmed on the device: the 起動マネージャー pill through the provider call (`+127`).
+- **Not checked on a device yet:** the backup of a frozen app, the data-only restore into one, the
+  item colour rows, and the pill after the removal of the broadcast path.
+- Not measured: what installing an APK over a hidden app does to its hidden state during a full
+  restore.
+- The colour roles need Android 11 or newer; an older system shows the defaults.
+
 ## 4.1.1+2026-11-03.19-47.gdc4154f4+125 — 2026-11-23
 
 Built on upstream App Manager **4.1.1**, commit `dc4154f4` (2026-11-03) — the base did not move.
